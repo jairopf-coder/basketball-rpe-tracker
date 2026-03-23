@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="RPE Basketball">
+    <meta name="theme-color" content="#ff6600">
+    <title>🏀 RPE Basketball</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="firebase-sync.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header>
+            <h1>🏀 RPE Baloncesto</h1>
+            <div class="header-actions">
+                <button id="backupBtn" class="btn-secondary">💾 Backup</button>
+                <button id="exportBtn" class="btn-secondary">📥 Exportar</button>
+                <button id="dashboardBtn" class="btn-secondary">📊 Dashboard</button>
+                <button id="playersBtn" class="btn-secondary">👥 Jugadoras</button>
+                <button id="addBtn" class="btn-primary">+ Nueva Sesión</button>
+            </div>
+            <input type="file" id="restoreFile" accept=".json" style="display: none;">
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-view="sessions">📋 Sesiones</button>
+            <button class="tab" data-view="dashboard">📊 Dashboard</button>
+            <button class="tab" data-view="players">👥 Jugadoras</button>
+            <button class="tab" data-view="analytics">📈 Análisis</button>
+            <button class="tab" data-view="calendar">📅 Calendario</button>
+            <button class="tab" data-view="injury">🏥 Lesiones</button>
+            <button class="tab" data-view="prediction">🔮 Predicción</button>
+        </nav>
+
+        <!-- Sesiones View -->
+        <div id="sessionsView" class="view active">
+            <!-- Advanced Filters -->
+            <div class="advanced-filters">
+                <div class="filter-row">
+                    <input type="text" id="searchSessions" placeholder="🔍 Buscar por jugadora o incidencias..." class="search-input">
+                    <select id="sortSessions" class="filter-select">
+                        <option value="date-desc">📅 Más reciente</option>
+                        <option value="date-asc">📅 Más antiguo</option>
+                        <option value="rpe-desc">💪 RPE Mayor</option>
+                        <option value="rpe-asc">💪 RPE Menor</option>
+                        <option value="player">👤 Por jugadora</option>
+                    </select>
+                </div>
+                
+                <div class="filter-row">
+                    <select id="playerFilter" class="filter-select">
+                        <option value="all">Todas las jugadoras</option>
+                    </select>
+                    <select id="typeFilter" class="filter-select">
+                        <option value="all">Todos los tipos</option>
+                        <option value="training">Entrenamientos</option>
+                        <option value="match">Partidos</option>
+                    </select>
+                </div>
+                
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Desde:</label>
+                        <input type="date" id="dateFrom" class="date-input">
+                    </div>
+                    <div class="filter-group">
+                        <label>Hasta:</label>
+                        <input type="date" id="dateTo" class="date-input">
+                    </div>
+                    <div class="filter-group">
+                        <label>RPE mín:</label>
+                        <input type="number" id="rpeMin" min="1" max="10" class="rpe-input">
+                    </div>
+                    <div class="filter-group">
+                        <label>RPE máx:</label>
+                        <input type="number" id="rpeMax" min="1" max="10" class="rpe-input">
+                    </div>
+                    <button id="clearFilters" class="btn-secondary" style="margin-left: auto;">🔄 Limpiar filtros</button>
+                </div>
+            </div>
+            
+            <main id="sessionList" class="session-list">
+                <!-- Se llenará dinámicamente -->
+            </main>
+            
+            <!-- Empty state -->
+            <div id="emptyState" class="empty-state">
+                <div class="empty-icon">🏀</div>
+                <h3>No hay sesiones registradas</h3>
+                <p>Pulsa el botón "+" para registrar tu primer entrenamiento</p>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboardView" class="view">
+            <div class="dashboard-container">
+                <h2>📊 Dashboard del Equipo</h2>
+                <div id="dashboardContent"></div>
+            </div>
+        </div>
+
+        <!-- Players View -->
+        <div id="playersView" class="view">
+            <div class="players-container">
+                <div class="players-header">
+                    <h2>👥 Gestión de Jugadoras</h2>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button onclick="rpeTracker.generateTeamPDFReport('weekly')" class="btn-secondary">📄 Informe Semanal Equipo</button>
+                        <button id="addPlayerBtn" class="btn-primary">+ Añadir Jugadora</button>
+                    </div>
+                </div>
+                <div id="playersList"></div>
+            </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div id="analyticsView" class="view">
+            <div class="analytics-container">
+                <h2>📈 Análisis Agudo:Crónico</h2>
+                
+                <!-- Export Charts Button -->
+                <div style="text-align: right; margin-bottom: 1rem;">
+                    <button onclick="rpeTracker.exportAllCharts()" class="btn-secondary">📸 Exportar Todos los Gráficos</button>
+                </div>
+                
+                <!-- Alerts Container -->
+                <div id="alertsContainer"></div>
+                
+                <!-- Evolution Charts -->
+                <div id="evolutionCharts"></div>
+                
+                <div id="analyticsContent"></div>
+            </div>
+        </div>
+
+        <!-- Calendar View -->
+        <div id="calendarView" class="view">
+            <div class="calendar-container">
+                <!-- Calendar will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Injury Management View -->
+        <div id="injuryView" class="view">
+            <div class="injury-container" id="injuryManagementView" style="padding: 2rem; max-width: 1400px; margin: 0 auto;">
+                <!-- Injury management will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Injury Prediction View -->
+        <div id="predictionView" class="view">
+            <div class="prediction-container" id="injuryPredictionView">
+                <!-- Prediction dashboard will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Modal Nueva Sesión -->
+        <div id="newSessionModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Nueva Sesión</h2>
+                    <button id="closeModal" class="btn-close">&times;</button>
+                </div>
+                
+                <form id="sessionForm">
+                    <div class="form-group">
+                        <label>👤 Selecciona Jugadora</label>
+                        <div id="playerButtons" class="player-buttons">
+                            <!-- Se llenará dinámicamente -->
+                        </div>
+                        <input type="hidden" id="sessionPlayer" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📅 Fecha</label>
+                        <input type="date" id="sessionDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🕐 Momento del día</label>
+                        <div class="session-type-toggle">
+                            <input type="radio" id="timeMorning" name="sessionTime" value="morning" checked>
+                            <label for="timeMorning" class="type-option time-option">
+                                ☀️ Mañana
+                            </label>
+                            
+                            <input type="radio" id="timeAfternoon" name="sessionTime" value="afternoon">
+                            <label for="timeAfternoon" class="type-option time-option">
+                                🌙 Tarde
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>⏱️ Duración (minutos)</label>
+                        <div class="duration-selector">
+                            <button type="button" class="duration-btn" data-duration="30">30'</button>
+                            <button type="button" class="duration-btn" data-duration="45">45'</button>
+                            <button type="button" class="duration-btn selected" data-duration="60">60'</button>
+                            <button type="button" class="duration-btn" data-duration="75">75'</button>
+                            <button type="button" class="duration-btn" data-duration="90">90'</button>
+                            <button type="button" class="duration-btn" data-duration="120">120'</button>
+                        </div>
+                        <div style="margin-top: 0.5rem; text-align: center;">
+                            <input type="number" id="customDuration" placeholder="Otra duración" 
+                                   min="1" max="300" style="width: 120px; padding: 0.5rem; border: 2px solid #ddd; border-radius: 8px; text-align: center;">
+                        </div>
+                        <input type="hidden" id="sessionDuration" value="60" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tipo de Sesión</label>
+                        <div class="session-type-toggle">
+                            <input type="radio" id="typeTraining" name="sessionType" value="training" checked>
+                            <label for="typeTraining" class="type-option training">
+                                🏀 Entrenamiento
+                            </label>
+                            
+                            <input type="radio" id="typeMatch" name="sessionType" value="match">
+                            <label for="typeMatch" class="type-option match">
+                                🏟️ Partido
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>💪 RPE (Esfuerzo Percibido)</label>
+                        <div class="rpe-display">
+                            <span id="rpeValue" class="rpe-number">5</span>
+                            <span id="rpeLabel" class="rpe-label">Moderado</span>
+                        </div>
+                        <input type="range" id="rpeSlider" min="1" max="10" value="5" class="rpe-slider">
+                        
+                        <div class="rpe-scale">
+                            <div class="rpe-bar" id="rpeBar"></div>
+                        </div>
+                        
+                        <div class="rpe-legend">
+                            <span>1 - Muy ligero</span>
+                            <span>10 - Máximo</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📝 Incidencias</label>
+                        <textarea id="sessionNotes" rows="5" placeholder="Lesiones, observaciones, etc..."></textarea>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" id="cancelBtn" class="btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal Detalle -->
+        <div id="detailModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Detalle de Sesión</h2>
+                    <button id="closeDetailModal" class="btn-close">&times;</button>
+                </div>
+                
+                <div id="detailContent" class="detail-content">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+
+                <div class="modal-footer">
+                    <button id="editSessionBtn" class="btn-primary">✏️ Editar</button>
+                    <button id="deleteSessionBtn" class="btn-danger">🗑️ Eliminar</button>
+                    <button id="closeDetailBtn" class="btn-secondary">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Edit Session -->
+        <div id="editSessionModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Editar Sesión</h2>
+                    <button id="closeEditSessionModal" class="btn-close">&times;</button>
+                </div>
+                
+                <form id="editSessionForm">
+                    <input type="hidden" id="editSessionId">
+                    
+                    <div class="form-group">
+                        <label>👤 Jugadora</label>
+                        <select id="editSessionPlayer" required disabled style="opacity: 0.6;">
+                            <option value="">Selecciona una jugadora</option>
+                        </select>
+                        <small style="color: var(--gray);">La jugadora no se puede cambiar después de crear la sesión</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📅 Fecha</label>
+                        <input type="date" id="editSessionDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🕐 Momento del día</label>
+                        <div class="session-type-toggle">
+                            <input type="radio" id="editTimeMorning" name="editSessionTime" value="morning">
+                            <label for="editTimeMorning" class="type-option time-option">☀️ Mañana</label>
+                            
+                            <input type="radio" id="editTimeAfternoon" name="editSessionTime" value="afternoon">
+                            <label for="editTimeAfternoon" class="type-option time-option">🌙 Tarde</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>⏱️ Duración (minutos)</label>
+                        <input type="number" id="editSessionDuration" min="1" max="300" required 
+                               style="width: 120px; padding: 0.75rem; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem;">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tipo de Sesión</label>
+                        <div class="session-type-toggle">
+                            <input type="radio" id="editTypeTraining" name="editSessionType" value="training">
+                            <label for="editTypeTraining" class="type-option training">🏀 Entrenamiento</label>
+                            
+                            <input type="radio" id="editTypeMatch" name="editSessionType" value="match">
+                            <label for="editTypeMatch" class="type-option match">🏟️ Partido</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>💪 RPE (Esfuerzo Percibido)</label>
+                        <div class="rpe-display">
+                            <span id="editRpeValue" class="rpe-number">5</span>
+                            <span id="editRpeLabel" class="rpe-label">Moderado</span>
+                        </div>
+                        <input type="range" id="editRpeSlider" min="1" max="10" value="5" class="rpe-slider">
+                        
+                        <div class="rpe-scale">
+                            <div class="rpe-bar" id="editRpeBar"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📝 Incidencias</label>
+                        <textarea id="editSessionNotes" rows="5" placeholder="Lesiones, observaciones, etc..."></textarea>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" id="cancelEditSessionBtn" class="btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn-primary">💾 Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal Add Player -->
+        <div id="addPlayerModal" class="modal">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>Añadir Jugadora</h2>
+                    <button id="closePlayerModal" class="btn-close">&times;</button>
+                </div>
+                
+                <form id="playerForm">
+                    <div class="form-group">
+                        <label>👤 Nombre</label>
+                        <input type="text" id="playerName" required placeholder="Nombre de la jugadora">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🔢 Dorsal (opcional)</label>
+                        <input type="number" id="playerNumber" placeholder="Ej: 23">
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" id="cancelPlayerBtn" class="btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal Edit Player -->
+        <div id="editPlayerModal" class="modal">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>Editar Jugadora</h2>
+                    <button id="closeEditPlayerModal" class="btn-close">&times;</button>
+                </div>
+                
+                <form id="editPlayerForm">
+                    <input type="hidden" id="editPlayerId">
+                    
+                    <div class="form-group">
+                        <label>👤 Nombre</label>
+                        <input type="text" id="editPlayerName" required placeholder="Nombre de la jugadora">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🔢 Dorsal (opcional)</label>
+                        <input type="number" id="editPlayerNumber" placeholder="Ej: 23">
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" id="cancelEditPlayerBtn" class="btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn-primary">💾 Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="chart.js"></script>
+    <script src="app.js"></script>
+    <script src="backup.js"></script>
+    <script src="improvements.js"></script>
+    <script src="calendar.js"></script>
+    <script src="pdf-reports.js"></script>
+    <script src="injury-prediction.js"></script>
+    <script src="ui-helpers.js"></script>
+    <script src="injury-management.js"></script>
+    <script src="injury-management-2.js"></script>
+</body>
+</html>

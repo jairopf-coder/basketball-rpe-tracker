@@ -1,0 +1,14 @@
+# Node
+node_modules/
+npm-debug.log
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# NO ignorar firebase-config.js porque es necesario para GitHub Pages
+# firebase-config.js
+
+# Backups locales
+*.backup
+backup/
