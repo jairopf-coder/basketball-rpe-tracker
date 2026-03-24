@@ -23,6 +23,9 @@ class RPETracker {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
+
+        // Show skeleton while Firebase loads
+        this.showSkeletonLoader();
     }
 
     setupEventListeners() {
@@ -146,6 +149,9 @@ class RPETracker {
         const targetView = document.getElementById(`${viewName}View`);
         if (targetView) {
             targetView.classList.add('active');
+            targetView.classList.remove('fade-in');
+            void targetView.offsetWidth; // force reflow
+            targetView.classList.add('fade-in');
         }
         
         // Render content based on view
@@ -203,7 +209,7 @@ class RPETracker {
         this.renderPlayers();
         this.populatePlayerSelects();
         this.closeModal('addPlayerModal');
-        this.showToast('✅ Jugadora añadida correctamente');
+        this.showToast('✅ Jugadora añadida correctamente', 'success');
     }
 
     deletePlayer(playerId) {
@@ -219,7 +225,7 @@ class RPETracker {
         this.renderPlayers();
         this.renderSessions();
         this.populatePlayerSelects();
-        this.showToast('🗑️ Jugadora eliminada');
+        this.showToast('🗑️ Jugadora eliminada', 'info');
     }
 
     renderPlayers() {
@@ -466,7 +472,23 @@ class RPETracker {
         this.renderSessions();
         this.closeModal('newSessionModal');
         
-        this.showToast('✅ Sesión guardada correctamente');
+        this.showToast('✅ Sesión guardada correctamente', 'success');
+    }
+
+    showSkeletonLoader() {
+        const list = document.getElementById('sessionList');
+        const empty = document.getElementById('emptyState');
+        if (!list) return;
+        if (empty) empty.style.display = 'none';
+        list.innerHTML = `
+            <div class="skeleton-list">
+                ${[1,2,3].map(() => `
+                <div class="skeleton-card">
+                    <div class="skeleton-line title"></div>
+                    <div class="skeleton-line sub"></div>
+                    <div class="skeleton-line badge"></div>
+                </div>`).join('')}
+            </div>`;
     }
 
     renderSessions() {
@@ -569,7 +591,7 @@ class RPETracker {
             this.saveSessions();
             this.renderSessions();
             this.closeModal('detailModal');
-            this.showToast('🗑️ Sesión eliminada');
+            this.showToast('🗑️ Sesión eliminada', 'info');
         }
     }
 
@@ -926,29 +948,19 @@ class RPETracker {
         }
     }
 
-    showToast(message) {
+    showToast(message, type = 'success') {
+        // Remove existing toasts
+        document.querySelectorAll('.toast').forEach(t => t.remove());
+
         const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
         toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 2rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #333;
-            color: white;
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 9999;
-            animation: slideUp 0.3s;
-        `;
         document.body.appendChild(toast);
-        
+
         setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-50%) translateY(20px)';
-            setTimeout(() => toast.remove(), 300);
-        }, 2000);
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 280);
+        }, 2500);
     }
 
     // ========== FEATURE 1: EVOLUTION CHARTS ==========
@@ -1170,7 +1182,7 @@ class RPETracker {
         link.click();
         document.body.removeChild(link);
         
-        this.showToast('📥 Datos exportados a CSV');
+        this.showToast('📥 Datos exportados a CSV', 'info');
     }
 
     // ========== FEATURE 4: LOAD RECOMMENDATIONS ==========
