@@ -8,6 +8,8 @@ class RPETracker {
         this.currentView = 'sessions';
         this.currentPlayerFilter = 'all';
         this.currentTypeFilter = 'all';
+        this.calendarYear = new Date().getFullYear();
+        this.calendarMonth = new Date().getMonth();
         this.init();
     }
 
