@@ -10,6 +10,8 @@ class RPETracker {
         this.currentTypeFilter = 'all';
         this.calendarYear = new Date().getFullYear();
         this.calendarMonth = new Date().getMonth();
+        this.injuries = [];
+        this.availability = {};
         this.init();
     }
 
@@ -20,7 +22,12 @@ class RPETracker {
         this.setDefaultDateTime();
         this.updateRPEDisplay(5);
         this.populatePlayerSelects();
-        
+
+        // Inicializar módulo de lesiones
+        if (typeof this.initializeInjuryManagement === 'function') {
+            this.initializeInjuryManagement();
+        }
+
         // Register service worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
