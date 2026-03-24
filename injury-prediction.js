@@ -20,8 +20,10 @@ RPETracker.prototype.predictInjuryRisk = function(playerId) {
             riskLevel: 'unknown',
             probability: 0,
             confidence: 'low',
-            message: 'Datos insuficientes. Se necesitan al menos 14 sesiones para predicción confiable.',
-            factors: []
+            color: '#9e9e9e',
+            message: `Datos insuficientes (${playerSessions.length}/14 sesiones). Se necesitan al menos 14 sesiones para predicción confiable.`,
+            factors: [],
+            recommendations: ['Registra más sesiones para activar la predicción de riesgo.']
         };
     }
     
