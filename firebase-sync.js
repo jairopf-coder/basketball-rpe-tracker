@@ -140,8 +140,8 @@ class FirebaseSync {
     }
 }
 
-// Crear instancia global
-window.firebaseSync = new FirebaseSync();
-
-// Verificar conexión
-window.firebaseSync.checkConnection();
+// Crear instancia global cuando Firebase esté listo
+document.addEventListener('DOMContentLoaded', () => {
+    window.firebaseSync = new FirebaseSync();
+    window.firebaseSync.checkConnection();
+});
