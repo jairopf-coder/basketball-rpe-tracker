@@ -52,8 +52,8 @@ class RPETracker {
         document.getElementById('restoreFile')?.addEventListener('change', (e) => this.restoreBackup(e));
         
         // Session modal controls
-        document.getElementById('closeModal').addEventListener('click', () => this.closeModal('newSessionModal'));
-        document.getElementById('cancelBtn').addEventListener('click', () => this.closeModal('newSessionModal'));
+        document.getElementById('closeModal')?.addEventListener('click', () => this.closeModal('newSessionModal'));
+        document.getElementById('cancelBtn')?.addEventListener('click', () => this.closeModal('newSessionModal'));
         document.getElementById('closeDetailModal').addEventListener('click', () => this.closeModal('detailModal'));
         document.getElementById('closeDetailBtn').addEventListener('click', () => this.closeModal('detailModal'));
         
@@ -63,11 +63,11 @@ class RPETracker {
         document.getElementById('cancelPlayerBtn').addEventListener('click', () => this.closeModal('addPlayerModal'));
         
         // Forms
-        document.getElementById('sessionForm').addEventListener('submit', (e) => this.handleSessionSubmit(e));
+        document.getElementById('sessionForm')?.addEventListener('submit', (e) => this.handleSessionSubmit(e));
         document.getElementById('playerForm').addEventListener('submit', (e) => this.handlePlayerSubmit(e));
         
         // RPE slider
-        document.getElementById('rpeSlider').addEventListener('input', (e) => this.updateRPEDisplay(e.target.value));
+        document.getElementById('rpeSlider')?.addEventListener('input', (e) => this.updateRPEDisplay(e.target.value));
         
         // Duration buttons
         document.addEventListener('click', (e) => {
