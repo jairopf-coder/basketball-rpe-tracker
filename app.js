@@ -75,6 +75,14 @@ class RPETracker {
                 this.selectDuration(e.target.dataset.duration);
             }
         });
+
+        // Player selection buttons (event delegation)
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.player-btn');
+            if (btn && btn.dataset.playerId) {
+                this.togglePlayerSelection(btn.dataset.playerId);
+            }
+        });
         
         // Custom duration input
         const customDurationInput = document.getElementById('customDuration');
@@ -393,8 +401,7 @@ class RPETracker {
         const container = document.getElementById('playerButtons');
         if (!container) return;
         container.innerHTML = this.players.map(player => `
-            <button type="button" class="player-btn" data-player-id="${player.id}"
-                onclick="if(window.rpeTracker)rpeTracker.togglePlayerSelection('${player.id}')">
+            <button type="button" class="player-btn" data-player-id="${player.id}">
                 <div class="player-btn-avatar">${player.name.charAt(0).toUpperCase()}</div>
                 <div class="player-btn-name">${player.name}</div>
                 ${player.number ? `<div class="player-btn-number">#${player.number}</div>` : ''}
