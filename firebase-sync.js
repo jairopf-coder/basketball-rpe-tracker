@@ -3,29 +3,17 @@
 
 class FirebaseSync {
     constructor() {
-        this.db = null;
-        this.sessionsRef = null;
-        this.playersRef = null;
+        this.db = window.firebaseDB;
+        this.sessionsRef = this.db.ref('sessions');
+        this.playersRef = this.db.ref('players');
         this.listeners = {
             sessions: [],
             players: []
         };
     }
 
-    init() {
-        this.db = window.firebaseDB;
-        if (!this.db) {
-            console.error('❌ firebaseDB no está disponible');
-            return false;
-        }
-        this.sessionsRef = this.db.ref('sessions');
-        this.playersRef = this.db.ref('players');
-        console.log('✅ FirebaseSync inicializado');
-        return true;
-    }
-
     // ========== SESSIONS ==========
-
+    
     // Cargar todas las sesiones
     async loadSessions() {
         try {
@@ -69,7 +57,7 @@ class FirebaseSync {
     }
 
     // ========== PLAYERS ==========
-
+    
     // Cargar todos los jugadores
     async loadPlayers() {
         try {
@@ -113,11 +101,11 @@ class FirebaseSync {
     }
 
     // ========== UTILITIES ==========
-
+    
     // Detener todos los listeners
     cleanup() {
-        if (this.sessionsRef) this.sessionsRef.off();
-        if (this.playersRef) this.playersRef.off();
+        this.sessionsRef.off();
+        this.playersRef.off();
         this.listeners = { sessions: [], players: [] };
     }
 
@@ -125,13 +113,13 @@ class FirebaseSync {
     async migrateFromLocalStorage() {
         const localSessions = localStorage.getItem('basketballSessions');
         const localPlayers = localStorage.getItem('basketballPlayers');
-
+        
         if (localSessions) {
             const sessions = JSON.parse(localSessions);
             await this.saveSessions(sessions);
             console.log('✅ Sesiones migradas a Firebase');
         }
-
+        
         if (localPlayers) {
             const players = JSON.parse(localPlayers);
             await this.savePlayers(players);
@@ -139,23 +127,28 @@ class FirebaseSync {
         }
     }
 
-    // Verificar estado de conexión
+    // Verificar estado de conexión y actualizar indicador visual
     checkConnection() {
         const connectedRef = this.db.ref('.info/connected');
         connectedRef.on('value', (snapshot) => {
-            if (snapshot.val() === true) {
-                console.log('🟢 Conectado a Firebase');
-            } else {
-                console.log('🔴 Desconectado de Firebase (usando datos locales)');
-            }
+            const online = snapshot.val() === true;
+            console.log(online ? '🟢 Conectado a Firebase' : '🔴 Desconectado de Firebase');
+            this.updateConnectionIndicator(online);
         });
+    }
+
+    updateConnectionIndicator(online) {
+        const indicator = document.getElementById('connectionIndicator');
+        const label = indicator?.querySelector('.connection-label');
+        if (!indicator || !label) return;
+
+        indicator.className = `connection-indicator ${online ? 'online' : 'offline'}`;
+        label.textContent = online ? 'En línea' : 'Sin conexión';
     }
 }
 
-// Crear instancia global cuando Firebase esté listo
-window.addEventListener('load', () => {
-    window.firebaseSync = new FirebaseSync();
-    if (window.firebaseSync.init()) {
-        window.firebaseSync.checkConnection();
-    }
-});
+// Crear instancia global
+window.firebaseSync = new FirebaseSync();
+
+// Verificar conexión
+window.firebaseSync.checkConnection();

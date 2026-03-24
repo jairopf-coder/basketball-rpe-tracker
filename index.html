@@ -12,12 +12,23 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="styles.css">
     
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="firebase-sync.js"></script>
 </head>
 <body>
     <div id="app">
         <!-- Header -->
         <header>
-            <h1>🏀 RPE Baloncesto</h1>
+            <div class="header-left">
+                <h1>🏀 RPE Baloncesto</h1>
+                <div id="connectionIndicator" class="connection-indicator connecting">
+                    <span class="connection-dot"></span>
+                    <span class="connection-label">Conectando...</span>
+                </div>
+            </div>
             <div class="header-actions">
                 <button id="backupBtn" class="btn-secondary">💾 Backup</button>
                 <button id="exportBtn" class="btn-secondary">📥 Exportar</button>
@@ -415,12 +426,6 @@
             </div>
         </div>
     </div>
-
-<!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-    <script src="firebase-config.js"></script>
-    <script src="firebase-sync.js"></script>
 
     <script src="chart.js"></script>
     <script src="app.js"></script>

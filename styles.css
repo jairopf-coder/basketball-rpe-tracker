@@ -1177,3 +1177,151 @@ header h1 {
         font-size: 1.5rem;
     }
 }
+
+/* ===== MEJORAS UX ===== */
+
+/* Header layout con indicador */
+.header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Indicador de conexión */
+.connection-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.connection-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.connection-indicator.online .connection-dot {
+    background: #4caf50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.25);
+}
+
+.connection-indicator.online .connection-label { color: #4caf50; }
+
+.connection-indicator.offline .connection-dot {
+    background: #f44336;
+    box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.25);
+}
+
+.connection-indicator.offline .connection-label { color: #f44336; }
+
+.connection-indicator.connecting .connection-dot {
+    background: #ff9800;
+    animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+.connection-indicator.connecting .connection-label { color: #ff9800; }
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* Transiciones entre vistas */
+.view {
+    display: none;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.view.active {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.view.fade-in {
+    animation: viewFadeIn 0.2s ease forwards;
+}
+
+@keyframes viewFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Toast mejorado */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(0);
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    animation: toastIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.toast.success { background: #1b5e20; color: #e8f5e9; }
+.toast.error   { background: #b71c1c; color: #ffebee; }
+.toast.info    { background: #1a237e; color: #e8eaf6; }
+.toast.warning { background: #e65100; color: #fff3e0; }
+
+.toast.hiding {
+    animation: toastOut 0.25s ease forwards;
+}
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes toastOut {
+    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(12px); }
+}
+
+/* Skeleton loader */
+.skeleton-list {
+    padding: 1rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.skeleton-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.skeleton-line {
+    border-radius: 6px;
+    background: linear-gradient(90deg, #ececec 25%, #f8f8f8 50%, #ececec 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+}
+
+.skeleton-line.title  { height: 14px; width: 55%; }
+.skeleton-line.sub    { height: 11px; width: 35%; }
+.skeleton-line.badge  { height: 11px; width: 20%; border-radius: 20px; }
+
+@keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
