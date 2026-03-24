@@ -20,7 +20,7 @@ class RPETracker {
         this.renderPlayers();
         this.renderSessions();
         this.setDefaultDateTime();
-        this.updateRPEDisplay(5);
+        if (document.getElementById('rpeValue')) this.updateRPEDisplay(5);
         this.populatePlayerSelects();
 
         // Inicializar módulo de lesiones
@@ -327,19 +327,21 @@ class RPETracker {
         const rpeValue = parseInt(value);
         const color = this.getRPEColor(rpeValue);
         const label = this.getRPELabel(rpeValue);
-        
-        document.getElementById('rpeValue').textContent = rpeValue;
-        document.getElementById('rpeValue').style.color = color;
-        document.getElementById('rpeLabel').textContent = label;
-        
+
+        const rpeValueEl = document.getElementById('rpeValue');
+        const rpeLabelEl = document.getElementById('rpeLabel');
         const slider = document.getElementById('rpeSlider');
-        slider.style.background = `linear-gradient(to right, ${color} 0%, ${color} ${rpeValue * 10}%, #ddd ${rpeValue * 10}%, #ddd 100%)`;
-        
+
+        if (rpeValueEl) { rpeValueEl.textContent = rpeValue; rpeValueEl.style.color = color; }
+        if (rpeLabelEl) rpeLabelEl.textContent = label;
+        if (slider) slider.style.background = `linear-gradient(to right, ${color} 0%, ${color} ${rpeValue * 10}%, #ddd ${rpeValue * 10}%, #ddd 100%)`;
+
         this.updateRPEScale(rpeValue);
     }
 
     updateRPEScale(value) {
         const rpeBar = document.getElementById('rpeBar');
+        if (!rpeBar) return;
         let html = '';
         
         for (let i = 1; i <= 10; i++) {
@@ -392,7 +394,7 @@ class RPETracker {
         if (!container) return;
         container.innerHTML = this.players.map(player => `
             <button type="button" class="player-btn" data-player-id="${player.id}"
-                onclick="rpeTracker.togglePlayerSelection('${player.id}')">
+                onclick="if(window.rpeTracker)rpeTracker.togglePlayerSelection('${player.id}')">
                 <div class="player-btn-avatar">${player.name.charAt(0).toUpperCase()}</div>
                 <div class="player-btn-name">${player.name}</div>
                 ${player.number ? `<div class="player-btn-number">#${player.number}</div>` : ''}
