@@ -3,17 +3,29 @@
 
 class FirebaseSync {
     constructor() {
-        this.db = window.firebaseDB;
-        this.sessionsRef = this.db.ref('sessions');
-        this.playersRef = this.db.ref('players');
+        this.db = null;
+        this.sessionsRef = null;
+        this.playersRef = null;
         this.listeners = {
             sessions: [],
             players: []
         };
     }
 
+    init() {
+        this.db = window.firebaseDB;
+        if (!this.db) {
+            console.error('❌ firebaseDB no está disponible');
+            return false;
+        }
+        this.sessionsRef = this.db.ref('sessions');
+        this.playersRef = this.db.ref('players');
+        console.log('✅ FirebaseSync inicializado');
+        return true;
+    }
+
     // ========== SESSIONS ==========
-    
+
     // Cargar todas las sesiones
     async loadSessions() {
         try {
@@ -57,7 +69,7 @@ class FirebaseSync {
     }
 
     // ========== PLAYERS ==========
-    
+
     // Cargar todos los jugadores
     async loadPlayers() {
         try {
@@ -101,11 +113,11 @@ class FirebaseSync {
     }
 
     // ========== UTILITIES ==========
-    
+
     // Detener todos los listeners
     cleanup() {
-        this.sessionsRef.off();
-        this.playersRef.off();
+        if (this.sessionsRef) this.sessionsRef.off();
+        if (this.playersRef) this.playersRef.off();
         this.listeners = { sessions: [], players: [] };
     }
 
@@ -113,13 +125,13 @@ class FirebaseSync {
     async migrateFromLocalStorage() {
         const localSessions = localStorage.getItem('basketballSessions');
         const localPlayers = localStorage.getItem('basketballPlayers');
-        
+
         if (localSessions) {
             const sessions = JSON.parse(localSessions);
             await this.saveSessions(sessions);
             console.log('✅ Sesiones migradas a Firebase');
         }
-        
+
         if (localPlayers) {
             const players = JSON.parse(localPlayers);
             await this.savePlayers(players);
@@ -141,7 +153,9 @@ class FirebaseSync {
 }
 
 // Crear instancia global cuando Firebase esté listo
-document.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('load', () => {
     window.firebaseSync = new FirebaseSync();
-    window.firebaseSync.checkConnection();
+    if (window.firebaseSync.init()) {
+        window.firebaseSync.checkConnection();
+    }
 });

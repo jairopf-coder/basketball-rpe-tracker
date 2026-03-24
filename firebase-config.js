@@ -12,6 +12,9 @@ if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
 
+// Persistencia offline: los cambios se guardan aunque no haya conexión
+firebase.database().goOnline();
+firebase.database().ref('.info/connected').on('value', () => {});
+
 window.firebaseDB = firebase.database();
 console.log("🟢 Firebase inicializado correctamente");
-

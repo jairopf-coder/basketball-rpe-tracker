@@ -874,28 +874,19 @@ class RPETracker {
     }
 
     loadSessions() {
-        // Carga inicial síncrona desde localStorage
-        const stored = localStorage.getItem('basketballSessions');
-        const sessions = stored ? JSON.parse(stored) : [];
-        
-        // Carga asíncrona desde Firebase
+        // Firebase es la fuente de verdad — escuchar cambios en tiempo real
         if (window.firebaseSync) {
-            window.firebaseSync.loadSessions().then(firebaseSessions => {
-                if (firebaseSessions.length > 0) {
-                    this.sessions = firebaseSessions;
-                    this.renderSessions();
-                }
-            });
-            
-            // Escuchar cambios en tiempo real
             window.firebaseSync.onSessionsChange((updatedSessions) => {
                 this.sessions = updatedSessions;
                 this.renderSessions();
                 console.log('🔄 Sesiones actualizadas desde Firebase');
             });
+        } else {
+            console.warn('⚠️ Firebase no disponible, usando localStorage');
+            const stored = localStorage.getItem('basketballSessions');
+            return stored ? JSON.parse(stored) : [];
         }
-        
-        return sessions;
+        return [];
     }
 
     saveSessions() {
@@ -909,30 +900,20 @@ class RPETracker {
     }
 
     loadPlayers() {
-        // Carga inicial síncrona desde localStorage
-        const stored = localStorage.getItem('basketballPlayers');
-        const players = stored ? JSON.parse(stored) : [];
-        
-        // Carga asíncrona desde Firebase
+        // Firebase es la fuente de verdad — escuchar cambios en tiempo real
         if (window.firebaseSync) {
-            window.firebaseSync.loadPlayers().then(firebasePlayers => {
-                if (firebasePlayers.length > 0) {
-                    this.players = firebasePlayers;
-                    this.renderPlayers();
-                    this.populatePlayerSelects();
-                }
-            });
-            
-            // Escuchar cambios en tiempo real
             window.firebaseSync.onPlayersChange((updatedPlayers) => {
                 this.players = updatedPlayers;
                 this.renderPlayers();
                 this.populatePlayerSelects();
                 console.log('🔄 Jugadores actualizados desde Firebase');
             });
+        } else {
+            console.warn('⚠️ Firebase no disponible, usando localStorage');
+            const stored = localStorage.getItem('basketballPlayers');
+            return stored ? JSON.parse(stored) : [];
         }
-        
-        return players;
+        return [];
     }
 
     savePlayers() {
@@ -1345,6 +1326,12 @@ class RPETracker {
 
 // Initialize app
 let rpeTracker;
-document.addEventListener('DOMContentLoaded', () => {
-    rpeTracker = new RPETracker();
+
+// Esperar a que Firebase esté listo antes de inicializar la app
+window.addEventListener('load', () => {
+    // Dar tiempo a firebase-sync.js para inicializarse (también usa window.load)
+    // Usamos un pequeño delay para asegurar el orden correcto
+    setTimeout(() => {
+        rpeTracker = new RPETracker();
+    }, 100);
 });
