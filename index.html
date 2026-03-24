@@ -176,17 +176,25 @@
         <div id="newSessionModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Nueva Sesión</h2>
+                    <div class="modal-header-inner">
+                        <h2 id="modalTitle">Nueva Sesión</h2>
+                        <div id="modalStepIndicator" class="step-indicator">
+                            <span class="step-dot active" id="dot1"></span>
+                            <span class="step-line"></span>
+                            <span class="step-dot" id="dot2"></span>
+                        </div>
+                    </div>
                     <button id="closeModal" class="btn-close">&times;</button>
                 </div>
-                
-                <form id="sessionForm">
+
+                <!-- PASO 1: Datos compartidos + selección jugadoras -->
+                <div id="sessionStep1">
                     <div class="form-group">
-                        <label>👤 Selecciona Jugadora</label>
+                        <label>👥 Jugadoras que participan</label>
                         <div id="playerButtons" class="player-buttons">
                             <!-- Se llenará dinámicamente -->
                         </div>
-                        <input type="hidden" id="sessionPlayer" required>
+                        <div id="selectedCount" class="selected-count">0 jugadoras seleccionadas</div>
                     </div>
 
                     <div class="form-group">
@@ -198,14 +206,9 @@
                         <label>🕐 Momento del día</label>
                         <div class="session-type-toggle">
                             <input type="radio" id="timeMorning" name="sessionTime" value="morning" checked>
-                            <label for="timeMorning" class="type-option time-option">
-                                ☀️ Mañana
-                            </label>
-                            
+                            <label for="timeMorning" class="type-option time-option">☀️ Mañana</label>
                             <input type="radio" id="timeAfternoon" name="sessionTime" value="afternoon">
-                            <label for="timeAfternoon" class="type-option time-option">
-                                🌙 Tarde
-                            </label>
+                            <label for="timeAfternoon" class="type-option time-option">🌙 Tarde</label>
                         </div>
                     </div>
 
@@ -220,54 +223,47 @@
                             <button type="button" class="duration-btn" data-duration="120">120'</button>
                         </div>
                         <div style="margin-top: 0.5rem; text-align: center;">
-                            <input type="number" id="customDuration" placeholder="Otra duración" 
+                            <input type="number" id="customDuration" placeholder="Otra duración"
                                    min="1" max="300" style="width: 120px; padding: 0.5rem; border: 2px solid #ddd; border-radius: 8px; text-align: center;">
                         </div>
-                        <input type="hidden" id="sessionDuration" value="60" required>
+                        <input type="hidden" id="sessionDuration" value="60">
                     </div>
 
                     <div class="form-group">
                         <label>Tipo de Sesión</label>
                         <div class="session-type-toggle">
                             <input type="radio" id="typeTraining" name="sessionType" value="training" checked>
-                            <label for="typeTraining" class="type-option training">
-                                🏀 Entrenamiento
-                            </label>
-                            
+                            <label for="typeTraining" class="type-option training">🏀 Entrenamiento</label>
                             <input type="radio" id="typeMatch" name="sessionType" value="match">
-                            <label for="typeMatch" class="type-option match">
-                                🏟️ Partido
-                            </label>
+                            <label for="typeMatch" class="type-option match">🏟️ Partido</label>
                         </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>💪 RPE (Esfuerzo Percibido)</label>
-                        <div class="rpe-display">
-                            <span id="rpeValue" class="rpe-number">5</span>
-                            <span id="rpeLabel" class="rpe-label">Moderado</span>
-                        </div>
-                        <input type="range" id="rpeSlider" min="1" max="10" value="5" class="rpe-slider">
-                        
-                        <div class="rpe-scale">
-                            <div class="rpe-bar" id="rpeBar"></div>
-                        </div>
-                        
-                        <div class="rpe-legend">
-                            <span>1 - Muy ligero</span>
-                            <span>10 - Máximo</span>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>📝 Incidencias</label>
-                        <textarea id="sessionNotes" rows="5" placeholder="Lesiones, observaciones, etc..."></textarea>
                     </div>
 
                     <div class="modal-footer">
                         <button type="button" id="cancelBtn" class="btn-secondary">Cancelar</button>
-                        <button type="submit" class="btn-primary">Guardar</button>
+                        <button type="button" id="nextStepBtn" class="btn-primary" onclick="rpeTracker.goToStep2()">
+                            Siguiente →
+                        </button>
                     </div>
+                </div>
+
+                <!-- PASO 2: RPE individual por jugadora -->
+                <div id="sessionStep2" style="display:none;">
+                    <div id="playerRpeList">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="rpeTracker.goToStep1()">← Atrás</button>
+                        <button type="button" class="btn-primary" onclick="rpeTracker.saveTeamSession()">
+                            💾 Guardar sesión
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mantener form vacío por compatibilidad con otros listeners -->
+                <form id="sessionForm" style="display:none;">
+                    <input type="hidden" id="sessionPlayer">
+                </form>
                 </form>
             </div>
         </div>

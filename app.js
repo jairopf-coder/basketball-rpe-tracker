@@ -371,42 +371,160 @@ class RPETracker {
             alert('⚠️ Primero debes añadir jugadoras en la sección "Jugadoras"');
             return;
         }
-        
+        this.selectedPlayerIds = [];
         document.getElementById('newSessionModal').classList.add('active');
-        document.getElementById('sessionForm').reset();
         this.setDefaultDateTime();
-        this.renderPlayerButtons();
-        document.getElementById('rpeSlider').value = 5;
-        this.updateRPEDisplay(5);
+        this.renderPlayerButtonsMulti();
+        document.getElementById('sessionDuration').value = 60;
+        // Reset duration buttons
+        document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('selected'));
+        const d60 = document.querySelector('[data-duration="60"]');
+        if (d60) d60.classList.add('selected');
+        this.goToStep1();
     }
     
     renderPlayerButtons() {
+        this.renderPlayerButtonsMulti();
+    }
+
+    renderPlayerButtonsMulti() {
         const container = document.getElementById('playerButtons');
         if (!container) return;
-        
         container.innerHTML = this.players.map(player => `
-            <button type="button" class="player-btn" data-player-id="${player.id}" onclick="rpeTracker.selectPlayer('${player.id}')">
+            <button type="button" class="player-btn" data-player-id="${player.id}"
+                onclick="rpeTracker.togglePlayerSelection('${player.id}')">
                 <div class="player-btn-avatar">${player.name.charAt(0).toUpperCase()}</div>
                 <div class="player-btn-name">${player.name}</div>
                 ${player.number ? `<div class="player-btn-number">#${player.number}</div>` : ''}
             </button>
         `).join('');
+        this.updateSelectedCount();
     }
-    
-    selectPlayer(playerId) {
-        // Remove previous selection
-        document.querySelectorAll('.player-btn').forEach(btn => {
-            btn.classList.remove('selected');
-        });
-        
-        // Select new player
-        const selectedBtn = document.querySelector(`[data-player-id="${playerId}"]`);
-        if (selectedBtn) {
-            selectedBtn.classList.add('selected');
+
+    togglePlayerSelection(playerId) {
+        if (!this.selectedPlayerIds) this.selectedPlayerIds = [];
+        const idx = this.selectedPlayerIds.indexOf(playerId);
+        if (idx === -1) {
+            this.selectedPlayerIds.push(playerId);
+        } else {
+            this.selectedPlayerIds.splice(idx, 1);
         }
-        
-        // Set hidden input value
-        document.getElementById('sessionPlayer').value = playerId;
+        // Update button styles
+        document.querySelectorAll('.player-btn').forEach(btn => {
+            const id = btn.dataset.playerId;
+            btn.classList.toggle('multi-selected', this.selectedPlayerIds.includes(id));
+        });
+        this.updateSelectedCount();
+    }
+
+    updateSelectedCount() {
+        const el = document.getElementById('selectedCount');
+        if (!el) return;
+        const n = (this.selectedPlayerIds || []).length;
+        el.textContent = n === 0 ? '0 jugadoras seleccionadas'
+            : n === 1 ? '1 jugadora seleccionada'
+            : `${n} jugadoras seleccionadas`;
+        el.classList.toggle('has-selection', n > 0);
+    }
+
+    selectPlayer(playerId) {
+        this.togglePlayerSelection(playerId);
+    }
+
+    goToStep1() {
+        document.getElementById('sessionStep1').style.display = '';
+        document.getElementById('sessionStep2').style.display = 'none';
+        document.getElementById('modalTitle').textContent = 'Nueva Sesión — Paso 1';
+        document.getElementById('dot1').classList.add('active');
+        document.getElementById('dot1').classList.remove('done');
+        document.getElementById('dot2').classList.remove('active');
+    }
+
+    goToStep2() {
+        if (!this.selectedPlayerIds || this.selectedPlayerIds.length === 0) {
+            this.showToast('⚠️ Selecciona al menos una jugadora', 'warning');
+            return;
+        }
+        const date = document.getElementById('sessionDate').value;
+        if (!date) {
+            this.showToast('⚠️ Selecciona una fecha', 'warning');
+            return;
+        }
+        this.renderPlayerRpeList();
+        document.getElementById('sessionStep1').style.display = 'none';
+        document.getElementById('sessionStep2').style.display = '';
+        document.getElementById('modalTitle').textContent = 'Nueva Sesión — Paso 2';
+        document.getElementById('dot1').classList.remove('active');
+        document.getElementById('dot1').classList.add('done');
+        document.getElementById('dot2').classList.add('active');
+    }
+
+    renderPlayerRpeList() {
+        const container = document.getElementById('playerRpeList');
+        if (!container) return;
+        container.innerHTML = this.selectedPlayerIds.map(playerId => {
+            const player = this.players.find(p => p.id === playerId);
+            if (!player) return '';
+            return `
+                <div class="player-rpe-item" id="rpe-item-${player.id}">
+                    <div class="player-rpe-header">
+                        <div class="player-rpe-avatar">${player.name.charAt(0).toUpperCase()}</div>
+                        <div class="player-rpe-name">${player.name}${player.number ? ` <span style="opacity:0.6;font-size:0.85rem">#${player.number}</span>` : ''}</div>
+                        <div>
+                            <div class="player-rpe-value" id="rpeVal-${player.id}" style="color:${this.getRPEColor(5)}">5</div>
+                            <div class="player-rpe-label-text" id="rpeLbl-${player.id}">${this.getRPELabel(5)}</div>
+                        </div>
+                    </div>
+                    <input type="range" class="rpe-slider player-rpe-slider" min="1" max="10" value="5"
+                        oninput="rpeTracker.updateIndividualRPE('${player.id}', this.value)">
+                    <textarea class="player-rpe-notes" id="notes-${player.id}" rows="2"
+                        placeholder="Incidencias de ${player.name} (opcional)..."></textarea>
+                </div>`;
+        }).join('');
+    }
+
+    updateIndividualRPE(playerId, value) {
+        const val = parseInt(value);
+        const valEl = document.getElementById(`rpeVal-${playerId}`);
+        const lblEl = document.getElementById(`rpeLbl-${playerId}`);
+        if (valEl) { valEl.textContent = val; valEl.style.color = this.getRPEColor(val); }
+        if (lblEl) lblEl.textContent = this.getRPELabel(val);
+    }
+
+    saveTeamSession() {
+        const dateValue = document.getElementById('sessionDate').value;
+        const timeOfDay = document.querySelector('input[name="sessionTime"]:checked').value;
+        const timeString = timeOfDay === 'morning' ? 'T10:00:00' : 'T18:00:00';
+        const fullDateTime = dateValue + timeString;
+        const duration = parseInt(document.getElementById('sessionDuration').value) || 60;
+        const type = document.querySelector('input[name="sessionType"]:checked').value;
+        const baseId = Date.now();
+
+        this.selectedPlayerIds.forEach((playerId, i) => {
+            const slider = document.querySelector(`#rpe-item-${playerId} .player-rpe-slider`);
+            const notesEl = document.getElementById(`notes-${playerId}`);
+            const rpe = slider ? parseInt(slider.value) : 5;
+            const notes = notesEl ? notesEl.value : '';
+            const session = {
+                id: (baseId + i).toString(),
+                playerId,
+                date: fullDateTime,
+                timeOfDay,
+                type,
+                rpe,
+                duration,
+                load: rpe * duration,
+                notes
+            };
+            this.sessions.push(session);
+        });
+
+        this.saveSessions();
+        this.renderSessions();
+        this.closeModal('newSessionModal');
+        const n = this.selectedPlayerIds.length;
+        this.showToast(`✅ ${n} sesión${n > 1 ? 'es guardadas' : ' guardada'} correctamente`, 'success');
+        this.selectedPlayerIds = [];
     }
     
     selectDuration(duration) {
@@ -446,10 +564,9 @@ class RPETracker {
 
     handleSessionSubmit(e) {
         e.preventDefault();
-        
+        // El guardado ahora se gestiona desde saveTeamSession()
         const playerId = document.getElementById('sessionPlayer').value;
         if (!playerId) {
-            alert('⚠️ Debes seleccionar una jugadora');
             return;
         }
         
