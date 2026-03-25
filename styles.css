@@ -2030,3 +2030,224 @@ header h1 {
         max-width: 1300px;
     }
 }
+
+/* ===== COMPARADOR DE JUGADORAS ===== */
+.comp-card {
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #e8e8e8;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.comp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.comp-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.comp-mode-toggle {
+    display: flex;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.comp-mode-btn {
+    border: none;
+    background: transparent;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: #888;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.comp-mode-btn.active {
+    background: var(--primary);
+    color: white;
+}
+
+.comp-selectors {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.comp-selector-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+    min-width: 140px;
+}
+
+.comp-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.comp-select {
+    padding: 0.55rem 0.85rem;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.comp-select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.comp-vs {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #bbb;
+    letter-spacing: 0.05em;
+    margin-top: 1rem;
+    flex-shrink: 0;
+}
+
+.comp-team-badge {
+    padding: 0.55rem 0.85rem;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: #f9f9f9;
+    color: #666;
+}
+
+/* Tabla de métricas */
+.comp-metrics {
+    margin-bottom: 1.25rem;
+    border: 1px solid #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.comp-metrics-header,
+.comp-metrics-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    align-items: center;
+}
+
+.comp-metrics-header {
+    background: #f8f8f8;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.comp-metrics-row {
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid #f8f8f8;
+    transition: background 0.15s;
+}
+
+.comp-metrics-row:last-child { border-bottom: none; }
+.comp-metrics-row:hover { background: #fafafa; }
+
+.comp-metrics-label {
+    font-size: 0.82rem;
+    color: #888;
+}
+
+.comp-metrics-col {
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.comp-metrics-header .comp-metrics-col {
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.comp-winner {
+    position: relative;
+}
+
+.comp-winner::after {
+    content: '▲';
+    font-size: 0.6rem;
+    margin-left: 3px;
+    opacity: 0.6;
+}
+
+.comp-chart-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.comp-chart-wrap canvas {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Móvil */
+@media (max-width: 768px) {
+    .comp-header { flex-direction: column; align-items: flex-start; }
+    .comp-mode-toggle { width: 100%; }
+    .comp-mode-btn { flex: 1; text-align: center; }
+    .comp-selectors { gap: 0.75rem; }
+    .comp-vs { margin-top: 0.5rem; }
+    .comp-metrics-col { font-size: 0.9rem; }
+}
+
+/* ===== COMPARADOR MEJORADO ===== */
+
+/* Trend colors en la tabla */
+.comp-trend-up   { color: #f44336 !important; }
+.comp-trend-down { color: #4caf50 !important; }
+.comp-trend-flat { color: #999 !important; }
+
+/* Comparador ocupa todo el ancho en analytics */
+#comparisonModule {
+    margin-bottom: 1.5rem;
+}
+
+.comp-card {
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+/* Cabecera del comparador con fondo sutil */
+.comp-header {
+    background: #fafafa;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 1rem 1.5rem;
+    margin: -1.5rem -1.5rem 1.25rem -1.5rem;
+}
+
+@media (min-width: 769px) {
+    #comparisonModule .comp-card {
+        box-shadow: var(--shadow-md);
+    }
+
+    .comp-metrics-row:hover { background: #f9f6f3; }
+
+    /* Gráfica más alta en desktop */
+    .comp-chart-wrap canvas {
+        height: 300px !important;
+    }
+}
