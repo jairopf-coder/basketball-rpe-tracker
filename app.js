@@ -1090,6 +1090,7 @@ class RPETracker {
                 this.players = updatedPlayers;
                 this.renderPlayers();
                 this.populatePlayerSelects();
+                this.renderSessions(); // re-renderizar para mostrar nombres correctos
                 console.log('🔄 Jugadores actualizados desde Firebase');
             });
         } else {
