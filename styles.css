@@ -1732,3 +1732,302 @@ header h1 {
     outline: none;
     border-color: var(--primary);
 }
+
+
+/* ===== DISEÑO DESKTOP LIMPIO ===== */
+@media (min-width: 769px) {
+
+    /* Variables desktop */
+    :root {
+        --radius: 12px;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+        --shadow-md: 0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+        --shadow-hover: 0 8px 24px rgba(0,0,0,0.09), 0 4px 8px rgba(0,0,0,0.05);
+        --border: 1px solid #e8e8e8;
+        --surface: #ffffff;
+        --bg: #f4f5f7;
+    }
+
+    body {
+        background: var(--bg);
+    }
+
+    /* Header más refinado */
+    header {
+        padding: 0.75rem 2rem;
+        box-shadow: none;
+        border-bottom: var(--border);
+        background: var(--surface);
+    }
+
+    header h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+
+    .header-actions {
+        gap: 0.4rem;
+    }
+
+    /* Botones header más sutiles */
+    #backupBtn, #exportBtn, #dashboardBtn, #playersBtn {
+        background: transparent;
+        color: var(--gray);
+        border: var(--border);
+        padding: 0.45rem 0.85rem;
+        font-size: 0.85rem;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+
+    #backupBtn:hover, #exportBtn:hover,
+    #dashboardBtn:hover, #playersBtn:hover {
+        background: var(--bg);
+        color: var(--dark);
+        transform: none;
+        box-shadow: none;
+    }
+
+    #addBtn {
+        padding: 0.5rem 1.1rem;
+        font-size: 0.9rem;
+        border-radius: 8px;
+    }
+
+    /* Pestañas más limpias */
+    .tabs {
+        background: var(--surface);
+        border-bottom: var(--border);
+        padding: 0 2rem;
+        top: 53px;
+        gap: 0;
+    }
+
+    .tab {
+        flex: none;
+        min-width: auto;
+        padding: 0.85rem 1.1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #888;
+        border-bottom: 2px solid transparent;
+        letter-spacing: 0;
+    }
+
+    .tab:hover {
+        background: transparent;
+        color: var(--dark);
+    }
+
+    .tab.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+        font-weight: 600;
+    }
+
+    /* Layout con max-width centrado */
+    .session-list, #sessionList {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 1.5rem 2rem;
+    }
+
+    .advanced-filters {
+        padding: 0.85rem 2rem;
+        background: var(--surface);
+        border-bottom: var(--border);
+    }
+
+    /* Tarjetas de sesión más limpias */
+    .session-card {
+        border-radius: var(--radius);
+        padding: 1rem 1.25rem;
+        margin-bottom: 0.6rem;
+        box-shadow: var(--shadow-sm);
+        border: var(--border);
+        gap: 1rem;
+    }
+
+    .session-card:hover {
+        transform: none;
+        box-shadow: var(--shadow-hover);
+        border-color: #d0d0d0;
+    }
+
+    .session-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 1.3rem;
+        border-radius: 10px;
+    }
+
+    .session-type { font-size: 0.95rem; }
+    .session-date { font-size: 0.82rem; }
+    .session-rpe-number { font-size: 2rem; }
+
+    /* Stat cards más limpias */
+    .stat-card {
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        border: var(--border);
+        padding: 1.25rem 1.5rem;
+    }
+
+    .stat-value { font-size: 2rem; }
+
+    /* Player cards */
+    .player-card {
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        border: var(--border);
+    }
+
+    .player-card:hover {
+        box-shadow: var(--shadow-hover);
+        transform: none;
+        border-color: #d0d0d0;
+    }
+
+    /* Containers con max-width */
+    .dashboard-container,
+    .players-container,
+    .analytics-container,
+    .calendar-container {
+        padding: 1.75rem 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .injury-container,
+    .prediction-container {
+        padding: 1.75rem 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    /* Modal desktop centrado y más refinado */
+    .modal-content {
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 8px 24px rgba(0,0,0,0.08);
+        border: var(--border);
+        max-width: 520px;
+    }
+
+    .modal-header {
+        padding: 1.25rem 1.5rem 1rem;
+    }
+
+    .form-group {
+        padding: 1rem 1.5rem;
+    }
+
+    .modal-footer {
+        padding: 1rem 1.5rem;
+    }
+
+    /* Botones jugadoras más compactos */
+    .player-buttons {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 0.6rem;
+    }
+
+    .player-btn {
+        padding: 0.7rem 0.5rem;
+        border-width: 2px;
+        border-radius: 10px;
+        gap: 0.35rem;
+    }
+
+    .player-btn-avatar {
+        width: 38px;
+        height: 38px;
+        font-size: 1.1rem;
+    }
+
+    .player-btn-name { font-size: 0.8rem; }
+
+    /* Filtros en una sola línea */
+    .filter-row {
+        flex-wrap: nowrap;
+        gap: 0.75rem;
+    }
+
+    /* Inputs y selects más refinados */
+    .search-input,
+    .filter-select,
+    .date-input,
+    .rpe-input {
+        border-color: #e0e0e0;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        padding: 0.6rem 0.85rem;
+    }
+
+    .search-input:focus,
+    .filter-select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(255,102,0,0.08);
+    }
+
+    /* Botones generales más refinados */
+    .btn-primary {
+        border-radius: 8px;
+        font-size: 0.9rem;
+        padding: 0.6rem 1.25rem;
+        font-weight: 600;
+    }
+
+    .btn-primary:hover {
+        transform: none;
+        box-shadow: 0 4px 12px rgba(255,102,0,0.25);
+    }
+
+    .btn-secondary {
+        border-radius: 8px;
+        font-size: 0.9rem;
+        padding: 0.6rem 1.1rem;
+        font-weight: 500;
+    }
+
+    /* RPE step 2 items */
+    .player-rpe-item {
+        border-radius: 10px;
+        border-color: #e8e8e8;
+    }
+
+    /* Calendar refinado */
+    .calendar-header {
+        border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    /* Indicador de conexión */
+    .connection-indicator {
+        font-size: 0.72rem;
+    }
+
+    /* Empty state */
+    .empty-state {
+        padding: 5rem 2rem;
+    }
+
+    /* Alerts */
+    .alert-banner {
+        border-radius: var(--radius);
+        border: var(--border);
+        box-shadow: var(--shadow-sm);
+    }
+}
+
+/* Desktop ancho (sidebar opcional en el futuro) */
+@media (min-width: 1200px) {
+    .session-list, #sessionList {
+        max-width: 920px;
+    }
+
+    .dashboard-container,
+    .players-container,
+    .analytics-container {
+        max-width: 1300px;
+    }
+}
