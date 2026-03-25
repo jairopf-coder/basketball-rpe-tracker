@@ -12,6 +12,7 @@ class RPETracker {
         this.calendarMonth = new Date().getMonth();
         this.injuries = [];
         this.availability = {};
+        this.weekPlan = null;
         this.init();
     }
 
@@ -26,6 +27,11 @@ class RPETracker {
         // Inicializar módulo de lesiones
         if (typeof this.initializeInjuryManagement === 'function') {
             this.initializeInjuryManagement();
+        }
+
+        // Inicializar planificación semanal
+        if (typeof this.loadWeekPlan === 'function') {
+            this.loadWeekPlan();
         }
 
         // Register service worker
@@ -200,6 +206,21 @@ class RPETracker {
                 if (typeof this.renderInjuryPredictionDashboard === 'function') {
                     this.renderInjuryPredictionDashboard();
                 }
+                break;
+            case 'teamstatus':
+                if (typeof this.renderTeamStatus === 'function') this.renderTeamStatus();
+                break;
+            case 'weekplan':
+                if (typeof this.renderWeeklyPlanning === 'function') this.renderWeeklyPlanning();
+                break;
+            case 'medical':
+                if (typeof this.renderMedicalHistory === 'function') this.renderMedicalHistory();
+                break;
+            case 'rehab':
+                if (typeof this.renderRehabLoad === 'function') this.renderRehabLoad();
+                break;
+            case 'correlation':
+                if (typeof this.renderLoadInjuryCorrelation === 'function') this.renderLoadInjuryCorrelation();
                 break;
         }
     }
