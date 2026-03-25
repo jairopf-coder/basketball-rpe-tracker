@@ -1176,7 +1176,7 @@ header h1 {
     }
 
     /* Ocultar botones secundarios del header en móvil — accesibles desde las pestañas */
-    #backupBtn, #exportBtn, #dashboardBtn, #playersBtn {
+    #backupBtn, #exportBtn {
         display: none;
     }
 
@@ -1771,7 +1771,7 @@ header h1 {
     }
 
     /* Botones header más sutiles */
-    #backupBtn, #exportBtn, #dashboardBtn, #playersBtn {
+    #backupBtn, #exportBtn {
         background: transparent;
         color: var(--gray);
         border: var(--border);
@@ -1781,8 +1781,7 @@ header h1 {
         font-weight: 500;
     }
 
-    #backupBtn:hover, #exportBtn:hover,
-    #dashboardBtn:hover, #playersBtn:hover {
+    #backupBtn:hover, #exportBtn:hover {
         background: var(--bg);
         color: var(--dark);
         transform: none;
