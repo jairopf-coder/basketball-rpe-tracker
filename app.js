@@ -1470,18 +1470,7 @@ class RPETracker {
             </div>
         `;
     }
-}
 
-// Initialize app
-let rpeTracker;
-
-// Esperar a que Firebase esté listo antes de inicializar la app
-window.addEventListener('load', () => {
-    // Dar tiempo a firebase-sync.js para inicializarse (también usa window.load)
-    // Usamos un pequeño delay para asegurar el orden correcto
-    setTimeout(() => {
-        rpeTracker = new RPETracker();
-    }, 100);
     // ========== MÓDULO DE COMPARACIÓN ==========
 
     renderComparisonModule() {
@@ -1735,6 +1724,14 @@ window.addEventListener('load', () => {
         d.setDate(d.getDate() - d.getDay() + 1); // Monday
         return d.toISOString().slice(0,10);
     }
+}
 
+// Initialize app
+let rpeTracker;
 
+// Esperar a que Firebase esté listo antes de inicializar la app
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        rpeTracker = new RPETracker();
+    }, 100);
 });
