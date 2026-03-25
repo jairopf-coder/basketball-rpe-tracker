@@ -1157,25 +1157,289 @@ header h1 {
 }
 
 /* Responsive */
+/* ===== MÓVIL COMPLETO ===== */
 @media (max-width: 768px) {
-    header h1 {
-        font-size: 1.2rem;
+
+    /* Header: compacto, botones secundarios ocultos */
+    header {
+        padding: 0.6rem 1rem;
+        flex-wrap: wrap;
+        gap: 0.4rem;
     }
-    
-    .btn-primary {
+
+    header h1 {
+        font-size: 1.1rem;
+    }
+
+    .header-actions {
+        gap: 0.35rem;
+    }
+
+    /* Ocultar botones secundarios del header en móvil — accesibles desde las pestañas */
+    #backupBtn, #exportBtn, #dashboardBtn, #playersBtn {
+        display: none;
+    }
+
+    #addBtn {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+        border-radius: 20px;
+    }
+
+    /* Pestañas: solo icono en móvil, sin texto */
+    .tabs {
+        top: 52px;
+        scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+        min-width: 52px;
+        padding: 0.65rem 0.5rem;
+        font-size: 0.7rem;
+        flex-shrink: 0;
+    }
+
+    /* Modal: ocupa toda la pantalla, bottom sheet */
+    .modal {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .modal-content {
+        border-radius: 20px 20px 0 0;
+        max-height: 92vh;
+        max-width: 100%;
+        width: 100%;
+        animation: slideUpMobile 0.3s cubic-bezier(0.34, 1.10, 0.64, 1);
+    }
+
+    @keyframes slideUpMobile {
+        from { transform: translateY(100%); }
+        to   { transform: translateY(0); }
+    }
+
+    .modal-header {
+        padding: 1rem 1.25rem 0.75rem;
+    }
+
+    .form-group {
+        padding: 0.9rem 1.25rem;
+    }
+
+    .modal-footer {
+        padding: 0.9rem 1.25rem;
+        padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+    }
+
+    /* Botones de jugadoras: más compactos, más por fila */
+    .player-buttons {
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 0.5rem;
+    }
+
+    .player-btn {
+        padding: 0.6rem 0.4rem;
+        border-radius: 10px;
+        border-width: 2px;
+        gap: 0.3rem;
+    }
+
+    .player-btn-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 1.1rem;
+    }
+
+    .player-btn-name {
+        font-size: 0.75rem;
+        text-align: center;
+        line-height: 1.2;
+    }
+
+    .player-btn-number {
+        font-size: 0.65rem;
+    }
+
+    /* Slider RPE: thumb más grande para dedo */
+    .rpe-slider {
+        height: 10px;
+    }
+
+    .rpe-slider::-webkit-slider-thumb {
+        width: 32px;
+        height: 32px;
+        border-width: 3px;
+    }
+
+    .rpe-slider::-moz-range-thumb {
+        width: 32px;
+        height: 32px;
+    }
+
+    .player-rpe-slider::-webkit-slider-thumb {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* RPE display más compacto */
+    .rpe-number {
+        font-size: 2.2rem;
+        min-width: 56px;
+    }
+
+    /* Tarjetas de sesión: más compactas */
+    .session-card {
+        padding: 0.85rem 1rem;
+        gap: 0.75rem;
+        border-radius: 10px;
+    }
+
+    .session-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 1.3rem;
+    }
+
+    .session-type {
+        font-size: 0.95rem;
+    }
+
+    .session-date {
+        font-size: 0.8rem;
+    }
+
+    .session-rpe-number {
+        font-size: 2rem;
+    }
+
+    /* Lista de sesiones con padding lateral */
+    .session-list, #sessionList {
+        padding: 0.75rem;
+    }
+
+    /* Filtros: en columna */
+    .advanced-filters {
+        padding: 0.75rem;
+    }
+
+    .filter-row {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .filter-select, .search-input {
+        width: 100%;
+        font-size: 0.9rem;
+    }
+
+    /* Botones de duración: más pequeños */
+    .duration-selector {
+        gap: 0.4rem;
+    }
+
+    .duration-btn {
+        padding: 0.5rem 0.6rem;
+        font-size: 0.85rem;
+        min-width: 44px;
+    }
+
+    /* Toggle tipo sesión */
+    .session-type-toggle {
+        gap: 0.5rem;
+    }
+
+    .type-option {
+        padding: 0.6rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    /* Botones generales más grandes (mínimo 44px para toque) */
+    .btn-primary, .btn-secondary, .btn-danger {
+        min-height: 44px;
         padding: 0.6rem 1rem;
         font-size: 0.9rem;
     }
-    
-    .session-card {
-        padding: 1rem;
+
+    /* Dashboard y analíticas */
+    .dashboard-container, .analytics-container,
+    .players-container, .injury-container,
+    .prediction-container {
+        padding: 0.75rem;
     }
-    
-    .session-icon {
-        width: 50px;
-        height: 50px;
-        font-size: 1.5rem;
+
+    /* Cabeceras de sección */
+    .players-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: flex-start;
     }
+
+    .players-header > div {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    /* Calendario */
+    .calendar-header {
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+
+    .calendar-grid {
+        font-size: 0.75rem;
+    }
+
+    /* Indicador de pasos en modal */
+    .modal-header-inner h2 {
+        font-size: 1rem;
+    }
+
+    /* RPE item en paso 2 */
+    .player-rpe-item {
+        padding: 0.85rem 1rem;
+    }
+
+    .player-rpe-avatar {
+        width: 30px;
+        height: 30px;
+        font-size: 0.9rem;
+    }
+
+    .player-rpe-name {
+        font-size: 0.9rem;
+    }
+
+    .player-rpe-value {
+        font-size: 1.3rem;
+    }
+
+    /* Toast centrado y ancho completo en móvil */
+    .toast {
+        left: 1rem;
+        right: 1rem;
+        transform: translateX(0) translateY(0);
+        white-space: normal;
+        text-align: center;
+        justify-content: center;
+        bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+
+    @keyframes toastIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Skeleton loader */
+    .skeleton-list { padding: 0.75rem; }
+}
+
+/* Pantallas muy pequeñas (< 380px) */
+@media (max-width: 380px) {
+    .tab { min-width: 44px; font-size: 0.65rem; padding: 0.6rem 0.3rem; }
+    .player-buttons { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
+    .player-btn-avatar { width: 30px; height: 30px; font-size: 0.95rem; }
 }
 
 /* ===== MEJORAS UX ===== */
