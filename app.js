@@ -790,50 +790,51 @@ class RPETracker {
         if (this.players.length === 0) {
             return '<p style="color: var(--gray); text-align: center;">No hay jugadoras registradas</p>';
         }
-        
-        return this.players.map(player => {
+
+        const getStatus = (r) => {
+            const n = parseFloat(r);
+            if (isNaN(n) || r === 'N/A') return { label: 'Sin datos', cls: 'status-nodata', icon: '—' };
+            if (n > 1.5)  return { label: 'Peligro',   cls: 'status-danger',  icon: '🔴' };
+            if (n > 1.3)  return { label: 'Precaución', cls: 'status-caution', icon: '🟠' };
+            if (n < 0.8)  return { label: 'Por debajo', cls: 'status-low',     icon: '🔵' };
+            return           { label: 'Óptimo',    cls: 'status-ok',      icon: '🟢' };
+        };
+
+        const cards = this.players.map(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
-            
+            const st = getStatus(ratio.ratio);
+            const num = player.number ? `<span class="rcard-number">#${player.number}</span>` : '';
             return `
-                <div class="ratio-card">
-                    <div class="ratio-header">
-                        <div>
-                            <h3>${player.name}${player.number ? ` #${player.number}` : ''}</h3>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <span class="ratio-value" style="color: ${this.getRatioColor(ratio.ratio)}">${ratio.ratio}</span>
-                            <span class="ratio-indicator ${this.getRatioClass(ratio.ratio)}">${this.getRatioStatus(ratio.ratio)}</span>
+                <div class="rcard ${st.cls}">
+                    <div class="rcard-top">
+                        <div class="rcard-avatar">${player.name.charAt(0).toUpperCase()}</div>
+                        <div class="rcard-info">
+                            <div class="rcard-name">${player.name}${num}</div>
+                            <div class="rcard-status-label">${st.icon} ${st.label}</div>
                         </div>
                     </div>
-                    <div class="ratio-details">
-                        <div class="ratio-detail-item">
-                            <span class="ratio-detail-value" style="color: var(--primary);">${ratio.acute.toFixed(0)}</span>
-                            <span class="ratio-detail-label">EWMA Aguda (7d)</span>
-                        </div>
-                        <div class="ratio-detail-item">
-                            <span class="ratio-detail-value" style="color: var(--secondary);">${ratio.chronic.toFixed(0)}</span>
-                            <span class="ratio-detail-label">EWMA Crónica (28d)</span>
-                        </div>
-                        <div class="ratio-detail-item">
-                            <span class="ratio-detail-value">${ratio.totalLoad7d}</span>
-                            <span class="ratio-detail-label">Carga Total (7d)</span>
-                        </div>
-                        <div class="ratio-detail-item">
-                            <span class="ratio-detail-value">${ratio.totalLoad21d}</span>
-                            <span class="ratio-detail-label">Carga Total (28d)</span>
-                        </div>
-                        <div class="ratio-detail-item">
-                            <span class="ratio-detail-value">${ratio.sessions7d}</span>
-                            <span class="ratio-detail-label">Sesiones (7d)</span>
-                        </div>
-                        <div class="ratio-detail-item">
-                            <span class="ratio-detail-value">${ratio.sessions21d}</span>
-                            <span class="ratio-detail-label">Sesiones (28d)</span>
+                    <div class="rcard-ratio">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
+                    <div class="rcard-bar-wrap">
+                        <div class="rcard-bar">
+                            <div class="rcard-bar-fill" style="width:${Math.min((parseFloat(ratio.ratio)||0)/2*100, 100)}%; background:${this.getRatioColor(ratio.ratio)};"></div>
+                            <div class="rcard-bar-marker safe-lo"></div>
+                            <div class="rcard-bar-marker safe-hi"></div>
                         </div>
                     </div>
-                </div>
-            `;
+                </div>`;
         }).join('');
+
+        return `
+            <h3 style="margin: 2rem 0 1rem; font-size: 1rem; color: #555; font-weight: 600;">
+                📊 Ratio Agudo:Crónico — Vista rápida del equipo
+            </h3>
+            <div class="rcard-legend">
+                <span class="rleg rleg-ok">🟢 Óptimo (0.8–1.3)</span>
+                <span class="rleg rleg-caution">🟠 Precaución (1.3–1.5)</span>
+                <span class="rleg rleg-danger">🔴 Peligro (&gt;1.5)</span>
+                <span class="rleg rleg-low">🔵 Por debajo (&lt;0.8)</span>
+            </div>
+            <div class="rcard-grid">${cards}</div>`;
     }
 
     // ========== ANALYTICS ==========
