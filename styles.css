@@ -2251,3 +2251,140 @@ header h1 {
         height: 300px !important;
     }
 }
+
+/* ===== RATIO GRID VISUAL ===== */
+
+.rcard-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    margin-bottom: 1rem;
+    font-size: 0.78rem;
+    color: #666;
+}
+
+.rcard-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 900px) {
+    .rcard-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 500px) {
+    .rcard-grid { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+}
+
+.rcard {
+    background: white;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    border: 2px solid #eee;
+    transition: box-shadow 0.2s, border-color 0.2s;
+    cursor: default;
+}
+
+.rcard:hover {
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+
+/* Status border colors */
+.rcard.status-ok     { border-left: 4px solid #4caf50; }
+.rcard.status-caution{ border-left: 4px solid #ff9800; }
+.rcard.status-danger { border-left: 4px solid #f44336; background: #fff8f8; }
+.rcard.status-low    { border-left: 4px solid #2196f3; }
+.rcard.status-nodata { border-left: 4px solid #ccc; opacity: 0.7; }
+
+.rcard-top {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.65rem;
+}
+
+.rcard-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.rcard-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.rcard-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #1a1a1a;
+}
+
+.rcard-number {
+    font-size: 0.75rem;
+    color: #999;
+    font-weight: 400;
+    margin-left: 3px;
+}
+
+.rcard-status-label {
+    font-size: 0.72rem;
+    color: #888;
+    margin-top: 1px;
+}
+
+.rcard-ratio {
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    color: #1a1a1a;
+}
+
+.status-ok     .rcard-ratio { color: #2e7d32; }
+.status-caution .rcard-ratio { color: #e65100; }
+.status-danger  .rcard-ratio { color: #c62828; }
+.status-low     .rcard-ratio { color: #1565c0; }
+
+/* Mini progress bar showing where ratio falls on 0–2 scale */
+.rcard-bar-wrap { margin-top: 0.4rem; }
+
+.rcard-bar {
+    height: 5px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    position: relative;
+    overflow: visible;
+}
+
+.rcard-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+/* Markers at 0.8/2 = 40% and 1.3/2 = 65% of the bar */
+.rcard-bar-marker {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 11px;
+    background: #bbb;
+    border-radius: 1px;
+}
+
+.rcard-bar-marker.safe-lo { left: 40%; }
+.rcard-bar-marker.safe-hi { left: 65%; }
