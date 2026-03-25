@@ -278,7 +278,7 @@ class RPETracker {
                         <div class="player-avatar">${player.name.charAt(0).toUpperCase()}</div>
                         <div class="player-details">
                             <h3>${player.name}${player.number ? ` #${player.number}` : ''}</h3>
-                            <p class="player-meta">${playerSessions.length} sesiones registradas</p>
+                            <p class="player-meta">${playerSessions.length} registros · ${rpeTracker ? rpeTracker.countUniqueSessions(playerSessions) : playerSessions.length} sesiones</p>
                         </div>
                     </div>
                     <div class="player-stats">
@@ -732,23 +732,48 @@ class RPETracker {
 
     // ========== DASHBOARD ==========
     
+    // Cuenta sesiones únicas de equipo (fecha + momento + tipo = 1 evento)
+    countUniqueSessions(sessions) {
+        const keys = new Set(sessions.map(s => {
+            const d = new Date(s.date);
+            const dateKey = d.toISOString().slice(0, 10);
+            return `${dateKey}_${s.timeOfDay || 'unknown'}_${s.type || 'training'}`;
+        }));
+        return keys.size;
+    }
+
+    getUniqueSessions(sessions) {
+        const seen = new Set();
+        return sessions.filter(s => {
+            const d = new Date(s.date);
+            const key = `${d.toISOString().slice(0,10)}_${s.timeOfDay||'unknown'}_${s.type||'training'}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
+
     renderDashboard() {
         const container = document.getElementById('dashboardContent');
         if (!container) return;
         
-        const totalSessions = this.sessions.length;
         const totalPlayers = this.players.length;
-        const avgRPE = totalSessions > 0 
-            ? (this.sessions.reduce((sum, s) => sum + s.rpe, 0) / totalSessions).toFixed(1)
+
+        // Conteos de eventos únicos de equipo (fecha + momento + tipo = 1 sesión)
+        const totalSessions = this.countUniqueSessions(this.sessions);
+        const trainingCount = this.countUniqueSessions(this.sessions.filter(s => s.type === 'training'));
+        const matchCount    = this.countUniqueSessions(this.sessions.filter(s => s.type === 'match'));
+
+        // RPE medio sigue siendo por registro individual (métrica de carga)
+        const avgRPE = this.sessions.length > 0
+            ? (this.sessions.reduce((sum, s) => sum + s.rpe, 0) / this.sessions.length).toFixed(1)
             : 0;
-        
-        const trainingCount = this.sessions.filter(s => s.type === 'training').length;
-        const matchCount = this.sessions.filter(s => s.type === 'match').length;
-        
-        // Get last 7 days sessions
+
+        // Últimos 7 días: eventos únicos
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const recentSessions = this.sessions.filter(s => new Date(s.date) >= sevenDaysAgo);
+        const recentUnique = this.countUniqueSessions(recentSessions);
         
         container.innerHTML = `
             <div class="stats-grid">
@@ -765,7 +790,7 @@ class RPETracker {
                     <span class="stat-label">💪 RPE Medio Global</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-value" style="color: var(--success);">${recentSessions.length}</span>
+                    <span class="stat-value" style="color: var(--success);">${recentUnique}</span>
                     <span class="stat-label">📅 Últimos 7 días</span>
                 </div>
             </div>
