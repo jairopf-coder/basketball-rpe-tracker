@@ -41,10 +41,15 @@
         <nav class="tabs">
             <button class="tab active" data-view="sessions">📋 Sesiones</button>
             <button class="tab" data-view="dashboard">📊 Dashboard</button>
+            <button class="tab" data-view="teamstatus">🟢 Equipo</button>
+            <button class="tab" data-view="weekplan">📅 Planificación</button>
             <button class="tab" data-view="players">👥 Jugadoras</button>
             <button class="tab" data-view="analytics">📈 Análisis</button>
-            <button class="tab" data-view="calendar">📅 Calendario</button>
+            <button class="tab" data-view="calendar">🗓️ Calendario</button>
             <button class="tab" data-view="injury">🏥 Lesiones</button>
+            <button class="tab" data-view="medical">📋 Historial</button>
+            <button class="tab" data-view="rehab">💪 Readapt.</button>
+            <button class="tab" data-view="correlation">🔗 Correlación</button>
             <button class="tab" data-view="prediction">🔮 Predicción</button>
         </nav>
 
@@ -164,6 +169,31 @@
             <div class="injury-container" id="injuryManagementView" style="padding: 2rem; max-width: 1400px; margin: 0 auto;">
                 <!-- Injury management will be rendered here -->
             </div>
+        </div>
+
+        <!-- Team Status View -->
+        <div id="teamstatusView" class="view">
+            <div class="analytics-container" id="teamStatusView"></div>
+        </div>
+
+        <!-- Weekly Planning View -->
+        <div id="weekplanView" class="view">
+            <div class="analytics-container" id="weeklyPlanView"></div>
+        </div>
+
+        <!-- Medical History View -->
+        <div id="medicalView" class="view">
+            <div class="analytics-container" id="medicalHistoryView"></div>
+        </div>
+
+        <!-- Rehab Load View -->
+        <div id="rehabView" class="view">
+            <div class="analytics-container" id="rehabLoadView"></div>
+        </div>
+
+        <!-- Correlation View -->
+        <div id="correlationView" class="view">
+            <div class="analytics-container" id="correlationView"></div>
         </div>
 
         <!-- Injury Prediction View -->
@@ -424,6 +454,7 @@
     </div>
 
     <script src="chart.js"></script>
+    <script src="team-status.js"></script>
     <script src="app.js"></script>
     <script src="backup.js"></script>
     <script src="improvements.js"></script>
