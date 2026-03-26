@@ -336,7 +336,7 @@ RPETracker.prototype.renderInjuryCard = function(injury) {
     
     return `
         <div class="injury-card" style="background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-left: 5px solid ${severityColors[injury.severity]};">
-            <div style="display: flex; justify-content: between; align-items: start; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
                 <div style="flex: 1;">
                     <h3 style="margin: 0 0 0.5rem 0;">${player.name}${player.number ? ` #${player.number}` : ''}</h3>
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
