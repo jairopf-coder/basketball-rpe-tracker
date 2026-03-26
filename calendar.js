@@ -68,7 +68,7 @@ RPETracker.prototype.renderCalendar = function(year, month) {
         }
         
         html += `
-            <div class="${dayClass}" onclick="rpeTracker.showDaySessions(${year}, ${month}, ${day})" style="background: ${ratioColor}20;">
+            <div class="${dayClass}" onclick="rpeTracker.showDaySessions(${year}, ${month}, ${day})" style="background: ${avgRatio > 0 ? ratioColor + '18' : 'transparent'};">
                 <div class="calendar-day-number">${day}</div>
                 <div class="calendar-day-sessions">
                     ${sessionsOnDay.length > 0 ? `
