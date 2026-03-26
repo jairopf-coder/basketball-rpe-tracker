@@ -461,7 +461,7 @@ RPETracker.prototype.updateMissedSessions = function() {
         
         // Estimate missed sessions (assuming similar attendance)
         const avgSessionsPerPlayer = totalSessionsInPeriod / Math.max(this.players.length - 1, 1);
-        injury.missedSessions = Math.round(avgSessionsInPeriod > 0 ? avgSessionsPerPlayer : 0);
+        injury.missedSessions = Math.round(avgSessionsPerPlayer > 0 ? avgSessionsPerPlayer : 0);
     });
     
     this.saveInjuries();
