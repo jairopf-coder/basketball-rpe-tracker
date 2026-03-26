@@ -2433,10 +2433,18 @@ header h1 {
 .wp-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:0.6rem; }
 @media(max-width:900px){ .wp-grid { grid-template-columns:repeat(4,1fr); } }
 @media(max-width:600px){ .wp-grid { grid-template-columns:repeat(2,1fr); } }
-.wp-day { background:white; border-radius:10px; border:0.5px solid #e8e8e8; padding:0.85rem; }
-.wp-day-rest { opacity:0.6; }
-.wp-day-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; }
-.wp-day-name { font-weight:600; font-size:0.85rem; }
+.wp-day { background:white; border-radius:10px; border:0.5px solid #e8e8e8; padding:0.85rem; display:flex; flex-direction:column; gap:0.5rem; }
+.wp-day-name-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; }
+.wp-day-name { font-weight:700; font-size:0.88rem; }
+.wp-day-total { font-size:0.72rem; background:#fff3e0; color:#e65100; padding:2px 7px; border-radius:20px; font-weight:600; }
+.wp-slot { background:#f9f9f9; border-radius:8px; padding:0.6rem 0.75rem; border:0.5px solid #f0f0f0; }
+.wp-slot-inactive { opacity:0.55; }
+.wp-slot-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; }
+.wp-slot-label { font-size:0.78rem; font-weight:600; color:#555; }
+.wp-slot-off { font-size:0.72rem; color:#ccc; padding:2px 0; }
+.wp-slot-loads { display:flex; justify-content:space-between; align-items:center; margin-top:0.4rem; flex-wrap:wrap; gap:4px; }
+.wp-target-load { font-size:0.75rem; color:#888; }
+.wp-actual-inline { font-size:0.75rem; color:#555; display:flex; align-items:center; gap:5px; }
 .wp-toggle { position:relative; width:32px; height:18px; }
 .wp-toggle input { opacity:0; width:0; height:0; }
 .wp-toggle-slider { position:absolute; inset:0; background:#ddd; border-radius:9px; cursor:pointer; transition:background 0.2s; }
@@ -2454,7 +2462,7 @@ header h1 {
 .wp-actual-empty { opacity:0.5; }
 .wp-actual-data { font-size:0.8rem; color:#444; }
 .wp-no-data { font-size:0.78rem; color:#bbb; }
-.wp-deviation { font-size:0.75rem; font-weight:600; margin-top:4px; padding:3px 8px; border-radius:20px; }
+.wp-deviation { font-size:0.7rem; font-weight:600; padding:1px 6px; border-radius:20px; }
 .wp-dev-ok { background:#e8f5e9; color:#2e7d32; }
 .wp-dev-high { background:#ffebee; color:#c62828; }
 .wp-dev-low { background:#e3f2fd; color:#1565c0; }
