@@ -2413,7 +2413,7 @@ header h1 {
 .ts-card-danger { border-left:3px solid #f44336; background:#fff8f8; }
 .ts-card-low { border-left:3px solid #2196f3; }
 .ts-card-out { border-left:3px solid #f44336; background:#fff8f8; }
-.ts-card-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,#ff6600,#0066ff); color:white; font-weight:700; font-size:0.9rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ts-card-avatar { width:34px; height:34px; border-radius:50%; background:#ff6600; color:white; font-weight:700; font-size:0.9rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .ts-card-info { flex:1; min-width:0; }
 .ts-card-name { font-weight:600; font-size:0.9rem; }
 .ts-num { font-size:0.78rem; color:#999; font-weight:400; }
@@ -2467,7 +2467,7 @@ header h1 {
 .mh-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:1rem; }
 .mh-card { background:white; border-radius:12px; border:0.5px solid #e8e8e8; padding:1.25rem; }
 .mh-card-header { display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem; }
-.mh-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#ff6600,#0066ff); color:white; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.mh-avatar { width:36px; height:36px; border-radius:50%; background:#ff6600; color:white; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .mh-player-info { flex:1; }
 .mh-player-name { font-weight:600; font-size:0.95rem; }
 .mh-num { font-size:0.78rem; color:#999; font-weight:400; }
@@ -2496,7 +2496,7 @@ header h1 {
 .rl-card { background:white; border-radius:12px; border:0.5px solid #e8e8e8; padding:1.25rem; margin-bottom:1rem; }
 .rl-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; }
 .rl-player-info { display:flex; align-items:center; gap:0.75rem; }
-.rl-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#ff6600,#0066ff); color:white; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.rl-avatar { width:36px; height:36px; border-radius:50%; background:#ff6600; color:white; font-weight:700; display:flex; align-items:center; justify-content:center; }
 .rl-player-name { font-weight:600; font-size:0.95rem; }
 .rl-injury-info { font-size:0.78rem; color:#888; margin-top:2px; }
 .rl-phase-badge { background:#e3f2fd; color:#1565c0; font-size:0.78rem; padding:4px 10px; border-radius:20px; font-weight:600; }
