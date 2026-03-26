@@ -114,7 +114,7 @@ RPETracker.prototype.renderTeamStatus = function() {
 // ========== PLANIFICACIÓN SEMANAL DE CARGA ==========
 
 RPETracker.prototype.loadWeekPlan = function() {
-    const stored = localStorage.getItem('basketballWeekPlan');
+    const stored = localStorage.getItem('basketballWeekPlan2'); // v2 with sessions array
     this.weekPlan = stored ? JSON.parse(stored) : this.defaultWeekPlan();
 };
 
@@ -123,15 +123,15 @@ RPETracker.prototype.defaultWeekPlan = function() {
     return days.map((name, i) => ({
         day: i,
         name,
-        type: 'training',
-        targetRPE: 6,
-        targetDuration: 90,
-        active: i < 5
+        sessions: [
+            { slot: 'morning', label: '☀️ Mañana', active: i < 5, type: 'training', targetRPE: 6, targetDuration: 90 },
+            { slot: 'afternoon', label: '🌙 Tarde', active: false, type: 'training', targetRPE: 6, targetDuration: 90 }
+        ]
     }));
 };
 
 RPETracker.prototype.saveWeekPlan = function() {
-    localStorage.setItem('basketballWeekPlan', JSON.stringify(this.weekPlan));
+    localStorage.setItem('basketballWeekPlan2', JSON.stringify(this.weekPlan));
 };
 
 RPETracker.prototype.renderWeeklyPlanning = function() {
@@ -140,7 +140,6 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
 
     if (!this.weekPlan) this.loadWeekPlan();
 
-    // Get this week's actual sessions
     const now = new Date();
     const monday = new Date(now);
     monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
@@ -151,85 +150,102 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
         return d >= monday && d < new Date(monday.getTime() + 7 * 86400000);
     });
 
-    const getActualForDay = (dayIndex) => {
+    const getActualForSlot = (dayIndex, slot) => {
         const target = new Date(monday);
         target.setDate(monday.getDate() + dayIndex);
         const nextDay = new Date(target); nextDay.setDate(target.getDate() + 1);
-        const daySessions = thisWeekSessions.filter(s => {
+        const slotSessions = thisWeekSessions.filter(s => {
             const d = new Date(s.date);
-            return d >= target && d < nextDay;
+            return d >= target && d < nextDay && (s.timeOfDay || 'morning') === slot;
         });
-        if (!daySessions.length) return null;
-        const uniqueEvents = this.countUniqueSessions(daySessions);
-        const avgRPE = daySessions.reduce((s, x) => s + x.rpe, 0) / daySessions.length;
-        const avgDur = daySessions.reduce((s, x) => s + (x.duration || 60), 0) / daySessions.length;
-        return { sessions: uniqueEvents, avgRPE: avgRPE.toFixed(1), avgDuration: Math.round(avgDur), load: Math.round(avgRPE * avgDur) };
+        if (!slotSessions.length) return null;
+        const avgRPE = slotSessions.reduce((s, x) => s + x.rpe, 0) / slotSessions.length;
+        const avgDur = slotSessions.reduce((s, x) => s + (x.duration || 60), 0) / slotSessions.length;
+        return { avgRPE: avgRPE.toFixed(1), avgDuration: Math.round(avgDur), load: Math.round(avgRPE * avgDur) };
     };
 
-    const dayCards = this.weekPlan.map((day, i) => {
-        const actual = getActualForDay(i);
-        const targetLoad = day.active ? day.targetRPE * day.targetDuration : 0;
-        const actualLoad = actual ? Math.round(parseFloat(actual.avgRPE) * actual.avgDuration) : null;
-        const deviation = actualLoad !== null && targetLoad > 0 ? Math.round(((actualLoad - targetLoad) / targetLoad) * 100) : null;
+    const renderSlot = (dayIndex, slotIndex, session) => {
+        const actual = getActualForSlot(dayIndex, session.slot);
+        const targetLoad = session.active ? session.targetRPE * session.targetDuration : 0;
+        const actualLoad = actual ? actual.load : null;
+        const deviation = actualLoad !== null && targetLoad > 0
+            ? Math.round(((actualLoad - targetLoad) / targetLoad) * 100) : null;
 
         let devClass = '', devText = '';
         if (deviation !== null) {
-            if (deviation > 20) { devClass = 'wp-dev-high'; devText = `+${deviation}% sobre lo planificado`; }
-            else if (deviation < -20) { devClass = 'wp-dev-low'; devText = `${deviation}% bajo lo planificado`; }
-            else { devClass = 'wp-dev-ok'; devText = `${deviation > 0 ? '+' : ''}${deviation}% — En línea`; }
+            if (deviation > 20)       { devClass = 'wp-dev-high'; devText = `+${deviation}%`; }
+            else if (deviation < -20) { devClass = 'wp-dev-low';  devText = `${deviation}%`; }
+            else                      { devClass = 'wp-dev-ok';   devText = `${deviation > 0 ? '+' : ''}${deviation}%`; }
         }
 
+        const sid = `${dayIndex}-${slotIndex}`;
+
         return `
-            <div class="wp-day ${!day.active ? 'wp-day-rest' : ''}" id="wpday-${i}">
-                <div class="wp-day-header">
-                    <span class="wp-day-name">${day.name}</span>
+            <div class="wp-slot ${!session.active ? 'wp-slot-inactive' : ''}">
+                <div class="wp-slot-header">
+                    <span class="wp-slot-label">${session.label}</span>
                     <label class="wp-toggle">
-                        <input type="checkbox" ${day.active ? 'checked' : ''} onchange="rpeTracker.togglePlanDay(${i}, this.checked)">
+                        <input type="checkbox" ${session.active ? 'checked' : ''}
+                            onchange="rpeTracker.togglePlanSlot(${dayIndex},${slotIndex},this.checked)">
                         <span class="wp-toggle-slider"></span>
                     </label>
                 </div>
 
-                ${day.active ? `
-                <div class="wp-plan">
-                    <div class="wp-plan-label">Planificado</div>
-                    <div class="wp-controls">
-                        <div class="wp-control-group">
-                            <label>RPE</label>
-                            <input type="range" min="1" max="10" value="${day.targetRPE}" step="1"
-                                oninput="rpeTracker.updatePlanDay(${i},'targetRPE',+this.value); document.getElementById('rpe-val-${i}').textContent=this.value">
-                            <span id="rpe-val-${i}" class="wp-val">${day.targetRPE}</span>
-                        </div>
-                        <div class="wp-control-group">
-                            <label>Min</label>
-                            <select onchange="rpeTracker.updatePlanDay(${i},'targetDuration',+this.value)">
-                                ${[30,45,60,75,90,105,120].map(v => `<option value="${v}" ${day.targetDuration===v?'selected':''}>${v}'</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="wp-control-group">
-                            <label>Tipo</label>
-                            <select onchange="rpeTracker.updatePlanDay(${i},'type',this.value)">
-                                <option value="training" ${day.type==='training'?'selected':''}>Entreno</option>
-                                <option value="match" ${day.type==='match'?'selected':''}>Partido</option>
-                            </select>
-                        </div>
+                ${session.active ? `
+                <div class="wp-controls">
+                    <div class="wp-control-group">
+                        <label>RPE</label>
+                        <input type="range" min="1" max="10" value="${session.targetRPE}" step="1"
+                            oninput="rpeTracker.updatePlanSlot(${dayIndex},${slotIndex},'targetRPE',+this.value);
+                                     document.getElementById('rv-${sid}').textContent=this.value">
+                        <span id="rv-${sid}" class="wp-val">${session.targetRPE}</span>
                     </div>
-                    <div class="wp-target-load">Carga objetivo: <strong>${targetLoad} UA</strong></div>
+                    <div class="wp-control-group">
+                        <label>Min</label>
+                        <select onchange="rpeTracker.updatePlanSlot(${dayIndex},${slotIndex},'targetDuration',+this.value)">
+                            ${[30,45,60,75,90,105,120].map(v =>
+                                `<option value="${v}" ${session.targetDuration===v?'selected':''}>${v}'</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    <div class="wp-control-group">
+                        <label>Tipo</label>
+                        <select onchange="rpeTracker.updatePlanSlot(${dayIndex},${slotIndex},'type',this.value)">
+                            <option value="training" ${session.type==='training'?'selected':''}>Entreno</option>
+                            <option value="match"    ${session.type==='match'   ?'selected':''}>Partido</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="wp-actual ${actual ? '' : 'wp-actual-empty'}">
-                    <div class="wp-plan-label">Real</div>
-                    ${actual ? `
-                        <div class="wp-actual-data">
-                            <span>RPE ${actual.avgRPE} × ${actual.avgDuration}' = <strong>${actualLoad} UA</strong></span>
-                        </div>
-                        ${deviation !== null ? `<div class="wp-deviation ${devClass}">${devText}</div>` : ''}
-                    ` : '<div class="wp-no-data">Sin sesiones registradas</div>'}
+                <div class="wp-slot-loads">
+                    <div class="wp-target-load">Obj: <strong>${targetLoad} UA</strong></div>
+                    ${actual
+                        ? `<div class="wp-actual-inline">Real: <strong>${actualLoad} UA</strong>
+                           <span class="wp-deviation ${devClass}">${devText}</span></div>`
+                        : `<div class="wp-no-data">Sin datos</div>`
+                    }
                 </div>
-                ` : `<div class="wp-rest-label">Descanso</div>`}
+                ` : `<div class="wp-slot-off">No planificado</div>`}
+            </div>`;
+    };
+
+    const dayCards = this.weekPlan.map((day, i) => {
+        const anyActive = day.sessions.some(s => s.active);
+        const dayTargetLoad = day.sessions.filter(s => s.active)
+            .reduce((sum, s) => sum + s.targetRPE * s.targetDuration, 0);
+
+        return `
+            <div class="wp-day" id="wpday-${i}">
+                <div class="wp-day-name-row">
+                    <span class="wp-day-name">${day.name}</span>
+                    ${dayTargetLoad > 0 ? `<span class="wp-day-total">${dayTargetLoad} UA</span>` : ''}
+                </div>
+                ${day.sessions.map((session, si) => renderSlot(i, si, session)).join('')}
             </div>`;
     }).join('');
 
-    const weekLoad = this.weekPlan.filter(d => d.active).reduce((s, d) => s + d.targetRPE * d.targetDuration, 0);
+    const weekLoad = this.weekPlan.reduce((sum, day) =>
+        sum + day.sessions.filter(s => s.active).reduce((s, x) => s + x.targetRPE * x.targetDuration, 0), 0);
 
     container.innerHTML = `
         <div class="wp-header">
@@ -246,18 +262,31 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     `;
 };
 
+RPETracker.prototype.togglePlanSlot = function(dayIndex, slotIndex, active) {
+    if (!this.weekPlan) this.loadWeekPlan();
+    this.weekPlan[dayIndex].sessions[slotIndex].active = active;
+    this.saveWeekPlan();
+    this.renderWeeklyPlanning();
+};
+
+RPETracker.prototype.updatePlanSlot = function(dayIndex, slotIndex, field, value) {
+    if (!this.weekPlan) this.loadWeekPlan();
+    this.weekPlan[dayIndex].sessions[slotIndex][field] = value;
+    this.saveWeekPlan();
+};
+
+// Keep old methods for compatibility
 RPETracker.prototype.togglePlanDay = function(index, active) {
     if (!this.weekPlan) this.loadWeekPlan();
-    this.weekPlan[index].active = active;
+    this.weekPlan[index].sessions.forEach(s => s.active = active);
     this.saveWeekPlan();
     this.renderWeeklyPlanning();
 };
 
 RPETracker.prototype.updatePlanDay = function(index, field, value) {
     if (!this.weekPlan) this.loadWeekPlan();
-    this.weekPlan[index][field] = value;
+    this.weekPlan[index].sessions.forEach(s => s[field] = value);
     this.saveWeekPlan();
-    // Re-render only the load targets without full re-render for sliders
 };
 
 
