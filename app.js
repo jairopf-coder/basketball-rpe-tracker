@@ -210,6 +210,9 @@ class RPETracker {
             case 'teamstatus':
                 if (typeof this.renderTeamStatus === 'function') this.renderTeamStatus();
                 break;
+            case 'wellness':
+                if (typeof this.renderWellnessDashboard === 'function') this.renderWellnessDashboard();
+                break;
             case 'weekplan':
                 if (typeof this.renderWeeklyPlanning === 'function') this.renderWeeklyPlanning();
                 break;
@@ -1774,12 +1777,5 @@ class RPETracker {
     }
 }
 
-// Initialize app
+// Initialize app — managed by auth.js
 let rpeTracker;
-
-// Esperar a que Firebase esté listo antes de inicializar la app
-window.addEventListener('load', () => {
-    setTimeout(() => {
-        rpeTracker = new RPETracker();
-    }, 100);
-});

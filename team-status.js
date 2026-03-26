@@ -696,3 +696,75 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
 RPETracker.prototype.generateTeamStatusPDF = function() {
     this.generateWeeklyTeamPDF();
 };
+
+// ========== VISTA DE WELLNESS PARA EL ENTRENADOR ==========
+
+RPETracker.prototype.renderWellnessDashboard = function() {
+    const container = document.getElementById('wellnessDashboardView');
+    if (!container) return;
+
+    const allData = AppAuth.loadWellnessData();
+    const today = new Date().toISOString().slice(0, 10);
+    const todayData = allData.filter(w => w.date === today);
+
+    const label = (q, v) => {
+        const labels = {
+            sleep:   ['','Muy mal','Mal','Regular','Bien','Muy bien'],
+            fatigue: ['','Agotada','Muy cansada','Cansada','Bien','Fresca'],
+            pain:    ['','Mucho dolor','Dolor','Algo','Leve','Sin dolor']
+        };
+        return labels[q][v] || v;
+    };
+
+    const color = v => ['','#f44336','#ff5722','#ff9800','#8bc34a','#4caf50'][v] || '#ccc';
+
+    const playerCards = this.players.map(player => {
+        const response = todayData.find(w => w.playerId === player.id);
+        const hasInjury = (this.injuries || []).some(i => i.playerId === player.id && i.status === 'active');
+
+        if (!response) {
+            return `
+                <div class="wc-card wc-pending">
+                    <div class="wc-avatar">${player.name.charAt(0).toUpperCase()}</div>
+                    <div class="wc-info">
+                        <div class="wc-name">${player.name}${player.number ? ` <span class="wc-num">#${player.number}</span>` : ''}</div>
+                        <div class="wc-status-text">Sin respuesta hoy</div>
+                    </div>
+                    ${hasInjury ? '<span class="wc-injury-badge">Lesionada</span>' : '<span class="wc-pending-badge">Pendiente</span>'}
+                </div>`;
+        }
+
+        const avg = Math.round((response.sleep + response.fatigue + response.pain) / 3);
+        const overall = color(avg);
+
+        return `
+            <div class="wc-card wc-answered" style="border-left:3px solid ${overall}">
+                <div class="wc-avatar" style="background:${overall}">${player.name.charAt(0).toUpperCase()}</div>
+                <div class="wc-info">
+                    <div class="wc-name">${player.name}${player.number ? ` <span class="wc-num">#${player.number}</span>` : ''}</div>
+                    <div class="wc-scores">
+                        <span title="Sueño">😴 ${response.sleep}</span>
+                        <span title="Fatiga">💪 ${response.fatigue}</span>
+                        <span title="Dolor">🦵 ${response.pain}</span>
+                    </div>
+                </div>
+                <div class="wc-avg" style="color:${overall}">${avg}/5</div>
+            </div>`;
+    }).join('');
+
+    const answered = todayData.filter(w => this.players.some(p => p.id === w.playerId)).length;
+
+    container.innerHTML = `
+        <div class="wc-header">
+            <div>
+                <h2>Wellness del equipo</h2>
+                <div class="wc-subtitle">${new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</div>
+            </div>
+            <div class="wc-summary">
+                <span class="wc-sum-num">${answered}</span>/<span>${this.players.length}</span>
+                <div class="wc-sum-lbl">respondidas</div>
+            </div>
+        </div>
+        <div class="wc-cards">${playerCards || '<div style="color:#bbb;padding:1rem">No hay jugadoras registradas</div>'}</div>
+    `;
+};
