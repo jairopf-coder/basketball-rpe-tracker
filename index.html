@@ -19,7 +19,7 @@
     <script src="firebase-sync.js"></script>
 </head>
 <body>
-    <div id="app">
+    <div id="app" style="display:none">
         <!-- Header -->
         <header>
             <div class="header-left">
@@ -42,6 +42,7 @@
             <button class="tab active" data-view="sessions">📋 Sesiones</button>
             <button class="tab" data-view="dashboard">📊 Dashboard</button>
             <button class="tab" data-view="teamstatus">🟢 Equipo</button>
+            <button class="tab" data-view="wellness">❤️ Wellness</button>
             <button class="tab" data-view="weekplan">📅 Planificación</button>
             <button class="tab" data-view="players">👥 Jugadoras</button>
             <button class="tab" data-view="analytics">📈 Análisis</button>
@@ -169,6 +170,11 @@
             <div class="injury-container" id="injuryManagementView" style="padding: 2rem; max-width: 1400px; margin: 0 auto;">
                 <!-- Injury management will be rendered here -->
             </div>
+        </div>
+
+        <!-- Wellness Dashboard View -->
+        <div id="wellnessView" class="view">
+            <div class="analytics-container" id="wellnessDashboardView"></div>
         </div>
 
         <!-- Team Status View -->
@@ -464,5 +470,6 @@
     <script src="injury-management.js"></script>
     <script src="injury-management-2.js"></script>
     <script src="team-status.js"></script>
+    <script src="auth.js"></script>
 </body>
 </html>
