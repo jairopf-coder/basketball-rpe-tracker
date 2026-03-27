@@ -186,7 +186,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     <span class="wp-slot-label">${session.label}</span>
                     <label class="wp-toggle">
                         <input type="checkbox" ${session.active ? 'checked' : ''}
-                            onchange="rpeTracker.togglePlanSlot(${dayIndex},${slotIndex},this.checked)">
+                            data-action="toggleSlot" data-day="${dayIndex}" data-slot="${slotIndex}">
                         <span class="wp-toggle-slider"></span>
                     </label>
                 </div>
@@ -196,13 +196,13 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     <div class="wp-control-group">
                         <label>RPE</label>
                         <input type="range" min="1" max="10" value="${session.targetRPE}" step="1"
-                            oninput="rpeTracker.updatePlanSlot(${dayIndex},${slotIndex},'targetRPE',+this.value);
-                                     document.getElementById('rv-${sid}').textContent=this.value">
+                            data-action="updateSlot" data-day="${dayIndex}" data-slot="${slotIndex}" data-field="targetRPE"
+                            oninput="document.getElementById('rv-${sid}').textContent=this.value">
                         <span id="rv-${sid}" class="wp-val">${session.targetRPE}</span>
                     </div>
                     <div class="wp-control-group">
                         <label>Min</label>
-                        <select onchange="rpeTracker.updatePlanSlot(${dayIndex},${slotIndex},'targetDuration',+this.value)">
+                        <select data-action="updateSlot" data-day="${dayIndex}" data-slot="${slotIndex}" data-field="targetDuration">
                             ${[30,45,60,75,90,105,120].map(v =>
                                 `<option value="${v}" ${session.targetDuration===v?'selected':''}>${v}'</option>`
                             ).join('')}
@@ -210,7 +210,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     </div>
                     <div class="wp-control-group">
                         <label>Tipo</label>
-                        <select onchange="rpeTracker.updatePlanSlot(${dayIndex},${slotIndex},'type',this.value)">
+                        <select data-action="updateSlot" data-day="${dayIndex}" data-slot="${slotIndex}" data-field="type">
                             <option value="training" ${session.type==='training'?'selected':''}>Entreno</option>
                             <option value="match"    ${session.type==='match'   ?'selected':''}>Partido</option>
                         </select>
@@ -258,8 +258,26 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                 <div class="wp-week-label">UA carga semanal objetivo</div>
             </div>
         </div>
-        <div class="wp-grid">${dayCards}</div>
+        <div class="wp-grid" id="wpGrid">${dayCards}</div>
     `;
+
+    // Event delegation — sin inline rpeTracker que puede no existir aún
+    const grid = document.getElementById('wpGrid');
+    if (grid) {
+        grid.addEventListener('change', (e) => {
+            const el = e.target;
+            const action = el.dataset.action;
+            if (!action || !window.rpeTracker) return;
+            const day = parseInt(el.dataset.day);
+            const slot = parseInt(el.dataset.slot);
+            if (action === 'toggleSlot') {
+                window.rpeTracker.togglePlanSlot(day, slot, el.checked);
+            } else if (action === 'updateSlot') {
+                window.rpeTracker.updatePlanSlot(day, slot, el.dataset.field,
+                    el.tagName === 'SELECT' ? el.value : +el.value);
+            }
+        });
+    }
 };
 
 RPETracker.prototype.togglePlanSlot = function(dayIndex, slotIndex, active) {
