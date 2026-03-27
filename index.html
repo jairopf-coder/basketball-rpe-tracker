@@ -127,7 +127,7 @@
                 <div class="players-header">
                     <h2>👥 Gestión de Jugadoras</h2>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button onclick="rpeTracker.generateTeamPDFReport('weekly')" class="btn-secondary">📄 Informe Semanal Equipo</button>
+                        <button onclick="window.rpeTracker?.generateTeamPDFReport('weekly')" class="btn-secondary">📄 Informe Semanal Equipo</button>
                         <button id="addPlayerBtn" class="btn-primary">+ Añadir Jugadora</button>
                     </div>
                 </div>
@@ -142,7 +142,7 @@
                 
                 <!-- Export Charts Button -->
                 <div style="text-align: right; margin-bottom: 1rem;">
-                    <button onclick="rpeTracker.exportAllCharts()" class="btn-secondary">📸 Exportar Todos los Gráficos</button>
+                    <button onclick="window.rpeTracker?.exportAllCharts()" class="btn-secondary">📸 Exportar Todos los Gráficos</button>
                 </div>
                 
                 <!-- Comparador — primero y destacado -->
@@ -278,7 +278,7 @@
 
                     <div class="modal-footer">
                         <button type="button" id="cancelBtn" class="btn-secondary">Cancelar</button>
-                        <button type="button" id="nextStepBtn" class="btn-primary" onclick="rpeTracker.goToStep2()">
+                        <button type="button" id="nextStepBtn" class="btn-primary" onclick="window.rpeTracker?.goToStep2()">
                             Siguiente →
                         </button>
                     </div>
@@ -290,8 +290,8 @@
                         <!-- Se llenará dinámicamente -->
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn-secondary" onclick="rpeTracker.goToStep1()">← Atrás</button>
-                        <button type="button" class="btn-primary" onclick="rpeTracker.saveTeamSession()">
+                        <button type="button" class="btn-secondary" onclick="window.rpeTracker?.goToStep1()">← Atrás</button>
+                        <button type="button" class="btn-primary" onclick="window.rpeTracker?.saveTeamSession()">
                             💾 Guardar sesión
                         </button>
                     </div>
