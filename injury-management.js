@@ -178,7 +178,7 @@ RPETracker.prototype.openAddInjuryModal = function(playerId = null) {
                 
                 <div class="form-group">
                     <label>⚠️ Severidad</label>
-                    <select id="injurySeverity" required onchange="rpeTracker.updateInjuryTimeline()">
+                    <select id="injurySeverity" required onchange="window.rpeTracker?.updateInjuryTimeline()">
                         <option value="minor">Leve (3-7 días)</option>
                         <option value="moderate">Moderada (1-3 semanas)</option>
                         <option value="severe">Grave (3+ semanas)</option>
@@ -268,7 +268,7 @@ RPETracker.prototype.renderInjuryManagement = function() {
     let html = `
         <div class="injury-header">
             <h2>🏥 Gestión de Lesiones</h2>
-            <button onclick="rpeTracker.openAddInjuryModal()" class="btn-primary">+ Registrar Lesión</button>
+            <button onclick="window.rpeTracker?.openAddInjuryModal()" class="btn-primary">+ Registrar Lesión</button>
         </div>
         
         <div class="stats-grid" style="margin: 2rem 0;">
@@ -391,13 +391,13 @@ RPETracker.prototype.renderInjuryCard = function(injury) {
             ` : ''}
             
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <button onclick="rpeTracker.updateRTPPhase('${injury.id}')" class="btn-primary" style="flex: 1;">
+                <button onclick="window.rpeTracker?.updateRTPPhase('${injury.id}')" class="btn-primary" style="flex: 1;">
                     🔄 Actualizar Fase RTP
                 </button>
-                <button onclick="rpeTracker.showRTPProgram('${injury.id}')" class="btn-secondary" style="flex: 1;">
+                <button onclick="window.rpeTracker?.showRTPProgram('${injury.id}')" class="btn-secondary" style="flex: 1;">
                     📋 Programa RTP
                 </button>
-                <button onclick="rpeTracker.markAsRecovered('${injury.id}')" class="btn-secondary" style="background: #4caf50; color: white;">
+                <button onclick="window.rpeTracker?.markAsRecovered('${injury.id}')" class="btn-secondary" style="background: #4caf50; color: white;">
                     ✅ Marcar Recuperada
                 </button>
             </div>

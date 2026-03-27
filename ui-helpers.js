@@ -17,15 +17,15 @@ RPETracker.prototype.showPlayerReportMenu = function(playerId) {
             <div style="padding: 1.5rem;">
                 <p style="margin-bottom: 1rem; color: var(--gray);">Selecciona el tipo de informe:</p>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <button onclick="rpeTracker.generatePDFReport('${playerId}', 'weekly'); this.closest('.modal').remove();" 
+                    <button onclick="window.rpeTracker?.generatePDFReport('${playerId}', 'weekly'); this.closest('.modal').remove();" 
                             class="btn-primary" style="width: 100%;">
                         📅 Informe Semanal
                     </button>
-                    <button onclick="rpeTracker.generatePDFReport('${playerId}', 'monthly'); this.closest('.modal').remove();" 
+                    <button onclick="window.rpeTracker?.generatePDFReport('${playerId}', 'monthly'); this.closest('.modal').remove();" 
                             class="btn-primary" style="width: 100%;">
                         📊 Informe Mensual
                     </button>
-                    <button onclick="rpeTracker.generatePDFReport('${playerId}', 'seasonal'); this.closest('.modal').remove();" 
+                    <button onclick="window.rpeTracker?.generatePDFReport('${playerId}', 'seasonal'); this.closest('.modal').remove();" 
                             class="btn-primary" style="width: 100%;">
                         🏆 Informe Trimestral
                     </button>
@@ -62,11 +62,11 @@ RPETracker.prototype.showTemplateManager = function() {
                     </small>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="rpeTracker.applyTemplate('${t.id}'); this.closest('.modal').remove();" 
+                    <button onclick="window.rpeTracker?.applyTemplate('${t.id}'); this.closest('.modal').remove();" 
                             class="btn-secondary" style="padding: 0.5rem 1rem;">
                         ✅ Usar
                     </button>
-                    <button onclick="rpeTracker.deleteTemplate('${t.id}'); rpeTracker.showTemplateManager();" 
+                    <button onclick="window.rpeTracker?.deleteTemplate('${t.id}'); window.rpeTracker?.showTemplateManager();" 
                             class="btn-danger" style="padding: 0.5rem 1rem;">
                         🗑️
                     </button>
@@ -83,7 +83,7 @@ RPETracker.prototype.showTemplateManager = function() {
             </div>
             <div style="padding: 1.5rem;">
                 ${templatesHTML}
-                <button onclick="rpeTracker.createTemplate(); rpeTracker.showTemplateManager();" 
+                <button onclick="window.rpeTracker?.createTemplate(); window.rpeTracker?.showTemplateManager();" 
                         class="btn-primary" style="width: 100%; margin-top: 1rem;">
                     + Crear Nueva Plantilla
                 </button>
@@ -215,19 +215,19 @@ RPETracker.prototype.showQuickActions = function() {
             </div>
             <div style="padding: 1.5rem;">
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <button onclick="rpeTracker.showTemplateManager(); this.closest('.modal').remove();" 
+                    <button onclick="window.rpeTracker?.showTemplateManager(); this.closest('.modal').remove();" 
                             class="btn-primary" style="width: 100%;">
                         📋 Gestionar Plantillas
                     </button>
-                    <button onclick="rpeTracker.exportAllCharts(); this.closest('.modal').remove();" 
+                    <button onclick="window.rpeTracker?.exportAllCharts(); this.closest('.modal').remove();" 
                             class="btn-primary" style="width: 100%;">
                         📸 Exportar Todos los Gráficos
                     </button>
-                    <button onclick="rpeTracker.generateTeamPDFReport('weekly'); this.closest('.modal').remove();" 
+                    <button onclick="window.rpeTracker?.generateTeamPDFReport('weekly'); this.closest('.modal').remove();" 
                             class="btn-primary" style="width: 100%;">
                         📄 Informe Semanal del Equipo
                     </button>
-                    <button onclick="rpeTracker.downloadBackup(); this.closest('.modal').remove();" 
+                    <button onclick="window.rpeTracker?.downloadBackup(); this.closest('.modal').remove();" 
                             class="btn-primary" style="width: 100%;">
                         💾 Descargar Backup
                     </button>
