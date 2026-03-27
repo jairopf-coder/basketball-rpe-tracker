@@ -16,9 +16,9 @@ RPETracker.prototype.renderCalendar = function(year, month) {
     
     let html = `
         <div class="calendar-header">
-            <button onclick="rpeTracker.previousMonth()" class="btn-secondary">← Anterior</button>
+            <button onclick="window.rpeTracker?.previousMonth()" class="btn-secondary">← Anterior</button>
             <h2>${monthNames[month]} ${year}</h2>
-            <button onclick="rpeTracker.nextMonth()" class="btn-secondary">Siguiente →</button>
+            <button onclick="window.rpeTracker?.nextMonth()" class="btn-secondary">Siguiente →</button>
         </div>
         <div class="calendar-grid">
             <div class="calendar-day-header">Dom</div>
@@ -68,7 +68,7 @@ RPETracker.prototype.renderCalendar = function(year, month) {
         }
         
         html += `
-            <div class="${dayClass}" onclick="rpeTracker.showDaySessions(${year}, ${month}, ${day})" style="background: ${avgRatio > 0 ? ratioColor + '18' : 'transparent'};">
+            <div class="${dayClass}" onclick="window.rpeTracker?.showDaySessions(${year}, ${month}, ${day})" style="background: ${avgRatio > 0 ? ratioColor + '18' : 'transparent'};">
                 <div class="calendar-day-number">${day}</div>
                 <div class="calendar-day-sessions">
                     ${sessionsOnDay.length > 0 ? `
@@ -103,7 +103,7 @@ RPETracker.prototype.showDaySessions = function(year, month, day) {
         const playerName = player ? player.name : 'Desconocida';
         
         html += `
-            <div class="session-card" onclick="rpeTracker.showSessionDetail('${session.id}')">
+            <div class="session-card" onclick="window.rpeTracker?.showSessionDetail('${session.id}')">
                 <div class="session-icon ${session.type}">
                     ${session.type === 'training' ? '🏀' : '🏟️'}
                 </div>
