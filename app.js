@@ -481,10 +481,36 @@ class RPETracker {
         const el = document.getElementById('selectedCount');
         if (!el) return;
         const n = (this.selectedPlayerIds || []).length;
+        const total = this.players.length;
         el.textContent = n === 0 ? '0 jugadoras seleccionadas'
             : n === 1 ? '1 jugadora seleccionada'
             : `${n} jugadoras seleccionadas`;
         el.classList.toggle('has-selection', n > 0);
+
+        // Update select-all button
+        const btn = document.getElementById('selectAllBtn');
+        if (!btn) return;
+        if (n === total) {
+            btn.textContent = 'Deseleccionar todas';
+            btn.classList.add('active');
+        } else {
+            btn.textContent = 'Seleccionar todas';
+            btn.classList.remove('active');
+        }
+    }
+
+    selectAllPlayers() {
+        if (!this.selectedPlayerIds) this.selectedPlayerIds = [];
+        const allSelected = this.selectedPlayerIds.length === this.players.length;
+        if (allSelected) {
+            this.selectedPlayerIds = [];
+        } else {
+            this.selectedPlayerIds = this.players.map(p => p.id);
+        }
+        document.querySelectorAll('.player-btn').forEach(btn => {
+            btn.classList.toggle('multi-selected', this.selectedPlayerIds.includes(btn.dataset.playerId));
+        });
+        this.updateSelectedCount();
     }
 
     selectPlayer(playerId) {
@@ -530,13 +556,20 @@ class RPETracker {
                     <div class="player-rpe-header">
                         <div class="player-rpe-avatar">${player.name.charAt(0).toUpperCase()}</div>
                         <div class="player-rpe-name">${player.name}${player.number ? ` <span style="opacity:0.6;font-size:0.85rem">#${player.number}</span>` : ''}</div>
-                        <div>
-                            <div class="player-rpe-value" id="rpeVal-${player.id}" style="color:${this.getRPEColor(5)}">5</div>
-                            <div class="player-rpe-label-text" id="rpeLbl-${player.id}">${this.getRPELabel(5)}</div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <div class="player-rpe-label-text" id="rpeLbl-${player.id}" style="text-align:right">${this.getRPELabel(5)}</div>
                         </div>
                     </div>
-                    <input type="range" class="rpe-slider player-rpe-slider" min="1" max="10" value="5"
-                        oninput="window.rpeTracker?.updateIndividualRPE('${player.id}', this.value)">
+                    <div class="rpe-btn-grid" id="rpeBtns-${player.id}">
+                        ${[1,2,3,4,5,6,7,8,9,10].map(v => `
+                            <button type="button" class="rpe-num-btn ${v===5?'selected':''}"
+                                data-player="${player.id}" data-val="${v}"
+                                style="background:${v===5?this.getRPEColor(v):''}; color:${v===5?'white':''}; border-color:${v===5?this.getRPEColor(v):''};"
+                                onclick="window.rpeTracker?.selectRPEButton('${player.id}',${v})">
+                                ${v}
+                            </button>`).join('')}
+                    </div>
+                    <input type="hidden" id="rpeHidden-${player.id}" value="5">
                     <textarea class="player-rpe-notes" id="notes-${player.id}" rows="2"
                         placeholder="Incidencias de ${player.name} (opcional)..."></textarea>
                 </div>`;
@@ -551,6 +584,26 @@ class RPETracker {
         if (lblEl) lblEl.textContent = this.getRPELabel(val);
     }
 
+    selectRPEButton(playerId, value) {
+        const val = parseInt(value);
+        // Update hidden input
+        const hidden = document.getElementById(`rpeHidden-${playerId}`);
+        if (hidden) hidden.value = val;
+        // Update label
+        const lbl = document.getElementById(`rpeLbl-${playerId}`);
+        if (lbl) lbl.textContent = this.getRPELabel(val);
+        // Update button styles
+        document.querySelectorAll(`#rpeBtns-${playerId} .rpe-num-btn`).forEach(btn => {
+            const v = parseInt(btn.dataset.val);
+            const active = v === val;
+            const color = this.getRPEColor(v);
+            btn.classList.toggle('selected', active);
+            btn.style.background = active ? color : '';
+            btn.style.color = active ? 'white' : '';
+            btn.style.borderColor = active ? color : '';
+        });
+    }
+
     saveTeamSession() {
         const dateValue = document.getElementById('sessionDate').value;
         const timeOfDay = document.querySelector('input[name="sessionTime"]:checked').value;
@@ -561,9 +614,9 @@ class RPETracker {
         const baseId = Date.now();
 
         this.selectedPlayerIds.forEach((playerId, i) => {
-            const slider = document.querySelector(`#rpe-item-${playerId} .player-rpe-slider`);
+            const hidden = document.getElementById(`rpeHidden-${playerId}`);
             const notesEl = document.getElementById(`notes-${playerId}`);
-            const rpe = slider ? parseInt(slider.value) : 5;
+            const rpe = hidden ? parseInt(hidden.value) : 5;
             const notes = notesEl ? notesEl.value : '';
             const session = {
                 id: (baseId + i).toString(),

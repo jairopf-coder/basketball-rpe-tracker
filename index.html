@@ -231,7 +231,11 @@
                         <div id="playerButtons" class="player-buttons">
                             <!-- Se llenará dinámicamente -->
                         </div>
-                        <div id="selectedCount" class="selected-count">0 jugadoras seleccionadas</div>
+                        <div class="select-all-row">
+                            <div id="selectedCount" class="selected-count">0 jugadoras seleccionadas</div>
+                            <button type="button" id="selectAllBtn" class="btn-select-all"
+                                onclick="window.rpeTracker?.selectAllPlayers()">Seleccionar todas</button>
+                        </div>
                     </div>
 
                     <div class="form-group">
