@@ -89,6 +89,33 @@ class RPETracker {
                 this.togglePlayerSelection(btn.dataset.playerId);
             }
         });
+
+        // Weekly planning — toggle slot checkbox
+        document.addEventListener('change', (e) => {
+            const el = e.target;
+            if (el.dataset.action === 'toggleSlot') {
+                if (typeof this.togglePlanSlot === 'function') {
+                    this.togglePlanSlot(+el.dataset.day, +el.dataset.slot, el.checked);
+                }
+            }
+            if (el.dataset.action === 'updateSlot') {
+                if (typeof this.updatePlanSlot === 'function') {
+                    const val = el.dataset.field === 'targetDuration' || el.dataset.field === 'targetRPE'
+                        ? +el.value : el.value;
+                    this.updatePlanSlot(+el.dataset.day, +el.dataset.slot, el.dataset.field, val);
+                }
+            }
+        });
+
+        // Weekly planning — range input (fires oninput, not onchange)
+        document.addEventListener('input', (e) => {
+            const el = e.target;
+            if (el.dataset.action === 'updateSlot' && el.type === 'range') {
+                if (typeof this.updatePlanSlot === 'function') {
+                    this.updatePlanSlot(+el.dataset.day, +el.dataset.slot, el.dataset.field, +el.value);
+                }
+            }
+        });
         
         // Custom duration input
         const customDurationInput = document.getElementById('customDuration');
@@ -320,9 +347,9 @@ class RPETracker {
                         </div>
                     </div>
                     <div class="player-actions">
-                        <button class="btn-icon" style="background: #2196f3; color: white;" onclick="rpeTracker.showPlayerReportMenu('${player.id}')" title="Informe PDF">📄</button>
-                        <button class="btn-icon" style="background: var(--primary); color: white;" onclick="rpeTracker.editPlayer('${player.id}')" title="Editar">✏️</button>
-                        <button class="btn-icon" style="background: #f44336; color: white;" onclick="rpeTracker.deletePlayer('${player.id}')" title="Eliminar">🗑️</button>
+                        <button class="btn-icon" style="background: #2196f3; color: white;" onclick="window.rpeTracker?.showPlayerReportMenu('${player.id}')" title="Informe PDF">📄</button>
+                        <button class="btn-icon" style="background: var(--primary); color: white;" onclick="window.rpeTracker?.editPlayer('${player.id}')" title="Editar">✏️</button>
+                        <button class="btn-icon" style="background: #f44336; color: white;" onclick="window.rpeTracker?.deletePlayer('${player.id}')" title="Eliminar">🗑️</button>
                     </div>
                 </div>
             `;
@@ -509,7 +536,7 @@ class RPETracker {
                         </div>
                     </div>
                     <input type="range" class="rpe-slider player-rpe-slider" min="1" max="10" value="5"
-                        oninput="rpeTracker.updateIndividualRPE('${player.id}', this.value)">
+                        oninput="window.rpeTracker?.updateIndividualRPE('${player.id}', this.value)">
                     <textarea class="player-rpe-notes" id="notes-${player.id}" rows="2"
                         placeholder="Incidencias de ${player.name} (opcional)..."></textarea>
                 </div>`;
@@ -674,7 +701,7 @@ class RPETracker {
             const playerName = player ? player.name : 'Desconocida';
             
             return `
-                <div class="session-card" onclick="rpeTracker.showSessionDetail('${session.id}')">
+                <div class="session-card" onclick="window.rpeTracker?.showSessionDetail('${session.id}')">
                     <div class="session-icon ${session.type}">
                         ${session.type === 'training' ? '🏀' : '🏟️'}
                     </div>
@@ -1540,10 +1567,10 @@ class RPETracker {
                 <div class="comp-header">
                     <h3 class="comp-title">🔍 Comparador</h3>
                     <div class="comp-mode-toggle">
-                        <button class="comp-mode-btn active" id="modePvP" onclick="rpeTracker.setCompMode('pvp')">
+                        <button class="comp-mode-btn active" id="modePvP" onclick="window.rpeTracker?.setCompMode('pvp')">
                             Jugadora vs Jugadora
                         </button>
-                        <button class="comp-mode-btn" id="modePvT" onclick="rpeTracker.setCompMode('pvt')">
+                        <button class="comp-mode-btn" id="modePvT" onclick="window.rpeTracker?.setCompMode('pvt')">
                             Jugadora vs Media equipo
                         </button>
                     </div>
@@ -1552,14 +1579,14 @@ class RPETracker {
                 <div class="comp-selectors">
                     <div class="comp-selector-group">
                         <label class="comp-label" id="labelA">Jugadora A</label>
-                        <select class="comp-select" id="compPlayerA" onchange="rpeTracker.updateComparison()">
+                        <select class="comp-select" id="compPlayerA" onchange="window.rpeTracker?.updateComparison()">
                             ${playerOptions}
                         </select>
                     </div>
                     <div class="comp-vs">VS</div>
                     <div class="comp-selector-group" id="selectorB">
                         <label class="comp-label" id="labelB">Jugadora B</label>
-                        <select class="comp-select" id="compPlayerB" onchange="rpeTracker.updateComparison()">
+                        <select class="comp-select" id="compPlayerB" onchange="window.rpeTracker?.updateComparison()">
                             ${this.players.map((p, i) =>
                                 `<option value="${p.id}" ${i===1?'selected':''}>${p.name}${p.number ? ' #'+p.number : ''}</option>`
                             ).join('')}

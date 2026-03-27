@@ -86,7 +86,7 @@ RPETracker.prototype.renderAvailabilityRow = function(player, dates) {
         
         row += `
             <td style="padding: 0.75rem; text-align: center; cursor: pointer;" 
-                onclick="rpeTracker.toggleAvailability('${player.id}', '${dateKey}')"
+                onclick="window.rpeTracker?.toggleAvailability('${player.id}', '${dateKey}')"
                 title="${title}">
                 <span style="font-size: 1.5rem; color: ${color};">${icon}</span>
             </td>
@@ -171,7 +171,7 @@ RPETracker.prototype.updateRTPPhase = function(injuryId) {
                 
                 <div class="modal-footer">
                     <button onclick="this.closest('.modal').remove()" class="btn-secondary">Cancelar</button>
-                    <button onclick="rpeTracker.saveRTPUpdate('${injuryId}'); this.closest('.modal').remove();" 
+                    <button onclick="window.rpeTracker?.saveRTPUpdate('${injuryId}'); this.closest('.modal').remove();" 
                             class="btn-primary">💾 Guardar Actualización</button>
                 </div>
             </div>
