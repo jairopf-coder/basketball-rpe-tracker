@@ -38,20 +38,22 @@
         </header>
 
         <!-- Navigation Tabs -->
-        <nav class="tabs">
-            <button class="tab active" data-view="sessions">📋 Sesiones</button>
-            <button class="tab" data-view="dashboard">📊 Dashboard</button>
-            <button class="tab" data-view="teamstatus">🟢 Equipo</button>
-            <button class="tab" data-view="wellness">❤️ Wellness</button>
-            <button class="tab" data-view="weekplan">📅 Planificación</button>
-            <button class="tab" data-view="players">👥 Jugadoras</button>
-            <button class="tab" data-view="analytics">📈 Análisis</button>
-            <button class="tab" data-view="calendar">🗓️ Calendario</button>
-            <button class="tab" data-view="injury">🏥 Lesiones</button>
-            <button class="tab" data-view="medical">📋 Historial</button>
-            <button class="tab" data-view="rehab">💪 Readapt.</button>
-            <button class="tab" data-view="correlation">🔗 Correlación</button>
-            <button class="tab" data-view="prediction">🔮 Predicción</button>
+        <nav class="nav-groups" id="navGroups">
+            <div class="nav-group-bar">
+                <button class="nav-group-btn active" data-group="sessions" onclick="NavMenu.selectGroup('sessions')">
+                    📋 Sesiones
+                </button>
+                <button class="nav-group-btn" data-group="carga" onclick="NavMenu.selectGroup('carga')">
+                    📊 Carga
+                </button>
+                <button class="nav-group-btn" data-group="lesiones" onclick="NavMenu.selectGroup('lesiones')">
+                    🏥 Lesiones
+                </button>
+                <button class="nav-group-btn" data-group="equipo" onclick="NavMenu.selectGroup('equipo')">
+                    🟢 Equipo
+                </button>
+            </div>
+            <div class="nav-sub-bar" id="navSubBar" style="display:none"></div>
         </nav>
 
         <!-- Sesiones View -->
