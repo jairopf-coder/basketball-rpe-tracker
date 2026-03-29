@@ -1,3 +1,130 @@
+// ========== NAVEGACIÓN POR GRUPOS ==========
+
+const NavMenu = {
+    groups: {
+        sessions: {
+            label: '📋 Sesiones',
+            direct: 'sessions', // go directly, no submenu
+        },
+        carga: {
+            label: '📊 Carga',
+            items: [
+                { view: 'dashboard',  label: '📊 Dashboard' },
+                { view: 'analytics',  label: '📈 Análisis A:C' },
+                { view: 'weekplan',   label: '📅 Planificación' },
+                { view: 'calendar',   label: '🗓️ Calendario' },
+                { view: 'players',    label: '👥 Jugadoras' },
+            ],
+            default: 'dashboard'
+        },
+        lesiones: {
+            label: '🏥 Lesiones',
+            items: [
+                { view: 'injury',       label: '🏥 Registro' },
+                { view: 'medical',      label: '📋 Historial' },
+                { view: 'rehab',        label: '💪 Readaptación' },
+                { view: 'correlation',  label: '🔗 Correlación' },
+                { view: 'prediction',   label: '🔮 Predicción' },
+            ],
+            default: 'injury'
+        },
+        equipo: {
+            label: '🟢 Equipo',
+            items: [
+                { view: 'teamstatus', label: '🟢 Disponibilidad' },
+                { view: 'wellness',   label: '❤️ Wellness' },
+            ],
+            default: 'teamstatus'
+        }
+    },
+
+    activeGroup: 'sessions',
+    activeView: 'sessions',
+
+    selectGroup(groupKey) {
+        const group = this.groups[groupKey];
+        if (!group) return;
+
+        this.activeGroup = groupKey;
+
+        // Update group buttons
+        document.querySelectorAll('.nav-group-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.group === groupKey);
+        });
+
+        // Direct view (no submenu)
+        if (group.direct) {
+            this.hideSubBar();
+            if (window.rpeTracker) window.rpeTracker.switchView(group.direct);
+            this.activeView = group.direct;
+            return;
+        }
+
+        // Show submenu
+        this.renderSubBar(groupKey);
+
+        // Navigate to last active view in this group, or default
+        const target = group.items.find(i => i.view === this.activeView)
+            ? this.activeView
+            : group.default;
+        this.selectView(target);
+    },
+
+    selectView(viewKey) {
+        this.activeView = viewKey;
+
+        // Update sub buttons
+        document.querySelectorAll('.nav-sub-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === viewKey);
+        });
+
+        if (window.rpeTracker) window.rpeTracker.switchView(viewKey);
+    },
+
+    renderSubBar(groupKey) {
+        const group = this.groups[groupKey];
+        const bar = document.getElementById('navSubBar');
+        if (!bar || !group.items) return;
+
+        bar.style.display = 'flex';
+        bar.innerHTML = group.items.map(item => `
+            <button class="nav-sub-btn ${item.view === this.activeView ? 'active' : ''}"
+                data-view="${item.view}"
+                onclick="NavMenu.selectView('${item.view}')">
+                ${item.label}
+            </button>`).join('');
+    },
+
+    hideSubBar() {
+        const bar = document.getElementById('navSubBar');
+        if (bar) bar.style.display = 'none';
+    },
+
+    // Call this to highlight the correct group/sub when switchView is called programmatically
+    syncToView(viewKey) {
+        for (const [groupKey, group] of Object.entries(this.groups)) {
+            if (group.direct === viewKey) {
+                this.activeGroup = groupKey;
+                this.activeView = viewKey;
+                document.querySelectorAll('.nav-group-btn').forEach(b =>
+                    b.classList.toggle('active', b.dataset.group === groupKey));
+                this.hideSubBar();
+                return;
+            }
+            if (group.items?.find(i => i.view === viewKey)) {
+                this.activeGroup = groupKey;
+                this.activeView = viewKey;
+                document.querySelectorAll('.nav-group-btn').forEach(b =>
+                    b.classList.toggle('active', b.dataset.group === groupKey));
+                this.renderSubBar(groupKey);
+                document.querySelectorAll('.nav-sub-btn').forEach(b =>
+                    b.classList.toggle('active', b.dataset.view === viewKey));
+                return;
+            }
+        }
+    }
+};
+
 // Basketball RPE Tracker - Progressive Web App with Advanced Analytics
 
 class RPETracker {
@@ -185,11 +312,9 @@ class RPETracker {
 
     switchView(viewName) {
         this.currentView = viewName;
-        
-        // Update tabs
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.view === viewName);
-        });
+
+        // Sync grouped nav
+        if (typeof NavMenu !== 'undefined') NavMenu.syncToView(viewName);
         
         // Update views
         document.querySelectorAll('.view').forEach(view => {
