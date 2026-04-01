@@ -1092,7 +1092,7 @@ class RPETracker {
                 <div class="db-right">
                     <div class="db-right-header">
                         <span class="db-right-label">Ratio A:C</span>
-                        <button class="db-sort-btn" onclick="window.rpeTracker?._dashSort='${nextSort[this._dashSort]}'; window.rpeTracker?.renderDashboard()">
+                        <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
                             ${sortLabel[this._dashSort]}
                         </button>
                     </div>
@@ -1109,6 +1109,12 @@ class RPETracker {
 
             </div>
         `;
+    }
+
+    cycleDashSort() {
+        const next = { risk: 'safe', safe: 'name', name: 'risk' };
+        this._dashSort = next[this._dashSort] || 'risk';
+        this.renderDashboard();
     }
 
     renderTeamRatios() {
