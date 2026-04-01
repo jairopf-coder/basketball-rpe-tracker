@@ -987,40 +987,47 @@ class RPETracker {
         if (!container) return;
 
         // Stats
-        const totalPlayers = this.players.length;
         const totalSessions = this.countUniqueSessions(this.sessions);
         const trainingCount = this.countUniqueSessions(this.sessions.filter(s => s.type === 'training'));
         const matchCount    = this.countUniqueSessions(this.sessions.filter(s => s.type === 'match'));
         const avgRPE = this.sessions.length > 0
             ? (this.sessions.reduce((sum, s) => sum + s.rpe, 0) / this.sessions.length).toFixed(1) : '—';
-
         const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const recentUnique = this.countUniqueSessions(this.sessions.filter(s => new Date(s.date) >= sevenDaysAgo));
+        const recent7 = this.sessions.filter(s => new Date(s.date) >= sevenDaysAgo);
+        const recentUnique = this.countUniqueSessions(recent7);
+        const avgRPE7 = recent7.length > 0
+            ? (recent7.reduce((s, x) => s + x.rpe, 0) / recent7.length).toFixed(1) : '—';
 
-        // Alerts — compact inline
-        const alerts = [];
-        this.players.forEach(player => {
-            const ratio = this.calculateAcuteChronicRatio(player.id);
-            const r = parseFloat(ratio.ratio);
-            if (ratio.ratio === 'N/A') return;
-            if (r > 1.5)  alerts.push({ name: player.name, ratio: ratio.ratio, cls: 'db-alert-danger', icon: '🔴' });
-            else if (r > 1.3) alerts.push({ name: player.name, ratio: ratio.ratio, cls: 'db-alert-warn', icon: '🟠' });
-        });
+        // Active injuries
+        const activeInjuries = (this.injuries || []).filter(i => i.status === 'active').length;
 
-        // Player ratio grid — ultra compact
+        // Sort order — persisted on instance
+        if (!this._dashSort) this._dashSort = 'risk'; // 'risk' | 'safe' | 'name'
+
+        // Build player data
         const getStatus = (r) => {
             const n = parseFloat(r);
-            if (isNaN(n) || r === 'N/A') return { cls: 'status-nodata', icon: '—', color: '#ccc' };
-            if (n > 1.5)  return { cls: 'status-danger',  icon: '🔴', color: '#f44336' };
-            if (n > 1.3)  return { cls: 'status-caution', icon: '🟠', color: '#ff9800' };
-            if (n < 0.8)  return { cls: 'status-low',     icon: '🔵', color: '#2196f3' };
-            return           { cls: 'status-ok',      icon: '🟢', color: '#4caf50' };
+            if (isNaN(n) || r === 'N/A') return { icon: '—', color: '#ccc', risk: -1 };
+            if (n > 1.5)  return { icon: '🔴', color: '#f44336', risk: 4 };
+            if (n > 1.3)  return { icon: '🟠', color: '#ff9800', risk: 3 };
+            if (n < 0.8)  return { icon: '🔵', color: '#2196f3', risk: 1 };
+            return           { icon: '🟢', color: '#4caf50', risk: 2 };
         };
 
-        const playerRows = this.players.map(player => {
+        let players = this.players.map(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
             const st = getStatus(ratio.ratio);
-            const r = parseFloat(ratio.ratio) || 0;
+            return { player, ratio, st, r: parseFloat(ratio.ratio) || 0 };
+        });
+
+        if (this._dashSort === 'risk')  players.sort((a, b) => b.st.risk - a.st.risk || b.r - a.r);
+        if (this._dashSort === 'safe')  players.sort((a, b) => a.st.risk - b.st.risk || a.r - b.r);
+        if (this._dashSort === 'name')  players.sort((a, b) => a.player.name.localeCompare(b.player.name));
+
+        const sortLabel = { risk: '↓ Mayor riesgo', safe: '↑ Menor riesgo', name: 'A–Z' };
+        const nextSort  = { risk: 'safe', safe: 'name', name: 'risk' };
+
+        const playerRows = players.map(({ player, ratio, st, r }) => {
             const barW = Math.min(r / 2 * 100, 100).toFixed(0);
             return `
                 <div class="db-player-row">
@@ -1036,55 +1043,68 @@ class RPETracker {
         }).join('');
 
         container.innerHTML = `
-            <div class="db-layout">
+            <div class="db-split">
 
-                <div class="db-top">
-                    <div class="db-stats">
-                        <div class="db-stat">
-                            <div class="db-stat-val">${recentUnique}</div>
-                            <div class="db-stat-lbl">sesiones 7d</div>
+                <!-- Columna izquierda: métricas -->
+                <div class="db-left">
+                    <div class="db-left-section">
+                        <div class="db-left-label">Esta semana</div>
+                        <div class="db-metric-row">
+                            <span class="db-metric-lbl">Sesiones</span>
+                            <span class="db-metric-val">${recentUnique}</span>
                         </div>
-                        <div class="db-stat-sep"></div>
-                        <div class="db-stat">
-                            <div class="db-stat-val">${avgRPE}</div>
-                            <div class="db-stat-lbl">RPE medio</div>
+                        <div class="db-metric-row">
+                            <span class="db-metric-lbl">RPE medio</span>
+                            <span class="db-metric-val" style="color:#ff9800">${avgRPE7}</span>
                         </div>
-                        <div class="db-stat-sep"></div>
-                        <div class="db-stat">
-                            <div class="db-stat-val">${trainingCount}</div>
-                            <div class="db-stat-lbl">entrenos</div>
+                        <div class="db-metric-row">
+                            <span class="db-metric-lbl">Entrenos</span>
+                            <span class="db-metric-val">${trainingCount}</span>
                         </div>
-                        <div class="db-stat-sep"></div>
-                        <div class="db-stat">
-                            <div class="db-stat-val">${matchCount}</div>
-                            <div class="db-stat-lbl">partidos</div>
-                        </div>
-                        <div class="db-stat-sep"></div>
-                        <div class="db-stat">
-                            <div class="db-stat-val">${totalSessions}</div>
-                            <div class="db-stat-lbl">total sesiones</div>
+                        <div class="db-metric-row">
+                            <span class="db-metric-lbl">Partidos</span>
+                            <span class="db-metric-val">${matchCount}</span>
                         </div>
                     </div>
-
-                    ${alerts.length > 0 ? `
-                    <div class="db-alerts">
-                        ${alerts.map(a => `
-                            <div class="db-alert-pill ${a.cls}">${a.icon} ${a.name} · ${a.ratio}</div>
-                        `).join('')}
-                    </div>` : ''}
+                    <div class="db-left-section">
+                        <div class="db-left-label">Temporada</div>
+                        <div class="db-metric-row">
+                            <span class="db-metric-lbl">Total sesiones</span>
+                            <span class="db-metric-val">${totalSessions}</span>
+                        </div>
+                        <div class="db-metric-row">
+                            <span class="db-metric-lbl">RPE medio global</span>
+                            <span class="db-metric-val">${avgRPE}</span>
+                        </div>
+                        <div class="db-metric-row">
+                            <span class="db-metric-lbl">Jugadoras</span>
+                            <span class="db-metric-val">${this.players.length}</span>
+                        </div>
+                        ${activeInjuries > 0 ? `
+                        <div class="db-metric-row">
+                            <span class="db-metric-lbl">Lesionadas</span>
+                            <span class="db-metric-val" style="color:#f44336">${activeInjuries}</span>
+                        </div>` : ''}
+                    </div>
                 </div>
 
-                <div class="db-section-label">
-                    Ratio A:C por jugadora
-                    <span class="db-legend">
-                        <span style="color:#4caf50">● 0.8–1.3 óptimo</span>
-                        <span style="color:#ff9800">● 1.3–1.5 precaución</span>
-                        <span style="color:#f44336">● &gt;1.5 peligro</span>
-                    </span>
-                </div>
-
-                <div class="db-players">
-                    ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras registradas</div>'}
+                <!-- Columna derecha: ratio jugadoras -->
+                <div class="db-right">
+                    <div class="db-right-header">
+                        <span class="db-right-label">Ratio A:C</span>
+                        <button class="db-sort-btn" onclick="window.rpeTracker?._dashSort='${nextSort[this._dashSort]}'; window.rpeTracker?.renderDashboard()">
+                            ${sortLabel[this._dashSort]}
+                        </button>
+                    </div>
+                    <div class="db-right-legend">
+                        <span style="color:#4caf50">● óptimo</span>
+                        <span style="color:#ff9800">● precaución</span>
+                        <span style="color:#f44336">● peligro</span>
+                        <span style="color:#2196f3">● bajo</span>
+                    </div>
+                    <div class="db-players">
+                        ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
+                    </div>
                 </div>
 
             </div>
