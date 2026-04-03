@@ -2749,7 +2749,7 @@ header h1 {
 /* Split layout */
 .db-split {
     display: grid;
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: 220px 1fr 220px;
     min-height: calc(100vh - 110px);
 }
 
@@ -2900,10 +2900,89 @@ header h1 {
 .db-player-icon  { font-size: 13px; text-align: center; }
 .db-empty        { color: #bbb; font-size: 0.85rem; padding: 1rem 0; text-align: center; }
 
-/* Mobile: stack columns */
+/* Availability column */
+.db-avail {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-left: 0.5px solid #eee;
+    background: #fafafa;
+}
+
+.db-avail-summary {
+    display: flex;
+    gap: 6px;
+    padding: 0.5rem 1rem;
+    border-bottom: 0.5px solid #eee;
+    background: white;
+    flex-wrap: wrap;
+}
+
+.db-avail-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+
+.db-avail-pill span { font-weight: 400; color: inherit; opacity: 0.75; }
+.db-avail-ok      { background: #e8f5e9; color: #2e7d32; }
+.db-avail-caution { background: #fff3e0; color: #e65100; }
+.db-avail-out     { background: #ffebee; color: #c62828; }
+
+.db-avail-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.25rem 0 1rem;
+}
+
+.db-avail-section {
+    padding: 0.4rem 1rem 0.2rem;
+}
+
+.db-avail-section-title {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #bbb;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.3rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.db-avail-count {
+    background: #eee;
+    color: #999;
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.db-avail-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.3rem 0;
+    border-bottom: 0.5px solid #f5f5f5;
+    font-size: 0.82rem;
+}
+
+.db-avail-row:last-child { border-bottom: none; }
+.db-avail-icon  { font-size: 11px; flex-shrink: 0; }
+.db-avail-name  { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.db-avail-detail { font-size: 0.72rem; white-space: nowrap; flex-shrink: 0; }
+
+/* Mobile: stack all columns */
 @media (max-width: 768px) {
     .db-split { grid-template-columns: 1fr; min-height: auto; }
     .db-left { border-right: none; border-bottom: 0.5px solid #eee; }
+    .db-avail { border-left: none; border-top: 0.5px solid #eee; }
     .db-left-section { padding: 0.5rem 1rem 0.6rem; }
     .db-metric-row { font-size: 0.82rem; }
     .db-right-header { padding: 0.5rem 1rem 0.35rem; }

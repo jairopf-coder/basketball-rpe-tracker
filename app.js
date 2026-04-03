@@ -1042,6 +1042,48 @@ class RPETracker {
                 </div>`;
         }).join('');
 
+        // Availability groups (same logic as renderTeamStatus)
+        const availGroups = { ok: [], caution: [], out: [] };
+        this.players.forEach(player => {
+            const ratio = this.calculateAcuteChronicRatio(player.id);
+            const r = parseFloat(ratio.ratio);
+            const activeInjury = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
+            const playerSessions = this.sessions.filter(s => s.playerId === player.id);
+            const last7 = playerSessions.filter(s => (new Date() - new Date(s.date)) / 86400000 <= 7);
+            const avgRPE7 = last7.length ? (last7.reduce((s, x) => s + x.rpe, 0) / last7.length).toFixed(1) : null;
+            const entry = { player, ratio, r, activeInjury, avgRPE7 };
+            if (activeInjury)                        availGroups.out.push(entry);
+            else if (r > 1.5 || (r > 0 && r < 0.8)) availGroups.caution.push(entry);
+            else                                      availGroups.ok.push(entry);
+        });
+
+        const availRow = ({ player, activeInjury, avgRPE7, r, ratio }) => {
+            let icon, color, detail;
+            if (activeInjury) {
+                icon = '🔴'; color = '#f44336';
+                detail = activeInjury.location ? this.getLocationName(activeInjury.location) : 'lesión activa';
+            } else if (r > 1.5) {
+                icon = '🟠'; color = '#ff9800'; detail = `Ratio ${ratio.ratio}`;
+            } else if (r > 0 && r < 0.8) {
+                icon = '🔵'; color = '#2196f3'; detail = `Ratio ${ratio.ratio}`;
+            } else {
+                icon = '🟢'; color = '#4caf50'; detail = avgRPE7 ? `RPE 7d: ${avgRPE7}` : 'Sin datos';
+            }
+            return `
+                <div class="db-avail-row">
+                    <span class="db-avail-icon">${icon}</span>
+                    <span class="db-avail-name">${player.name}${player.number ? `<span class="db-num">#${player.number}</span>` : ''}</span>
+                    <span class="db-avail-detail" style="color:${color}">${detail}</span>
+                </div>`;
+        };
+
+        const availSection = (title, entries, emptyMsg) =>
+            entries.length === 0 ? '' : `
+                <div class="db-avail-section">
+                    <div class="db-avail-section-title">${title} <span class="db-avail-count">${entries.length}</span></div>
+                    ${entries.map(availRow).join('')}
+                </div>`;
+
         container.innerHTML = `
             <div class="db-split">
 
@@ -1104,6 +1146,28 @@ class RPETracker {
                     </div>
                     <div class="db-players">
                         ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
+                    </div>
+                </div>
+
+                <!-- Columna disponibilidad -->
+                <div class="db-avail">
+                    <div class="db-right-header">
+                        <span class="db-right-label">Disponibilidad</span>
+                        <button class="db-sort-btn" onclick="NavMenu.selectGroup('equipo')" title="Ver detalle completo">
+                            Ver detalle →
+                        </button>
+                    </div>
+                    <div class="db-avail-summary">
+                        <div class="db-avail-pill db-avail-ok">${availGroups.ok.length} <span>aptas</span></div>
+                        <div class="db-avail-pill db-avail-caution">${availGroups.caution.length} <span>precaución</span></div>
+                        <div class="db-avail-pill db-avail-out">${availGroups.out.length} <span>no disp.</span></div>
+                    </div>
+                    <div class="db-avail-list">
+                        ${this.players.length === 0
+                            ? '<div class="db-empty">Sin jugadoras</div>'
+                            : availSection('Precaución', availGroups.caution, '') +
+                              availSection('No disponibles', availGroups.out, '') +
+                              availSection('Disponibles', availGroups.ok, '')}
                     </div>
                 </div>
 
