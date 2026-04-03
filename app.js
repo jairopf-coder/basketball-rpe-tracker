@@ -30,11 +30,7 @@ const NavMenu = {
         },
         equipo: {
             label: '🟢 Equipo',
-            items: [
-                { view: 'teamstatus', label: '🟢 Disponibilidad' },
-                { view: 'wellness',   label: '❤️ Wellness' },
-            ],
-            default: 'teamstatus'
+            direct: 'wellness',
         }
     },
 
@@ -1153,8 +1149,8 @@ class RPETracker {
                 <div class="db-avail">
                     <div class="db-right-header">
                         <span class="db-right-label">Disponibilidad</span>
-                        <button class="db-sort-btn" onclick="NavMenu.selectGroup('equipo')" title="Ver detalle completo">
-                            Ver detalle →
+                        <button class="db-sort-btn" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Generar informe PDF">
+                            📄 Informe PDF
                         </button>
                     </div>
                     <div class="db-avail-summary">

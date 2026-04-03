@@ -2749,7 +2749,7 @@ header h1 {
 /* Split layout */
 .db-split {
     display: grid;
-    grid-template-columns: 220px 1fr 220px;
+    grid-template-columns: 200px minmax(0, 1fr) 240px;
     min-height: calc(100vh - 110px);
 }
 
@@ -2795,7 +2795,6 @@ header h1 {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    max-width: 480px;
 }
 
 .db-right-header {
@@ -2853,7 +2852,7 @@ header h1 {
 
 .db-player-row {
     display: grid;
-    grid-template-columns: 130px 120px 42px 18px;
+    grid-template-columns: 130px 1fr 42px 18px;
     align-items: center;
     gap: 0.6rem;
     padding: 0.5rem 0;
