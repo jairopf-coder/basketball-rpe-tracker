@@ -11,6 +11,7 @@ const NavMenu = {
             items: [
                 { view: 'dashboard',  label: '📊 Dashboard' },
                 { view: 'analytics',  label: '📈 Análisis A:C' },
+                { view: 'wellness',   label: '❤️ Wellness' },
                 { view: 'weekplan',   label: '📅 Planificación' },
                 { view: 'calendar',   label: '🗓️ Calendario' },
                 { view: 'players',    label: '👥 Jugadoras' },
@@ -27,10 +28,6 @@ const NavMenu = {
                 { view: 'prediction',   label: '🔮 Predicción' },
             ],
             default: 'injury'
-        },
-        equipo: {
-            label: '🟢 Equipo',
-            direct: 'wellness',
         }
     },
 
