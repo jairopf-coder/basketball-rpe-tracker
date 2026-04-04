@@ -2,10 +2,6 @@
 
 const NavMenu = {
     groups: {
-        sessions: {
-            label: '📋 Sesiones',
-            direct: 'sessions', // go directly, no submenu
-        },
         carga: {
             label: '📊 Carga',
             items: [
@@ -15,6 +11,7 @@ const NavMenu = {
                 { view: 'weekplan',   label: '📅 Planificación' },
                 { view: 'calendar',   label: '🗓️ Calendario' },
                 { view: 'players',    label: '👥 Jugadoras' },
+                { view: 'sessions',   label: '📋 Sesiones' },
             ],
             default: 'dashboard'
         },
@@ -31,8 +28,8 @@ const NavMenu = {
         }
     },
 
-    activeGroup: 'sessions',
-    activeView: 'sessions',
+    activeGroup: 'carga',
+    activeView: 'dashboard',
 
     selectGroup(groupKey) {
         const group = this.groups[groupKey];
