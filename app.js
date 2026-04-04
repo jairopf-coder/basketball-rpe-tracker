@@ -158,6 +158,9 @@ class RPETracker {
 
         // Show skeleton while Firebase loads
         this.showSkeletonLoader();
+
+        // Arrange initial view: carga group → dashboard
+        setTimeout(() => NavMenu.selectGroup('carga'), 0);
     }
 
     setupEventListeners() {
