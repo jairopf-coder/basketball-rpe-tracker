@@ -122,7 +122,7 @@ class RPETracker {
         this.sessions = this.loadSessions();
         this.players = this.loadPlayers();
         this.currentSessionId = null;
-        this.currentView = 'sessions';
+        this.currentView = 'dashboard';
         this.currentPlayerFilter = 'all';
         this.currentTypeFilter = 'all';
         this.calendarYear = new Date().getFullYear();
@@ -159,8 +159,8 @@ class RPETracker {
         // Show skeleton while Firebase loads
         this.showSkeletonLoader();
 
-        // Arrange initial view: carga group → dashboard
-        setTimeout(() => NavMenu.selectGroup('carga'), 0);
+        // Activate carga group and show dashboard nav/subbar immediately
+        NavMenu.selectGroup('carga');
     }
 
     setupEventListeners() {
@@ -1426,6 +1426,7 @@ class RPETracker {
             window.firebaseSync.onSessionsChange((updatedSessions) => {
                 this.sessions = updatedSessions;
                 this.renderSessions();
+                if (this.currentView === 'dashboard') this.renderDashboard();
                 console.log('🔄 Sesiones actualizadas desde Firebase');
             });
         } else {
@@ -1454,6 +1455,7 @@ class RPETracker {
                 this.renderPlayers();
                 this.populatePlayerSelects();
                 this.renderSessions(); // re-renderizar para mostrar nombres correctos
+                if (this.currentView === 'dashboard') this.renderDashboard();
                 console.log('🔄 Jugadores actualizados desde Firebase');
             });
         } else {
