@@ -30,6 +30,7 @@
                 </div>
             </div>
             <div class="header-actions">
+                <button id="darkModeBtn" class="dark-mode-btn" onclick="DarkMode.toggle()" title="Modo oscuro">🌙</button>
                 <button id="addBtn" class="btn-primary">+ Nueva Sesión</button>
                 <button id="backupBtn" class="btn-secondary">💾 Backup</button>
                 <button id="exportBtn" class="btn-secondary">📥 Exportar</button>
@@ -422,6 +423,12 @@
                         <input type="number" id="playerNumber" placeholder="Ej: 23">
                     </div>
 
+                    <div class="form-group">
+                        <label>🎨 Color identificativo</label>
+                        <div id="playerColorPicker" class="token-color-picker"></div>
+                        <input type="hidden" id="playerColor">
+                    </div>
+
                     <div class="modal-footer">
                         <button type="button" id="cancelPlayerBtn" class="btn-secondary">Cancelar</button>
                         <button type="submit" class="btn-primary">Guardar</button>
@@ -449,6 +456,12 @@
                     <div class="form-group">
                         <label>🔢 Dorsal (opcional)</label>
                         <input type="number" id="editPlayerNumber" placeholder="Ej: 23">
+                    </div>
+
+                    <div class="form-group">
+                        <label>🎨 Color identificativo</label>
+                        <div id="editPlayerColorPicker" class="token-color-picker"></div>
+                        <input type="hidden" id="editPlayerColor">
                     </div>
 
                     <div class="modal-footer">
