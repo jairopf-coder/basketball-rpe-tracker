@@ -115,6 +115,99 @@ const NavMenu = {
     }
 };
 
+// ========== PLAYER TOKEN COLOR SYSTEM ==========
+
+const PlayerTokens = {
+    PALETTE: [
+        '#ff6600', // orange  (primary)
+        '#0066ff', // blue    (secondary)
+        '#9c27b0', // purple
+        '#00bcd4', // cyan
+        '#e91e63', // pink
+        '#4caf50', // green
+        '#ff9800', // amber
+        '#795548', // brown
+        '#607d8b', // blue-grey
+        '#f44336', // red
+        '#009688', // teal
+        '#673ab7', // deep-purple
+    ],
+
+    /** Return a color for a player, assigning one if they don't have one yet */
+    get(player) {
+        if (player.color) return player.color;
+        // fallback: derive from index in global player list
+        const tracker = window.rpeTracker;
+        if (tracker) {
+            const idx = tracker.players.findIndex(p => p.id === player.id);
+            return this.PALETTE[(idx >= 0 ? idx : 0) % this.PALETTE.length];
+        }
+        return this.PALETTE[0];
+    },
+
+    /** Assign a color to a player if they don't have one (mutates player object) */
+    assign(player, allPlayers) {
+        if (!player.color) {
+            const idx = allPlayers ? allPlayers.findIndex(p => p.id === player.id) : 0;
+            player.color = this.PALETTE[(idx >= 0 ? idx : 0) % this.PALETTE.length];
+        }
+        return player.color;
+    },
+
+    /** Render an avatar div with the correct token color inline style */
+    avatar(player, sizePx = 40, fontSize = '1rem', extraClass = '') {
+        const color = this.get(player);
+        const initials = this._initials(player.name);
+        return `<div class="player-token-avatar ${extraClass}" style="width:${sizePx}px;height:${sizePx}px;font-size:${fontSize};background:${color}" title="${player.name}">${initials}</div>`;
+    },
+
+    /** CSS inline style string to set --player-token on a parent element */
+    tokenStyle(player) {
+        return `--player-token: ${this.get(player)}`;
+    },
+
+    _initials(name) {
+        if (!name) return '?';
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    }
+};
+
+// ========== DARK MODE ==========
+
+const DarkMode = {
+    KEY: 'rpe_dark_mode',
+
+    init() {
+        const saved = localStorage.getItem(this.KEY);
+        const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+        const enabled = saved !== null ? saved === 'true' : prefersDark;
+        this.apply(enabled);
+    },
+
+    toggle() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        this.apply(!isDark);
+    },
+
+    apply(dark) {
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        localStorage.setItem(this.KEY, String(dark));
+        // Update button icon
+        const btn = document.getElementById('darkModeBtn');
+        if (btn) btn.textContent = dark ? '☀️' : '🌙';
+    },
+
+    isDark() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+};
+
+// ========== GLOBAL AVATAR HELPER ==========
+// Exposed so other modules (team-status, injury, etc.) can use it
+window.PlayerTokens = PlayerTokens;
+
 // Basketball RPE Tracker - Progressive Web App with Advanced Analytics
 
 class RPETracker {
@@ -134,6 +227,12 @@ class RPETracker {
     }
 
     init() {
+        // Init dark mode first (before any render)
+        DarkMode.init();
+
+        // Ensure every player has a token color assigned
+        this._ensurePlayerColors();
+
         this.setupEventListeners();
         this.renderPlayers();
         this.renderSessions();
@@ -378,24 +477,70 @@ class RPETracker {
     openAddPlayerModal() {
         document.getElementById('addPlayerModal').classList.add('active');
         document.getElementById('playerForm').reset();
+        // Pre-select next available color
+        const usedColors = this.players.map(p => p.color).filter(Boolean);
+        const defaultColor = PlayerTokens.PALETTE.find(c => !usedColors.includes(c)) || PlayerTokens.PALETTE[0];
+        this._renderColorPicker('playerColorPicker', 'playerColor', defaultColor);
     }
 
     handlePlayerSubmit(e) {
         e.preventDefault();
-        
+
+        const chosenColor = document.getElementById('playerColor').value;
+        const usedColors = this.players.map(p => p.color).filter(Boolean);
+        const fallback = PlayerTokens.PALETTE.find(c => !usedColors.includes(c)) || PlayerTokens.PALETTE[this.players.length % PlayerTokens.PALETTE.length];
+
         const player = {
             id: Date.now().toString(),
             name: document.getElementById('playerName').value,
             number: document.getElementById('playerNumber').value || null,
+            color: chosenColor || fallback,
             createdAt: new Date().toISOString()
         };
-        
+
         this.players.push(player);
         this.savePlayers();
         this.renderPlayers();
         this.populatePlayerSelects();
         this.closeModal('addPlayerModal');
         this.showToast('✅ Jugadora añadida correctamente', 'success');
+    }
+
+    /** Ensure every existing player has a color token (migration for old data) */
+    _ensurePlayerColors() {
+        let changed = false;
+        this.players.forEach((player, idx) => {
+            if (!player.color) {
+                player.color = PlayerTokens.PALETTE[idx % PlayerTokens.PALETTE.length];
+                changed = true;
+            }
+        });
+        if (changed) this.savePlayers();
+    }
+
+    /** Render an interactive color picker into a container element.
+     *  @param {string} containerId  - id of the .token-color-picker div
+     *  @param {string} hiddenInputId - id of the <input type="hidden"> that stores the value
+     *  @param {string} selectedColor - color to pre-select
+     */
+    _renderColorPicker(containerId, hiddenInputId, selectedColor) {
+        const container = document.getElementById(containerId);
+        const hidden    = document.getElementById(hiddenInputId);
+        if (!container || !hidden) return;
+
+        hidden.value = selectedColor || PlayerTokens.PALETTE[0];
+
+        container.innerHTML = PlayerTokens.PALETTE.map(color => `
+            <div class="token-color-swatch ${color === hidden.value ? 'selected' : ''}"
+                 style="background:${color}"
+                 data-color="${color}"
+                 title="${color}"
+                 onclick="(function(el){
+                     el.closest('.token-color-picker').querySelectorAll('.token-color-swatch').forEach(s=>s.classList.remove('selected'));
+                     el.classList.add('selected');
+                     document.getElementById('${hiddenInputId}').value = '${color}';
+                 })(this)">
+            </div>`).join('');
     }
 
     deletePlayer(playerId) {
@@ -417,7 +562,7 @@ class RPETracker {
     renderPlayers() {
         const container = document.getElementById('playersList');
         if (!container) return;
-        
+
         if (this.players.length === 0) {
             container.innerHTML = `
                 <div class="empty-state active">
@@ -428,25 +573,26 @@ class RPETracker {
             `;
             return;
         }
-        
+
         container.innerHTML = this.players.map(player => {
             const playerSessions = this.sessions.filter(s => s.playerId === player.id);
             const avgRPE = playerSessions.length > 0
                 ? (playerSessions.reduce((sum, s) => sum + s.rpe, 0) / playerSessions.length).toFixed(1)
                 : 0;
-            
+
             const totalLoad = playerSessions.reduce((sum, s) => {
                 return sum + (s.load || (s.rpe * (s.duration || 60)));
             }, 0);
-            
+
             const ratio = this.calculateAcuteChronicRatio(player.id);
-            
+            const color = PlayerTokens.get(player);
+
             return `
-                <div class="player-card">
+                <div class="player-card" style="border-left: 4px solid ${color}">
                     <div class="player-info">
-                        <div class="player-avatar">${player.name.charAt(0).toUpperCase()}</div>
+                        ${PlayerTokens.avatar(player, 56, '1.4rem')}
                         <div class="player-details">
-                            <h3>${player.name}${player.number ? ` #${player.number}` : ''}</h3>
+                            <h3>${player.name}${player.number ? ` <span style="opacity:0.5;font-size:0.85em">#${player.number}</span>` : ''}</h3>
                             <p class="player-meta">${playerSessions.length} registros · ${rpeTracker ? rpeTracker.countUniqueSessions(playerSessions) : playerSessions.length} sesiones</p>
                         </div>
                     </div>
@@ -569,13 +715,15 @@ class RPETracker {
     renderPlayerButtonsMulti() {
         const container = document.getElementById('playerButtons');
         if (!container) return;
-        container.innerHTML = this.players.map(player => `
-            <button type="button" class="player-btn" data-player-id="${player.id}">
-                <div class="player-btn-avatar">${player.name.charAt(0).toUpperCase()}</div>
+        container.innerHTML = this.players.map(player => {
+            const color = PlayerTokens.get(player);
+            return `
+            <button type="button" class="player-btn" data-player-id="${player.id}" style="--player-token:${color}">
+                ${PlayerTokens.avatar(player, 50, '1.3rem', 'player-btn-avatar')}
                 <div class="player-btn-name">${player.name}</div>
                 ${player.number ? `<div class="player-btn-number">#${player.number}</div>` : ''}
-            </button>
-        `).join('');
+            </button>`;
+        }).join('');
         this.updateSelectedCount();
     }
 
@@ -669,10 +817,11 @@ class RPETracker {
         container.innerHTML = this.selectedPlayerIds.map(playerId => {
             const player = this.players.find(p => p.id === playerId);
             if (!player) return '';
+            const color = PlayerTokens.get(player);
             return `
-                <div class="player-rpe-item" id="rpe-item-${player.id}">
+                <div class="player-rpe-item" id="rpe-item-${player.id}" style="border-left:3px solid ${color}">
                     <div class="player-rpe-header">
-                        <div class="player-rpe-avatar">${player.name.charAt(0).toUpperCase()}</div>
+                        ${PlayerTokens.avatar(player, 36, '0.9rem', 'player-rpe-avatar')}
                         <div class="player-rpe-name">${player.name}${player.number ? ` <span style="opacity:0.6;font-size:0.85rem">#${player.number}</span>` : ''}</div>
                         <div style="display:flex;align-items:center;gap:6px;">
                             <div class="player-rpe-label-text" id="rpeLbl-${player.id}" style="text-align:right">${this.getRPELabel(5)}</div>
@@ -1024,6 +1173,7 @@ class RPETracker {
             const barW = Math.min(r / 2 * 100, 100).toFixed(0);
             return `
                 <div class="db-player-row">
+                    ${PlayerTokens.avatar(player, 20, '0.6rem')}
                     <div class="db-player-name">${player.name}${player.number ? `<span class="db-num">#${player.number}</span>` : ''}</div>
                     <div class="db-player-bar">
                         <div class="db-bar-fill" style="width:${barW}%;background:${st.color}"></div>
@@ -1065,6 +1215,7 @@ class RPETracker {
             return `
                 <div class="db-avail-row">
                     <span class="db-avail-icon">${icon}</span>
+                    ${PlayerTokens.avatar(player, 22, '0.65rem')}
                     <span class="db-avail-name">${player.name}${player.number ? `<span class="db-num">#${player.number}</span>` : ''}</span>
                     <span class="db-avail-detail" style="color:${color}">${detail}</span>
                 </div>`;
@@ -1452,6 +1603,7 @@ class RPETracker {
         if (window.firebaseSync) {
             window.firebaseSync.onPlayersChange((updatedPlayers) => {
                 this.players = updatedPlayers;
+                this._ensurePlayerColors(); // migrate old players that lack color
                 this.renderPlayers();
                 this.populatePlayerSelects();
                 this.renderSessions(); // re-renderizar para mostrar nombres correctos

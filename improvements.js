@@ -112,28 +112,34 @@ RPETracker.prototype.updateEditRPEDisplay = function(value) {
 RPETracker.prototype.editPlayer = function(playerId) {
     const player = this.players.find(p => p.id === playerId);
     if (!player) return;
-    
+
     document.getElementById('editPlayerId').value = player.id;
     document.getElementById('editPlayerName').value = player.name;
     document.getElementById('editPlayerNumber').value = player.number || '';
-    
+
+    // Render color picker with current color preselected
+    const currentColor = PlayerTokens.get(player);
+    this._renderColorPicker('editPlayerColorPicker', 'editPlayerColor', currentColor);
+
     document.getElementById('editPlayerModal').classList.add('active');
 };
 
 RPETracker.prototype.handleEditPlayerSubmit = function(e) {
     e.preventDefault();
-    
+
     const playerId = document.getElementById('editPlayerId').value;
     const player = this.players.find(p => p.id === playerId);
-    
+
     if (!player) {
         alert('❌ Jugadora no encontrada');
         return;
     }
-    
+
     player.name = document.getElementById('editPlayerName').value;
     player.number = document.getElementById('editPlayerNumber').value || null;
-    
+    const chosenColor = document.getElementById('editPlayerColor').value;
+    if (chosenColor) player.color = chosenColor;
+
     this.savePlayers();
     this.renderPlayers();
     this.renderSessions();
