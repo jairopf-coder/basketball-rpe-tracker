@@ -574,7 +574,18 @@ class RPETracker {
             return;
         }
 
-        container.innerHTML = this.players.map(player => {
+        // Batch 2: apply search filter
+        const searchTerm = (document.getElementById('playerSearchInput')?.value || '').toLowerCase().trim();
+        const playersToShow = searchTerm
+            ? this.players.filter(p => p.name.toLowerCase().includes(searchTerm) || (p.number && String(p.number).includes(searchTerm)))
+            : this.players;
+
+        if (playersToShow.length === 0 && searchTerm) {
+            container.innerHTML = `<div class="empty-state active"><div class="empty-icon">🔍</div><h3>Sin resultados</h3><p>No hay jugadoras que coincidan con "${searchTerm}"</p></div>`;
+            return;
+        }
+
+        container.innerHTML = playersToShow.map((player, idx) => {
             const playerSessions = this.sessions.filter(s => s.playerId === player.id);
             const avgRPE = playerSessions.length > 0
                 ? (playerSessions.reduce((sum, s) => sum + s.rpe, 0) / playerSessions.length).toFixed(1)
@@ -587,12 +598,39 @@ class RPETracker {
             const ratio = this.calculateAcuteChronicRatio(player.id);
             const color = PlayerTokens.get(player);
 
+            // Batch 2: load trend (this week vs last week)
+            const now = new Date();
+            const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+            const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+            const thisWeekLoad = playerSessions.filter(s => new Date(s.date) >= weekAgo).reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
+            const lastWeekLoad = playerSessions.filter(s => new Date(s.date) >= twoWeeksAgo && new Date(s.date) < weekAgo).reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
+            let trendHTML = '';
+            if (lastWeekLoad > 0 && thisWeekLoad > 0) {
+                const pct = Math.round(((thisWeekLoad - lastWeekLoad) / lastWeekLoad) * 100);
+                const up = pct >= 0;
+                trendHTML = `<span class="player-trend ${up ? 'trend-up' : 'trend-down'}">${up ? '↑' : '↓'} ${Math.abs(pct)}%</span>`;
+            } else if (thisWeekLoad > 0) {
+                trendHTML = `<span class="player-trend trend-new">● nueva</span>`;
+            }
+
+            // Batch 2: 7-day sparkline data (daily load)
+            const sparkData = [];
+            for (let d = 6; d >= 0; d--) {
+                const dayStart = new Date(now); dayStart.setDate(dayStart.getDate() - d); dayStart.setHours(0,0,0,0);
+                const dayEnd   = new Date(dayStart); dayEnd.setHours(23,59,59,999);
+                const dayLoad  = playerSessions.filter(s => { const sd = new Date(s.date); return sd >= dayStart && sd <= dayEnd; }).reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
+                sparkData.push(dayLoad);
+            }
+            const sparkMax = Math.max(...sparkData, 1);
+            const sparkId = `spark-${player.id}`;
+
             return `
-                <div class="player-card" style="border-left: 4px solid ${color}">
+                <div class="player-card" style="border-left: 4px solid ${color}" data-player-id="${player.id}" draggable="true">
+                    <div class="player-card-drag-handle" title="Arrastrar para reordenar">⠿</div>
                     <div class="player-info">
                         ${PlayerTokens.avatar(player, 56, '1.4rem')}
                         <div class="player-details">
-                            <h3>${player.name}${player.number ? ` <span style="opacity:0.5;font-size:0.85em">#${player.number}</span>` : ''}</h3>
+                            <h3>${player.name}${player.number ? ` <span style="opacity:0.5;font-size:0.85em">#${player.number}</span>` : ''}${trendHTML}</h3>
                             <p class="player-meta">${playerSessions.length} registros · ${rpeTracker ? rpeTracker.countUniqueSessions(playerSessions) : playerSessions.length} sesiones</p>
                         </div>
                     </div>
@@ -610,6 +648,11 @@ class RPETracker {
                             <span class="player-stat-label">Ratio A:C</span>
                         </div>
                     </div>
+                    <!-- Batch 2: sparkline -->
+                    <div class="player-sparkline-row">
+                        <span class="player-sparkline-label">Carga 7d</span>
+                        <canvas id="${sparkId}" class="player-sparkline" width="120" height="28"></canvas>
+                    </div>
                     <div class="player-actions">
                         <button class="btn-icon" style="background: #2196f3; color: white;" onclick="window.rpeTracker?.showPlayerReportMenu('${player.id}')" title="Informe PDF">📄</button>
                         <button class="btn-icon" style="background: var(--primary); color: white;" onclick="window.rpeTracker?.editPlayer('${player.id}')" title="Editar">✏️</button>
@@ -618,6 +661,27 @@ class RPETracker {
                 </div>
             `;
         }).join('');
+
+        // Batch 2: draw sparklines after DOM is updated
+        requestAnimationFrame(() => {
+            playersToShow.forEach(player => {
+                const canvas = document.getElementById(`spark-${player.id}`);
+                if (!canvas) return;
+                const playerSessions = this.sessions.filter(s => s.playerId === player.id);
+                const now = new Date();
+                const sparkData = [];
+                for (let d = 6; d >= 0; d--) {
+                    const dayStart = new Date(now); dayStart.setDate(dayStart.getDate() - d); dayStart.setHours(0,0,0,0);
+                    const dayEnd   = new Date(dayStart); dayEnd.setHours(23,59,59,999);
+                    const dayLoad  = playerSessions.filter(s => { const sd = new Date(s.date); return sd >= dayStart && sd <= dayEnd; }).reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
+                    sparkData.push(dayLoad);
+                }
+                this._drawSparkline(canvas, sparkData, PlayerTokens.get(player));
+            });
+        });
+
+        // Batch 2: init drag-and-drop on roster
+        if (!searchTerm) this._initRosterDragAndDrop(container);
     }
 
     populatePlayerSelects() {
@@ -1019,14 +1083,33 @@ class RPETracker {
         listContainer.innerHTML = sorted.map(session => {
             const player = this.players.find(p => p.id === session.playerId);
             const playerName = player ? player.name : 'Desconocida';
-            
+
+            // Batch 2: time badge
+            const sessionDate = new Date(session.date);
+            const today = new Date(); today.setHours(0,0,0,0);
+            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+            sessionDate.setHours(0,0,0,0);
+            let timeBadge = '';
+            if (sessionDate.getTime() === today.getTime()) {
+                timeBadge = '<span class="session-time-badge badge-today">HOY</span>';
+            } else if (sessionDate.getTime() === yesterday.getTime()) {
+                timeBadge = '<span class="session-time-badge badge-yesterday">AYER</span>';
+            } else {
+                const diffDays = Math.floor((today - sessionDate) / 86400000);
+                if (diffDays <= 6) timeBadge = `<span class="session-time-badge badge-recent">hace ${diffDays}d</span>`;
+            }
+
             return `
                 <div class="session-card" onclick="window.rpeTracker?.showSessionDetail('${session.id}')">
                     <div class="session-icon ${session.type}">
                         ${session.type === 'training' ? '🏀' : '🏟️'}
                     </div>
                     <div class="session-info">
-                        <div class="session-type">${playerName} - ${this.getSessionTypeName(session.type)}</div>
+                        <div class="session-type">
+                            ${player ? PlayerTokens.avatar(player, 18, '0.55rem', 'session-player-token') : ''}
+                            ${playerName} - ${this.getSessionTypeName(session.type)}
+                            ${timeBadge}
+                        </div>
                         <div class="session-date">${this.formatDate(session.date)}</div>
                     </div>
                     <div class="session-rpe">
@@ -2267,6 +2350,108 @@ class RPETracker {
         d.setHours(0,0,0,0);
         d.setDate(d.getDate() - d.getDay() + 1); // Monday
         return d.toISOString().slice(0,10);
+    }
+
+    // ========== BATCH 2: SPARKLINE ==========
+
+    _drawSparkline(canvas, data, color) {
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        const max = Math.max(...data, 1);
+        const n = data.length;
+        const pad = 2;
+        const xStep = (w - pad * 2) / (n - 1);
+
+        // Fill area
+        ctx.beginPath();
+        ctx.moveTo(pad, h - pad);
+        data.forEach((v, i) => {
+            const x = pad + i * xStep;
+            const y = h - pad - ((v / max) * (h - pad * 2));
+            ctx.lineTo(x, y);
+        });
+        ctx.lineTo(pad + (n - 1) * xStep, h - pad);
+        ctx.closePath();
+        ctx.fillStyle = color + '33';
+        ctx.fill();
+
+        // Line
+        ctx.beginPath();
+        data.forEach((v, i) => {
+            const x = pad + i * xStep;
+            const y = h - pad - ((v / max) * (h - pad * 2));
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        // Last point dot
+        const lastX = pad + (n - 1) * xStep;
+        const lastY = h - pad - ((data[n - 1] / max) * (h - pad * 2));
+        ctx.beginPath();
+        ctx.arc(lastX, lastY, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    // ========== BATCH 2: ROSTER DRAG-AND-DROP ==========
+
+    _initRosterDragAndDrop(container) {
+        let dragging = null;
+
+        container.querySelectorAll('.player-card[draggable]').forEach(card => {
+            card.addEventListener('dragstart', e => {
+                dragging = card;
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+                container.querySelectorAll('.player-card').forEach(c => c.classList.remove('drag-over'));
+                dragging = null;
+            });
+            card.addEventListener('dragover', e => {
+                e.preventDefault();
+                if (!dragging || dragging === card) return;
+                container.querySelectorAll('.player-card').forEach(c => c.classList.remove('drag-over'));
+                card.classList.add('drag-over');
+            });
+            card.addEventListener('drop', e => {
+                e.preventDefault();
+                if (!dragging || dragging === card) return;
+                const dragId = dragging.dataset.playerId;
+                const dropId = card.dataset.playerId;
+                const dragIdx = this.players.findIndex(p => p.id === dragId);
+                const dropIdx = this.players.findIndex(p => p.id === dropId);
+                if (dragIdx < 0 || dropIdx < 0) return;
+                const [moved] = this.players.splice(dragIdx, 1);
+                this.players.splice(dropIdx, 0, moved);
+                this.savePlayers();
+                this.renderPlayers();
+                this.showToast('↕️ Orden del equipo actualizado', 'success');
+            });
+        });
+    }
+
+    // ========== BATCH 2: PLAYER SEARCH ==========
+
+    filterPlayersList(value) {
+        const clearBtn = document.getElementById('playerSearchClear');
+        if (clearBtn) clearBtn.style.display = value ? 'flex' : 'none';
+        this.renderPlayers();
+    }
+
+    clearPlayerSearch() {
+        const input = document.getElementById('playerSearchInput');
+        if (input) { input.value = ''; input.focus(); }
+        const clearBtn = document.getElementById('playerSearchClear');
+        if (clearBtn) clearBtn.style.display = 'none';
+        this.renderPlayers();
     }
 }
 
