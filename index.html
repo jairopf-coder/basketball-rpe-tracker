@@ -129,6 +129,12 @@
                         <button id="addPlayerBtn" class="btn-primary">+ Añadir Jugadora</button>
                     </div>
                 </div>
+                <!-- Batch 2: search bar -->
+                <div class="players-search-bar">
+                    <span class="players-search-icon">🔍</span>
+                    <input type="text" id="playerSearchInput" placeholder="Buscar jugadora…" oninput="window.rpeTracker?.filterPlayersList(this.value)" autocomplete="off">
+                    <button class="players-search-clear" id="playerSearchClear" onclick="window.rpeTracker?.clearPlayerSearch()" title="Limpiar">✕</button>
+                </div>
                 <div id="playersList"></div>
             </div>
         </div>
