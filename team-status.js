@@ -84,7 +84,7 @@ RPETracker.prototype.renderTeamStatus = function() {
                 <h2 class="ts-title">Estado del equipo</h2>
                 <div class="ts-subtitle">Disponibilidad para el próximo partido</div>
             </div>
-            <button class="btn-secondary" onclick="rpeTracker.generateTeamStatusPDF()" style="font-size:0.85rem;padding:0.5rem 1rem;">
+            <button class="btn-secondary" onclick="window.rpeTracker?.generateTeamStatusPDF()" style="font-size:0.85rem;padding:0.5rem 1rem;">
                 📄 Informe PDF
             </button>
         </div>
@@ -460,7 +460,7 @@ RPETracker.prototype.renderRehabLoad = function() {
                         </div>
                     </div>
                     <button class="btn-primary" style="width:100%;margin-top:0.75rem;font-size:0.9rem;"
-                        onclick="rpeTracker.saveRehabSession('${injury.id}')">
+                        onclick="window.rpeTracker?.saveRehabSession('${injury.id}')">
                         + Registrar sesión
                     </button>
                 </div>
