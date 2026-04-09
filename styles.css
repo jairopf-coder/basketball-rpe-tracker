@@ -3496,3 +3496,118 @@ header h1 {
 [data-theme="dark"] .badge-today     { background: rgba(255,102,0,0.22); }
 [data-theme="dark"] .badge-yesterday { background: rgba(33,150,243,0.18); }
 [data-theme="dark"] .badge-recent    { background: var(--bg-elevated); }
+
+/* =============================================================
+   BATCH 3 STYLES
+   ============================================================= */
+
+/* ===== SESSION DETAIL — PLAYER HEADER ===== */
+.sd-player-header {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.75rem 0 1rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 0.5px solid var(--border);
+}
+
+.sd-player-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.sd-player-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.sd-player-number {
+    opacity: 0.45;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.sd-player-meta {
+    font-size: 0.75rem;
+    color: var(--text-faint);
+    margin-top: 0.15rem;
+}
+
+.sd-ratio-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid;
+    border-radius: 10px;
+    padding: 0.35rem 0.7rem;
+    min-width: 60px;
+    flex-shrink: 0;
+    gap: 0.05rem;
+}
+
+.sd-ratio-icon { font-size: 1rem; line-height: 1; }
+.sd-ratio-val  { font-size: 1rem; font-weight: 800; line-height: 1.1; }
+.sd-ratio-lbl  { font-size: 0.6rem; font-weight: 600; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ===== SESSION DETAIL — load row dark mode fix ===== */
+.sd-load-row {
+    background: var(--bg-subtle);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+/* ===== PLAYER CARD — last session label ===== */
+.player-meta-last {
+    color: var(--text-faint);
+    font-size: 0.8em;
+}
+
+/* ===== DASHBOARD — team sparkline ===== */
+.db-team-sparkline {
+    display: block;
+    width: 100%;
+    max-width: 160px;
+    height: 36px;
+    margin-top: 0.4rem;
+    opacity: 0.9;
+}
+
+/* ===== NAV ALERT BADGE ===== */
+.nav-group-btn {
+    position: relative; /* needed for badge positioning */
+}
+
+.nav-alert-badge {
+    position: absolute;
+    top: 6px;
+    right: 4px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: #f44336;
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    pointer-events: none;
+    line-height: 1;
+    box-shadow: 0 1px 4px rgba(244,67,54,0.5);
+    animation: badge-pop 0.25s ease;
+}
+
+@keyframes badge-pop {
+    0%   { transform: scale(0); }
+    70%  { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* ===== DARK MODE ADDITIONS (Batch 3) ===== */
+[data-theme="dark"] .sd-player-header { border-color: var(--border); }
+[data-theme="dark"] .sd-load-row { background: var(--bg-elevated); }

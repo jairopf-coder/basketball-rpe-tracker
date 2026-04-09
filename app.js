@@ -624,6 +624,16 @@ class RPETracker {
             const sparkMax = Math.max(...sparkData, 1);
             const sparkId = `spark-${player.id}`;
 
+            // Batch 3: last session date
+            const lastSession = playerSessions.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+            let lastSessionLabel = '';
+            if (lastSession) {
+                const diffDays = Math.floor((new Date() - new Date(lastSession.date)) / 86400000);
+                lastSessionLabel = diffDays === 0 ? ' · Hoy' : diffDays === 1 ? ' · Ayer' : ` · hace ${diffDays}d`;
+            } else {
+                lastSessionLabel = ' · Sin sesiones';
+            }
+
             return `
                 <div class="player-card" style="border-left: 4px solid ${color}" data-player-id="${player.id}" draggable="true">
                     <div class="player-card-drag-handle" title="Arrastrar para reordenar">⠿</div>
@@ -631,7 +641,7 @@ class RPETracker {
                         ${PlayerTokens.avatar(player, 56, '1.4rem')}
                         <div class="player-details">
                             <h3>${player.name}${player.number ? ` <span style="opacity:0.5;font-size:0.85em">#${player.number}</span>` : ''}${trendHTML}</h3>
-                            <p class="player-meta">${playerSessions.length} registros · ${rpeTracker ? rpeTracker.countUniqueSessions(playerSessions) : playerSessions.length} sesiones</p>
+                            <p class="player-meta">${playerSessions.length} registros · ${rpeTracker ? rpeTracker.countUniqueSessions(playerSessions) : playerSessions.length} sesiones<span class="player-meta-last">${lastSessionLabel}</span></p>
                         </div>
                     </div>
                     <div class="player-stats">
@@ -967,7 +977,20 @@ class RPETracker {
         this.renderSessions();
         this.closeModal('newSessionModal');
         const n = this.selectedPlayerIds.length;
-        this.showToast(`✅ ${n} sesión${n > 1 ? 'es guardadas' : ' guardada'} correctamente`, 'success');
+
+        // Batch 3: show ratio in toast for single-player saves
+        if (n === 1) {
+            const pid = this.selectedPlayerIds[0];
+            const p = this.players.find(pl => pl.id === pid);
+            const ratio = this.calculateAcuteChronicRatio(pid);
+            const r = parseFloat(ratio.ratio);
+            const icon = isNaN(r) ? '' : r > 1.5 ? '🔴' : r > 1.3 ? '🟠' : r < 0.8 ? '🔵' : '🟢';
+            const rLabel = ratio.ratio === 'N/A' ? '' : ` · Ratio A:C: ${ratio.ratio} ${icon}`;
+            this.showToast(`✅ Sesión guardada${rLabel}`, 'success');
+        } else {
+            this.showToast(`✅ ${n} sesiones guardadas`, 'success');
+        }
+
         this.selectedPlayerIds = [];
     }
     
@@ -1119,6 +1142,9 @@ class RPETracker {
                 </div>
             `;
         }).join('');
+
+        // Batch 3: keep nav badge in sync
+        if (typeof this._updateNavAlertBadge === 'function') this._updateNavAlertBadge();
     }
 
     showSessionDetail(id) {
@@ -1130,13 +1156,42 @@ class RPETracker {
         const playerName = player ? player.name : 'Desconocida';
         
         const timeOfDay = session.timeOfDay === 'morning' ? '☀️ Mañana' : '🌙 Tarde';
+
+        // Batch 3: calculate A:C ratio context
+        const ratio = player ? this.calculateAcuteChronicRatio(player.id) : null;
+        const ratioVal  = ratio ? ratio.ratio : 'N/A';
+        const ratioColor = ratio ? this.getRatioColor(ratioVal) : '#999';
+        const ratioIcon = (() => {
+            const r = parseFloat(ratioVal);
+            if (isNaN(r)) return '—';
+            if (r > 1.5) return '🔴';
+            if (r > 1.3) return '🟠';
+            if (r < 0.8) return '🔵';
+            return '🟢';
+        })();
+
+        // Batch 3: session position in player history
+        const playerSessions = this.sessions
+            .filter(s => s.playerId === session.playerId)
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+        const sessionIdx = playerSessions.findIndex(s => s.id === session.id) + 1;
+        const totalSessions = playerSessions.length;
         
         const content = document.getElementById('detailContent');
         content.innerHTML = `
-            <div class="detail-row">
-                <span class="detail-label">Jugadora</span>
-                <span>${playerName}</span>
-            </div>
+            ${player ? `
+            <div class="sd-player-header">
+                ${PlayerTokens.avatar(player, 44, '1.1rem')}
+                <div class="sd-player-info">
+                    <div class="sd-player-name">${playerName}${player.number ? ` <span class="sd-player-number">#${player.number}</span>` : ''}</div>
+                    <div class="sd-player-meta">Sesión ${sessionIdx} de ${totalSessions}</div>
+                </div>
+                <div class="sd-ratio-badge" style="color:${ratioColor};border-color:${ratioColor}20;background:${ratioColor}12">
+                    <span class="sd-ratio-icon">${ratioIcon}</span>
+                    <span class="sd-ratio-val">${ratioVal}</span>
+                    <span class="sd-ratio-lbl">Ratio A:C</span>
+                </div>
+            </div>` : ''}
             <div class="detail-row">
                 <span class="detail-label">Tipo</span>
                 <span>${session.type === 'training' ? '🏀 Entrenamiento' : '🏟️ Partido'}</span>
@@ -1157,7 +1212,7 @@ class RPETracker {
                 <span class="detail-rpe-number" style="color: ${this.getRPEColor(session.rpe)}">${session.rpe}</span>
                 <div>${this.getRPELabel(session.rpe)}</div>
             </div>
-            <div class="detail-row" style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+            <div class="detail-row sd-load-row">
                 <span class="detail-label">Carga Total (sRPE)</span>
                 <span style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${session.load || (session.rpe * (session.duration || 60))}</span>
             </div>
@@ -1165,8 +1220,8 @@ class RPETracker {
                 <div class="detail-row">
                     <span class="detail-label">Incidencias</span>
                 </div>
-                <div class="detail-notes">${session.notes || 'Sin incidencias'}</div>
-            ` : '<div class="detail-notes" style="font-style: italic; color: #999;">Sin incidencias registradas</div>'}
+                <div class="detail-notes">${session.notes}</div>
+            ` : '<div class="detail-notes" style="font-style: italic; color: var(--text-faint);">Sin incidencias registradas</div>'}
         `;
         
         document.getElementById('detailModal').classList.add('active');
@@ -1316,6 +1371,11 @@ class RPETracker {
 
                 <!-- Columna izquierda: métricas -->
                 <div class="db-left">
+                    <!-- Batch 3: team load sparkline -->
+                    <div class="db-left-section">
+                        <div class="db-left-label">Carga equipo 7d</div>
+                        <canvas id="teamSparklineCanvas" class="db-team-sparkline" width="160" height="36"></canvas>
+                    </div>
                     <div class="db-left-section">
                         <div class="db-left-label">Esta semana</div>
                         <div class="db-metric-row">
@@ -1400,6 +1460,26 @@ class RPETracker {
 
             </div>
         `;
+
+        // Batch 3: draw team sparkline
+        requestAnimationFrame(() => {
+            const canvas = document.getElementById('teamSparklineCanvas');
+            if (canvas) {
+                const now = new Date();
+                const teamData = [];
+                for (let d = 6; d >= 0; d--) {
+                    const dayStart = new Date(now); dayStart.setDate(dayStart.getDate() - d); dayStart.setHours(0,0,0,0);
+                    const dayEnd   = new Date(dayStart); dayEnd.setHours(23,59,59,999);
+                    const dayLoad  = this.sessions
+                        .filter(s => { const sd = new Date(s.date); return sd >= dayStart && sd <= dayEnd; })
+                        .reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
+                    teamData.push(dayLoad);
+                }
+                this._drawSparkline(canvas, teamData, '#ff6600');
+            }
+            // Batch 3: nav alert badge
+            this._updateNavAlertBadge();
+        });
     }
 
     cycleDashSort() {
@@ -2452,6 +2532,31 @@ class RPETracker {
         const clearBtn = document.getElementById('playerSearchClear');
         if (clearBtn) clearBtn.style.display = 'none';
         this.renderPlayers();
+    }
+
+    // ========== BATCH 3: NAV ALERT BADGE ==========
+
+    _updateNavAlertBadge() {
+        const alertCount = this.players.filter(player => {
+            const ratio = this.calculateAcuteChronicRatio(player.id);
+            const r = parseFloat(ratio.ratio);
+            return !isNaN(r) && r > 1.3;
+        }).length;
+
+        // Find the "Carga" nav group button
+        const cargaBtn = document.querySelector('.nav-group-btn[data-group="carga"]');
+        if (!cargaBtn) return;
+
+        // Remove existing badge
+        const existing = cargaBtn.querySelector('.nav-alert-badge');
+        if (existing) existing.remove();
+
+        if (alertCount > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'nav-alert-badge';
+            badge.textContent = alertCount;
+            cargaBtn.appendChild(badge);
+        }
     }
 }
 
