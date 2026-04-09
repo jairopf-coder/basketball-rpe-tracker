@@ -8,7 +8,25 @@
 RPETracker.prototype.loadWeekPlan = function() {
     try {
         const raw = localStorage.getItem('basketballWeekPlan');
-        this.weekPlan = raw ? JSON.parse(raw) : this._defaultWeekPlan();
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            // Validar que el objeto tenga la propiedad 'days' con los días esperados
+            const defaultPlan = this._defaultWeekPlan();
+            if (!parsed || typeof parsed !== 'object' || !parsed.days || typeof parsed.days !== 'object') {
+                this.weekPlan = defaultPlan;
+            } else {
+                // Rellenar días que falten con los valores por defecto
+                const expectedDays = ['lun','mar','mie','jue','vie','sab','dom'];
+                expectedDays.forEach(day => {
+                    if (!parsed.days[day] || typeof parsed.days[day] !== 'object') {
+                        parsed.days[day] = defaultPlan.days[day];
+                    }
+                });
+                this.weekPlan = parsed;
+            }
+        } else {
+            this.weekPlan = this._defaultWeekPlan();
+        }
     } catch(e) {
         this.weekPlan = this._defaultWeekPlan();
     }
@@ -37,6 +55,10 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     const container = document.getElementById('weeklyPlanView');
     if (!container) return;
     if (!this.weekPlan) this.loadWeekPlan();
+    // Guardia extra: si days sigue sin existir, recargar desde defaults
+    if (!this.weekPlan || !this.weekPlan.days) {
+        this.weekPlan = this._defaultWeekPlan();
+    }
 
     const offset = this.weekPlan.weekOffset || 0;
     const weekStart = new Date();

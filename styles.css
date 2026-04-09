@@ -3308,10 +3308,10 @@ header h1 {
 /* Select all row */
 [data-theme="dark"] .select-all-row { border-color: var(--border); }
 
-/* Scrollbars in dark mode */
-[data-theme="dark"] ::-webkit-scrollbar-track { background: var(--bg-subtle); }
-[data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--border-input); border-radius: 4px; }
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+/* Scrollbars in dark mode (webkit only; selector combinado no válido en Firefox) */
+[data-theme="dark"] *::-webkit-scrollbar-track { background: var(--bg-subtle); }
+[data-theme="dark"] *::-webkit-scrollbar-thumb { background: var(--border-input); border-radius: 4px; }
+[data-theme="dark"] *::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ===== TOKEN COLOR PICKER ===== */
 .token-color-picker {
