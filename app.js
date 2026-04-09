@@ -905,7 +905,7 @@ class RPETracker {
                         ${[1,2,3,4,5,6,7,8,9,10].map(v => `
                             <button type="button" class="rpe-num-btn ${v===5?'selected':''}"
                                 data-player="${player.id}" data-val="${v}"
-                                style="background:${v===5?this.getRPEColor(v):''}; color:${v===5?'white':''}; border-color:${v===5?this.getRPEColor(v):''};"
+                                ${v===5?`style="background:${this.getRPEColor(v)};color:white;border-color:${this.getRPEColor(v)};"` : ''}
                                 onclick="window.rpeTracker?.selectRPEButton('${player.id}',${v})">
                                 ${v}
                             </button>`).join('')}
@@ -939,9 +939,15 @@ class RPETracker {
             const active = v === val;
             const color = this.getRPEColor(v);
             btn.classList.toggle('selected', active);
-            btn.style.background = active ? color : '';
-            btn.style.color = active ? 'white' : '';
-            btn.style.borderColor = active ? color : '';
+            if (active) {
+                btn.style.background = color;
+                btn.style.color = 'white';
+                btn.style.borderColor = color;
+            } else {
+                btn.style.removeProperty('background');
+                btn.style.removeProperty('color');
+                btn.style.removeProperty('border-color');
+            }
         });
     }
 
