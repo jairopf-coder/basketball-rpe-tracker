@@ -81,10 +81,10 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     </p>
                 </div>
                 <div style="display:flex;gap:.5rem;align-items:center">
-                    <button class="btn-secondary btn-sm" onclick="rpeTracker._wpChangeWeek(-1)">← Anterior</button>
-                    <button class="btn-secondary btn-sm" onclick="rpeTracker._wpResetWeek()">Hoy</button>
-                    <button class="btn-secondary btn-sm" onclick="rpeTracker._wpChangeWeek(1)">Siguiente →</button>
-                    <button class="btn-primary btn-sm" onclick="rpeTracker._wpSaveCurrentPlan()">💾 Guardar</button>
+                    <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._wpChangeWeek(-1)">← Anterior</button>
+                    <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._wpResetWeek()">Hoy</button>
+                    <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._wpChangeWeek(1)">Siguiente →</button>
+                    <button class="btn-primary btn-sm" onclick="window.rpeTracker?._wpSaveCurrentPlan()">💾 Guardar</button>
                 </div>
             </div>
 
@@ -129,7 +129,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                             ${isToday ? '<span class="wp-today-badge">HOY</span>' : ''}
                         </div>
                         <div style="margin:.5rem 0">
-                            <select class="wp-select" data-day="${day}" data-field="type" onchange="rpeTracker._wpUpdateField('${day}','type',this.value)">
+                            <select class="wp-select" data-day="${day}" data-field="type" onchange="window.rpeTracker?._wpUpdateField('${day}','type',this.value)">
                                 <option value="training" ${plan.type==='training'?'selected':''}>🏀 Entreno</option>
                                 <option value="match"    ${plan.type==='match'?'selected':''}>🏟️ Partido</option>
                                 <option value="recovery" ${plan.type==='recovery'?'selected':''}>💪 Recuperación</option>
@@ -137,7 +137,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                             </select>
                         </div>
                         <div style="margin:.35rem 0;display:flex;gap:.4rem;align-items:center">
-                            <select class="wp-select wp-select-sm" data-day="${day}" data-field="intensity" onchange="rpeTracker._wpUpdateField('${day}','intensity',this.value)">
+                            <select class="wp-select wp-select-sm" data-day="${day}" data-field="intensity" onchange="window.rpeTracker?._wpUpdateField('${day}','intensity',this.value)">
                                 <option value="none"   ${plan.intensity==='none'?'selected':''}>— Sin carga</option>
                                 <option value="low"    ${plan.intensity==='low'?'selected':''}>🟢 Baja</option>
                                 <option value="medium" ${plan.intensity==='medium'?'selected':''}>🟡 Media</option>
@@ -149,14 +149,14 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                             <span style="color:var(--text-secondary)">⏱</span>
                             <input type="number" class="wp-input-sm" min="0" max="240" step="5"
                                 value="${plan.duration||0}"
-                                onchange="rpeTracker._wpUpdateField('${day}','duration',parseInt(this.value))"
+                                onchange="window.rpeTracker?._wpUpdateField('${day}','duration',parseInt(this.value))"
                                 ${plan.type==='rest'?'disabled':''}>
                             <span style="color:var(--text-secondary);font-size:.75rem">min</span>
                         </div>
                         <div style="margin:.35rem 0">
                             <input type="text" class="wp-input-focus" placeholder="Foco del día..."
                                 value="${plan.focus||''}"
-                                onchange="rpeTracker._wpUpdateField('${day}','focus',this.value)">
+                                onchange="window.rpeTracker?._wpUpdateField('${day}','focus',this.value)">
                         </div>
                         ${realSessions.length > 0 ? `
                         <div class="wp-real-sessions">
@@ -347,7 +347,7 @@ RPETracker.prototype.renderMedicalHistory = function() {
                     <h2 style="margin:0 0 .25rem">📋 Historial Médico</h2>
                     <p style="margin:0;color:var(--text-secondary);font-size:.85rem">${allInjuries.length} lesiones registradas</p>
                 </div>
-                <button class="btn-primary" onclick="rpeTracker.switchView('injury')">➕ Nueva lesión</button>
+                <button class="btn-primary" onclick="window.rpeTracker?.switchView('injury')">➕ Nueva lesión</button>
             </div>
 
             <!-- Stats cards -->
@@ -375,10 +375,10 @@ RPETracker.prototype.renderMedicalHistory = function() {
                 <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
                     <span style="font-weight:600;font-size:.85rem;color:var(--text-secondary)">Filtrar por jugadora:</span>
                     <button class="wp-filter-btn ${this._medPlayerFilter==='all'?'active':''}"
-                        onclick="rpeTracker._medSetFilter('all')">Todas</button>
+                        onclick="window.rpeTracker?._medSetFilter('all')">Todas</button>
                     ${this.players.map(p=>`
                         <button class="wp-filter-btn ${this._medPlayerFilter===p.id?'active':''}"
-                            onclick="rpeTracker._medSetFilter('${p.id}')">
+                            onclick="window.rpeTracker?._medSetFilter('${p.id}')">
                             ${PlayerTokens.avatar(p,16,'.5rem')} ${p.name}
                         </button>`).join('')}
                 </div>
@@ -389,7 +389,7 @@ RPETracker.prototype.renderMedicalHistory = function() {
                 ? `<div class="wellness-card" style="text-align:center;padding:2rem;color:var(--text-secondary)">
                     <p style="font-size:2rem">🏥</p>
                     <p>No hay lesiones registradas${this._medPlayerFilter!=='all'?' para esta jugadora':''}.</p>
-                    <button class="btn-primary" onclick="rpeTracker.switchView('injury')">Registrar primera lesión</button>
+                    <button class="btn-primary" onclick="window.rpeTracker?.switchView('injury')">Registrar primera lesión</button>
                   </div>`
                 : `<div style="display:flex;flex-direction:column;gap:.75rem">
                     ${filtered.map(inj => this._renderMedCard(inj)).join('')}
@@ -501,7 +501,7 @@ RPETracker.prototype.renderRehabLoad = function() {
                 <p style="font-size:3rem">💪</p>
                 <h3 style="margin:.5rem 0">No hay jugadoras en readaptación</h3>
                 <p style="margin:.5rem 0 1rem">Cuando haya una lesión activa, aquí verás el seguimiento de carga.</p>
-                <button class="btn-primary" onclick="rpeTracker.switchView('injury')">Ver gestión de lesiones</button>
+                <button class="btn-primary" onclick="window.rpeTracker?.switchView('injury')">Ver gestión de lesiones</button>
             </div>
         </div>`;
         return;
@@ -532,7 +532,7 @@ RPETracker.prototype.renderRehabLoad = function() {
                         <div style="font-size:.8rem;color:var(--text-secondary)">${inj.type||'Lesión'} — Día ${playerLoad.daysInjured} de baja</div>
                     </div>
                 </div>
-                <button class="btn-secondary btn-sm" onclick="rpeTracker.switchView('injury')">Ver RTP</button>
+                <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.switchView('injury')">Ver RTP</button>
             </div>
 
             <!-- RTP Phase -->

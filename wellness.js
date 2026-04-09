@@ -32,7 +32,7 @@ RPETracker.prototype.renderWellnessDashboard = function() {
                     <h2 style="margin:0 0 .25rem">❤️ Wellness del Equipo</h2>
                     <p style="margin:0;color:var(--text-secondary);font-size:.85rem">${this._wFmtDate(today)}</p>
                 </div>
-                <button class="btn-primary" onclick="rpeTracker.openWellnessForm()">➕ Registrar bienestar</button>
+                <button class="btn-primary" onclick="window.rpeTracker?.openWellnessForm()">➕ Registrar bienestar</button>
             </div>
             ${this._renderWTodayStatus(filledIds, today)}
             ${this._renderWTeamSummary(sevenDaysAgo)}
@@ -62,7 +62,7 @@ RPETracker.prototype._renderWTodayStatus = function(filledIds, today) {
                 const entry = (this.wellnessData||[]).find(w=>w.playerId===p.id && w.date===today);
                 const score = entry ? this._wOverall(entry) : null;
                 return `<div class="wellness-today-chip ${entry?'filled':'pending'}"
-                    onclick="rpeTracker.openWellnessForm('${p.id}')"
+                    onclick="window.rpeTracker?.openWellnessForm('${p.id}')"
                     title="${entry?'Editar':'Registrar'}">
                     ${PlayerTokens.avatar(p,26,'.65rem')}
                     <span class="wt-name">${p.name}${p.number?` <span style="opacity:.6">#${p.number}</span>`:''}</span>
@@ -258,7 +258,7 @@ RPETracker.prototype._renderWHistory = function() {
     return `<div class="wellness-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
             <h3 class="wellness-section-title" style="margin:0">📋 Historial reciente</h3>
-            <button class="btn-danger-sm" onclick="rpeTracker._clearWellness()">🗑️ Limpiar todo</button>
+            <button class="btn-danger-sm" onclick="window.rpeTracker?._clearWellness()">🗑️ Limpiar todo</button>
         </div>
         <div style="overflow-x:auto">
             <table class="wellness-history-table">
@@ -278,7 +278,7 @@ RPETracker.prototype._renderWHistory = function() {
                             <td style="font-size:.82rem">${dot(w.soreness)}</td>
                             <td><strong style="color:${this._wColor(o)}">${o.toFixed(1)}</strong></td>
                             <td style="font-size:.78rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.notes||'—'}</td>
-                            <td><button class="btn-icon-sm" onclick="rpeTracker._deleteWellness('${w.id}')">🗑️</button></td>
+                            <td><button class="btn-icon-sm" onclick="window.rpeTracker?._deleteWellness('${w.id}')">🗑️</button></td>
                         </tr>`;
                     }).join('')}
                 </tbody>
@@ -296,7 +296,7 @@ RPETracker.prototype._renderWModal = function(today) {
             <div class="modal-header">
                 <div class="modal-header-inner">
                     <h2 class="modal-title">❤️ Registrar Bienestar</h2>
-                    <button class="close-btn" onclick="rpeTracker.closeWellnessModal()">✕</button>
+                    <button class="close-btn" onclick="window.rpeTracker?.closeWellnessModal()">✕</button>
                 </div>
             </div>
             <div class="modal-body" style="padding:1.25rem">
@@ -339,8 +339,8 @@ RPETracker.prototype._renderWModal = function(today) {
                     <strong id="wOverallScore" style="font-size:1.4rem">3.0 / 5</strong>
                 </div>
                 <div style="display:flex;gap:.75rem;margin-top:1rem">
-                    <button class="btn-secondary" style="flex:1" onclick="rpeTracker.closeWellnessModal()">Cancelar</button>
-                    <button class="btn-primary" style="flex:1" onclick="rpeTracker.saveWellnessEntry()">💾 Guardar</button>
+                    <button class="btn-secondary" style="flex:1" onclick="window.rpeTracker?.closeWellnessModal()">Cancelar</button>
+                    <button class="btn-primary" style="flex:1" onclick="window.rpeTracker?.saveWellnessEntry()">💾 Guardar</button>
                 </div>
             </div>
         </div>
