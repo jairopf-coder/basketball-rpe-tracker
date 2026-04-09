@@ -3609,3 +3609,201 @@ header h1 {
 /* ===== DARK MODE ADDITIONS (Batch 3) ===== */
 [data-theme="dark"] .sd-player-header { border-color: var(--border); }
 [data-theme="dark"] .sd-load-row { background: var(--bg-elevated); }
+
+/* ===== DARK MODE COMPLETO — BATCH 4 ===== */
+/* Team Status */
+[data-theme="dark"] .ts-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .ts-card-danger,
+[data-theme="dark"] .ts-card-out { background: rgba(244,67,54,0.10); }
+[data-theme="dark"] .ts-section-count { background: var(--bg-elevated); color: var(--text-muted); }
+[data-theme="dark"] .ts-subtitle,
+[data-theme="dark"] .ts-num,
+[data-theme="dark"] .ts-card-status,
+[data-theme="dark"] .ts-meta-label,
+[data-theme="dark"] .ts-empty { color: var(--text-muted); }
+[data-theme="dark"] .ts-sum-ok { background: rgba(76,175,80,0.15); }
+[data-theme="dark"] .ts-sum-caution { background: rgba(255,152,0,0.15); }
+[data-theme="dark"] .ts-sum-out { background: rgba(244,67,54,0.15); }
+[data-theme="dark"] .ts-sum-label { color: var(--text-muted); }
+
+/* Weekly Plan */
+[data-theme="dark"] .wp-day { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .wp-slot { background: var(--bg-elevated); border-color: var(--border); }
+[data-theme="dark"] .wp-day-total { background: rgba(255,152,0,0.20); color: #ffb74d; }
+[data-theme="dark"] .wp-subtitle,
+[data-theme="dark"] .wp-week-label,
+[data-theme="dark"] .wp-target-load,
+[data-theme="dark"] .wp-control-group label,
+[data-theme="dark"] .wp-slot-label,
+[data-theme="dark"] .wp-actual-data { color: var(--text-muted); }
+[data-theme="dark"] .wp-slot-off { color: var(--text-faint); }
+[data-theme="dark"] .wp-plan-label { color: var(--text-faint); }
+[data-theme="dark"] .wp-actual-inline { color: var(--text-secondary); }
+[data-theme="dark"] .wp-rest-label { color: var(--text-faint); }
+[data-theme="dark"] .wp-no-data { color: var(--text-faint); }
+[data-theme="dark"] .wp-dev-ok { background: rgba(76,175,80,0.18); color: #81c784; }
+[data-theme="dark"] .wp-dev-high { background: rgba(244,67,54,0.18); color: #e57373; }
+[data-theme="dark"] .wp-dev-low { background: rgba(33,150,243,0.18); color: #64b5f6; }
+[data-theme="dark"] .wp-toggle-slider { background: var(--border-input); }
+[data-theme="dark"] .wp-toggle-slider:before { background: var(--text-secondary); }
+[data-theme="dark"] .wp-sum-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .wp-day-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .wp-day-head { color: var(--text-primary); }
+[data-theme="dark"] .wp-day-name { color: var(--text-primary); }
+[data-theme="dark"] .wp-day-date { color: var(--text-muted); }
+[data-theme="dark"] .wp-select { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-input); }
+[data-theme="dark"] .wp-input-sm,
+[data-theme="dark"] .wp-input-focus { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-input); }
+[data-theme="dark"] .wp-real-chip { background: var(--bg-elevated); color: var(--text-secondary); }
+[data-theme="dark"] .wp-filter-btn { background: var(--bg-subtle); color: var(--text-secondary); border-color: var(--border-input); }
+[data-theme="dark"] .wp-filter-btn.active { background: var(--primary); color: white; }
+
+/* Medical History */
+[data-theme="dark"] .mh-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .mh-stat { background: var(--bg-elevated); }
+[data-theme="dark"] .mh-stat-lbl,
+[data-theme="dark"] .mh-num,
+[data-theme="dark"] .mh-player-sub,
+[data-theme="dark"] .mh-team-stats { color: var(--text-muted); }
+[data-theme="dark"] .mh-active-badge { background: rgba(244,67,54,0.20); color: #e57373; }
+[data-theme="dark"] .med-info-cell { background: var(--bg-elevated); border-color: var(--border); }
+[data-theme="dark"] .mic-label { color: var(--text-muted); }
+[data-theme="dark"] .wellness-card.med-injury-card { background: var(--bg-surface); border-color: var(--border); }
+
+/* Rehab Load */
+[data-theme="dark"] .rl-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .rl-add-session { background: var(--bg-elevated); border-color: var(--border); }
+
+/* Correlation */
+[data-theme="dark"] .corr-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .corr-summary { background: var(--bg-elevated); color: var(--text-secondary); border-color: var(--primary); }
+[data-theme="dark"] .corr-bar-track { background: var(--bg-elevated); }
+[data-theme="dark"] .corr-stat { background: var(--bg-elevated); }
+[data-theme="dark"] .corr-alert-danger { background: rgba(244,67,54,0.15); color: #e57373; }
+[data-theme="dark"] .corr-alert-warning { background: rgba(255,152,0,0.15); color: #ffb74d; }
+
+/* Wellness */
+[data-theme="dark"] .wellness-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .wellness-wrap { background: var(--bg-app); }
+[data-theme="dark"] .wellness-section-title { color: var(--text-muted); }
+[data-theme="dark"] .wellness-slider { background: var(--bg-elevated); }
+[data-theme="dark"] .wellness-today-chip { background: var(--bg-elevated); color: var(--text-muted); border-color: var(--border); }
+[data-theme="dark"] .wellness-today-chip.filled { background: rgba(255,102,0,0.15); border-color: var(--primary); color: var(--primary); }
+[data-theme="dark"] .wellness-history-table th { background: var(--bg-elevated); color: var(--text-muted); }
+[data-theme="dark"] .wellness-history-table td { border-color: var(--border); color: var(--text-primary); }
+[data-theme="dark"] .wellness-metric-row { border-color: var(--border); }
+[data-theme="dark"] .wellness-overall-preview { background: var(--bg-elevated); }
+[data-theme="dark"] .wellness-alert-row { background: rgba(244,67,54,0.10); border-color: rgba(244,67,54,0.30); }
+
+/* Wellness player form */
+[data-theme="dark"] .wl-question { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .wl-scale-btn { background: var(--bg-surface); border-color: var(--border-input); color: var(--text-primary); }
+[data-theme="dark"] .wl-scale-btn:hover { border-color: var(--primary); }
+[data-theme="dark"] .wl-player-selected { background: rgba(255,102,0,0.15); color: var(--primary); }
+[data-theme="dark"] .wl-btn-secondary { background: var(--bg-surface); border-color: var(--border); color: var(--text-secondary); }
+[data-theme="dark"] .wl-question { border-color: var(--border); }
+
+/* Wellness Coach */
+[data-theme="dark"] .wc-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .wc-subtitle { color: var(--text-muted); }
+
+/* Alert tints — dark adaptations */
+[data-theme="dark"] .rcard.status-danger { background: rgba(244,67,54,0.10); }
+[data-theme="dark"] .comp-metrics-row:hover { background: var(--bg-elevated); }
+
+/* Generic light backgrounds that slip through */
+[data-theme="dark"] [style*="background:#f"] { background: var(--bg-surface) !important; }
+[data-theme="dark"] [style*="background: #f"] { background: var(--bg-surface) !important; }
+[data-theme="dark"] [style*="background:white"] { background: var(--bg-surface) !important; }
+[data-theme="dark"] [style*="background: white"] { background: var(--bg-surface) !important; }
+
+/* Injury prediction */
+[data-theme="dark"] .pred-card { background: var(--bg-surface); border-color: var(--border); }
+
+/* Select/input elements */
+[data-theme="dark"] select,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] input[type="time"],
+[data-theme="dark"] textarea { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-input); }
+
+/* PIN screen */
+[data-theme="dark"] .pin-dot.filled { background: var(--primary); }
+
+/* Weekplan header & summary */
+[data-theme="dark"] .weekplan-wrap { color: var(--text-primary); }
+[data-theme="dark"] .weekplan-header { color: var(--text-primary); }
+[data-theme="dark"] .weekplan-summary-row .wp-sum-card { background: var(--bg-surface); }
+
+/* ===== DARK MODE — DASHBOARD & ANALYTICS (Batch 4 fix) ===== */
+
+/* Dashboard columna central (barras ratio) */
+[data-theme="dark"] .db-players { background: var(--bg-app); }
+[data-theme="dark"] .db-player-row { border-color: var(--border); color: var(--text-primary); }
+[data-theme="dark"] .db-player-name { color: var(--text-primary); }
+[data-theme="dark"] .db-bar-lo,
+[data-theme="dark"] .db-bar-hi { background: var(--border-input); }
+
+/* Dashboard columna derecha (disponibilidad) */
+[data-theme="dark"] .db-avail { background: var(--bg-subtle); border-color: var(--border); }
+[data-theme="dark"] .db-avail-summary { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .db-avail-section-title { color: var(--text-muted); }
+[data-theme="dark"] .db-avail-count { background: var(--bg-elevated); color: var(--text-secondary); }
+[data-theme="dark"] .db-avail-row { border-color: var(--border); }
+[data-theme="dark"] .db-avail-name { color: var(--text-primary); }
+
+/* Dashboard botón sort y header */
+[data-theme="dark"] .db-sort-btn { background: var(--bg-elevated); border-color: var(--border-input); color: var(--text-muted); }
+[data-theme="dark"] .db-sort-btn:hover { border-color: var(--primary); color: var(--primary); }
+[data-theme="dark"] .db-right-header { background: var(--bg-surface); }
+[data-theme="dark"] .db-right-legend { background: var(--bg-surface); }
+
+/* Info box (caja azul informativa EWMA en Análisis A:C) */
+[data-theme="dark"] .info-box,
+[data-theme="dark"] [style*="background: #e3f2fd"],
+[data-theme="dark"] [style*="background:#e3f2fd"] { background: var(--bg-elevated) !important; color: var(--text-primary) !important; }
+[data-theme="dark"] [style*="background: #f0f4ff"],
+[data-theme="dark"] [style*="background:#f0f4ff"] { background: var(--bg-elevated) !important; }
+[data-theme="dark"] [style*="background: #fff9e6"],
+[data-theme="dark"] [style*="background:#fff9e6"] { background: rgba(255,152,0,0.12) !important; }
+[data-theme="dark"] [style*="background: #ffebee"],
+[data-theme="dark"] [style*="background:#ffebee"] { background: rgba(244,67,54,0.12) !important; }
+[data-theme="dark"] [style*="background: #fff3e0"],
+[data-theme="dark"] [style*="background:#fff3e0"] { background: rgba(255,152,0,0.12) !important; }
+[data-theme="dark"] [style*="background: #e8f5e9"],
+[data-theme="dark"] [style*="background:#e8f5e9"] { background: rgba(76,175,80,0.12) !important; }
+
+/* Caja interna blanca del info box */
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background:white"],
+[data-theme="dark"] [style*="background: #fff"],
+[data-theme="dark"] [style*="background:#fff"] { background: var(--bg-subtle) !important; }
+
+/* rcard grid (tarjetas ratio equipo) */
+[data-theme="dark"] .rcard { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .rcard-bar-wrap { background: transparent; }
+[data-theme="dark"] .rcard-bar { background: var(--bg-elevated); }
+[data-theme="dark"] .rcard-status-label { color: var(--text-muted); }
+[data-theme="dark"] .rcard-legend { color: var(--text-muted); }
+[data-theme="dark"] .rcard-name { color: var(--text-primary); }
+[data-theme="dark"] .rleg { color: var(--text-muted); }
+
+/* Comparador */
+[data-theme="dark"] .comp-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .comp-select { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-input); }
+[data-theme="dark"] .comp-metrics-row { border-color: var(--border); color: var(--text-secondary); }
+[data-theme="dark"] .comp-metrics-label { color: var(--text-muted); }
+[data-theme="dark"] .comp-section-title { color: var(--text-muted); border-color: var(--border); }
+
+/* Texto color #555 hardcodeado (títulos de sección en analytics) */
+[data-theme="dark"] [style*="color: #555"],
+[data-theme="dark"] [style*="color:#555"],
+[data-theme="dark"] [style*="color: #444"],
+[data-theme="dark"] [style*="color:#444"] { color: var(--text-secondary) !important; }
+
+/* Disponibilidad pills (0 aptas, 6 precaución, 0 no disp.) */
+[data-theme="dark"] .db-avail-pill { background: var(--bg-elevated); color: var(--text-secondary); border-color: var(--border); }
+[data-theme="dark"] .db-avail-pill.ok { background: rgba(76,175,80,0.15); }
+[data-theme="dark"] .db-avail-pill.caution { background: rgba(255,152,0,0.15); }
+[data-theme="dark"] .db-avail-pill.out { background: rgba(244,67,54,0.15); }
