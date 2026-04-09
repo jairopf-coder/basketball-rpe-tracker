@@ -3308,12 +3308,8 @@ header h1 {
 /* Select all row */
 [data-theme="dark"] .select-all-row { border-color: var(--border); }
 
-/* Scrollbars in dark mode (solo webkit; Firefox ignora este bloque) */
-@supports selector(::-webkit-scrollbar) {
-    [data-theme="dark"] *::-webkit-scrollbar-track { background: var(--bg-subtle); }
-    [data-theme="dark"] *::-webkit-scrollbar-thumb { background: var(--border-input); border-radius: 4px; }
-    [data-theme="dark"] *::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-}
+/* Scrollbars in dark mode — standard API (Firefox/Chrome moderno) */
+[data-theme="dark"] { scrollbar-color: var(--border-input) var(--bg-subtle); scrollbar-width: thin; }
 
 /* ===== TOKEN COLOR PICKER ===== */
 .token-color-picker {
