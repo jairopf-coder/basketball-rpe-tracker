@@ -135,65 +135,89 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     const sessionBlock = (slot, label, emoji) => {
                         const s = slot === 'morning' ? morning : afternoon;
                         const isRest = !s.enabled;
-                        return \`
-                        <div class="wp-session-block \${isRest ? 'wp-session-rest' : ''}">
-                            <div class="wp-session-header">
-                                <span class="wp-session-label">\${emoji} \${label}</span>
-                                <label class="wp-toggle-mini">
-                                    <input type="checkbox" \${s.enabled ? 'checked' : ''}
-                                        onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','enabled',this.checked)">
-                                    <span class="wp-toggle-mini-slider"></span>
-                                </label>
-                            </div>
-                            \${s.enabled ? \`
-                            <select class="wp-select wp-select-xs" onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','type',this.value)">
-                                <option value="training"  \${s.type==='training' ?'selected':''}>🏀 Entreno</option>
-                                <option value="shooting"  \${s.type==='shooting' ?'selected':''}>🎯 Tiro</option>
-                                <option value="gym"       \${s.type==='gym'      ?'selected':''}>🏋️ Gym</option>
-                                <option value="match"     \${s.type==='match'    ?'selected':''}>🏟️ Partido</option>
-                                <option value="recovery"  \${s.type==='recovery' ?'selected':''}>💪 Recuperación</option>
-                            </select>
-                            <select class="wp-select wp-select-xs" onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','intensity',this.value)">
-                                <option value="none"   \${s.intensity==='none'  ?'selected':''}>— Sin carga</option>
-                                <option value="low"    \${s.intensity==='low'   ?'selected':''}>🟢 Baja</option>
-                                <option value="medium" \${s.intensity==='medium'?'selected':''}>🟡 Media</option>
-                                <option value="high"   \${s.intensity==='high'  ?'selected':''}>🟠 Alta</option>
-                                <option value="max"    \${s.intensity==='max'   ?'selected':''}>🔴 Máxima</option>
-                            </select>
-                            <div style="display:flex;align-items:center;gap:.3rem;margin-top:.25rem">
-                                <span style="color:var(--text-secondary);font-size:.8rem">⏱</span>
-                                <input type="number" class="wp-input-sm" min="0" max="240" step="5"
-                                    value="\${s.duration||0}"
-                                    onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','duration',parseInt(this.value))">
-                                <span style="color:var(--text-secondary);font-size:.72rem">min</span>
-                            </div>
-                            <input type="text" class="wp-input-focus" placeholder="Foco..."
-                                value="\${s.focus||''}"
-                                onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','focus',this.value)">
-                            \` : '<span class="wp-session-off">Sin sesión</span>'}
-                        </div>\`;
+                        const blockClass = 'wp-session-block' + (isRest ? ' wp-session-rest' : '');
+                        const d = day, sl = slot;
+
+                        const onchangeSession = function(field) {
+                            return 'window.rpeTracker?._wpUpdateSession(' +
+                                JSON.stringify(d) + ',' + JSON.stringify(sl) + ',' +
+                                JSON.stringify(field) + ',this.value)';
+                        };
+                        const onchangeCheck = 'window.rpeTracker?._wpUpdateSession(' +
+                            JSON.stringify(d) + ',' + JSON.stringify(sl) + ',"enabled",this.checked)';
+                        const onchangeDur = 'window.rpeTracker?._wpUpdateSession(' +
+                            JSON.stringify(d) + ',' + JSON.stringify(sl) + ',"duration",parseInt(this.value))';
+                        const onchangeFocus = 'window.rpeTracker?._wpUpdateSession(' +
+                            JSON.stringify(d) + ',' + JSON.stringify(sl) + ',"focus",this.value)';
+
+                        let inner = '';
+                        if (s.enabled) {
+                            inner =
+                                '<select class="wp-select wp-select-xs" onchange="' + onchangeSession('type') + '">' +
+                                    '<option value="training"'  + (s.type==='training' ?' selected':'') + '>🏀 Entreno</option>' +
+                                    '<option value="shooting"'  + (s.type==='shooting' ?' selected':'') + '>🎯 Tiro</option>' +
+                                    '<option value="gym"'       + (s.type==='gym'      ?' selected':'') + '>🏋️ Gym</option>' +
+                                    '<option value="match"'     + (s.type==='match'    ?' selected':'') + '>🏟️ Partido</option>' +
+                                    '<option value="recovery"'  + (s.type==='recovery' ?' selected':'') + '>💪 Recuperación</option>' +
+                                '</select>' +
+                                '<select class="wp-select wp-select-xs" onchange="' + onchangeSession('intensity') + '">' +
+                                    '<option value="none"'   + (s.intensity==='none'  ?' selected':'') + '>— Sin carga</option>' +
+                                    '<option value="low"'    + (s.intensity==='low'   ?' selected':'') + '>🟢 Baja</option>' +
+                                    '<option value="medium"' + (s.intensity==='medium'?' selected':'') + '>🟡 Media</option>' +
+                                    '<option value="high"'   + (s.intensity==='high'  ?' selected':'') + '>🟠 Alta</option>' +
+                                    '<option value="max"'    + (s.intensity==='max'   ?' selected':'') + '>🔴 Máxima</option>' +
+                                '</select>' +
+                                '<div style="display:flex;align-items:center;gap:.3rem;margin-top:.25rem">' +
+                                    '<span style="color:var(--text-secondary);font-size:.8rem">⏱</span>' +
+                                    '<input type="number" class="wp-input-sm" min="0" max="240" step="5"' +
+                                    ' value="' + (s.duration||0) + '"' +
+                                    ' onchange="' + onchangeDur + '">' +
+                                    '<span style="color:var(--text-secondary);font-size:.72rem">min</span>' +
+                                '</div>' +
+                                '<input type="text" class="wp-input-focus" placeholder="Foco..."' +
+                                ' value="' + (s.focus||'').replace(/"/g,'&quot;') + '"' +
+                                ' onchange="' + onchangeFocus + '">';
+                        } else {
+                            inner = '<span class="wp-session-off">Sin sesión</span>';
+                        }
+
+                        return '<div class="' + blockClass + '">' +
+                            '<div class="wp-session-header">' +
+                                '<span class="wp-session-label">' + emoji + ' ' + label + '</span>' +
+                                '<label class="wp-toggle-mini">' +
+                                    '<input type="checkbox"' + (s.enabled ? ' checked' : '') +
+                                    ' onchange="' + onchangeCheck + '">' +
+                                    '<span class="wp-toggle-mini-slider"></span>' +
+                                '</label>' +
+                            '</div>' +
+                            inner +
+                        '</div>';
                     };
 
-                    return \`
-                    <div class="wp-day-card \${isToday ? 'today' : ''}" style="border-top:3px solid \${topColor}">
-                        <div class="wp-day-head">
-                            <span class="wp-day-name">\${dayLabels[i]}</span>
-                            <span class="wp-day-date">\${date.getDate()}/\${date.getMonth()+1}</span>
-                            \${isToday ? '<span class="wp-today-badge">HOY</span>' : ''}
-                        </div>
-                        \${sessionBlock('morning',   'Mañana', '🌅')}
-                        \${sessionBlock('afternoon', 'Tarde',  '🌆')}
-                        \${realSessions.length > 0 ? \`
-                        <div class="wp-real-sessions">
-                            <span style="font-size:.72rem;color:var(--text-secondary);font-weight:600">REAL:</span>
-                            \${realSessions.slice(0,3).map(s => {
-                                const p = this.players.find(x=>x.id===s.playerId);
-                                return p ? \`<span class="wp-real-chip">\${PlayerTokens.avatar(p,14,'.45rem')} RPE \${s.rpe}</span>\` : '';
-                            }).join('')}
-                            \${realSessions.length > 3 ? \`<span style="font-size:.72rem;color:var(--text-secondary)">+\${realSessions.length-3}</span>\` : ''}
-                            <span style="font-size:.72rem;color:var(--text-secondary);margin-left:auto">Carga: \${realLoad}</span>
-                        </div>\` : ''}
-                    </div>\`;
+                    let realHtml = '';
+                    if (realSessions.length > 0) {
+                        const chips = realSessions.slice(0,3).map(s => {
+                            const p = this.players.find(x => x.id === s.playerId);
+                            return p ? '<span class="wp-real-chip">' + PlayerTokens.avatar(p,14,'.45rem') + ' RPE ' + s.rpe + '</span>' : '';
+                        }).join('');
+                        const more = realSessions.length > 3 ? '<span style="font-size:.72rem;color:var(--text-secondary)">+' + (realSessions.length-3) + '</span>' : '';
+                        realHtml = '<div class="wp-real-sessions">' +
+                            '<span style="font-size:.72rem;color:var(--text-secondary);font-weight:600">REAL:</span>' +
+                            chips + more +
+                            '<span style="font-size:.72rem;color:var(--text-secondary);margin-left:auto">Carga: ' + realLoad + '</span>' +
+                        '</div>';
+                    }
+
+                    return '<div class="wp-day-card' + (isToday ? ' today' : '') + '" style="border-top:3px solid ' + topColor + '">' +
+                        '<div class="wp-day-head">' +
+                            '<span class="wp-day-name">' + dayLabels[i] + '</span>' +
+                            '<span class="wp-day-date">' + date.getDate() + '/' + (date.getMonth()+1) + '</span>' +
+                            (isToday ? '<span class="wp-today-badge">HOY</span>' : '') +
+                        '</div>' +
+                        sessionBlock('morning',   'Mañana', '🌅') +
+                        sessionBlock('afternoon', 'Tarde',  '🌆') +
+                        realHtml +
+                    '</div>';
                 }).join('')}
             </div>
 
