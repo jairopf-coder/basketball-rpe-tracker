@@ -11,7 +11,19 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="styles.css">
-    
+
+    <!-- Dark mode aplicado inmediatamente para evitar flash blanco -->
+    <script>
+        (function() {
+            try {
+                var saved = localStorage.getItem('rpe_dark_mode');
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var enabled = saved !== null ? saved === 'true' : prefersDark;
+                if (enabled) document.documentElement.setAttribute('data-theme', 'dark');
+            } catch(e) {}
+        })();
+    </script>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
