@@ -3804,3 +3804,85 @@ header h1 {
 [data-theme="dark"] .db-avail-pill.ok { background: rgba(76,175,80,0.15); }
 [data-theme="dark"] .db-avail-pill.caution { background: rgba(255,152,0,0.15); }
 [data-theme="dark"] .db-avail-pill.out { background: rgba(244,67,54,0.15); }
+
+/* ===== WEEKLY PLAN — SESIONES MAÑANA/TARDE ===== */
+.wp-session-block {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .5rem .6rem;
+    margin-bottom: .4rem;
+    background: var(--bg-subtle);
+    transition: background .15s;
+}
+.wp-session-block.wp-session-rest {
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--border);
+    opacity: .7;
+}
+.wp-session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: .3rem;
+}
+.wp-session-label {
+    font-size: .72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+.wp-session-off {
+    font-size: .75rem;
+    color: var(--text-faint);
+    font-style: italic;
+}
+
+/* Mini toggle switch */
+.wp-toggle-mini {
+    position: relative;
+    display: inline-block;
+    width: 28px;
+    height: 16px;
+    flex-shrink: 0;
+}
+.wp-toggle-mini input { opacity: 0; width: 0; height: 0; }
+.wp-toggle-mini-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border-input);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .2s;
+}
+.wp-toggle-mini-slider:before {
+    content: '';
+    position: absolute;
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+    background: white;
+    border-radius: 50%;
+    transition: transform .2s;
+}
+.wp-toggle-mini input:checked + .wp-toggle-mini-slider { background: var(--primary, #ff6600); }
+.wp-toggle-mini input:checked + .wp-toggle-mini-slider:before { transform: translateX(12px); }
+
+/* XS select inside session blocks */
+.wp-select-xs {
+    width: 100%;
+    font-size: .75rem;
+    padding: .2rem .3rem;
+    border-radius: 5px;
+    border: 1px solid var(--border-input);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    margin-bottom: .2rem;
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] .wp-session-block { background: var(--bg-elevated); }
+[data-theme="dark"] .wp-session-block.wp-session-rest { background: transparent; }
+[data-theme="dark"] .wp-select-xs { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-input); }

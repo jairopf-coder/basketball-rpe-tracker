@@ -10,16 +10,23 @@ RPETracker.prototype.loadWeekPlan = function() {
         const raw = localStorage.getItem('basketballWeekPlan');
         if (raw) {
             const parsed = JSON.parse(raw);
-            // Validar que el objeto tenga la propiedad 'days' con los días esperados
             const defaultPlan = this._defaultWeekPlan();
+            const emptySession = () => ({ type: 'rest', intensity: 'none', duration: 0, focus: '', enabled: false });
             if (!parsed || typeof parsed !== 'object' || !parsed.days || typeof parsed.days !== 'object') {
                 this.weekPlan = defaultPlan;
             } else {
-                // Rellenar días que falten con los valores por defecto
+                // Migrar formato legacy (días sin morning/afternoon) al nuevo formato
                 const expectedDays = ['lun','mar','mie','jue','vie','sab','dom'];
                 expectedDays.forEach(day => {
                     if (!parsed.days[day] || typeof parsed.days[day] !== 'object') {
                         parsed.days[day] = defaultPlan.days[day];
+                    } else if (!parsed.days[day].morning) {
+                        // Migración: formato antiguo con type/intensity directo -> mañana
+                        const old = parsed.days[day];
+                        parsed.days[day] = {
+                            morning: { type: old.type||'rest', intensity: old.intensity||'none', duration: old.duration||0, focus: old.focus||'', enabled: (old.type&&old.type!=='rest') },
+                            afternoon: emptySession()
+                        };
                     }
                 });
                 this.weekPlan = parsed;
@@ -37,16 +44,18 @@ RPETracker.prototype.saveWeekPlan = function() {
 };
 
 RPETracker.prototype._defaultWeekPlan = function() {
+    const emptySession = () => ({ type: 'rest', intensity: 'none', duration: 0, focus: '', enabled: false });
+    const trainingSession = (intensity, duration, focus) => ({ type: 'training', intensity, duration, focus, enabled: true });
     return {
         weekOffset: 0,
         days: {
-            lun: { type: 'training', intensity: 'medium', duration: 90, focus: 'Técnica-táctica', notes: '' },
-            mar: { type: 'training', intensity: 'high',   duration: 90, focus: 'Físico / Condición', notes: '' },
-            mie: { type: 'rest',     intensity: 'none',   duration: 0,  focus: 'Descanso activo', notes: '' },
-            jue: { type: 'training', intensity: 'medium', duration: 75, focus: 'Táctica', notes: '' },
-            vie: { type: 'training', intensity: 'low',    duration: 60, focus: 'Activación previa', notes: '' },
-            sab: { type: 'match',    intensity: 'max',    duration: 90, focus: 'PARTIDO', notes: '' },
-            dom: { type: 'rest',     intensity: 'none',   duration: 0,  focus: 'Descanso', notes: '' }
+            lun: { morning: trainingSession('medium', 90, 'Técnica-táctica'),   afternoon: emptySession() },
+            mar: { morning: trainingSession('high',   90, 'Físico / Condición'), afternoon: emptySession() },
+            mie: { morning: emptySession(),                                       afternoon: emptySession() },
+            jue: { morning: trainingSession('medium', 75, 'Táctica'),            afternoon: emptySession() },
+            vie: { morning: trainingSession('low',    60, 'Activación previa'),  afternoon: emptySession() },
+            sab: { morning: { type: 'match', intensity: 'max', duration: 90, focus: 'PARTIDO', enabled: true }, afternoon: emptySession() },
+            dom: { morning: emptySession(),                                       afternoon: emptySession() }
         }
     };
 };
@@ -111,64 +120,80 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
             <!-- Day cards grid -->
             <div class="weekplan-grid">
                 ${days.map((day, i) => {
-                    const plan = this.weekPlan.days[day] || {};
+                    const dayData = this.weekPlan.days[day] || {};
+                    const morning   = dayData.morning   || { type:'rest', intensity:'none', duration:0, focus:'', enabled:false };
+                    const afternoon = dayData.afternoon || { type:'rest', intensity:'none', duration:0, focus:'', enabled:false };
                     const date = new Date(weekStart); date.setDate(date.getDate() + i);
                     const dateStr = date.toISOString().slice(0,10);
                     const isToday = dateStr === new Date().toISOString().slice(0,10);
                     const realSessions = weekRealSessions.byDay[dateStr] || [];
                     const realLoad = realSessions.reduce((s,x) => s + (x.load||0), 0);
-                    const typeColors = {training:'#2196f3',match:'#f44336',rest:'#9e9e9e',recovery:'#4caf50'};
-                    const intensityBadge = {
-                        none:'—', low:'🟢 Baja', medium:'🟡 Media', high:'🟠 Alta', max:'🔴 Máxima'
-                    }[plan.intensity||'none'];
-                    return `
-                    <div class="wp-day-card ${isToday ? 'today' : ''}" style="border-top:3px solid ${typeColors[plan.type]||'#ccc'}">
+
+                    const typeColors = {training:'#2196f3', match:'#f44336', rest:'#9e9e9e', recovery:'#4caf50', shooting:'#9c27b0', gym:'#795548'};
+                    const topColor = morning.enabled ? (typeColors[morning.type]||'#ccc') : (afternoon.enabled ? (typeColors[afternoon.type]||'#ccc') : '#9e9e9e');
+
+                    const sessionBlock = (slot, label, emoji) => {
+                        const s = slot === 'morning' ? morning : afternoon;
+                        const isRest = !s.enabled;
+                        return \`
+                        <div class="wp-session-block \${isRest ? 'wp-session-rest' : ''}">
+                            <div class="wp-session-header">
+                                <span class="wp-session-label">\${emoji} \${label}</span>
+                                <label class="wp-toggle-mini">
+                                    <input type="checkbox" \${s.enabled ? 'checked' : ''}
+                                        onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','enabled',this.checked)">
+                                    <span class="wp-toggle-mini-slider"></span>
+                                </label>
+                            </div>
+                            \${s.enabled ? \`
+                            <select class="wp-select wp-select-xs" onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','type',this.value)">
+                                <option value="training"  \${s.type==='training' ?'selected':''}>🏀 Entreno</option>
+                                <option value="shooting"  \${s.type==='shooting' ?'selected':''}>🎯 Tiro</option>
+                                <option value="gym"       \${s.type==='gym'      ?'selected':''}>🏋️ Gym</option>
+                                <option value="match"     \${s.type==='match'    ?'selected':''}>🏟️ Partido</option>
+                                <option value="recovery"  \${s.type==='recovery' ?'selected':''}>💪 Recuperación</option>
+                            </select>
+                            <select class="wp-select wp-select-xs" onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','intensity',this.value)">
+                                <option value="none"   \${s.intensity==='none'  ?'selected':''}>— Sin carga</option>
+                                <option value="low"    \${s.intensity==='low'   ?'selected':''}>🟢 Baja</option>
+                                <option value="medium" \${s.intensity==='medium'?'selected':''}>🟡 Media</option>
+                                <option value="high"   \${s.intensity==='high'  ?'selected':''}>🟠 Alta</option>
+                                <option value="max"    \${s.intensity==='max'   ?'selected':''}>🔴 Máxima</option>
+                            </select>
+                            <div style="display:flex;align-items:center;gap:.3rem;margin-top:.25rem">
+                                <span style="color:var(--text-secondary);font-size:.8rem">⏱</span>
+                                <input type="number" class="wp-input-sm" min="0" max="240" step="5"
+                                    value="\${s.duration||0}"
+                                    onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','duration',parseInt(this.value))">
+                                <span style="color:var(--text-secondary);font-size:.72rem">min</span>
+                            </div>
+                            <input type="text" class="wp-input-focus" placeholder="Foco..."
+                                value="\${s.focus||''}"
+                                onchange="window.rpeTracker?._wpUpdateSession('\${day}','\${slot}','focus',this.value)">
+                            \` : '<span class="wp-session-off">Sin sesión</span>'}
+                        </div>\`;
+                    };
+
+                    return \`
+                    <div class="wp-day-card \${isToday ? 'today' : ''}" style="border-top:3px solid \${topColor}">
                         <div class="wp-day-head">
-                            <span class="wp-day-name">${dayLabels[i]}</span>
-                            <span class="wp-day-date">${date.getDate()}/${date.getMonth()+1}</span>
-                            ${isToday ? '<span class="wp-today-badge">HOY</span>' : ''}
+                            <span class="wp-day-name">\${dayLabels[i]}</span>
+                            <span class="wp-day-date">\${date.getDate()}/\${date.getMonth()+1}</span>
+                            \${isToday ? '<span class="wp-today-badge">HOY</span>' : ''}
                         </div>
-                        <div style="margin:.5rem 0">
-                            <select class="wp-select" data-day="${day}" data-field="type" onchange="window.rpeTracker?._wpUpdateField('${day}','type',this.value)">
-                                <option value="training" ${plan.type==='training'?'selected':''}>🏀 Entreno</option>
-                                <option value="match"    ${plan.type==='match'?'selected':''}>🏟️ Partido</option>
-                                <option value="recovery" ${plan.type==='recovery'?'selected':''}>💪 Recuperación</option>
-                                <option value="rest"     ${plan.type==='rest'?'selected':''}>😴 Descanso</option>
-                            </select>
-                        </div>
-                        <div style="margin:.35rem 0;display:flex;gap:.4rem;align-items:center">
-                            <select class="wp-select wp-select-sm" data-day="${day}" data-field="intensity" onchange="window.rpeTracker?._wpUpdateField('${day}','intensity',this.value)">
-                                <option value="none"   ${plan.intensity==='none'?'selected':''}>— Sin carga</option>
-                                <option value="low"    ${plan.intensity==='low'?'selected':''}>🟢 Baja</option>
-                                <option value="medium" ${plan.intensity==='medium'?'selected':''}>🟡 Media</option>
-                                <option value="high"   ${plan.intensity==='high'?'selected':''}>🟠 Alta</option>
-                                <option value="max"    ${plan.intensity==='max'?'selected':''}>🔴 Máxima</option>
-                            </select>
-                        </div>
-                        <div style="margin:.35rem 0;display:flex;align-items:center;gap:.35rem;font-size:.8rem">
-                            <span style="color:var(--text-secondary)">⏱</span>
-                            <input type="number" class="wp-input-sm" min="0" max="240" step="5"
-                                value="${plan.duration||0}"
-                                onchange="window.rpeTracker?._wpUpdateField('${day}','duration',parseInt(this.value))"
-                                ${plan.type==='rest'?'disabled':''}>
-                            <span style="color:var(--text-secondary);font-size:.75rem">min</span>
-                        </div>
-                        <div style="margin:.35rem 0">
-                            <input type="text" class="wp-input-focus" placeholder="Foco del día..."
-                                value="${plan.focus||''}"
-                                onchange="window.rpeTracker?._wpUpdateField('${day}','focus',this.value)">
-                        </div>
-                        ${realSessions.length > 0 ? `
+                        \${sessionBlock('morning',   'Mañana', '🌅')}
+                        \${sessionBlock('afternoon', 'Tarde',  '🌆')}
+                        \${realSessions.length > 0 ? \`
                         <div class="wp-real-sessions">
                             <span style="font-size:.72rem;color:var(--text-secondary);font-weight:600">REAL:</span>
-                            ${realSessions.slice(0,3).map(s => {
+                            \${realSessions.slice(0,3).map(s => {
                                 const p = this.players.find(x=>x.id===s.playerId);
-                                return p ? `<span class="wp-real-chip">${PlayerTokens.avatar(p,14,'.45rem')} RPE ${s.rpe}</span>` : '';
+                                return p ? \`<span class="wp-real-chip">\${PlayerTokens.avatar(p,14,'.45rem')} RPE \${s.rpe}</span>\` : '';
                             }).join('')}
-                            ${realSessions.length > 3 ? `<span style="font-size:.72rem;color:var(--text-secondary)">+${realSessions.length-3}</span>` : ''}
-                            <span style="font-size:.72rem;color:var(--text-secondary);margin-left:auto">Carga: ${realLoad}</span>
-                        </div>` : ''}
-                    </div>`;
+                            \${realSessions.length > 3 ? \`<span style="font-size:.72rem;color:var(--text-secondary)">+\${realSessions.length-3}</span>\` : ''}
+                            <span style="font-size:.72rem;color:var(--text-secondary);margin-left:auto">Carga: \${realLoad}</span>
+                        </div>\` : ''}
+                    </div>\`;
                 }).join('')}
             </div>
 
@@ -209,10 +234,21 @@ RPETracker.prototype._plannedWeekLoad = function() {
     const plan = this.weekPlan?.days || {};
     let total = 0;
     Object.values(plan).forEach(d => {
-        const rpe = intensityRPE[d.intensity||'none'] || 0;
-        total += rpe * (d.duration||0);
+        // Nuevo formato: morning/afternoon
+        if (d.morning || d.afternoon) {
+            ['morning','afternoon'].forEach(slot => {
+                const s = d[slot];
+                if (s && s.enabled) {
+                    const rpe = intensityRPE[s.intensity||'none'] || 0;
+                    total += rpe * (s.duration||0);
+                }
+            });
+        } else {
+            // Formato legacy
+            const rpe = intensityRPE[d.intensity||'none'] || 0;
+            total += rpe * (d.duration||0);
+        }
     });
-    // Multiply by typical player count for team estimate
     const playerCount = Math.max(this.players.length, 1);
     return Math.round(total * playerCount);
 };
@@ -229,6 +265,15 @@ RPETracker.prototype._wpUpdateField = function(day, field, value) {
     if (!this.weekPlan) this.loadWeekPlan();
     if (!this.weekPlan.days[day]) this.weekPlan.days[day] = {};
     this.weekPlan.days[day][field] = value;
+};
+
+RPETracker.prototype._wpUpdateSession = function(day, slot, field, value) {
+    if (!this.weekPlan) this.loadWeekPlan();
+    if (!this.weekPlan.days[day]) this.weekPlan.days[day] = {};
+    if (!this.weekPlan.days[day][slot]) this.weekPlan.days[day][slot] = { type:'rest', intensity:'none', duration:0, focus:'', enabled:false };
+    this.weekPlan.days[day][slot][field] = value;
+    // Si se activa/desactiva, re-renderizar para mostrar/ocultar controles
+    if (field === 'enabled') this.renderWeeklyPlanning();
 };
 
 RPETracker.prototype._wpSaveCurrentPlan = function() {
