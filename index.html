@@ -85,8 +85,10 @@
                     </select>
                     <select id="typeFilter" class="filter-select">
                         <option value="all">Todos los tipos</option>
-                        <option value="training">Entrenamientos</option>
-                        <option value="match">Partidos</option>
+                        <option value="training">🏀 Entrenamientos</option>
+                        <option value="match">🏟️ Partidos</option>
+                        <option value="shooting">🎯 Tiro</option>
+                        <option value="gym">🏋️ Gym</option>
                     </select>
                 </div>
                 
@@ -293,6 +295,10 @@
                             <label for="typeTraining" class="type-option training">🏀 Entrenamiento</label>
                             <input type="radio" id="typeMatch" name="sessionType" value="match">
                             <label for="typeMatch" class="type-option match">🏟️ Partido</label>
+                            <input type="radio" id="typeShooting" name="sessionType" value="shooting">
+                            <label for="typeShooting" class="type-option shooting">🎯 Tiro</label>
+                            <input type="radio" id="typeGym" name="sessionType" value="gym">
+                            <label for="typeGym" class="type-option gym">🏋️ Gym</label>
                         </div>
                     </div>
 
@@ -390,9 +396,12 @@
                         <div class="session-type-toggle">
                             <input type="radio" id="editTypeTraining" name="editSessionType" value="training">
                             <label for="editTypeTraining" class="type-option training">🏀 Entrenamiento</label>
-                            
                             <input type="radio" id="editTypeMatch" name="editSessionType" value="match">
                             <label for="editTypeMatch" class="type-option match">🏟️ Partido</label>
+                            <input type="radio" id="editTypeShooting" name="editSessionType" value="shooting">
+                            <label for="editTypeShooting" class="type-option shooting">🎯 Tiro</label>
+                            <input type="radio" id="editTypeGym" name="editSessionType" value="gym">
+                            <label for="editTypeGym" class="type-option gym">🏋️ Gym</label>
                         </div>
                     </div>
 

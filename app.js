@@ -1131,7 +1131,7 @@ class RPETracker {
             return `
                 <div class="session-card" onclick="window.rpeTracker?.showSessionDetail('${session.id}')">
                     <div class="session-icon ${session.type}">
-                        ${session.type === 'training' ? '🏀' : '🏟️'}
+                        ${{training:'🏀',match:'🏟️',shooting:'🎯',gym:'🏋️',recovery:'💪'}[session.type] || '🏀'}
                     </div>
                     <div class="session-info">
                         <div class="session-type">
@@ -1200,7 +1200,7 @@ class RPETracker {
             </div>` : ''}
             <div class="detail-row">
                 <span class="detail-label">Tipo</span>
-                <span>${session.type === 'training' ? '🏀 Entrenamiento' : '🏟️ Partido'}</span>
+                <span>${{training:'🏀 Entrenamiento',match:'🏟️ Partido',shooting:'🎯 Tiro',gym:'🏋️ Gym',recovery:'💪 Recuperación'}[session.type] || '🏀 Entrenamiento'}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Fecha</span>
@@ -1568,7 +1568,7 @@ class RPETracker {
                 <p style="margin-bottom: 0.5rem;"><strong>Carga = RPE × Duración</strong> (método sRPE)</p>
                 <p style="margin-bottom: 0.5rem;">Esta app usa el <strong>método EWMA</strong>, el estándar científico usado por equipos profesionales para calcular el ratio Agudo:Crónico.</p>
                 
-                <div style="background: white; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <div style="background: var(--bg-subtle); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
                     <strong>¿Por qué EWMA es mejor?</strong>
                     <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem;">
                         <li>✅ Pondera más los entrenamientos recientes</li>
@@ -1720,7 +1720,8 @@ class RPETracker {
     // ========== UTILITIES ==========
     
     getSessionTypeName(type) {
-        return type === 'training' ? 'Entrenamiento' : 'Partido';
+        const names = {training:'Entrenamiento', match:'Partido', shooting:'Tiro', gym:'Gym', recovery:'Recuperación'};
+        return names[type] || 'Entrenamiento';
     }
 
     formatDate(dateString) {
@@ -1989,7 +1990,7 @@ class RPETracker {
             const date = new Date(session.date);
             const dateStr = date.toLocaleDateString('es-ES');
             const timeOfDay = session.timeOfDay === 'morning' ? 'Mañana' : 'Tarde';
-            const type = session.type === 'training' ? 'Entrenamiento' : 'Partido';
+            const type = {training:'Entrenamiento',match:'Partido',shooting:'Tiro',gym:'Gym',recovery:'Recuperación'}[session.type] || 'Entrenamiento';
             const load = session.load || (session.rpe * (session.duration || 60));
             const notes = (session.notes || '').replace(/"/g, '""'); // Escape quotes
             
