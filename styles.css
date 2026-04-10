@@ -3886,3 +3886,15 @@ header h1 {
 [data-theme="dark"] .wp-session-block { background: var(--bg-elevated); }
 [data-theme="dark"] .wp-session-block.wp-session-rest { background: transparent; }
 [data-theme="dark"] .wp-select-xs { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-input); }
+
+/* ===== TIPOS DE SESIÓN — TIRO Y GYM ===== */
+.session-icon.shooting { background: rgba(156,39,176,0.1); }
+.session-icon.gym      { background: rgba(121,85,72,0.1); }
+.session-icon.recovery { background: rgba(76,175,80,0.1); }
+
+.session-type-toggle input:checked + .type-option.shooting {
+    background: #9c27b0; color: white; border-color: #9c27b0;
+}
+.session-type-toggle input:checked + .type-option.gym {
+    background: #795548; color: white; border-color: #795548;
+}
