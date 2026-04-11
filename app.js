@@ -1562,40 +1562,54 @@ class RPETracker {
             return;
         }
         
+        const ewmaOpen = localStorage.getItem('rpe_ewma_open') !== 'false';
         container.innerHTML = `
-            <div class="info-box" style="background: #e3f2fd; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem;">
-                <h3 style="margin-bottom: 0.5rem;">ℹ️ Método EWMA (Exponentially Weighted Moving Average)</h3>
-                <p style="margin-bottom: 0.5rem;"><strong>Carga = RPE × Duración</strong> (método sRPE)</p>
-                <p style="margin-bottom: 0.5rem;">Esta app usa el <strong>método EWMA</strong>, el estándar científico usado por equipos profesionales para calcular el ratio Agudo:Crónico.</p>
-                
-                <div style="background: var(--bg-subtle); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                    <strong>¿Por qué EWMA es mejor?</strong>
-                    <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem;">
-                        <li>✅ Pondera más los entrenamientos recientes</li>
-                        <li>✅ Se adapta más rápido a cambios de carga</li>
-                        <li>✅ Más sensible a picos de carga (mejor prevención)</li>
-                        <li>✅ Método validado científicamente</li>
+            <details class="ewma-info-box" id="ewmaDetails" ${ewmaOpen ? 'open' : ''}>
+                <summary class="ewma-summary">
+                    <span>ℹ️ Método EWMA — ¿Cómo se calcula el ratio A:C?</span>
+                    <span class="ewma-toggle-hint">ver más</span>
+                </summary>
+                <div class="ewma-body">
+                    <p style="margin-bottom: 0.5rem;"><strong>Carga = RPE × Duración</strong> (método sRPE)</p>
+                    <p style="margin-bottom: 0.5rem;">Esta app usa el <strong>método EWMA</strong>, el estándar científico usado por equipos profesionales para calcular el ratio Agudo:Crónico.</p>
+                    
+                    <div style="background: var(--bg-subtle); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                        <strong>¿Por qué EWMA es mejor?</strong>
+                        <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem;">
+                            <li>✅ Pondera más los entrenamientos recientes</li>
+                            <li>✅ Se adapta más rápido a cambios de carga</li>
+                            <li>✅ Más sensible a picos de carga (mejor prevención)</li>
+                            <li>✅ Método validado científicamente</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="margin-bottom: 0.5rem;"><strong>Interpretación del Ratio:</strong></p>
+                    <ul style="margin-left: 1.5rem; color: var(--gray);">
+                        <li><strong style="color: #2e7d32;">0.8 - 1.3 (Verde):</strong> 🟢 Zona óptima - Adaptación positiva</li>
+                        <li><strong style="color: #ef6c00;">1.3 - 1.5 (Naranja):</strong> 🟠 Precaución - Riesgo moderado de lesión</li>
+                        <li><strong style="color: #c62828;">> 1.5 (Rojo):</strong> 🔴 Peligro - Alto riesgo de lesión</li>
+                        <li><strong style="color: #1565c0;">< 0.8 (Azul):</strong> 🔵 Descarga - Puede perder condición</li>
                     </ul>
+                    
+                    <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--gray); font-style: italic;">
+                        Nota: EWMA Aguda usa ventana de 7 días (λ=0.25), EWMA Crónica usa 28 días (λ=0.069)
+                    </p>
                 </div>
-                
-                <p style="margin-bottom: 0.5rem;"><strong>Interpretación del Ratio:</strong></p>
-                <ul style="margin-left: 1.5rem; color: var(--gray);">
-                    <li><strong style="color: #2e7d32;">0.8 - 1.3 (Verde):</strong> 🟢 Zona óptima - Adaptación positiva</li>
-                    <li><strong style="color: #ef6c00;">1.3 - 1.5 (Naranja):</strong> 🟠 Precaución - Riesgo moderado de lesión</li>
-                    <li><strong style="color: #c62828;">> 1.5 (Rojo):</strong> 🔴 Peligro - Alto riesgo de lesión</li>
-                    <li><strong style="color: #1565c0;">< 0.8 (Azul):</strong> 🔵 Descarga - Puede perder condición</li>
-                </ul>
-                
-                <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--gray); font-style: italic;">
-                    Nota: EWMA Aguda usa ventana de 7 días (λ=0.25), EWMA Crónica usa 28 días (λ=0.069)
-                </p>
-            </div>
+            </details>
             
             ${this.renderPlayerComparison()}
             
             ${this.renderTeamRatios()}
         `;
         
+        // Persist EWMA details open/closed state
+        setTimeout(() => {
+            const det = document.getElementById('ewmaDetails');
+            if (det) det.addEventListener('toggle', () => {
+                localStorage.setItem('rpe_ewma_open', det.open);
+            });
+        }, 0);
+
         // Render comparison module first (top of page)
         setTimeout(() => {
             this.renderComparisonModule();
@@ -1818,35 +1832,87 @@ class RPETracker {
     renderEvolutionCharts() {
         const container = document.getElementById('evolutionCharts');
         if (!container) return;
-        
+
         if (this.players.length === 0) {
             container.innerHTML = '';
             return;
         }
-        
-        // Create charts for each player
-        let chartsHTML = '<h3 style="margin: 2rem 0 1rem 0;">📈 Evolución del Ratio A:C</h3>';
-        
-        this.players.forEach(player => {
-            chartsHTML += `
+
+        // Restore previously selected players from sessionStorage
+        let selected = (() => {
+            try { return JSON.parse(sessionStorage.getItem('rpe_chart_players') || 'null'); } catch(e) { return null; }
+        })();
+        if (!selected) selected = this.players.map(p => p.id); // default: all
+
+        // Build chip selector
+        const chipsHTML = this.players.map(p => {
+            const ratio = this.calculateAcuteChronicRatio(p.id);
+            const r = parseFloat(ratio.ratio);
+            const dot = isNaN(r) ? '#999' : r > 1.5 ? '#e53935' : r > 1.3 ? '#fb8c00' : r < 0.8 ? '#1e88e5' : '#43a047';
+            const active = selected.includes(p.id) ? 'chart-chip--active' : '';
+            return `<button class="chart-chip ${active}" data-pid="${p.id}" onclick="window.rpeTracker?.toggleChartPlayer('${p.id}')">
+                <span class="chart-chip-dot" style="background:${dot}"></span>
+                ${p.name}${p.number ? ' #'+p.number : ''}
+            </button>`;
+        }).join('');
+
+        const chartsHTML = this.players
+            .filter(p => selected.includes(p.id))
+            .map(p => `
                 <div class="chart-container">
-                    <h4>${player.name}${player.number ? ` #${player.number}` : ''}</h4>
-                    <canvas id="chart-${player.id}" class="chart-canvas" width="800" height="300"></canvas>
+                    <div class="chart-header">
+                        <h4>${p.name}${p.number ? ` #${p.number}` : ''}</h4>
+                        <div class="chart-period-btns">
+                            ${[7,14,30,90].map(d => `<button class="chart-period-btn${(this._chartPeriods?.[p.id]||30)===d?' active':''}" onclick="window.rpeTracker?.setChartPeriod('${p.id}',${d})">${d}d</button>`).join('')}
+                        </div>
+                    </div>
+                    <canvas id="chart-${p.id}" class="chart-canvas" width="800" height="240"></canvas>
                 </div>
-            `;
-        });
-        
-        container.innerHTML = chartsHTML;
-        
-        // Render each chart
+            `).join('');
+
+        container.innerHTML = `
+            <div class="evolution-section-header">
+                <h3>📈 Evolución del Ratio A:C</h3>
+                <div class="chart-chips-wrap">${chipsHTML}</div>
+            </div>
+            <div class="charts-grid">${chartsHTML}</div>
+        `;
+
         setTimeout(() => {
-            this.players.forEach(player => {
-                this.renderPlayerEvolutionChart(player.id);
+            this.players.filter(p => selected.includes(p.id)).forEach(p => {
+                this.renderPlayerEvolutionChart(p.id, this._chartPeriods?.[p.id] || 30);
             });
         }, 100);
     }
+
+    toggleChartPlayer(pid) {
+        let selected = (() => {
+            try { return JSON.parse(sessionStorage.getItem('rpe_chart_players') || 'null'); } catch(e) { return null; }
+        })();
+        if (!selected) selected = this.players.map(p => p.id);
+        if (selected.includes(pid)) {
+            if (selected.length > 1) selected = selected.filter(id => id !== pid);
+        } else {
+            selected.push(pid);
+        }
+        sessionStorage.setItem('rpe_chart_players', JSON.stringify(selected));
+        this.renderEvolutionCharts();
+    }
+
+    setChartPeriod(pid, days) {
+        if (!this._chartPeriods) this._chartPeriods = {};
+        this._chartPeriods[pid] = days;
+        this.renderPlayerEvolutionChart(pid, days);
+        // Update period button active states for this player's chart
+        const container = document.getElementById(`chart-${pid}`)?.closest('.chart-container');
+        if (container) {
+            container.querySelectorAll('.chart-period-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.textContent) === days);
+            });
+        }
+    }
     
-    renderPlayerEvolutionChart(playerId) {
+    renderPlayerEvolutionChart(playerId, daysBack = 30) {
         const canvasId = `chart-${playerId}`;
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
@@ -1865,7 +1931,6 @@ class RPETracker {
         
         // Calculate EWMA for each day
         const now = new Date();
-        const daysBack = 30;
         const labels = [];
         const ratioData = [];
         
@@ -1907,7 +1972,7 @@ class RPETracker {
                 color: '#ff6600'
             }],
             labels: labels,
-            title: 'Evolución Ratio Agudo:Crónico (30 días)',
+            title: `Evolución Ratio Agudo:Crónico (${daysBack} días)`,
             zones: [
                 { min: 0, max: 0.8, color: 'rgba(21, 101, 192, 0.1)' },     // Blue
                 { min: 0.8, max: 1.3, color: 'rgba(76, 175, 80, 0.1)' },    // Green
