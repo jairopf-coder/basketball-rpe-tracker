@@ -1489,7 +1489,30 @@ header h1 {
     white-space: pre-wrap;
 }
 
-/* Responsive */
+/* ===== RPE HISTOGRAM IN SESSION DETAIL MODAL ===== */
+.detail-rpe-hist-section {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+.detail-rpe-hist-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.6rem;
+}
+.detail-rpe-hist-canvas {
+    width: 100% !important;
+    height: 130px !important;
+    display: block;
+}
+[data-theme="dark"] .detail-rpe-hist-section {
+    border-color: var(--border);
+}
+
+
 /* ===== MÓVIL COMPLETO ===== */
 @media (max-width: 768px) {
 
@@ -3976,6 +3999,39 @@ header h1 {
 /* Dark mode overrides */
 [data-theme="dark"] .wp-session-block { background: var(--bg-elevated); }
 [data-theme="dark"] .wp-session-block.wp-session-rest { background: transparent; }
+
+/* ===== DÍA DE DESCANSO — estilo diferenciado ===== */
+.wp-day-card.wp-day-rest {
+    background: var(--bg-subtle);
+    opacity: 0.82;
+}
+.wp-day-card.wp-day-rest .wp-session-block.wp-session-rest {
+    border-color: transparent;
+}
+.wp-rest-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.5rem;
+    margin-bottom: 0.4rem;
+    background: rgba(120,144,156,0.10);
+    border: 1.5px dashed rgba(120,144,156,0.35);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+    user-select: none;
+}
+[data-theme="dark"] .wp-day-card.wp-day-rest {
+    background: rgba(255,255,255,0.03);
+}
+[data-theme="dark"] .wp-rest-banner {
+    background: rgba(120,144,156,0.08);
+    border-color: rgba(120,144,156,0.25);
+}
+
 [data-theme="dark"] .wp-select-xs { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-input); }
 
 /* ===== TIPOS DE SESIÓN — TIRO Y GYM ===== */
@@ -4127,9 +4183,15 @@ details[open] .ewma-toggle-hint { display: none; }
     font-size: 0.875rem;
     cursor: pointer;
     white-space: nowrap;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, background 0.15s;
 }
 .btn-filters-toggle:hover { border-color: var(--primary); }
+.btn-filters-toggle.has-active-filters {
+    border-color: var(--primary);
+    background: rgba(255,102,0,0.07);
+    color: var(--primary);
+    font-weight: 600;
+}
 .filter-row--always { margin-bottom: 0; }
 .advanced-filters-panel {
     border-top: 1px solid var(--border);

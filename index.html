@@ -536,6 +536,8 @@
             if (document.getElementById('searchSessions')?.value) count++;
             const badge = document.getElementById('filtersActiveBadge');
             if (badge) { badge.textContent = count; badge.style.display = count > 0 ? '' : 'none'; }
+            const toggleBtn = document.getElementById('filtersToggleBtn');
+            if (toggleBtn) toggleBtn.classList.toggle('has-active-filters', count > 0);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
