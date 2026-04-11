@@ -4146,7 +4146,7 @@ details[open] .ewma-toggle-hint { display: none; }
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 12px;
+    padding: 5px 10px 5px 5px;
     border-radius: 20px;
     border: 1.5px solid var(--border);
     background: var(--bg-surface);
@@ -4169,6 +4169,95 @@ details[open] .ewma-toggle-hint { display: none; }
     border-radius: 50%;
     flex-shrink: 0;
 }
+.chart-chip-name { font-weight: 500; }
+.chip-num { opacity: 0.6; font-weight: 400; }
+.chart-chip-ratio {
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: rgba(0,0,0,0.06);
+    border-radius: 8px;
+    padding: 1px 5px;
+    letter-spacing: 0.01em;
+    margin-left: 2px;
+}
+[data-theme="dark"] .chart-chip-ratio { background: rgba(255,255,255,0.08); }
+
+/* ===== STICKY SEMAPHORE BAR ===== */
+.semaphore-bar {
+    position: sticky;
+    top: 0;
+    z-index: 80;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: -0.5rem -1rem 1.25rem -1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    flex-wrap: wrap;
+}
+.sema-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.sema-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+}
+.sema-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px 3px 3px;
+    border-radius: 20px;
+    border: 1.5px solid var(--sema-color, var(--border));
+    background: color-mix(in srgb, var(--sema-color, #ccc) 10%, transparent);
+    cursor: pointer;
+    font-size: 0.78rem;
+    transition: transform 0.1s, box-shadow 0.1s;
+    white-space: nowrap;
+    user-select: none;
+}
+.sema-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.sema-name {
+    font-weight: 500;
+    color: var(--text);
+}
+.sema-num { opacity: 0.55; font-weight: 400; }
+.sema-ratio {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--sema-color, var(--text-muted));
+    background: color-mix(in srgb, var(--sema-color, #ccc) 12%, transparent);
+    border-radius: 6px;
+    padding: 1px 4px;
+}
+.sema-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+[data-theme="dark"] .semaphore-bar {
+    background: var(--bg-surface);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+@media (max-width: 600px) {
+    .semaphore-bar { padding: 0.4rem 0.75rem; gap: 0.5rem; }
+    .sema-pill { font-size: 0.72rem; padding: 2px 6px 2px 2px; }
+}
+
 
 /* Collapsible filters toggle button */
 .btn-filters-toggle {
