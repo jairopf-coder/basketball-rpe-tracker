@@ -2100,31 +2100,56 @@ class RPETracker {
             beforeDraw(chart) {
                 const { ctx, chartArea: ca, scales: { y } } = chart;
                 if (!ca) return;
+                const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
                 const zones = [
-                    { min: 0,   max: 0.8,  color: 'rgba(21,101,192,0.10)'  },
-                    { min: 0.8, max: 1.3,  color: 'rgba(76,175,80,0.12)'   },
-                    { min: 1.3, max: 1.5,  color: 'rgba(255,152,0,0.13)'   },
-                    { min: 1.5, max: 3.0,  color: 'rgba(244,67,54,0.11)'   },
+                    { min: 0,   max: 0.8,  color: isDarkMode ? 'rgba(30,120,220,0.22)'  : 'rgba(21,101,192,0.13)',  label: 'Baja carga',   labelColor: isDarkMode ? 'rgba(100,170,255,0.70)' : 'rgba(21,101,192,0.55)'  },
+                    { min: 0.8, max: 1.3,  color: isDarkMode ? 'rgba(34,168,97,0.22)'   : 'rgba(76,175,80,0.16)',   label: 'Óptimo',       labelColor: isDarkMode ? 'rgba(80,210,130,0.75)'  : 'rgba(34,130,70,0.55)'   },
+                    { min: 1.3, max: 1.5,  color: isDarkMode ? 'rgba(245,166,35,0.28)'  : 'rgba(255,152,0,0.20)',   label: 'Precaución',   labelColor: isDarkMode ? 'rgba(255,190,60,0.80)'  : 'rgba(200,100,0,0.60)'   },
+                    { min: 1.5, max: 3.0,  color: isDarkMode ? 'rgba(229,57,53,0.25)'   : 'rgba(244,67,54,0.15)',   label: 'Alto riesgo',  labelColor: isDarkMode ? 'rgba(255,110,100,0.80)' : 'rgba(200,40,40,0.60)'   },
                 ];
                 ctx.save();
                 zones.forEach(z => {
                     const yTop    = y.getPixelForValue(z.max);
                     const yBottom = y.getPixelForValue(z.min);
+                    const top     = Math.max(yTop, ca.top);
+                    const bottom  = Math.min(yBottom, ca.bottom);
+                    if (bottom <= top) return;
+                    // Fill zone
                     ctx.fillStyle = z.color;
-                    ctx.fillRect(ca.left, Math.max(yTop, ca.top), ca.width, Math.min(yBottom, ca.bottom) - Math.max(yTop, ca.top));
+                    ctx.fillRect(ca.left, top, ca.width, bottom - top);
+                    // Label — centrado verticalmente en la zona, alineado a la derecha
+                    const midY = (top + bottom) / 2;
+                    if (bottom - top > 12) { // solo si la zona tiene altura suficiente
+                        ctx.font = 'bold 10px system-ui, sans-serif';
+                        ctx.fillStyle = z.labelColor;
+                        ctx.textAlign = 'right';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(z.label, ca.right - 6, midY);
+                    }
                 });
-                // Zone threshold lines
-                [0.8, 1.3, 1.5].forEach(v => {
+                // Zone threshold lines — más visibles
+                const thresholds = [
+                    { v: 0.8, label: '0.8' },
+                    { v: 1.3, label: '1.3' },
+                    { v: 1.5, label: '1.5' },
+                ];
+                thresholds.forEach(({ v, label }) => {
                     const yLine = y.getPixelForValue(v);
                     if (yLine < ca.top || yLine > ca.bottom) return;
-                    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.22)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([5, 4]);
                     ctx.beginPath();
                     ctx.moveTo(ca.left, yLine);
                     ctx.lineTo(ca.right, yLine);
                     ctx.stroke();
                     ctx.setLineDash([]);
+                    // Valor numérico en el eje izquierdo
+                    ctx.font = '10px system-ui, sans-serif';
+                    ctx.fillStyle = isDarkMode ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.40)';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(label, ca.left + 3, yLine - 2);
                 });
                 ctx.restore();
             }
