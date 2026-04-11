@@ -1623,8 +1623,58 @@ class RPETracker {
             <div class="rcard-grid">${cards}</div>`;
     }
 
+    // ========== STICKY SEMAPHORE BAR ==========
+
+    _renderSemaphoreBar() {
+        let bar = document.getElementById('semaphoreBar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'semaphoreBar';
+            bar.className = 'semaphore-bar';
+            // Insert inside analytics-container, before comparisonModule
+            const anchor = document.getElementById('comparisonModule');
+            if (anchor) anchor.parentNode.insertBefore(bar, anchor);
+            else return;
+        }
+
+        const getStatus = (r) => {
+            const n = parseFloat(r);
+            if (isNaN(n) || r === 'N/A') return { color: '#9e9e9e', icon: '⚪', label: 'Sin datos' };
+            if (n > 1.5)  return { color: '#e53935', icon: '🔴', label: 'Peligro' };
+            if (n > 1.3)  return { color: '#fb8c00', icon: '🟠', label: 'Precaución' };
+            if (n < 0.8)  return { color: '#1e88e5', icon: '🔵', label: 'Por debajo' };
+            return           { color: '#43a047', icon: '🟢', label: 'Óptimo' };
+        };
+
+        const pills = this.players.map(player => {
+            const ratio = this.calculateAcuteChronicRatio(player.id);
+            const st = getStatus(ratio.ratio);
+            const ratioDisplay = ratio.ratio === 'N/A' ? '—' : ratio.ratio;
+            const avatar = PlayerTokens.avatar(player, 22, '0.6rem');
+            return `<div class="sema-pill" style="--sema-color:${st.color}" title="${player.name} · Ratio A:C ${ratioDisplay} · ${st.label}"
+                onclick="window.rpeTracker?.scrollToPlayerChart('${player.id}')">
+                ${avatar}
+                <span class="sema-name">${player.name}${player.number ? ' <span class="sema-num">#'+player.number+'</span>' : ''}</span>
+                <span class="sema-ratio">${ratioDisplay}</span>
+                <span class="sema-dot" style="background:${st.color}"></span>
+            </div>`;
+        }).join('');
+
+        bar.innerHTML = `
+            <div class="sema-label">Estado equipo</div>
+            <div class="sema-pills">${pills}</div>
+        `;
+    }
+
+    scrollToPlayerChart(playerId) {
+        const canvas = document.getElementById(`chart-${playerId}`);
+        if (canvas) {
+            canvas.closest('.chart-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
     // ========== ANALYTICS ==========
-    
+
     renderAnalytics() {
         const container = document.getElementById('analyticsContent');
         if (!container) return;
@@ -1640,6 +1690,9 @@ class RPETracker {
             return;
         }
         
+        // Build sticky semaphore bar
+        this._renderSemaphoreBar();
+
         const ewmaOpen = localStorage.getItem('rpe_ewma_open') !== 'false';
         container.innerHTML = `
             <details class="ewma-info-box" id="ewmaDetails" ${ewmaOpen ? 'open' : ''}>
@@ -1927,10 +1980,13 @@ class RPETracker {
             const ratio = this.calculateAcuteChronicRatio(p.id);
             const r = parseFloat(ratio.ratio);
             const dot = isNaN(r) ? '#999' : r > 1.5 ? '#e53935' : r > 1.3 ? '#fb8c00' : r < 0.8 ? '#1e88e5' : '#43a047';
+            const ratioDisplay = ratio.ratio === 'N/A' ? '—' : ratio.ratio;
             const active = selected.includes(p.id) ? 'chart-chip--active' : '';
+            const avatar = PlayerTokens.avatar(p, 20, '0.55rem');
             return `<button class="chart-chip ${active}" data-pid="${p.id}" onclick="window.rpeTracker?.toggleChartPlayer('${p.id}')">
-                <span class="chart-chip-dot" style="background:${dot}"></span>
-                ${p.name}${p.number ? ' #'+p.number : ''}
+                ${avatar}
+                <span class="chart-chip-name">${p.name}${p.number ? ' <span class="chip-num">#'+p.number+'</span>' : ''}</span>
+                <span class="chart-chip-ratio" style="color:${dot}">${ratioDisplay}</span>
             </button>`;
         }).join('');
 
