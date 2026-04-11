@@ -130,7 +130,8 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     const realLoad = realSessions.reduce((s,x) => s + (x.load||0), 0);
 
                     const typeColors = {training:'#2196f3', match:'#f44336', rest:'#9e9e9e', recovery:'#4caf50', shooting:'#9c27b0', gym:'#795548'};
-                    const topColor = morning.enabled ? (typeColors[morning.type]||'#ccc') : (afternoon.enabled ? (typeColors[afternoon.type]||'#ccc') : '#9e9e9e');
+                    const isFullRestDay = !morning.enabled && !afternoon.enabled;
+                    const topColor = morning.enabled ? (typeColors[morning.type]||'#ccc') : (afternoon.enabled ? (typeColors[afternoon.type]||'#ccc') : (isFullRestDay ? '#78909c' : '#9e9e9e'));
 
                     const sessionBlock = (slot, label, emoji) => {
                         const s = slot === 'morning' ? morning : afternoon;
@@ -208,12 +209,15 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                         '</div>';
                     }
 
-                    return '<div class="wp-day-card' + (isToday ? ' today' : '') + '" style="border-top:3px solid ' + topColor + '">' +
+                    return '<div class="wp-day-card' + (isToday ? ' today' : '') + (isFullRestDay ? ' wp-day-rest' : '') + '" style="border-top:3px solid ' + topColor + '">' +
                         '<div class="wp-day-head">' +
                             '<span class="wp-day-name">' + dayLabels[i] + '</span>' +
                             '<span class="wp-day-date">' + date.getDate() + '/' + (date.getMonth()+1) + '</span>' +
                             (isToday ? '<span class="wp-today-badge">HOY</span>' : '') +
                         '</div>' +
+                        (isFullRestDay
+                            ? '<div class="wp-rest-banner">🛌 <span>Descanso</span></div>'
+                            : '') +
                         sessionBlock('morning',   'Mañana', '🌅') +
                         sessionBlock('afternoon', 'Tarde',  '🌆') +
                         realHtml +

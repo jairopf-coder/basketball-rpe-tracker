@@ -1228,9 +1228,87 @@ class RPETracker {
                 </div>
                 <div class="detail-notes">${session.notes}</div>
             ` : '<div class="detail-notes" style="font-style: italic; color: var(--text-faint);">Sin incidencias registradas</div>'}
+            ${playerSessions.length >= 2 ? `
+            <div class="detail-rpe-hist-section">
+                <div class="detail-rpe-hist-title">📊 Distribución RPE — historial de ${playerName}</div>
+                <canvas id="rpeHistogramCanvas" class="detail-rpe-hist-canvas"></canvas>
+            </div>` : ''}
         `;
         
         document.getElementById('detailModal').classList.add('active');
+
+        // Render RPE histogram after modal is in DOM
+        if (playerSessions.length >= 2) {
+            requestAnimationFrame(() => this._renderRPEHistogram(playerSessions, session.rpe));
+        }
+    }
+
+    _renderRPEHistogram(playerSessions, currentRpe) {
+        const canvas = document.getElementById('rpeHistogramCanvas');
+        if (!canvas) return;
+        if (canvas._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
+
+        // Build counts for RPE 1-10
+        const counts = Array(10).fill(0);
+        playerSessions.forEach(s => { if (s.rpe >= 1 && s.rpe <= 10) counts[s.rpe - 1]++; });
+        const labels = ['1','2','3','4','5','6','7','8','9','10'];
+
+        const rpeColors = [
+            '#43a047','#66bb6a','#9ccc65','#d4e157',
+            '#ffee58','#ffa726','#ef6c00','#e53935','#b71c1c','#7b1fa2'
+        ];
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const textColor = isDark ? '#aaa' : '#666';
+        const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+
+        const barColors = rpeColors.map((c, i) => {
+            const isActive = (i + 1) === currentRpe;
+            return isActive ? c : (isDark ? c + '55' : c + '77');
+        });
+
+        canvas._chartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Sesiones',
+                    data: counts,
+                    backgroundColor: barColors,
+                    borderColor: rpeColors,
+                    borderWidth: (ctx) => (ctx.dataIndex + 1 === currentRpe ? 2 : 0),
+                    borderRadius: 4,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 500, easing: 'easeOutQuart' },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => `RPE ${items[0].label}`,
+                            label: (ctx) => `${ctx.raw} sesión${ctx.raw !== 1 ? 'es' : ''}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: textColor, font: { size: 10 } },
+                        grid: { display: false },
+                        title: { display: true, text: 'RPE', color: textColor, font: { size: 10 } }
+                    },
+                    y: {
+                        ticks: { color: textColor, font: { size: 10 }, precision: 0 },
+                        grid: { color: gridColor },
+                        beginAtZero: true,
+                        title: { display: true, text: 'Sesiones', color: textColor, font: { size: 10 } }
+                    }
+                }
+            }
+        });
     }
 
     deleteCurrentSession() {
@@ -2041,12 +2119,19 @@ class RPETracker {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: { duration: 600, easing: 'easeOutQuart' },
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
                     legend: {
-                        labels: { color: textColor, font: { size: 11 }, boxWidth: 14 }
+                        labels: { color: textColor, font: { size: 11, family: 'system-ui, -apple-system, sans-serif' }, boxWidth: 14 }
                     },
                     tooltip: {
+                        backgroundColor: isDark ? 'rgba(30,30,30,0.92)' : 'rgba(255,255,255,0.96)',
+                        titleColor: isDark ? '#fff' : '#111',
+                        bodyColor: isDark ? '#ccc' : '#444',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                        borderWidth: 1,
+                        padding: 10,
                         callbacks: {
                             afterBody(items) {
                                 const ratio = items.find(i => i.dataset.label === 'Ratio A:C');
@@ -2063,7 +2148,7 @@ class RPETracker {
                 },
                 scales: {
                     x: {
-                        ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 10 },
+                        ticks: { color: textColor, font: { size: 10, family: 'system-ui, sans-serif' }, maxTicksLimit: 10 },
                         grid: { color: gridColor }
                     },
                     y: {
@@ -2071,7 +2156,7 @@ class RPETracker {
                         min: 0,
                         max: 2.5,
                         ticks: {
-                            color: textColor, font: { size: 10 },
+                            color: textColor, font: { size: 10, family: 'system-ui, sans-serif' },
                             callback: v => v.toFixed(1)
                         },
                         grid: { color: gridColor },
@@ -2081,7 +2166,7 @@ class RPETracker {
                         position: 'right',
                         min: 0,
                         grid: { drawOnChartArea: false },
-                        ticks: { color: textColor, font: { size: 10 } },
+                        ticks: { color: textColor, font: { size: 10, family: 'system-ui, sans-serif' } },
                         title: { display: true, text: 'Carga', color: textColor, font: { size: 10 } }
                     }
                 }
@@ -2345,9 +2430,16 @@ class RPETracker {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: { duration: 600, easing: 'easeOutQuart' },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
+                        backgroundColor: isDark ? 'rgba(30,30,30,0.92)' : 'rgba(255,255,255,0.96)',
+                        titleColor: isDark ? '#fff' : '#111',
+                        bodyColor: isDark ? '#ccc' : '#444',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                        borderWidth: 1,
+                        padding: 10,
                         callbacks: {
                             label(ctx) {
                                 const v = ctx.raw;
@@ -2363,7 +2455,7 @@ class RPETracker {
                 },
                 scales: {
                     x: {
-                        ticks: { color: textColor, font: { size: 11 } },
+                        ticks: { color: textColor, font: { size: 11, family: 'system-ui, sans-serif' } },
                         grid: { display: false }
                     },
                     y: {
@@ -2371,7 +2463,7 @@ class RPETracker {
                         suggestedMax: 2.0,
                         ticks: {
                             color: textColor,
-                            font: { size: 10 },
+                            font: { size: 10, family: 'system-ui, sans-serif' },
                             callback: v => v.toFixed(1)
                         },
                         grid: { color: gridColor },
