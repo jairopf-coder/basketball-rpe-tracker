@@ -1866,7 +1866,7 @@ class RPETracker {
                             ${[7,14,30,90].map(d => `<button class="chart-period-btn${(this._chartPeriods?.[p.id]||30)===d?' active':''}" onclick="window.rpeTracker?.setChartPeriod('${p.id}',${d})">${d}d</button>`).join('')}
                         </div>
                     </div>
-                    <canvas id="chart-${p.id}" class="chart-canvas" width="800" height="240"></canvas>
+                    <canvas id="chart-${p.id}" class="chart-canvas"></canvas>
                 </div>
             `).join('');
 
@@ -1916,72 +1916,179 @@ class RPETracker {
         const canvasId = `chart-${playerId}`;
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
-        
-        // Get player sessions sorted by date
+
+        // Destroy previous Chart.js instance if it exists
+        if (canvas._chartInstance) {
+            canvas._chartInstance.destroy();
+            canvas._chartInstance = null;
+        }
+
         const playerSessions = this.sessions
             .filter(s => s.playerId === playerId)
-            .map(s => ({
-                ...s,
-                date: new Date(s.date),
-                load: s.load || (s.rpe * (s.duration || 60))
-            }))
+            .map(s => ({ ...s, date: new Date(s.date), load: s.load || (s.rpe * (s.duration || 60)) }))
             .sort((a, b) => a.date - b.date);
-        
+
         if (playerSessions.length === 0) return;
-        
-        // Calculate EWMA for each day
+
         const now = new Date();
         const labels = [];
         const ratioData = [];
-        
+        const loadData = [];
+
         const lambdaAcute = 2 / (7 + 1);
         const lambdaChronic = 2 / (28 + 1);
-        
         let ewmaAcute = 0;
         let ewmaChronic = 0;
-        
+
         for (let i = daysBack; i >= 0; i--) {
             const currentDate = new Date(now);
             currentDate.setDate(currentDate.getDate() - i);
             currentDate.setHours(0, 0, 0, 0);
-            
-            // Find sessions on this day
+
             const dailySessions = playerSessions.filter(s => {
-                const sessionDate = new Date(s.date);
-                sessionDate.setHours(0, 0, 0, 0);
-                return sessionDate.getTime() === currentDate.getTime();
+                const sd = new Date(s.date); sd.setHours(0, 0, 0, 0);
+                return sd.getTime() === currentDate.getTime();
             });
-            
             const dailyLoad = dailySessions.reduce((sum, s) => sum + s.load, 0);
-            
-            ewmaAcute = (lambdaAcute * dailyLoad) + ((1 - lambdaAcute) * ewmaAcute);
+
+            ewmaAcute   = (lambdaAcute   * dailyLoad) + ((1 - lambdaAcute)   * ewmaAcute);
             ewmaChronic = (lambdaChronic * dailyLoad) + ((1 - lambdaChronic) * ewmaChronic);
-            
+
             const ratio = ewmaChronic > 0 ? (ewmaAcute / ewmaChronic) : 0;
-            
             labels.push(`${currentDate.getDate()}/${currentDate.getMonth() + 1}`);
-            ratioData.push(ratio);
+            ratioData.push(parseFloat(ratio.toFixed(3)));
+            loadData.push(dailyLoad);
         }
-        
-        // Create chart with zones
-        const chart = new SimpleChart(canvasId, {
+
+        // Zone annotation plugin — draw as background gradient segments
+        const zonePlugin = {
+            id: 'ratioZones',
+            beforeDraw(chart) {
+                const { ctx, chartArea: ca, scales: { y } } = chart;
+                if (!ca) return;
+                const zones = [
+                    { min: 0,   max: 0.8,  color: 'rgba(21,101,192,0.10)'  },
+                    { min: 0.8, max: 1.3,  color: 'rgba(76,175,80,0.12)'   },
+                    { min: 1.3, max: 1.5,  color: 'rgba(255,152,0,0.13)'   },
+                    { min: 1.5, max: 3.0,  color: 'rgba(244,67,54,0.11)'   },
+                ];
+                ctx.save();
+                zones.forEach(z => {
+                    const yTop    = y.getPixelForValue(z.max);
+                    const yBottom = y.getPixelForValue(z.min);
+                    ctx.fillStyle = z.color;
+                    ctx.fillRect(ca.left, Math.max(yTop, ca.top), ca.width, Math.min(yBottom, ca.bottom) - Math.max(yTop, ca.top));
+                });
+                // Zone threshold lines
+                [0.8, 1.3, 1.5].forEach(v => {
+                    const yLine = y.getPixelForValue(v);
+                    if (yLine < ca.top || yLine > ca.bottom) return;
+                    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(ca.left, yLine);
+                    ctx.lineTo(ca.right, yLine);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                });
+                ctx.restore();
+            }
+        };
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const gridColor  = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+        const textColor  = isDark ? '#aaa' : '#666';
+
+        const instance = new Chart(canvas.getContext('2d'), {
             type: 'line',
-            data: [{
-                label: 'Ratio A:C',
-                values: ratioData,
-                color: '#ff6600'
-            }],
-            labels: labels,
-            title: `Evolución Ratio Agudo:Crónico (${daysBack} días)`,
-            zones: [
-                { min: 0, max: 0.8, color: 'rgba(21, 101, 192, 0.1)' },     // Blue
-                { min: 0.8, max: 1.3, color: 'rgba(76, 175, 80, 0.1)' },    // Green
-                { min: 1.3, max: 1.5, color: 'rgba(255, 152, 0, 0.1)' },    // Orange
-                { min: 1.5, max: 3, color: 'rgba(244, 67, 54, 0.1)' }       // Red
-            ]
+            plugins: [zonePlugin],
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Ratio A:C',
+                        data: ratioData,
+                        borderColor: '#ff6600',
+                        backgroundColor: 'rgba(255,102,0,0.08)',
+                        fill: false,
+                        tension: 0.35,
+                        pointRadius: (ctx) => (ratioData[ctx.dataIndex] > 0 ? 3 : 0),
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: (ctx) => {
+                            const v = ratioData[ctx.dataIndex];
+                            if (v <= 0) return 'transparent';
+                            if (v < 0.8) return '#1565c0';
+                            if (v <= 1.3) return '#2e7d32';
+                            if (v <= 1.5) return '#ef6c00';
+                            return '#c62828';
+                        },
+                        borderWidth: 2,
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: 'Carga diaria',
+                        data: loadData,
+                        type: 'bar',
+                        backgroundColor: 'rgba(33,150,243,0.18)',
+                        borderColor: 'rgba(33,150,243,0.4)',
+                        borderWidth: 1,
+                        borderRadius: 2,
+                        yAxisID: 'y2',
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        labels: { color: textColor, font: { size: 11 }, boxWidth: 14 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            afterBody(items) {
+                                const ratio = items.find(i => i.dataset.label === 'Ratio A:C');
+                                if (!ratio) return [];
+                                const v = ratio.raw;
+                                if (v <= 0) return ['Estado: Sin datos'];
+                                if (v < 0.8)  return [`Estado: ⬇️ Descarga (${v.toFixed(2)})`];
+                                if (v <= 1.3) return [`Estado: ✅ Óptimo (${v.toFixed(2)})`];
+                                if (v <= 1.5) return [`Estado: ⚠️ Precaución (${v.toFixed(2)})`];
+                                return [`Estado: 🚨 Peligro (${v.toFixed(2)})`];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 10 },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        position: 'left',
+                        min: 0,
+                        max: 2.5,
+                        ticks: {
+                            color: textColor, font: { size: 10 },
+                            callback: v => v.toFixed(1)
+                        },
+                        grid: { color: gridColor },
+                        title: { display: true, text: 'Ratio A:C', color: textColor, font: { size: 10 } }
+                    },
+                    y2: {
+                        position: 'right',
+                        min: 0,
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: textColor, font: { size: 10 } },
+                        title: { display: true, text: 'Carga', color: textColor, font: { size: 10 } }
+                    }
+                }
+            }
         });
-        
-        chart.render();
+
+        canvas._chartInstance = instance;
     }
 
     // ========== FEATURE 2: ALERTS ==========
@@ -2168,7 +2275,12 @@ class RPETracker {
     renderComparisonChart() {
         const canvas = document.getElementById('comparisonChart');
         if (!canvas || this.players.length < 2) return;
-        
+
+        if (canvas._chartInstance) {
+            canvas._chartInstance.destroy();
+            canvas._chartInstance = null;
+        }
+
         const comparisonData = this.players.map(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
             return {
@@ -2176,76 +2288,226 @@ class RPETracker {
                 ratio: parseFloat(ratio.ratio) || 0
             };
         }).sort((a, b) => b.ratio - a.ratio);
-        
-        const colors = comparisonData.map(player => this.getRatioColor(player.ratio));
-        
-        const chart = new SimpleChart('comparisonChart', {
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+        const textColor = isDark ? '#aaa' : '#666';
+
+        const barColors     = comparisonData.map(p => this.getRatioColor(p.ratio));
+        const barColorsFade = barColors.map(c => c + '55');
+
+        // Zone reference lines plugin
+        const zoneLines = {
+            id: 'compZoneLines',
+            afterDraw(chart) {
+                const { ctx, chartArea: ca, scales: { y } } = chart;
+                if (!ca) return;
+                const thresholds = [
+                    { v: 0.8, label: '0.8', color: '#1565c0' },
+                    { v: 1.3, label: '1.3', color: '#2e7d32' },
+                    { v: 1.5, label: '1.5', color: '#ef6c00' },
+                ];
+                ctx.save();
+                thresholds.forEach(({ v, label, color }) => {
+                    const yPx = y.getPixelForValue(v);
+                    if (yPx < ca.top || yPx > ca.bottom) return;
+                    ctx.strokeStyle = color + 'aa';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([5, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(ca.left, yPx);
+                    ctx.lineTo(ca.right, yPx);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = color;
+                    ctx.font = '10px system-ui, sans-serif';
+                    ctx.fillText(label, ca.right + 4, yPx + 3);
+                });
+                ctx.restore();
+            }
+        };
+
+        const instance = new Chart(canvas.getContext('2d'), {
             type: 'bar',
-            data: [{
-                label: 'Ratio A:C',
-                values: comparisonData.map(p => p.ratio),
-                colors: colors
-            }],
-            labels: comparisonData.map(p => p.name),
-            title: 'Comparativa Ratio A:C por Jugadora'
+            plugins: [zoneLines],
+            data: {
+                labels: comparisonData.map(p => p.name),
+                datasets: [{
+                    label: 'Ratio A:C',
+                    data: comparisonData.map(p => p.ratio),
+                    backgroundColor: barColorsFade,
+                    borderColor: barColors,
+                    borderWidth: 2,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label(ctx) {
+                                const v = ctx.raw;
+                                const estado = v <= 0 ? 'Sin datos'
+                                    : v < 0.8  ? '⬇️ Descarga'
+                                    : v <= 1.3 ? '✅ Óptimo'
+                                    : v <= 1.5 ? '⚠️ Precaución'
+                                    : '🚨 Peligro';
+                                return `Ratio A:C: ${v.toFixed(2)}  •  ${estado}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: textColor, font: { size: 11 } },
+                        grid: { display: false }
+                    },
+                    y: {
+                        min: 0,
+                        suggestedMax: 2.0,
+                        ticks: {
+                            color: textColor,
+                            font: { size: 10 },
+                            callback: v => v.toFixed(1)
+                        },
+                        grid: { color: gridColor },
+                        title: { display: true, text: 'Ratio A:C', color: textColor, font: { size: 10 } }
+                    }
+                }
+            }
         });
-        
-        chart.render();
+
+        canvas._chartInstance = instance;
+    }
+
+    // ========== HELPER: SVG SPARKLINE INLINE ==========
+
+    renderSparklineSVG(data, color = '#ff6600', width = 80, height = 28) {
+        const n = data.length;
+        if (n === 0) return `<svg width="${width}" height="${height}"></svg>`;
+        const max = Math.max(...data, 1);
+        const pad = 2;
+        const xStep = (width - pad * 2) / Math.max(n - 1, 1);
+
+        const pts = data.map((v, i) => {
+            const x = pad + i * xStep;
+            const y = pad + (height - pad * 2) * (1 - v / max);
+            return [parseFloat(x.toFixed(1)), parseFloat(y.toFixed(1))];
+        });
+
+        const polyline = pts.map(([x, y]) => `${x},${y}`).join(' ');
+        const area = [
+            `${pts[0][0]},${height - pad}`,
+            ...pts.map(([x, y]) => `${x},${y}`),
+            `${pts[n - 1][0]},${height - pad}`
+        ].join(' ');
+
+        return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="display:block;overflow:visible">
+            <polygon points="${area}" fill="${color}" fill-opacity="0.18"/>
+            <polyline points="${polyline}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+            <circle cx="${pts[n-1][0]}" cy="${pts[n-1][1]}" r="2.5" fill="${color}"/>
+        </svg>`;
     }
 
     // ========== FEATURE 5: PLAYER COMPARISON ==========
-    
+
     renderPlayerComparison() {
         if (this.players.length < 2) return '';
-        
+
+        const now = new Date();
+
         const comparisonData = this.players.map(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
             const playerSessions = this.sessions.filter(s => s.playerId === player.id);
             const avgRPE = playerSessions.length > 0
-                ? (playerSessions.reduce((sum, s) => sum + s.rpe, 0) / playerSessions.length)
-                : 0;
-            
+                ? (playerSessions.reduce((sum, s) => sum + s.rpe, 0) / playerSessions.length).toFixed(1)
+                : '—';
+
+            // 7-day daily load for sparkline
+            const sparkData = [];
+            for (let d = 6; d >= 0; d--) {
+                const dayStart = new Date(now); dayStart.setDate(dayStart.getDate() - d); dayStart.setHours(0,0,0,0);
+                const dayEnd   = new Date(dayStart); dayEnd.setHours(23,59,59,999);
+                const dayLoad  = playerSessions
+                    .filter(s => { const sd = new Date(s.date); return sd >= dayStart && sd <= dayEnd; })
+                    .reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
+                sparkData.push(dayLoad);
+            }
+
+            const totalLoad7d  = ratio.totalLoad7d  || 0;
+            const totalLoad21d = ratio.totalLoad21d || 0;
+            const rec = this.getLoadRecommendation(player.id);
+            const color = PlayerTokens.get(player);
+
             return {
-                name: player.name,
-                number: player.number,
-                ratio: parseFloat(ratio.ratio) || 0,
-                avgRPE: avgRPE,
-                totalSessions: playerSessions.length,
-                acute: ratio.acute,
-                chronic: ratio.chronic
+                player, ratio, avgRPE, sparkData, totalLoad7d, totalLoad21d, rec, color
             };
-        }).sort((a, b) => b.ratio - a.ratio); // Sort by ratio descending
-        
-        return `
-            <h3 style="margin: 2rem 0 1rem 0;">👥 Comparativa de Jugadoras</h3>
-            <div class="chart-container">
-                <canvas id="comparisonChart" class="chart-canvas" width="800" height="300"></canvas>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-top: 1rem;">
-                ${comparisonData.map(player => {
-                    const recommendation = this.getLoadRecommendation(
-                        this.players.find(p => p.name === player.name).id
-                    );
-                    
-                    return `
-                        <div class="recommendation-card" style="border-left-color: ${this.getRatioColor(player.ratio)};">
-                            <div class="recommendation-title">
-                                ${player.name}${player.number ? ` #${player.number}` : ''}
-                                <span style="margin-left: auto; color: ${this.getRatioColor(player.ratio)}; font-size: 1.5rem;">
-                                    ${player.ratio > 0 ? player.ratio.toFixed(2) : 'N/A'}
-                                </span>
-                            </div>
-                            <div class="recommendation-content">
-                                <p><strong>${recommendation.message}</strong></p>
-                                <p style="margin-top: 0.5rem;">${recommendation.advice || ''}</p>
-                                <div class="load-suggestion">
-                                    📊 Próxima sesión: RPE ${recommendation.suggestedRPE} × ${recommendation.suggestedDuration}min = ~${recommendation.suggestedLoad} unidades
-                                </div>
-                            </div>
+        }).sort((a, b) => (parseFloat(b.ratio.ratio) || 0) - (parseFloat(a.ratio.ratio) || 0));
+
+        const rows = comparisonData.map(({ player, ratio, avgRPE, sparkData, totalLoad7d, rec, color }) => {
+            const rVal      = parseFloat(ratio.ratio) || 0;
+            const ratioCol  = this.getRatioColor(ratio.ratio);
+            const statusBadge = ratio.ratio === 'N/A'
+                ? `<span class="cmp-badge cmp-badge--grey">N/A</span>`
+                : rVal < 0.8
+                    ? `<span class="cmp-badge cmp-badge--blue">⬇ Descarga</span>`
+                    : rVal <= 1.3
+                        ? `<span class="cmp-badge cmp-badge--green">✅ Óptimo</span>`
+                        : rVal <= 1.5
+                            ? `<span class="cmp-badge cmp-badge--orange">⚠ Precaución</span>`
+                            : `<span class="cmp-badge cmp-badge--red">🚨 Peligro</span>`;
+
+            const spark = this.renderSparklineSVG(sparkData, color, 84, 28);
+
+            return `<tr class="cmp-row">
+                <td class="cmp-td cmp-td--player">
+                    <div class="cmp-player-cell">
+                        <div class="cmp-token" style="background:${color}">
+                            ${player.name.charAt(0).toUpperCase()}
                         </div>
-                    `;
-                }).join('')}
+                        <div>
+                            <div class="cmp-name">${player.name}</div>
+                            ${player.number ? `<div class="cmp-num">#${player.number}</div>` : ''}
+                        </div>
+                    </div>
+                </td>
+                <td class="cmp-td cmp-td--ratio" style="color:${ratioCol}; font-weight:700">
+                    ${ratio.ratio !== 'N/A' ? rVal.toFixed(2) : '—'}
+                </td>
+                <td class="cmp-td">${statusBadge}</td>
+                <td class="cmp-td cmp-td--num">${avgRPE}</td>
+                <td class="cmp-td cmp-td--num">${totalLoad7d > 0 ? totalLoad7d.toLocaleString('es-ES') : '—'}</td>
+                <td class="cmp-td cmp-td--spark">${spark}</td>
+                <td class="cmp-td cmp-td--rec">
+                    <span class="cmp-rec" title="${rec.advice || ''}">${rec.message.replace(/^[^\s]+\s/, '')}</span>
+                </td>
+            </tr>`;
+        }).join('');
+
+        return `
+            <h3 style="margin: 2rem 0 0.75rem 0;">👥 Comparativa de Jugadoras</h3>
+            <div class="chart-container" style="padding: 0; overflow: auto;">
+                <canvas id="comparisonChart" class="chart-canvas" style="height:220px; padding: 1.25rem 1.25rem 0.5rem;"></canvas>
+            </div>
+            <div class="cmp-table-wrap">
+                <table class="cmp-table">
+                    <thead>
+                        <tr class="cmp-thead-row">
+                            <th class="cmp-th">Jugadora</th>
+                            <th class="cmp-th">Ratio A:C</th>
+                            <th class="cmp-th">Estado</th>
+                            <th class="cmp-th">RPE Medio</th>
+                            <th class="cmp-th">Carga 7d</th>
+                            <th class="cmp-th">7 días</th>
+                            <th class="cmp-th">Recomendación</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
             </div>
         `;
     }
@@ -2401,17 +2663,74 @@ class RPETracker {
         const valB = allWeeks.map(w => seriesB.find(d=>d.week===w)?.rpe ?? null);
         const labels = allWeeks.map(w => 'S'+w.slice(-2));
 
-        const chart = new SimpleChart('compChart', {
-            type: 'line',
-            data: [
-                { label: labelA,  values: valA.map(v=>v??0), color: colorA },
-                { label: labelB,  values: valB.map(v=>v??0), color: colorB }
-            ],
-            labels,
-            title: 'RPE medio semanal',
-            yAxisLabel: 'RPE'
-        });
-        chart.render();
+        // Line chart: RPE evolution last 8 weeks (Chart.js)
+        const seriesA = this.getWeeklyRPESeries(idA);
+        const seriesB = mode === 'pvp'
+            ? this.getWeeklyRPESeries(document.getElementById('compPlayerB')?.value)
+            : this.getTeamWeeklyRPESeries();
+
+        const allWeeks = [...new Set([...seriesA.map(d=>d.week), ...seriesB.map(d=>d.week)])].sort();
+        const valA = allWeeks.map(w => seriesA.find(d=>d.week===w)?.rpe ?? null);
+        const valB = allWeeks.map(w => seriesB.find(d=>d.week===w)?.rpe ?? null);
+        const labels = allWeeks.map(w => 'S'+w.slice(-2));
+
+        const compCanvas = document.getElementById('compChart');
+        if (compCanvas) {
+            if (compCanvas._chartInstance) { compCanvas._chartInstance.destroy(); compCanvas._chartInstance = null; }
+            const isDark   = document.documentElement.getAttribute('data-theme') === 'dark';
+            const gridCol  = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+            const textCol  = isDark ? '#aaa' : '#666';
+            compCanvas._chartInstance = new Chart(compCanvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: labelA,
+                            data: valA,
+                            borderColor: colorA,
+                            backgroundColor: colorA + '22',
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            borderWidth: 2,
+                            spanGaps: true
+                        },
+                        {
+                            label: labelB,
+                            data: valB,
+                            borderColor: colorB,
+                            backgroundColor: colorB + '22',
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            borderWidth: 2,
+                            spanGaps: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { labels: { color: textCol, font: { size: 11 }, boxWidth: 14 } },
+                        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: RPE ${ctx.raw?.toFixed(1) ?? '—'}` } }
+                    },
+                    scales: {
+                        x: { ticks: { color: textCol, font: { size: 10 } }, grid: { color: gridCol } },
+                        y: {
+                            min: 0, max: 10,
+                            ticks: { color: textCol, font: { size: 10 }, stepSize: 2 },
+                            grid: { color: gridCol },
+                            title: { display: true, text: 'RPE medio', color: textCol, font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
     }
 
     getCompStats(playerId) {
