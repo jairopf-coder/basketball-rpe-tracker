@@ -550,5 +550,73 @@
             document.getElementById('clearFilters')?.addEventListener('click', () => setTimeout(updateFiltersBadge, 0));
         });
     </script>
+
+    <!-- ===== BOTTOM NAV BAR (visible solo en móvil) ===== -->
+    <nav class="bottom-nav" id="bottomNav" aria-label="Navegación principal">
+        <button class="bottom-nav-btn active" data-bn-group="carga" data-bn-view="dashboard"
+                onclick="BottomNav.select(this)" aria-label="Dashboard">
+            <span class="bn-icon">📊</span>
+            <span class="bn-label">Dashboard</span>
+        </button>
+        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="analytics"
+                onclick="BottomNav.select(this)" aria-label="Análisis">
+            <span class="bn-icon">📈</span>
+            <span class="bn-label">Análisis</span>
+        </button>
+        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="wellness"
+                onclick="BottomNav.select(this)" aria-label="Wellness">
+            <span class="bn-icon">❤️</span>
+            <span class="bn-label">Wellness</span>
+        </button>
+        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="weekplan"
+                onclick="BottomNav.select(this)" aria-label="Planificación">
+            <span class="bn-icon">📅</span>
+            <span class="bn-label">Plan</span>
+        </button>
+        <button class="bottom-nav-btn" data-bn-group="lesiones" data-bn-view="injury"
+                onclick="BottomNav.select(this)" aria-label="Lesiones">
+            <span class="bn-icon">🏥</span>
+            <span class="bn-label">Lesiones</span>
+            <span class="bn-badge" id="bnInjuryBadge" style="display:none">0</span>
+        </button>
+        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="players"
+                onclick="BottomNav.select(this)" aria-label="Jugadoras">
+            <span class="bn-icon">👥</span>
+            <span class="bn-label">Equipo</span>
+        </button>
+    </nav>
+
+    <script>
+    const BottomNav = {
+        select(btn) {
+            const group = btn.dataset.bnGroup;
+            const view  = btn.dataset.bnView;
+            // Update active state
+            document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Sync with NavMenu + app router
+            if (window.NavMenu) {
+                NavMenu.activeGroup = group;
+                NavMenu.activeView  = view;
+                document.querySelectorAll('.nav-group-btn').forEach(b =>
+                    b.classList.toggle('active', b.dataset.group === group));
+            }
+            if (window.rpeTracker) window.rpeTracker.switchView(view);
+        },
+        // Call from app when view changes programmatically
+        syncToView(viewKey) {
+            document.querySelectorAll('.bottom-nav-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.bnView === viewKey);
+            });
+        }
+    };
+
+    // Hook into NavMenu.selectView to keep bottom nav in sync
+    const _origSelectView = NavMenu.selectView.bind(NavMenu);
+    NavMenu.selectView = function(viewKey) {
+        _origSelectView(viewKey);
+        BottomNav.syncToView(viewKey);
+    };
+    </script>
 </body>
 </html>
