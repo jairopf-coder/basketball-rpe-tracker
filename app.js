@@ -2652,17 +2652,6 @@ class RPETracker {
             }).join('')}
         `;
 
-        // Line chart: RPE evolution last 8 weeks
-        const seriesA = this.getWeeklyRPESeries(idA);
-        const seriesB = mode === 'pvp'
-            ? this.getWeeklyRPESeries(document.getElementById('compPlayerB')?.value)
-            : this.getTeamWeeklyRPESeries();
-
-        const allWeeks = [...new Set([...seriesA.map(d=>d.week), ...seriesB.map(d=>d.week)])].sort();
-        const valA = allWeeks.map(w => seriesA.find(d=>d.week===w)?.rpe ?? null);
-        const valB = allWeeks.map(w => seriesB.find(d=>d.week===w)?.rpe ?? null);
-        const labels = allWeeks.map(w => 'S'+w.slice(-2));
-
         // Line chart: RPE evolution last 8 weeks (Chart.js)
         const seriesA = this.getWeeklyRPESeries(idA);
         const seriesB = mode === 'pvp'
