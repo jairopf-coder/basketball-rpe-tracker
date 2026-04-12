@@ -3144,10 +3144,10 @@ header h1 {
 /* Split layout */
 .db-split {
     display: grid;
-    grid-template-columns: 200px minmax(0, 320px) 240px;
+    grid-template-columns: 220px minmax(0, 420px) 260px;
     height: calc(100vh - 110px);
     overflow: hidden;
-    max-width: 800px;
+    max-width: 960px;
     margin: 0 auto;
     border-left: 0.5px solid var(--border);
     border-right: 0.5px solid var(--border);
@@ -3254,9 +3254,9 @@ header h1 {
 
 .db-player-row {
     display: grid;
-    grid-template-columns: 20px 110px 1fr 42px 18px;
+    grid-template-columns: 20px 120px 1fr 42px 18px;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.5rem;
     padding: 0.5rem 0;
     border-bottom: 0.5px solid var(--border);
 }
@@ -3277,25 +3277,35 @@ header h1 {
 .db-num { font-size: 0.72rem; color: var(--text-faint); font-weight: 400; }
 
 .db-player-bar {
-    height: 6px;
+    height: 8px;
     background: var(--bg-subtle);
-    border-radius: 3px;
+    border-radius: 4px;
     position: relative;
     overflow: visible;
+    outline: 1px solid var(--border);
 }
 
-.db-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.db-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
 
 .db-bar-lo, .db-bar-hi {
     position: absolute;
-    top: -3px;
-    width: 1.5px;
-    height: 12px;
-    background: #ccc;
+    top: -4px;
+    width: 2px;
+    height: 16px;
+    background: #aaa;
     border-radius: 1px;
 }
 .db-bar-lo { left: 40%; }
 .db-bar-hi { left: 65%; }
+
+[data-theme="dark"] .db-player-bar {
+    background: #2a2a32;
+    outline-color: #3e3e4a;
+}
+[data-theme="dark"] .db-bar-lo,
+[data-theme="dark"] .db-bar-hi {
+    background: #666;
+}
 
 .db-player-ratio { font-size: 0.88rem; font-weight: 700; text-align: right; }
 .db-player-icon  { font-size: 13px; text-align: center; }
