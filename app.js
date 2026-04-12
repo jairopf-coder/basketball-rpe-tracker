@@ -429,7 +429,8 @@ class RPETracker {
             case 'analytics':
                 this.renderAnalytics();
                 this.renderEvolutionCharts();
-                this.checkAndShowAlerts();
+                setTimeout(() => this.renderComparisonModule(), 50);
+                // checkAndShowAlerts se mantiene pero el contenedor está oculto
                 break;
             case 'calendar':
                 if (typeof this.renderCalendar === 'function') {
@@ -1703,7 +1704,8 @@ class RPETracker {
         // Build sticky semaphore bar
         this._renderSemaphoreBar();
 
-        const ewmaOpen = localStorage.getItem('rpe_ewma_open') !== 'false';
+        // EWMA box: contraída por defecto (solo se abre si el usuario lo guardó explícitamente)
+        const ewmaOpen = localStorage.getItem('rpe_ewma_open') === 'true';
         container.innerHTML = `
             ${this.renderPlayerComparison()}
 
@@ -1749,10 +1751,6 @@ class RPETracker {
             });
         }, 0);
 
-        // Render comparison module (debajo de la comparativa de jugadoras)
-        setTimeout(() => {
-            this.renderComparisonModule();
-        }, 50);
     }
 
     // ========== ACUTE:CHRONIC RATIO CALCULATION (EWMA METHOD) ==========
