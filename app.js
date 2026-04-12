@@ -2,30 +2,26 @@
 
 const NavMenu = {
     groups: {
+        dashboard: { label: '📊 Inicio', direct: 'dashboard' },
         carga: {
-            label: '📊 Carga',
+            label: '🏋️ Carga',
             items: [
-                { view: 'dashboard',  label: '📊 Dashboard' },
-                { view: 'analytics',  label: '📈 Análisis A:C' },
-                { view: 'wellness',   label: '❤️ Wellness' },
-                { view: 'weekplan',   label: '📅 Planificación' },
-                { view: 'calendar',   label: '🗓️ Calendario' },
-                { view: 'players',    label: '👥 Jugadoras' },
-                { view: 'sessions',   label: '📋 Sesiones' },
+                { view: 'analytics', label: '📈 Análisis A:C' },
+                { view: 'weekplan',  label: '📅 Planificación' },
+                { view: 'sessions',  label: '📋 Historial' },
             ],
-            default: 'dashboard'
+            default: 'analytics'
         },
-        lesiones: {
-            label: '🏥 Lesiones',
+        salud: {
+            label: '❤️ Salud',
             items: [
-                { view: 'injury',       label: '🏥 Registro' },
-                { view: 'medical',      label: '📋 Historial' },
-                { view: 'rehab',        label: '💪 Readaptación' },
-                { view: 'correlation',  label: '🔗 Correlación' },
-                { view: 'prediction',   label: '🔮 Predicción' },
+                { view: 'wellness', label: '❤️ Wellness' },
+                { view: 'injury',   label: '🏥 Lesiones' },
+                { view: 'rehab',    label: '💪 Readaptación' },
             ],
-            default: 'injury'
-        }
+            default: 'wellness'
+        },
+        equipo: { label: '👥 Equipo', direct: 'players' }
     },
 
     activeGroup: 'carga',
@@ -258,8 +254,8 @@ class RPETracker {
         // Show skeleton while Firebase loads
         this.showSkeletonLoader();
 
-        // Activate carga group and show dashboard nav/subbar immediately
-        NavMenu.selectGroup('carga');
+        // Activate dashboard on init
+        NavMenu.selectGroup('dashboard');
     }
 
     setupEventListeners() {
@@ -1365,6 +1361,15 @@ class RPETracker {
         // Active injuries
         const activeInjuries = (this.injuries || []).filter(i => i.status === 'active').length;
 
+        // Wellness chips — jugadoras sin registro hoy
+        const _wToday = new Date().toISOString().slice(0, 10);
+        const _wData  = this.wellnessData || {};
+        const _pendingW = this.players.filter(p => !(_wData[p.id] || []).some(e => e.date === _wToday));
+        const wellnessChips = this.players.length === 0 ? '' :
+            _pendingW.length === 0
+                ? `<div class="db-w-all-ok">✅ Todas registradas hoy</div>`
+                : _pendingW.map(p => `<button class="db-w-chip" onclick="NavMenu.selectGroup('salud')" title="${p.name}">${PlayerTokens.avatar(p,16,'0.5rem')}<span>${p.name.split(' ')[0]}</span></button>`).join('');
+
         // Sort order — persisted on instance
         if (!this._dashSort) this._dashSort = 'risk'; // 'risk' | 'safe' | 'name'
 
@@ -1455,6 +1460,11 @@ class RPETracker {
 
                 <!-- Columna izquierda: métricas -->
                 <div class="db-left">
+                    <!-- Wellness rápido -->
+                    ${this.players.length > 0 ? `<div class="db-left-section">
+                        <div class="db-left-label">Wellness hoy <button class="db-w-link" onclick="NavMenu.selectGroup('salud')">ver →</button></div>
+                        <div class="db-w-chips">${wellnessChips}</div>
+                    </div>` : ''}
                     <!-- Batch 3: team load sparkline -->
                     <div class="db-left-section">
                         <div class="db-left-label">Carga equipo 7d</div>
