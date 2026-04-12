@@ -2576,13 +2576,25 @@ header h1 {
     opacity: 0.6;
 }
 
+.comp-body-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.comp-body-grid .comp-metrics {
+    margin-bottom: 0;
+}
+
 .comp-chart-wrap {
     width: 100%;
     overflow-x: auto;
+    min-height: 220px;
 }
 
 .comp-chart-wrap canvas {
-    width: 100%;
+    width: 100% !important;
     max-width: 100%;
 }
 
@@ -2594,6 +2606,7 @@ header h1 {
     .comp-selectors { gap: 0.75rem; }
     .comp-vs { margin-top: 0.5rem; }
     .comp-metrics-col { font-size: 0.9rem; }
+    .comp-body-grid { grid-template-columns: 1fr; }
 }
 
 /* ===== COMPARADOR MEJORADO ===== */

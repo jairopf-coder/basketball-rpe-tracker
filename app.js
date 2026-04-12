@@ -1705,6 +1705,8 @@ class RPETracker {
 
         const ewmaOpen = localStorage.getItem('rpe_ewma_open') !== 'false';
         container.innerHTML = `
+            ${this.renderPlayerComparison()}
+
             <details class="ewma-info-box" id="ewmaDetails" ${ewmaOpen ? 'open' : ''}>
                 <summary class="ewma-summary">
                     <span>ℹ️ Método EWMA — ¿Cómo se calcula el ratio A:C?</span>
@@ -1737,10 +1739,6 @@ class RPETracker {
                     </p>
                 </div>
             </details>
-            
-            ${this.renderPlayerComparison()}
-            
-            ${this.renderTeamRatios()}
         `;
         
         // Persist EWMA details open/closed state
@@ -1751,10 +1749,9 @@ class RPETracker {
             });
         }, 0);
 
-        // Render comparison module first (top of page)
+        // Render comparison module (debajo de la comparativa de jugadoras)
         setTimeout(() => {
             this.renderComparisonModule();
-            this.renderComparisonChart();
         }, 50);
     }
 
@@ -2672,10 +2669,7 @@ class RPETracker {
         }).join('');
 
         return `
-            <h3 style="margin: 2rem 0 0.75rem 0;">👥 Comparativa de Jugadoras</h3>
-            <div class="chart-container" style="padding: 0; overflow: auto;">
-                <canvas id="comparisonChart" class="chart-canvas" style="height:220px; padding: 1.25rem 1.25rem 0.5rem;"></canvas>
-            </div>
+            <h3 style="margin: 0 0 0.75rem 0;">👥 Comparativa de Jugadoras</h3>
             <div class="cmp-table-wrap">
                 <table class="cmp-table">
                     <thead>
@@ -2744,9 +2738,11 @@ class RPETracker {
                     </div>
                 </div>
 
-                <div id="compMetrics" class="comp-metrics"></div>
-                <div class="comp-chart-wrap">
-                    <canvas id="compChart" width="800" height="260"></canvas>
+                <div class="comp-body-grid">
+                    <div id="compMetrics" class="comp-metrics"></div>
+                    <div class="comp-chart-wrap">
+                        <canvas id="compChart" width="600" height="300"></canvas>
+                    </div>
                 </div>
             </div>
         `;
