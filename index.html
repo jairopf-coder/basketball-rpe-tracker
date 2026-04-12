@@ -165,16 +165,17 @@
                     <button onclick="window.rpeTracker?.exportAllCharts()" class="btn-secondary">📸 Exportar Todos los Gráficos</button>
                 </div>
                 
-                <!-- Comparador — primero y destacado -->
-                <div id="comparisonModule"></div>
+                <!-- 1. Comparativa de jugadoras + caja EWMA -->
+                <div id="analyticsContent"></div>
 
-                <!-- Alerts Container -->
-                <div id="alertsContainer" style="margin-top:1rem;"></div>
-                
-                <!-- Evolution Charts -->
+                <!-- 2. Gráficos de evolución -->
                 <div id="evolutionCharts"></div>
 
-                <div id="analyticsContent"></div>
+                <!-- 3. Comparador -->
+                <div id="comparisonModule"></div>
+
+                <!-- Alertas ocultas: info ya cubierta por comparativa y semáforo -->
+                <div id="alertsContainer" style="display:none;"></div>
             </div>
         </div>
 
