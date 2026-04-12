@@ -2576,6 +2576,37 @@ header h1 {
     opacity: 0.6;
 }
 
+.cmp-rec-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    line-height: 1.3;
+}
+
+.cmp-rec-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.cmp-rec-load {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.3;
+}
+
+.cmp-rec-combo {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.cmp-rec-nodata {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
 .comp-body-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

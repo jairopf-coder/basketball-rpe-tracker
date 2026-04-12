@@ -2385,62 +2385,98 @@ class RPETracker {
     getLoadRecommendation(playerId) {
         const ratio = this.calculateAcuteChronicRatio(playerId);
         const r = parseFloat(ratio.ratio);
-        
+
         if (ratio.ratio === 'N/A' || ratio.sessions7d === 0) {
             return {
                 type: 'info',
                 message: 'Sin datos suficientes para recomendar carga.',
-                suggestedRPE: '5-7',
-                suggestedDuration: '60',
-                suggestedLoad: '300-420'
+                suggestedLoad: null,
+                targetLoad: null
             };
         }
-        
-        const avgRecentLoad = ratio.totalLoad7d / Math.max(ratio.sessions7d, 1);
-        
+
+        // EWMA-based optimal load calculation
+        // We want the next session load such that the resulting acute EWMA
+        // keeps the ratio within the target range [0.8, 1.3].
+        // Formula: EWMA_acute_new = λ × load + (1-λ) × EWMA_acute_current
+        // Ratio_new = EWMA_acute_new / EWMA_chronic
+        // Solving for load: load = (ratio_target × EWMA_chronic - (1-λ) × EWMA_acute) / λ
+        const lambdaAcute = 2 / (7 + 1); // 0.25
+        const ewmaAcute   = ratio.acute;
+        const ewmaChronic = ratio.chronic;
+
+        // Target: centre of optimal zone (ratio 1.05)
+        const ratioTarget  = 1.05;
+        const loadOptimal  = Math.max(0, Math.round(
+            (ratioTarget * ewmaChronic - (1 - lambdaAcute) * ewmaAcute) / lambdaAcute
+        ));
+
+        // Also compute min/max load for the safe zone boundaries (0.8 and 1.3)
+        const loadMin = Math.max(0, Math.round(
+            (0.8  * ewmaChronic - (1 - lambdaAcute) * ewmaAcute) / lambdaAcute
+        ));
+        const loadMax = Math.max(0, Math.round(
+            (1.3  * ewmaChronic - (1 - lambdaAcute) * ewmaAcute) / lambdaAcute
+        ));
+
+        // Suggest RPE × duration combos that approximate targetLoad
+        const suggestCombo = (load) => {
+            if (!load || load <= 0) return null;
+            // Try common durations: 45, 60, 75, 90 min
+            const durations = [45, 60, 75, 90];
+            const combos = durations.map(d => {
+                const rpe = load / d;
+                return { d, rpe: Math.round(rpe * 10) / 10 };
+            }).filter(c => c.rpe >= 1 && c.rpe <= 10);
+            // Pick the one closest to RPE 6-7
+            const best = combos.reduce((a, b) =>
+                Math.abs(a.rpe - 6.5) < Math.abs(b.rpe - 6.5) ? a : b, combos[0]);
+            return best ? `RPE ${best.rpe.toFixed(1)} × ${best.d}'` : null;
+        };
+
+        const combo = suggestCombo(loadOptimal);
+
         if (r > 1.5) {
-            // DANGER - Reduce load significantly
-            const targetLoad = avgRecentLoad * 0.5;
+            const loadSafe = loadMax > 0 ? loadMax : Math.round(loadOptimal * 0.5);
+            const safeCombo = suggestCombo(loadSafe);
             return {
                 type: 'danger',
-                message: '🚨 REDUCIR CARGA - Alto riesgo de lesión',
-                suggestedRPE: '3-5',
-                suggestedDuration: '45-60',
-                suggestedLoad: Math.round(targetLoad).toString(),
-                advice: 'Sesión de recuperación activa. Evitar alta intensidad.'
+                message: '🚨 Reducir carga',
+                targetLoad: loadSafe,
+                combo: safeCombo,
+                loadMin, loadMax,
+                advice: `Máx. recomendado: ~${loadSafe.toLocaleString('es-ES')} UA${safeCombo ? ' (ej: ' + safeCombo + ')' : ''}. Sesión de recuperación activa.`
             };
         } else if (r > 1.3) {
-            // CAUTION - Reduce load moderately
-            const targetLoad = avgRecentLoad * 0.7;
+            const loadSafe = loadMax > 0 ? Math.round((loadOptimal + loadMax) / 2) : Math.round(loadOptimal * 0.8);
+            const safeCombo = suggestCombo(loadSafe);
             return {
                 type: 'warning',
-                message: '⚠️ Moderar carga - Precaución',
-                suggestedRPE: '4-6',
-                suggestedDuration: '60',
-                suggestedLoad: Math.round(targetLoad).toString(),
-                advice: 'Reducir intensidad pero mantener volumen técnico.'
+                message: '⚠️ Moderar carga',
+                targetLoad: loadSafe,
+                combo: safeCombo,
+                loadMin, loadMax,
+                advice: `Recomendado: ~${loadSafe.toLocaleString('es-ES')} UA${safeCombo ? ' (ej: ' + safeCombo + ')' : ''}. Reducir intensidad.`
             };
         } else if (r < 0.8) {
-            // DETRAINING - Increase load
-            const targetLoad = avgRecentLoad * 1.3;
+            const loadSafe = loadMin > 0 ? Math.round((loadOptimal + loadMin) / 2) : Math.round(loadOptimal * 1.1);
+            const safeCombo = suggestCombo(loadSafe);
             return {
                 type: 'info',
-                message: 'ℹ️ Aumentar carga - Puede perder condición',
-                suggestedRPE: '7-8',
-                suggestedDuration: '75-90',
-                suggestedLoad: Math.round(targetLoad).toString(),
-                advice: 'Incrementar gradualmente intensidad y volumen.'
+                message: '🔵 Aumentar carga',
+                targetLoad: loadSafe,
+                combo: safeCombo,
+                loadMin, loadMax,
+                advice: `Recomendado: ~${loadSafe.toLocaleString('es-ES')} UA${safeCombo ? ' (ej: ' + safeCombo + ')' : ''}. Incrementar gradualmente.`
             };
         } else {
-            // OPTIMAL - Maintain or slight increase
-            const targetLoad = avgRecentLoad * 1.05;
             return {
                 type: 'success',
-                message: '✅ Zona óptima - Continuar progresión',
-                suggestedRPE: '6-8',
-                suggestedDuration: '60-75',
-                suggestedLoad: Math.round(targetLoad).toString(),
-                advice: 'Mantener carga actual con pequeñas progresiones.'
+                message: '✅ Mantener',
+                targetLoad: loadOptimal,
+                combo,
+                loadMin, loadMax,
+                advice: `Óptimo: ~${loadOptimal.toLocaleString('es-ES')} UA${combo ? ' (ej: ' + combo + ')' : ''}. Rango seguro: ${loadMin.toLocaleString('es-ES')}–${loadMax.toLocaleString('es-ES')} UA.`
             };
         }
     }
@@ -2663,7 +2699,10 @@ class RPETracker {
                 <td class="cmp-td cmp-td--num">${totalLoad7d > 0 ? totalLoad7d.toLocaleString('es-ES') : '—'}</td>
                 <td class="cmp-td cmp-td--spark">${spark}</td>
                 <td class="cmp-td cmp-td--rec">
-                    <span class="cmp-rec" title="${rec.advice || ''}">${rec.message.replace(/^[^\s]+\s/, '')}</span>
+                    <div class="cmp-rec-wrap">
+                        <span class="cmp-rec-label">${rec.message}</span>
+                        ${rec.targetLoad != null ? `<span class="cmp-rec-load" title="${rec.advice || ''}">${rec.targetLoad.toLocaleString('es-ES')} UA${rec.combo ? '<br><span class=\'cmp-rec-combo\'>' + rec.combo + '</span>' : ''}</span>` : '<span class="cmp-rec-nodata">—</span>'}
+                    </div>
                 </td>
             </tr>`;
         }).join('');
