@@ -53,13 +53,10 @@
         <!-- Navigation Tabs -->
         <nav class="nav-groups" id="navGroups">
             <div class="nav-group-bar">
-                <button class="nav-group-btn active" data-group="carga" onclick="NavMenu.selectGroup('carga')">
-                    📊 Carga
-                </button>
-                <button class="nav-group-btn" data-group="lesiones" onclick="NavMenu.selectGroup('lesiones')">
-                    🏥 Lesiones
-                </button>
-
+                <button class="nav-group-btn active" data-group="dashboard" onclick="NavMenu.selectGroup('dashboard')">📊 Inicio</button>
+                <button class="nav-group-btn" data-group="carga" onclick="NavMenu.selectGroup('carga')">🏋️ Carga</button>
+                <button class="nav-group-btn" data-group="salud" onclick="NavMenu.selectGroup('salud')">❤️ Salud</button>
+                <button class="nav-group-btn" data-group="equipo" onclick="NavMenu.selectGroup('equipo')">👥 Equipo</button>
             </div>
             <div class="nav-sub-bar" id="navSubBar" style="display:none"></div>
         </nav>
@@ -553,34 +550,28 @@
 
     <!-- ===== BOTTOM NAV BAR (visible solo en móvil) ===== -->
     <nav class="bottom-nav" id="bottomNav" aria-label="Navegación principal">
-        <button class="bottom-nav-btn active" data-bn-group="carga" data-bn-view="dashboard"
-                onclick="BottomNav.select(this)" aria-label="Dashboard">
+        <button class="bottom-nav-btn active" data-bn-group="dashboard" data-bn-view="dashboard"
+                onclick="BottomNav.select(this)" aria-label="Inicio">
             <span class="bn-icon">📊</span>
-            <span class="bn-label">Dashboard</span>
+            <span class="bn-label">Inicio</span>
         </button>
         <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="analytics"
-                onclick="BottomNav.select(this)" aria-label="Análisis">
-            <span class="bn-icon">📈</span>
-            <span class="bn-label">Análisis</span>
+                onclick="BottomNav.select(this)" aria-label="Carga">
+            <span class="bn-icon">🏋️</span>
+            <span class="bn-label">Carga</span>
         </button>
-        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="wellness"
-                onclick="BottomNav.select(this)" aria-label="Wellness">
+        <button class="bottom-nav-btn bn-fab" aria-label="Nueva sesión"
+                onclick="window.rpeTracker?.openNewSessionModal()">
+            <span class="bn-icon">＋</span>
+        </button>
+        <button class="bottom-nav-btn" data-bn-group="salud" data-bn-view="wellness"
+                onclick="BottomNav.select(this)" aria-label="Salud">
             <span class="bn-icon">❤️</span>
-            <span class="bn-label">Wellness</span>
-        </button>
-        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="weekplan"
-                onclick="BottomNav.select(this)" aria-label="Planificación">
-            <span class="bn-icon">📅</span>
-            <span class="bn-label">Plan</span>
-        </button>
-        <button class="bottom-nav-btn" data-bn-group="lesiones" data-bn-view="injury"
-                onclick="BottomNav.select(this)" aria-label="Lesiones">
-            <span class="bn-icon">🏥</span>
-            <span class="bn-label">Lesiones</span>
+            <span class="bn-label">Salud</span>
             <span class="bn-badge" id="bnInjuryBadge" style="display:none">0</span>
         </button>
-        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="players"
-                onclick="BottomNav.select(this)" aria-label="Jugadoras">
+        <button class="bottom-nav-btn" data-bn-group="equipo" data-bn-view="players"
+                onclick="BottomNav.select(this)" aria-label="Equipo">
             <span class="bn-icon">👥</span>
             <span class="bn-label">Equipo</span>
         </button>

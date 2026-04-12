@@ -192,14 +192,41 @@ RPETracker.prototype.openAddInjuryModal = function(playerId = null) {
                 
                 <div class="form-group">
                     <label>📝 Descripción</label>
-                    <textarea id="injuryDescription" rows="3" placeholder="Describe cómo ocurrió la lesión..."></textarea>
+                    <textarea id="injuryDescription" rows="2" placeholder="Describe cómo ocurrió la lesión..."></textarea>
                 </div>
-                
-                <div id="injuryTimeline" style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                    <strong>Tiempo estimado de recuperación:</strong>
-                    <p id="timelineText">3-7 días</p>
+
+                <div class="form-group">
+                    <label>⚡ Mecanismo lesional</label>
+                    <select id="injuryMechanism">
+                        <option value="">Sin especificar</option>
+                        <option value="Contacto">Contacto (choque/caída)</option>
+                        <option value="Sobreuso">Sobreuso / carga acumulada</option>
+                        <option value="Fatiga">Fatiga muscular</option>
+                        <option value="Reglamentario">Falta reglamentaria</option>
+                        <option value="Gesto técnico">Gesto técnico / torsión</option>
+                        <option value="Otro">Otro</option>
+                    </select>
                 </div>
-                
+
+                <div class="form-group">
+                    <label>🩹 Tratamiento inicial aplicado</label>
+                    <input type="text" id="injuryInitialTreatment" placeholder="p.ej. Hielo 20min, vendaje funcional...">
+                </div>
+
+                <div class="form-group">
+                    <label>😣 Dolor inicial (EVA): <strong id="injuryPainDisplay">5</strong>/10</label>
+                    <input type="range" id="injuryPainLevel" min="0" max="10" value="5"
+                           oninput="document.getElementById('injuryPainDisplay').textContent=this.value"
+                           style="width:100%;margin-top:0.25rem">
+                    <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-muted)">
+                        <span>Sin dolor</span><span>Máximo</span>
+                    </div>
+                </div>
+
+                <div id="injuryTimeline" style="background:var(--bg-subtle);padding:0.6rem 1rem;border-radius:8px;margin-top:0.5rem;font-size:0.88rem">
+                    <strong>Tiempo estimado:</strong> <span id="timelineText">3-7 días</span>
+                </div>
+
                 <div class="modal-footer">
                     <button type="button" onclick="this.closest('.modal').remove()" class="btn-secondary">Cancelar</button>
                     <button type="submit" class="btn-primary">💾 Guardar Lesión</button>
@@ -243,7 +270,10 @@ RPETracker.prototype.saveNewInjury = function() {
         location: document.getElementById('injuryLocation').value,
         severity: document.getElementById('injurySeverity').value,
         startDate: document.getElementById('injuryStartDate').value,
-        description: document.getElementById('injuryDescription').value
+        description: document.getElementById('injuryDescription').value,
+        mechanism: document.getElementById('injuryMechanism')?.value || '',
+        initialTreatment: document.getElementById('injuryInitialTreatment')?.value || '',
+        painLevel: parseInt(document.getElementById('injuryPainLevel')?.value) || null
     });
     
     this.injuries.push(injury);
@@ -257,62 +287,60 @@ RPETracker.prototype.saveNewInjury = function() {
 RPETracker.prototype.renderInjuryManagement = function() {
     const container = document.getElementById('injuryManagementView');
     if (!container) return;
-    
-    const activeInjuries = this.injuries.filter(i => i.status === 'active');
+
+    const activeInjuries    = this.injuries.filter(i => i.status === 'active');
     const recoveredInjuries = this.injuries.filter(i => i.status === 'recovered');
-    
-    // Calculate stats
-    const totalMissedSessions = this.injuries.reduce((sum, i) => sum + i.missedSessions, 0);
-    const currentlyInjured = activeInjuries.length;
-    
-    let html = `
-        <div class="injury-header">
-            <h2>🏥 Gestión de Lesiones</h2>
-            <button onclick="window.rpeTracker?.openAddInjuryModal()" class="btn-primary">+ Registrar Lesión</button>
-        </div>
-        
-        <div class="stats-grid" style="margin: 2rem 0;">
-            <div class="stat-card">
-                <span class="stat-value" style="color: #f44336;">${currentlyInjured}</span>
-                <span class="stat-label">Jugadoras Lesionadas</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value" style="color: #ff9800;">${totalMissedSessions}</span>
-                <span class="stat-label">Sesiones Perdidas Total</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value" style="color: #4caf50;">${recoveredInjuries.length}</span>
-                <span class="stat-label">Recuperaciones</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value" style="color: var(--primary);">${this.injuries.length}</span>
-                <span class="stat-label">Total Lesiones</span>
-            </div>
-        </div>
-    `;
-    
-    // Availability table
-    html += this.renderAvailabilityTable();
-    
-    // Active injuries
-    if (activeInjuries.length > 0) {
-        html += '<h3 style="margin-top: 2rem;">🏥 Lesiones Activas</h3>';
-        activeInjuries.forEach(injury => {
-            html += this.renderInjuryCard(injury);
-        });
+    const totalMissed = this.injuries.reduce((s, i) => s + (i.missedSessions || 0), 0);
+    const tab = this._injuryTab || 'activas';
+
+    const statsBar = `
+        <div class="inj-stats-bar">
+            <div class="inj-stat"><span class="inj-stat-val" style="color:#f44336">${activeInjuries.length}</span><span class="inj-stat-lbl">Activas</span></div>
+            <div class="inj-stat"><span class="inj-stat-val" style="color:#ff9800">${totalMissed}</span><span class="inj-stat-lbl">Sesiones perdidas</span></div>
+            <div class="inj-stat"><span class="inj-stat-val" style="color:#4caf50">${recoveredInjuries.length}</span><span class="inj-stat-lbl">Recuperadas</span></div>
+            <div class="inj-stat"><span class="inj-stat-val" style="color:var(--primary)">${this.injuries.length}</span><span class="inj-stat-lbl">Total</span></div>
+        </div>`;
+
+    const tabBar = `
+        <div class="inj-tabs">
+            <button class="inj-tab${tab==='activas'?' active':''}" onclick="window.rpeTracker?._setInjuryTab('activas')">
+                🏥 Activas${activeInjuries.length ? ` <span class="inj-tab-badge">${activeInjuries.length}</span>` : ''}
+            </button>
+            <button class="inj-tab${tab==='historial'?' active':''}" onclick="window.rpeTracker?._setInjuryTab('historial')">
+                📋 Historial
+            </button>
+            <button class="inj-tab${tab==='disponibilidad'?' active':''}" onclick="window.rpeTracker?._setInjuryTab('disponibilidad')">
+                📅 Disponibilidad
+            </button>
+        </div>`;
+
+    let tabContent = '';
+    if (tab === 'activas') {
+        tabContent = activeInjuries.length === 0
+            ? '<div class="inj-empty">✅ Ninguna jugadora lesionada actualmente</div>'
+            : activeInjuries.map(inj => this.renderInjuryCard(inj)).join('');
+    } else if (tab === 'historial') {
+        tabContent = recoveredInjuries.length === 0
+            ? '<div class="inj-empty">Sin lesiones recuperadas registradas</div>'
+            : `<div class="inj-history-grid">${recoveredInjuries.map(inj => this.renderCompactInjuryCard(inj)).join('')}</div>`;
+    } else if (tab === 'disponibilidad') {
+        tabContent = this.renderAvailabilityTable();
     }
-    
-    // Recovered injuries
-    if (recoveredInjuries.length > 0) {
-        html += '<h3 style="margin-top: 2rem;">✅ Recuperadas</h3>';
-        html += '<div style="display: grid; gap: 1rem;">';
-        recoveredInjuries.slice(0, 5).forEach(injury => {
-            html += this.renderCompactInjuryCard(injury);
-        });
-        html += '</div>';
-    }
-    
-    container.innerHTML = html;
+
+    container.innerHTML = `
+        <div class="inj-wrap">
+            <div class="inj-header">
+                <h2>🏥 Lesiones</h2>
+                <button onclick="window.rpeTracker?.openAddInjuryModal()" class="btn-primary">+ Registrar</button>
+            </div>
+            ${statsBar}${tabBar}
+            <div class="inj-tab-content">${tabContent}</div>
+        </div>`;
+};
+
+RPETracker.prototype._setInjuryTab = function(tab) {
+    this._injuryTab = tab;
+    this.renderInjuryManagement();
 };
 
 // ========== RENDER INJURY CARD ==========
@@ -320,89 +348,72 @@ RPETracker.prototype.renderInjuryManagement = function() {
 RPETracker.prototype.renderInjuryCard = function(injury) {
     const player = this.players.find(p => p.id === injury.playerId);
     if (!player) return '';
-    
-    const daysInjured = injury.getDaysInjured();
-    const expectedReturn = injury.getExpectedReturn();
-    const daysRemaining = expectedReturn ? Math.ceil((expectedReturn - new Date()) / (1000 * 60 * 60 * 24)) : 0;
-    
-    const phase = RTP_PHASES[injury.rtpPhase];
-    const progressPercent = injury.rtpProgress;
-    
-    const severityColors = {
-        'minor': '#4caf50',
-        'moderate': '#ff9800',
-        'severe': '#f44336'
-    };
-    
+
+    const daysInjured     = injury.getDaysInjured();
+    const expectedReturn  = injury.getExpectedReturn();
+    const daysRemaining   = expectedReturn ? Math.ceil((expectedReturn - new Date()) / 86400000) : 0;
+    const phase           = RTP_PHASES ? RTP_PHASES[injury.rtpPhase] : null;
+    const progressPercent = injury.rtpProgress || 0;
+
+    const sevColor = { minor:'#4caf50', moderate:'#ff9800', severe:'#f44336' };
+    const sevLabel = { minor:'Leve', moderate:'Moderada', severe:'Grave' };
+    const col = sevColor[injury.severity] || '#999';
+
+    // RTP phase stepper
+    const totalPhases = RTP_PHASES ? Object.keys(RTP_PHASES).length : 5;
+    const curPhase = parseInt(injury.rtpPhase) || 1;
+    const stepperHTML = Array.from({length: totalPhases}, (_, i) => {
+        const n = i + 1;
+        const isDone   = n < curPhase;
+        const isActive = n === curPhase;
+        const pName    = RTP_PHASES?.[n]?.name || '';
+        return `<div class="rtp-step${isDone?' rtp-done':''}${isActive?' rtp-active':''}" title="Fase ${n}${pName?' — '+pName:''}">${isDone?'✓':n}</div>${n<totalPhases?'<div class="rtp-conn"></div>':''}`;
+    }).join('');
+
+    const painColor = injury.painLevel > 6 ? '#f44336' : injury.painLevel > 3 ? '#ff9800' : '#4caf50';
+
     return `
-        <div class="injury-card" style="background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-left: 5px solid ${severityColors[injury.severity]};">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
-                <div style="flex: 1;">
-                    <h3 style="margin: 0 0 0.5rem 0;">${player.name}${player.number ? ` #${player.number}` : ''}</h3>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <span class="badge" style="background: ${severityColors[injury.severity]}; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem;">
-                            ${injury.severity === 'minor' ? 'Leve' : injury.severity === 'moderate' ? 'Moderada' : 'Grave'}
-                        </span>
-                        <span class="badge" style="background: #2196f3; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem;">
-                            ${this.getLocationName(injury.location)}
-                        </span>
-                        <span class="badge" style="background: #9c27b0; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem;">
-                            ${this.getTypeName(injury.type)}
-                        </span>
+        <div class="inj-card" style="border-left:4px solid ${col}">
+            <div class="inj-card-top">
+                <div class="inj-card-player">
+                    ${typeof PlayerTokens !== 'undefined' ? PlayerTokens.avatar(player, 28, '0.75rem') : `<div style="width:28px;height:28px;border-radius:50%;background:${player.color||col};display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:#fff;font-weight:600">${player.name.charAt(0)}</div>`}
+                    <div>
+                        <div class="inj-card-name">${player.name}${player.number ? ` <span class="inj-num">#${player.number}</span>` : ''}</div>
+                        <div class="inj-card-badges">
+                            <span class="inj-badge" style="background:${col}">${sevLabel[injury.severity]||'—'}</span>
+                            <span class="inj-badge inj-badge-blue">${this.getLocationName(injury.location)}</span>
+                            <span class="inj-badge inj-badge-purple">${this.getTypeName(injury.type)}</span>
+                            ${injury.mechanism ? `<span class="inj-badge inj-badge-gray">${injury.mechanism}</span>` : ''}
+                        </div>
                     </div>
                 </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 2rem; font-weight: bold; color: ${severityColors[injury.severity]};">
-                        ${daysInjured}
-                    </div>
-                    <div style="font-size: 0.85rem; color: #666;">días lesionada</div>
+                <div class="inj-card-days">
+                    <span class="inj-days-num" style="color:${col}">${daysInjured}</span>
+                    <span class="inj-days-lbl">días</span>
                 </div>
             </div>
-            
-            <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <strong>Fase ${injury.rtpPhase}: ${phase.name}</strong>
-                    <span style="color: var(--primary); font-weight: bold;">${progressPercent}%</span>
-                </div>
-                <div style="background: #ddd; height: 10px; border-radius: 5px; overflow: hidden;">
-                    <div style="background: var(--primary); height: 100%; width: ${progressPercent}%; transition: width 0.3s;"></div>
-                </div>
-                <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">${phase.description}</p>
+
+            <div class="rtp-stepper-wrap">
+                <div class="rtp-stepper">${stepperHTML}</div>
+                <div class="rtp-phase-label">Fase ${curPhase}${phase ? ' — ' + phase.name : ''} · <strong>${progressPercent}%</strong></div>
+                <div class="rtp-track"><div class="rtp-fill" style="width:${progressPercent}%;background:${col}"></div></div>
             </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div>
-                    <strong style="font-size: 0.9rem; color: #666;">Sesiones perdidas:</strong>
-                    <div style="font-size: 1.5rem; font-weight: bold;">${injury.missedSessions}</div>
-                </div>
-                <div>
-                    <strong style="font-size: 0.9rem; color: #666;">Retorno estimado:</strong>
-                    <div style="font-size: 1rem; font-weight: bold;">
-                        ${expectedReturn ? `${daysRemaining > 0 ? daysRemaining + ' días' : 'Próximamente'}` : 'Recuperada'}
-                    </div>
-                </div>
+
+            <div class="inj-card-meta">
+                <div><span class="inj-meta-lbl">Sesiones perdidas</span><span class="inj-meta-val">${injury.missedSessions||0}</span></div>
+                <div><span class="inj-meta-lbl">Retorno estimado</span><span class="inj-meta-val">${expectedReturn ? (daysRemaining > 0 ? daysRemaining + ' días' : 'Próximamente') : '—'}</span></div>
+                ${injury.painLevel != null ? `<div><span class="inj-meta-lbl">Dolor EVA</span><span class="inj-meta-val" style="color:${painColor}">${injury.painLevel}/10</span></div>` : ''}
             </div>
-            
-            ${injury.description ? `
-                <div style="background: #fff9e6; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem;">
-                    <strong style="font-size: 0.85rem;">📝 Descripción:</strong>
-                    <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">${injury.description}</p>
-                </div>
-            ` : ''}
-            
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <button onclick="window.rpeTracker?.updateRTPPhase('${injury.id}')" class="btn-primary" style="flex: 1;">
-                    🔄 Actualizar Fase RTP
-                </button>
-                <button onclick="window.rpeTracker?.showRTPProgram('${injury.id}')" class="btn-secondary" style="flex: 1;">
-                    📋 Programa RTP
-                </button>
-                <button onclick="window.rpeTracker?.markAsRecovered('${injury.id}')" class="btn-secondary" style="background: #4caf50; color: white;">
-                    ✅ Marcar Recuperada
-                </button>
+
+            ${injury.description ? `<div class="inj-desc">📝 ${injury.description}</div>` : ''}
+            ${injury.initialTreatment ? `<div class="inj-desc" style="background:var(--bg-subtle)">🩹 ${injury.initialTreatment}</div>` : ''}
+
+            <div class="inj-card-actions">
+                <button onclick="window.rpeTracker?.updateRTPPhase('${injury.id}')" class="btn-primary" style="flex:1">🔄 Actualizar Fase</button>
+                <button onclick="window.rpeTracker?.showRTPProgram('${injury.id}')" class="btn-secondary" style="flex:1">📋 Programa</button>
+                <button onclick="window.rpeTracker?.markAsRecovered('${injury.id}')" class="btn-secondary" style="color:#4caf50;border-color:#4caf50">✅ Alta</button>
             </div>
-        </div>
-    `;
+        </div>`;
 };
 
 // ========== RENDER COMPACT INJURY CARD ==========

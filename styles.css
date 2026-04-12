@@ -3101,7 +3101,8 @@ header h1 {
 .db-split {
     display: grid;
     grid-template-columns: 200px minmax(0, 1fr) 240px;
-    min-height: calc(100vh - 110px);
+    height: calc(100vh - 110px);
+    overflow: hidden;
 }
 
 /* Left column */
@@ -3110,6 +3111,7 @@ header h1 {
     background: var(--bg-subtle);
     padding: 1rem 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .db-left-section {
@@ -3198,6 +3200,7 @@ header h1 {
 .db-players {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0.25rem 1.25rem 1rem;
 }
 
@@ -4336,10 +4339,7 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 
 @media (max-width: 640px) {
-    /* Espacio para que el contenido no quede bajo la barra */
-    body { padding-bottom: 64px; }
-
-    /* Ocultar nav superior en móvil para ganar espacio vertical */
+    body { padding-bottom: 68px; }
     .nav-groups { display: none; }
 
     .bottom-nav {
@@ -4363,21 +4363,21 @@ details[open] .ewma-toggle-hint { display: none; }
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 3px;
+        gap: 2px;
         border: none;
         background: transparent;
         cursor: pointer;
         color: var(--text-muted);
-        font-size: 0.62rem;
+        font-size: 0.6rem;
         font-weight: 500;
-        padding: 0 4px;
+        padding: 0 2px;
         transition: color var(--transition);
         position: relative;
         -webkit-tap-highlight-color: transparent;
     }
 
     .bottom-nav-btn .bn-icon {
-        font-size: 1.35rem;
+        font-size: 1.25rem;
         line-height: 1;
         transition: transform 0.15s ease;
     }
@@ -4388,15 +4388,40 @@ details[open] .ewma-toggle-hint { display: none; }
         white-space: nowrap;
     }
 
-    .bottom-nav-btn.active {
-        color: var(--primary);
+    /* FAB central — botón Nueva Sesión */
+    .bottom-nav-btn.bn-fab {
+        flex: 0 0 56px;
+        overflow: visible;
     }
-
-    .bottom-nav-btn.active .bn-icon {
-        transform: translateY(-1px);
+    .bottom-nav-btn.bn-fab .bn-icon {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--primary, #ff6600);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 300;
+        color: #fff;
+        box-shadow: 0 3px 10px rgba(255,102,0,0.4);
+        transition: transform 0.15s ease, box-shadow 0.15s;
+        line-height: 1;
     }
+    .bottom-nav-btn.bn-fab:active .bn-icon {
+        transform: translateX(-50%) scale(0.92);
+        box-shadow: 0 1px 6px rgba(255,102,0,0.3);
+    }
+    .bottom-nav-btn.bn-fab.active::before { display: none; }
+    .bottom-nav-btn.bn-fab.active { color: var(--text-muted); }
 
-    /* Pill indicador sobre el botón activo */
+    .bottom-nav-btn.active { color: var(--primary); }
+    .bottom-nav-btn.active .bn-icon { transform: translateY(-1px); }
+
     .bottom-nav-btn.active::before {
         content: '';
         position: absolute;
@@ -4408,7 +4433,6 @@ details[open] .ewma-toggle-hint { display: none; }
         background: var(--primary);
     }
 
-    /* Badge de alertas en nav */
     .bottom-nav-btn .bn-badge {
         position: absolute;
         top: 6px;
@@ -4427,8 +4451,285 @@ details[open] .ewma-toggle-hint { display: none; }
         line-height: 1;
     }
 
-    /* Dark mode adjustments */
     [data-theme="dark"] .bottom-nav {
         box-shadow: 0 -2px 16px rgba(0,0,0,0.40);
     }
+}
+
+/* ============================================================
+   BATCH 6 — Nuevas clases
+   ============================================================ */
+
+/* --- Wellness chips en dashboard --- */
+.db-w-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+.db-w-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px 2px 2px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--bg-surface);
+    cursor: pointer;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    transition: background 0.15s;
+}
+.db-w-chip:hover { background: var(--bg-elevated); }
+.db-w-all-ok {
+    font-size: 0.75rem;
+    color: var(--text-success, #4caf50);
+    padding: 2px 0;
+}
+.db-w-link {
+    border: none;
+    background: none;
+    color: var(--primary);
+    font-size: 0.68rem;
+    cursor: pointer;
+    padding: 0;
+    font-weight: 500;
+    float: right;
+}
+
+/* --- Vista lesiones: layout wrap --- */
+.inj-wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+@media (max-width: 640px) {
+    .inj-wrap { padding: 1rem 0.75rem; }
+}
+
+.inj-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.inj-header h2 { margin: 0; font-size: 1.2rem; }
+
+/* Stats bar */
+.inj-stats-bar {
+    display: flex;
+    gap: 0;
+    background: var(--bg-subtle);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+.inj-stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.6rem 0.5rem;
+    border-right: 0.5px solid var(--border);
+}
+.inj-stat:last-child { border-right: none; }
+.inj-stat-val { font-size: 1.4rem; font-weight: 700; line-height: 1; }
+.inj-stat-lbl { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; text-align: center; }
+
+/* Tabs internos */
+.inj-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+    gap: 0;
+}
+.inj-tab {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    position: relative;
+    top: 1px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.inj-tab:hover { color: var(--text-primary); }
+.inj-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; }
+.inj-tab-badge {
+    background: var(--danger, #f44336);
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+.inj-tab-content { min-height: 200px; }
+.inj-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+.inj-history-grid { display: grid; gap: 0.75rem; }
+
+/* Tarjeta de lesión modernizada */
+.inj-card {
+    background: var(--bg-surface);
+    border-radius: 12px;
+    border: 0.5px solid var(--border);
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.inj-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+.inj-card-player {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.inj-card-name {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 4px;
+}
+.inj-num { color: var(--text-muted); font-weight: 400; font-size: 0.85em; }
+.inj-card-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.inj-badge {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 500;
+}
+.inj-badge-blue   { background: #2196f3; }
+.inj-badge-purple { background: #9c27b0; }
+.inj-badge-gray   { background: var(--text-muted); color: #fff; }
+.inj-card-days { text-align: center; flex-shrink: 0; }
+.inj-days-num { display: block; font-size: 2rem; font-weight: 700; line-height: 1; }
+.inj-days-lbl { font-size: 0.72rem; color: var(--text-muted); }
+
+/* RTP stepper */
+.rtp-stepper-wrap {
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+}
+.rtp-stepper {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.rtp-step {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+.rtp-step.rtp-done {
+    background: #4caf50;
+    border-color: #4caf50;
+    color: #fff;
+}
+.rtp-step.rtp-active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(255,102,0,0.18);
+}
+.rtp-conn {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    margin: 0 2px;
+}
+.rtp-phase-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+.rtp-phase-label strong { color: var(--text-primary); }
+.rtp-track {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.rtp-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+/* Meta row de la tarjeta */
+.inj-card-meta {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+.inj-card-meta > div { display: flex; flex-direction: column; }
+.inj-meta-lbl { font-size: 0.68rem; color: var(--text-muted); }
+.inj-meta-val { font-size: 1rem; font-weight: 700; }
+
+/* Descripción / tratamiento */
+.inj-desc {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    background: #fff9e6;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+[data-theme="dark"] .inj-desc { background: var(--bg-elevated); }
+
+/* Acciones */
+.inj-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+}
+
+/* Dark mode lesiones */
+[data-theme="dark"] .inj-card { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .inj-stats-bar { background: var(--bg-elevated); }
+[data-theme="dark"] .rtp-stepper-wrap { background: var(--bg-elevated); }
+
+/* Mobile responsive dashboard — columna única */
+@media (max-width: 640px) {
+    .db-split {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+    }
+    .db-left { border-right: none; border-bottom: 0.5px solid var(--border); overflow-y: visible; }
+    .db-avail { border-left: none; border-top: 0.5px solid var(--border); overflow-y: visible; }
+    .db-players { overflow-y: visible; max-height: none; }
+    .db-avail-list { overflow-y: visible; max-height: none; }
 }
