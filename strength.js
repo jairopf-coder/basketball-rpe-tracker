@@ -32,6 +32,26 @@ const DEFAULT_EXERCISES = [
     { id: 'dbp',   name: 'Press Mancuerna',         category: 'upper', bilateral: false },
     { id: 'lat',   name: 'Jalón al Pecho',          category: 'upper', bilateral: true  },
 
+    // COMPUESTOS / OLÍMPICOS
+    { id: 'burpee',   name: 'Burpee',                   category: 'compound', bilateral: true  },
+    { id: 'lunpal',   name: 'Zancada Pallof',            category: 'compound', bilateral: false },
+    { id: 'lunpre',   name: 'Lunge Press',               category: 'compound', bilateral: false },
+    { id: 'jumppre',  name: 'Jump Press',                category: 'compound', bilateral: true  },
+    { id: 'clean',    name: 'Barbell Clean',             category: 'compound', bilateral: true  },
+    { id: 'cleanp',   name: 'Barbell Clean & Press',     category: 'compound', bilateral: true  },
+    { id: 'snatch',   name: 'Snatch (Arrancada)',         category: 'compound', bilateral: true  },
+    { id: 'thruster', name: 'Thruster',                  category: 'compound', bilateral: true  },
+    { id: 'kbswing',  name: 'Kettlebell Swing',          category: 'compound', bilateral: true  },
+    { id: 'kbsnatch', name: 'Kettlebell Snatch',         category: 'compound', bilateral: false },
+    { id: 'tgu',      name: 'Turkish Get-Up',            category: 'compound', bilateral: false },
+    { id: 'medball',  name: 'Med Ball Slam',             category: 'compound', bilateral: true  },
+    { id: 'medrot',   name: 'Med Ball Rotational Throw', category: 'compound', bilateral: false },
+    { id: 'boxjump',  name: 'Box Jump',                  category: 'compound', bilateral: true  },
+    { id: 'sboxjump', name: 'Single Leg Box Jump',       category: 'compound', bilateral: false },
+    { id: 'steppre',  name: 'Step-up Press',             category: 'compound', bilateral: false },
+    { id: 'deadbur',  name: 'Deadlift Burpee',           category: 'compound', bilateral: true  },
+    { id: 'sqtrow',   name: 'Squat to Row',              category: 'compound', bilateral: true  },
+
     // CORE
     { id: 'plank', name: 'Plancha',                 category: 'core',  bilateral: true  },
     { id: 'siplk', name: 'Plancha Lateral',         category: 'core',  bilateral: false },
@@ -117,7 +137,7 @@ RPETracker.prototype.renderGymView = function() {
     if (!el) return;
     if (!this.exerciseLibrary) this._loadStrengthData();
 
-    const cats = { lower: 'Miembro Inferior', upper: 'Miembro Superior', core: 'Core' };
+    const cats = { lower: 'Miembro Inferior', upper: 'Miembro Superior', core: 'Core', compound: 'Compuestos / Olímpicos' };
 
     // Sub-router: gymSubView puede ser 'list' | 'player' | 'exercise'
     const sub = this._gymSub || 'list';
@@ -392,7 +412,7 @@ RPETracker.prototype._renderGymExerciseRows = function() {
     const container = document.getElementById('gymExerciseRows');
     if (!container) return;
 
-    const cats = { lower: 'Miembro Inferior', upper: 'Miembro Superior', core: 'Core' };
+    const cats = { lower: 'Miembro Inferior', upper: 'Miembro Superior', core: 'Core', compound: 'Compuestos / Olímpicos' };
     const exByCategory = {};
     (this.exerciseLibrary || []).forEach(ex => {
         if (!exByCategory[ex.category]) exByCategory[ex.category] = [];
@@ -567,7 +587,7 @@ RPETracker.prototype._openExerciseLibrary = function() {
 };
 
 RPETracker.prototype._renderLibraryModal = function(modal) {
-    const cats = { lower: '🦵 Miembro Inferior', upper: '💪 Miembro Superior', core: '🔘 Core' };
+    const cats = { lower: '🦵 Miembro Inferior', upper: '💪 Miembro Superior', core: '🔘 Core', compound: '⚡ Compuestos / Olímpicos' };
     const byCategory = {};
     (this.exerciseLibrary || []).forEach(ex => {
         if (!byCategory[ex.category]) byCategory[ex.category] = [];
@@ -608,6 +628,7 @@ RPETracker.prototype._renderLibraryModal = function(modal) {
                                 <option value="lower">Miembro Inferior</option>
                                 <option value="upper">Miembro Superior</option>
                                 <option value="core">Core</option>
+                                <option value="compound">Compuestos / Olímpicos</option>
                             </select>
                         </div>
                         <div>
