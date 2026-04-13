@@ -343,16 +343,41 @@ RPETracker.prototype._buildGymSuggestions = function(playerId) {
 //  MODAL NUEVA SESIÓN DE GIMNASIO
 // ─────────────────────────────────────────
 
+
+// ─────────────────────────────────────────
+//  MIGRACIÓN: añade ejercicios que falten en biblioteca guardada
+// ─────────────────────────────────────────
+RPETracker.prototype._migrateExerciseLibrary = function() {
+    let changed = false;
+    DEFAULT_EXERCISES.forEach(def => {
+        if (!this.exerciseLibrary.find(e => e.id === def.id)) {
+            this.exerciseLibrary.push({...def});
+            changed = true;
+        }
+    });
+    if (changed) this._saveExercises();
+};
+
+// ─────────────────────────────────────────
+//  MODAL NUEVA SESIÓN — multi-jugadora + filtros
+// ─────────────────────────────────────────
 RPETracker.prototype._openNewGymSession = function(preselectedPlayerId) {
     if (!this.exerciseLibrary) this._loadStrengthData();
-
-    const playerOpts = this.players.map(p =>
-        `<option value="${p.id}" ${p.id === preselectedPlayerId ? 'selected' : ''}>${p.name}${p.number ? ' #'+p.number : ''}</option>`
-    ).join('');
+    this._migrateExerciseLibrary();
 
     const today = new Date().toISOString().slice(0, 10);
 
-    // Crear modal
+    // Estado interno del modal
+    this._gymExRows      = [];
+    this._gymModalPlayers = this.players.map(p => ({
+        ...p,
+        selected: p.id === preselectedPlayerId,
+        rows: []   // ejercicios propios de esta jugadora
+    }));
+    this._gymActiveTab = preselectedPlayerId || (this.players[0]?.id || null);
+    this._gymSharedRows = []; // ejercicios compartidos
+    this._gymDate = today;
+
     let modal = document.getElementById('gymSessionModal');
     if (!modal) {
         modal = document.createElement('div');
@@ -361,123 +386,290 @@ RPETracker.prototype._openNewGymSession = function(preselectedPlayerId) {
         document.body.appendChild(modal);
     }
 
+    this._renderGymSessionModal(modal);
+    modal.classList.add('active');
+};
+
+RPETracker.prototype._renderGymSessionModal = function(modal) {
+    if (!modal) modal = document.getElementById('gymSessionModal');
+    if (!modal) return;
+
+    const playerChips = this.players.map(p => {
+        const active = this._gymModalPlayers.find(mp => mp.id === p.id)?.selected;
+        const color  = PlayerTokens.get(p);
+        return `<button class="gym-player-chip ${active ? 'gym-player-chip--active' : ''}"
+            style="${active ? `background:${color};color:#fff;border-color:${color}` : `border-color:${color}40;color:${color}`}"
+            onclick="window.rpeTracker._toggleGymPlayer('${p.id}')">
+            ${p.name.split(' ')[0]}${p.number ? ' #'+p.number : ''}
+        </button>`;
+    }).join('');
+
+    const selectedPlayers = this._gymModalPlayers.filter(p => p.selected);
+
+    // Tabs por jugadora seleccionada + "Compartido"
+    const tabsHTML = selectedPlayers.length > 1 ? `
+        <div class="gym-tabs">
+            <button class="gym-tab ${this._gymActiveTab === '__shared__' ? 'gym-tab--active' : ''}"
+                onclick="window.rpeTracker._setGymTab('__shared__')">
+                👥 Compartido <span class="gym-tab-count">${this._gymSharedRows.length}</span>
+            </button>
+            ${selectedPlayers.map(p => {
+                const mp = this._gymModalPlayers.find(x => x.id === p.id);
+                const count = (mp?.rows||[]).length;
+                const color = PlayerTokens.get(p);
+                return `<button class="gym-tab ${this._gymActiveTab === p.id ? 'gym-tab--active' : ''}"
+                    style="${this._gymActiveTab === p.id ? `border-bottom-color:${color};color:${color}` : ''}"
+                    onclick="window.rpeTracker._setGymTab('${p.id}')">
+                    ${p.name.split(' ')[0]} <span class="gym-tab-count">${count}</span>
+                </button>`;
+            }).join('')}
+        </div>` : '';
+
+    const currentRows = this._gymActiveTab === '__shared__'
+        ? this._gymSharedRows
+        : (this._gymModalPlayers.find(p => p.id === this._gymActiveTab)?.rows || []);
+
     modal.innerHTML = `
         <div class="modal-content modal-content--wide">
             <div class="modal-header">
-                <div class="modal-header-inner">
-                    <h2>Nueva Sesión de Gimnasio</h2>
-                </div>
+                <div class="modal-header-inner"><h2>🏋️ Nueva Sesión de Gimnasio</h2></div>
                 <button class="modal-close" onclick="document.getElementById('gymSessionModal').classList.remove('active')">✕</button>
             </div>
             <div class="modal-body" style="padding:1.25rem">
-                <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+
+                <div style="display:grid;grid-template-columns:1fr 150px;gap:1rem;margin-bottom:1.25rem;align-items:start">
                     <div>
-                        <label class="form-label">Jugadora</label>
-                        <select id="gymPlayerSel" class="form-select">${playerOpts}</select>
+                        <label class="form-label">Jugadoras</label>
+                        <div class="gym-player-chips">${playerChips}</div>
                     </div>
                     <div>
                         <label class="form-label">Fecha</label>
-                        <input type="date" id="gymDate" class="form-input" value="${today}">
+                        <input type="date" id="gymDate" class="form-input" value="${this._gymDate}"
+                            onchange="window.rpeTracker._gymDate=this.value">
                     </div>
                 </div>
 
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-                    <h3 style="margin:0;font-size:0.95rem">Ejercicios</h3>
-                    <button class="btn-secondary" onclick="window.rpeTracker._addGymExerciseRow()" style="font-size:0.8rem;padding:0.3rem 0.75rem">+ Añadir ejercicio</button>
-                </div>
+                ${selectedPlayers.length === 0 ? '<p class="str-empty">Selecciona al menos una jugadora</p>' : `
+                    ${tabsHTML}
 
-                <div id="gymExerciseRows" class="gym-exercise-rows"></div>
+                    <div class="gym-tab-info">
+                        ${selectedPlayers.length > 1 && this._gymActiveTab !== '__shared__'
+                            ? `<span>Ejercicios exclusivos de <strong>${this.players.find(p=>p.id===this._gymActiveTab)?.name}</strong></span>`
+                            : selectedPlayers.length > 1
+                                ? '<span>Ejercicios que harán <strong>todas las jugadoras seleccionadas</strong></span>'
+                                : ''}
+                    </div>
 
-                <div style="margin-top:1.5rem;text-align:right">
-                    <button class="btn-secondary" onclick="document.getElementById('gymSessionModal').classList.remove('active')" style="margin-right:0.5rem">Cancelar</button>
+                    <div id="gymExFilters" class="gym-ex-filters">
+                        ${this._renderExFilters()}
+                    </div>
+
+                    <div id="gymExerciseRows" class="gym-exercise-rows">
+                        ${this._renderExRowsHTML(currentRows)}
+                    </div>
+
+                    <button class="gym-add-ex-btn" onclick="window.rpeTracker._addGymExerciseRow()">+ Añadir ejercicio</button>
+                `}
+
+                <div style="margin-top:1.5rem;display:flex;justify-content:flex-end;gap:0.5rem">
+                    <button class="btn-secondary" onclick="document.getElementById('gymSessionModal').classList.remove('active')">Cancelar</button>
                     <button class="btn-primary" onclick="window.rpeTracker._saveGymSession()">💾 Guardar sesión</button>
                 </div>
             </div>
-        </div>
-    `;
+        </div>`;
 
-    modal.classList.add('active');
-    this._gymExRows = [];
-    this._addGymExerciseRow(); // primera fila vacía
+    // Restaurar selección de ejercicios en los selects
+    setTimeout(() => this._bindGymExSelects(currentRows), 0);
 };
 
-RPETracker.prototype._addGymExerciseRow = function() {
-    if (!this._gymExRows) this._gymExRows = [];
-    const rowId = Date.now();
-    this._gymExRows.push({ id: rowId, sets: [{ reps: '', weight: '', rpe: '' }] });
-    this._renderGymExerciseRows();
+RPETracker.prototype._renderExFilters = function() {
+    const cats = [
+        { key: 'all',      label: 'Todos' },
+        { key: 'lower',    label: '🦵 Inf.' },
+        { key: 'upper',    label: '💪 Sup.' },
+        { key: 'core',     label: '🔘 Core' },
+        { key: 'compound', label: '⚡ Comp.' },
+    ];
+    const active = this._gymExFilter || 'all';
+    return cats.map(c => `
+        <button class="gym-filter-btn ${active === c.key ? 'gym-filter-btn--active' : ''}"
+            onclick="window.rpeTracker._setExFilter('${c.key}')">
+            ${c.label}
+        </button>`).join('');
 };
 
-RPETracker.prototype._renderGymExerciseRows = function() {
-    const container = document.getElementById('gymExerciseRows');
-    if (!container) return;
+RPETracker.prototype._setExFilter = function(cat) {
+    this._gymExFilter = cat;
+    document.getElementById('gymExFilters').innerHTML = this._renderExFilters();
+    // Re-render los selects con la lista filtrada manteniendo selección actual
+    const currentRows = this._gymActiveTab === '__shared__'
+        ? this._gymSharedRows
+        : (this._gymModalPlayers.find(p => p.id === this._gymActiveTab)?.rows || []);
+    document.getElementById('gymExerciseRows').innerHTML = this._renderExRowsHTML(currentRows);
+    setTimeout(() => this._bindGymExSelects(currentRows), 0);
+};
 
-    const cats = { lower: 'Miembro Inferior', upper: 'Miembro Superior', core: 'Core', compound: 'Compuestos / Olímpicos' };
-    const exByCategory = {};
-    (this.exerciseLibrary || []).forEach(ex => {
-        if (!exByCategory[ex.category]) exByCategory[ex.category] = [];
-        exByCategory[ex.category].push(ex);
+RPETracker.prototype._toggleGymPlayer = function(playerId) {
+    // Sync date before re-render
+    const dateEl = document.getElementById('gymDate');
+    if (dateEl) this._gymDate = dateEl.value;
+
+    const mp = this._gymModalPlayers.find(p => p.id === playerId);
+    if (!mp) return;
+    mp.selected = !mp.selected;
+
+    // Si el tab activo es el jugador que se deseleccionó, ir a shared o primer seleccionado
+    const selected = this._gymModalPlayers.filter(p => p.selected);
+    if (!selected.find(p => p.id === this._gymActiveTab) && this._gymActiveTab !== '__shared__') {
+        this._gymActiveTab = selected.length > 1 ? '__shared__' : (selected[0]?.id || null);
+    }
+    if (selected.length <= 1) this._gymActiveTab = selected[0]?.id || null;
+
+    this._renderGymSessionModal();
+};
+
+RPETracker.prototype._setGymTab = function(tabId) {
+    // Sync current rows before switching
+    this._syncCurrentRows();
+    this._gymActiveTab = tabId;
+    this._renderGymSessionModal();
+};
+
+RPETracker.prototype._syncCurrentRows = function() {
+    const rows = document.querySelectorAll('#gymExerciseRows .gym-ex-row');
+    const target = this._gymActiveTab === '__shared__'
+        ? this._gymSharedRows
+        : (this._gymModalPlayers.find(p => p.id === this._gymActiveTab)?.rows || []);
+
+    rows.forEach(rowEl => {
+        const rowId = parseInt(rowEl.dataset.row);
+        const r = target.find(x => x.id === rowId);
+        if (!r) return;
+        const sel = document.getElementById(`gymEx_${rowId}`);
+        if (sel) r.exerciseId = sel.value;
+        // sets are synced via _updateSet
     });
+};
 
-    const exOptions = Object.entries(cats).map(([cat, label]) => {
-        const items = (exByCategory[cat] || []).map(ex =>
-            `<option value="${ex.id}">${ex.name}</option>`
-        ).join('');
-        return `<optgroup label="${label}">${items}</optgroup>`;
+RPETracker.prototype._buildExOptions = function() {
+    const filter = this._gymExFilter || 'all';
+    const cats = { lower: 'Miembro Inferior', upper: 'Miembro Superior', core: 'Core', compound: 'Compuestos / Olímpicos' };
+    const lib = filter === 'all'
+        ? (this.exerciseLibrary || [])
+        : (this.exerciseLibrary || []).filter(e => e.category === filter);
+
+    if (filter !== 'all') {
+        const items = lib.map(ex => `<option value="${ex.id}">${ex.name}</option>`).join('');
+        return items;
+    }
+    // Agrupado por categoría
+    const byCategory = {};
+    lib.forEach(ex => {
+        if (!byCategory[ex.category]) byCategory[ex.category] = [];
+        byCategory[ex.category].push(ex);
+    });
+    return Object.entries(cats).map(([cat, label]) => {
+        const items = (byCategory[cat] || []).map(ex => `<option value="${ex.id}">${ex.name}</option>`).join('');
+        return items ? `<optgroup label="${label}">${items}</optgroup>` : '';
     }).join('');
+};
 
-    container.innerHTML = this._gymExRows.map((row, ri) => `
+RPETracker.prototype._renderExRowsHTML = function(rows) {
+    if (!rows || rows.length === 0) return '<p class="gym-no-ex">Sin ejercicios. Pulsa "+ Añadir ejercicio".</p>';
+    const exOptions = this._buildExOptions();
+    return rows.map(row => `
         <div class="gym-ex-row" data-row="${row.id}">
             <div class="gym-ex-header">
                 <select class="form-select gym-ex-select" id="gymEx_${row.id}" style="flex:1">
                     <option value="">— Selecciona ejercicio —</option>
                     ${exOptions}
                 </select>
-                <button class="str-del-btn" onclick="window.rpeTracker._removeGymExRow(${row.id})" title="Eliminar ejercicio">✕</button>
+                <button class="str-del-btn" onclick="window.rpeTracker._removeGymExRow(${row.id})" title="Eliminar">✕</button>
             </div>
             <div class="gym-sets-wrap" id="gymSets_${row.id}">
                 ${row.sets.map((s, si) => this._gymSetHTML(row.id, si, s)).join('')}
             </div>
             <button class="gym-add-set-btn" onclick="window.rpeTracker._addSet(${row.id})">+ Serie</button>
-        </div>
-    `).join('');
+        </div>`).join('');
+};
 
-    // Restore selected values
-    this._gymExRows.forEach(row => {
+RPETracker.prototype._bindGymExSelects = function(rows) {
+    (rows || []).forEach(row => {
         const sel = document.getElementById(`gymEx_${row.id}`);
-        if (sel && row.exerciseId) sel.value = row.exerciseId;
-        sel?.addEventListener('change', e => {
-            const r = this._gymExRows.find(x => x.id === row.id);
-            if (r) r.exerciseId = e.target.value;
-        });
+        if (!sel) return;
+        if (row.exerciseId) sel.value = row.exerciseId;
+        sel.onchange = e => { row.exerciseId = e.target.value; };
     });
+};
+
+RPETracker.prototype._addGymExerciseRow = function() {
+    this._syncCurrentRows();
+    const rowId = Date.now();
+    const newRow = { id: rowId, exerciseId: '', sets: [{ reps: '', weight: '', rpe: '' }] };
+
+    if (this._gymActiveTab === '__shared__') {
+        this._gymSharedRows.push(newRow);
+    } else {
+        const mp = this._gymModalPlayers.find(p => p.id === this._gymActiveTab);
+        if (mp) mp.rows.push(newRow);
+    }
+
+    const container = document.getElementById('gymExerciseRows');
+    const currentRows = this._gymActiveTab === '__shared__'
+        ? this._gymSharedRows
+        : (this._gymModalPlayers.find(p => p.id === this._gymActiveTab)?.rows || []);
+    if (container) container.innerHTML = this._renderExRowsHTML(currentRows);
+    setTimeout(() => this._bindGymExSelects(currentRows), 0);
+};
+
+RPETracker.prototype._removeGymExRow = function(rowId) {
+    if (this._gymActiveTab === '__shared__') {
+        this._gymSharedRows = this._gymSharedRows.filter(r => r.id !== rowId);
+    } else {
+        const mp = this._gymModalPlayers.find(p => p.id === this._gymActiveTab);
+        if (mp) mp.rows = mp.rows.filter(r => r.id !== rowId);
+    }
+    const currentRows = this._gymActiveTab === '__shared__'
+        ? this._gymSharedRows
+        : (this._gymModalPlayers.find(p => p.id === this._gymActiveTab)?.rows || []);
+    const container = document.getElementById('gymExerciseRows');
+    if (container) container.innerHTML = this._renderExRowsHTML(currentRows);
+    setTimeout(() => this._bindGymExSelects(currentRows), 0);
 };
 
 RPETracker.prototype._gymSetHTML = function(rowId, si, s) {
     return `
     <div class="gym-set-row" data-set="${si}">
         <span class="gym-set-num">${si + 1}</span>
-        <input type="number" class="gym-set-input" placeholder="Reps" min="1" max="50" value="${s.reps}"
+        <input type="number" class="gym-set-input" placeholder="Reps" min="1" max="50" value="${s.reps||''}"
             oninput="window.rpeTracker._updateSet(${rowId},${si},'reps',this.value)">
         <span class="gym-set-sep">×</span>
-        <input type="number" class="gym-set-input gym-set-input--weight" placeholder="kg" min="0" step="0.5" value="${s.weight}"
+        <input type="number" class="gym-set-input" placeholder="kg" min="0" step="0.5" value="${s.weight||''}"
             oninput="window.rpeTracker._updateSet(${rowId},${si},'weight',this.value)">
         <span class="gym-set-sep">kg</span>
         <span class="gym-set-sep">RPE</span>
-        <input type="number" class="gym-set-input gym-set-input--rpe" placeholder="1-10" min="1" max="10" value="${s.rpe}"
+        <input type="number" class="gym-set-input gym-set-input--rpe" placeholder="1-10" min="1" max="10" value="${s.rpe||''}"
             oninput="window.rpeTracker._updateSet(${rowId},${si},'rpe',this.value)">
         ${si > 0 ? `<button class="gym-del-set-btn" onclick="window.rpeTracker._removeSet(${rowId},${si})">✕</button>` : '<span style="width:20px"></span>'}
     </div>`;
 };
 
 RPETracker.prototype._updateSet = function(rowId, si, field, val) {
-    const row = (this._gymExRows || []).find(r => r.id === rowId);
+    const allRows = [
+        ...this._gymSharedRows,
+        ...(this._gymModalPlayers||[]).flatMap(p => p.rows||[])
+    ];
+    const row = allRows.find(r => r.id === rowId);
     if (!row || !row.sets[si]) return;
     row.sets[si][field] = field === 'rpe' ? parseInt(val) : parseFloat(val);
 };
 
 RPETracker.prototype._addSet = function(rowId) {
-    const row = (this._gymExRows || []).find(r => r.id === rowId);
+    const allRows = [
+        ...this._gymSharedRows,
+        ...(this._gymModalPlayers||[]).flatMap(p => p.rows||[])
+    ];
+    const row = allRows.find(r => r.id === rowId);
     if (!row) return;
     const last = row.sets[row.sets.length - 1] || {};
     row.sets.push({ reps: last.reps || '', weight: last.weight || '', rpe: last.rpe || '' });
@@ -486,47 +678,57 @@ RPETracker.prototype._addSet = function(rowId) {
 };
 
 RPETracker.prototype._removeSet = function(rowId, si) {
-    const row = (this._gymExRows || []).find(r => r.id === rowId);
+    const allRows = [
+        ...this._gymSharedRows,
+        ...(this._gymModalPlayers||[]).flatMap(p => p.rows||[])
+    ];
+    const row = allRows.find(r => r.id === rowId);
     if (!row || row.sets.length <= 1) return;
     row.sets.splice(si, 1);
     const container = document.getElementById(`gymSets_${rowId}`);
     if (container) container.innerHTML = row.sets.map((s, si) => this._gymSetHTML(rowId, si, s)).join('');
 };
 
-RPETracker.prototype._removeGymExRow = function(rowId) {
-    this._gymExRows = (this._gymExRows || []).filter(r => r.id !== rowId);
-    this._renderGymExerciseRows();
-};
-
 RPETracker.prototype._saveGymSession = function() {
-    const playerId = document.getElementById('gymPlayerSel')?.value;
-    const date     = document.getElementById('gymDate')?.value;
-    if (!playerId || !date) { this.showToast('Selecciona jugadora y fecha', 'error'); return; }
+    this._syncCurrentRows();
+    const date = this._gymDate || document.getElementById('gymDate')?.value;
+    if (!date) { this.showToast('Selecciona la fecha', 'error'); return; }
 
-    const exercises = (this._gymExRows || [])
-        .filter(r => r.exerciseId)
+    const selectedPlayers = (this._gymModalPlayers || []).filter(p => p.selected);
+    if (selectedPlayers.length === 0) { this.showToast('Selecciona al menos una jugadora', 'error'); return; }
+
+    const cleanExercises = rows => rows
         .map(r => {
-            // Sync exercise selection
             const sel = document.getElementById(`gymEx_${r.id}`);
             const exId = sel ? sel.value : r.exerciseId;
-            return {
-                exerciseId: exId,
-                sets: r.sets.filter(s => s.reps && s.weight)
-            };
+            return { exerciseId: exId, sets: r.sets.filter(s => s.reps && s.weight) };
         })
         .filter(e => e.exerciseId && e.sets.length > 0);
 
-    if (exercises.length === 0) { this.showToast('Añade al menos un ejercicio con datos', 'error'); return; }
+    const sharedExercises = cleanExercises(this._gymSharedRows);
+    let saved = 0;
 
-    const session = { id: Date.now().toString(), playerId, date, exercises, createdAt: new Date().toISOString() };
-    if (!this.gymSessions) this.gymSessions = [];
-    this.gymSessions.push(session);
+    selectedPlayers.forEach(mp => {
+        const playerExercises = cleanExercises(mp.rows);
+        const allExercises = [...sharedExercises, ...playerExercises];
+        if (allExercises.length === 0) return; // jugadora sin ejercicios, no guardar
+        const session = {
+            id: Date.now().toString() + '_' + mp.id,
+            playerId: mp.id,
+            date,
+            exercises: allExercises,
+            createdAt: new Date().toISOString()
+        };
+        if (!this.gymSessions) this.gymSessions = [];
+        this.gymSessions.push(session);
+        saved++;
+    });
+
+    if (saved === 0) { this.showToast('Añade ejercicios con datos antes de guardar', 'error'); return; }
+
     this._saveGymSessions();
-
     document.getElementById('gymSessionModal')?.classList.remove('active');
-    this.showToast('✅ Sesión de gimnasio guardada', 'success');
-
-    // Refresh if on gym view
+    this.showToast(`✅ ${saved} sesión${saved > 1 ? 'es' : ''} guardada${saved > 1 ? 's' : ''}`, 'success');
     if (this.currentView === 'gym') this.renderGymView();
 };
 
