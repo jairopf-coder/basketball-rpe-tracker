@@ -5027,3 +5027,107 @@ details[open] .ewma-toggle-hint { display: none; }
     .test-asym-display { grid-column: 1 / -1; flex-direction: row; gap: 0.5rem; justify-content: flex-start; }
     .str-session-row { grid-template-columns: 80px 80px 1fr auto; gap: 0.5rem; }
 }
+
+/* ── Gym modal: chips de jugadoras ── */
+.gym-player-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+}
+.gym-player-chip {
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    border: 1.5px solid;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.15s;
+}
+.gym-player-chip--active { font-weight: 700; }
+
+/* ── Tabs por jugadora ── */
+.gym-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1.5px solid var(--border);
+    margin-bottom: 0.75rem;
+    overflow-x: auto;
+}
+.gym-tab {
+    padding: 0.45rem 1rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    background: none;
+    border: none;
+    border-bottom: 2.5px solid transparent;
+    cursor: pointer;
+    color: var(--text-muted);
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+}
+.gym-tab--active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.gym-tab-count {
+    font-size: 0.7rem;
+    background: var(--bg-subtle);
+    border-radius: 999px;
+    padding: 0 5px;
+    margin-left: 3px;
+    color: var(--text-faint);
+}
+
+.gym-tab-info {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+    min-height: 18px;
+}
+
+/* ── Filtros de ejercicio ── */
+.gym-ex-filters {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+.gym-filter-btn {
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: var(--bg-surface);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+}
+.gym-filter-btn--active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+/* ── Sin ejercicios placeholder ── */
+.gym-no-ex {
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 0.85rem;
+    padding: 1.25rem 0;
+}
+
+/* ── Botón añadir ejercicio ── */
+.gym-add-ex-btn {
+    width: 100%;
+    padding: 0.55rem;
+    border: 1.5px dashed var(--border);
+    border-radius: 8px;
+    background: none;
+    color: var(--primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: background 0.15s;
+}
+.gym-add-ex-btn:hover { background: var(--primary-soft); }
