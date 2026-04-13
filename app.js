@@ -21,7 +21,15 @@ const NavMenu = {
             ],
             default: 'wellness'
         },
-        equipo: { label: '👥 Equipo', direct: 'players' }
+        equipo: { label: '👥 Equipo', direct: 'players' },
+        rendimiento: {
+            label: '💪 Rendimiento',
+            items: [
+                { view: 'gym',   label: '🏋️ Gimnasio' },
+                { view: 'tests', label: '📊 Tests' },
+            ],
+            default: 'gym'
+        }
     },
 
     activeGroup: 'carga',
@@ -219,6 +227,9 @@ class RPETracker {
         this.injuries = [];
         this.availability = {};
         this.weekPlan = null;
+        this.exerciseLibrary = null; // se carga lazy en strength.js
+        this.gymSessions     = null;
+        this.testSessions    = null;
         this.init();
     }
 
@@ -465,6 +476,12 @@ class RPETracker {
                 break;
             case 'correlation':
                 if (typeof this.renderLoadInjuryCorrelation === 'function') this.renderLoadInjuryCorrelation();
+                break;
+            case 'gym':
+                if (typeof this.renderGymView === 'function') this.renderGymView();
+                break;
+            case 'tests':
+                if (typeof this.renderTestsView === 'function') this.renderTestsView();
                 break;
         }
     }

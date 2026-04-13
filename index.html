@@ -56,6 +56,7 @@
                 <button class="nav-group-btn active" data-group="dashboard" onclick="NavMenu.selectGroup('dashboard')">📊 Inicio</button>
                 <button class="nav-group-btn" data-group="carga" onclick="NavMenu.selectGroup('carga')">🏋️ Carga</button>
                 <button class="nav-group-btn" data-group="salud" onclick="NavMenu.selectGroup('salud')">❤️ Salud</button>
+                <button class="nav-group-btn" data-group="rendimiento" onclick="NavMenu.selectGroup('rendimiento')">💪 Rendimiento</button>
                 <button class="nav-group-btn" data-group="equipo" onclick="NavMenu.selectGroup('equipo')">👥 Equipo</button>
             </div>
             <div class="nav-sub-bar" id="navSubBar" style="display:none"></div>
@@ -229,6 +230,12 @@
                 <!-- Prediction dashboard will be rendered here -->
             </div>
         </div>
+
+        <!-- Gym View -->
+        <div id="gymView" class="view"></div>
+
+        <!-- Tests View -->
+        <div id="testsView" class="view"></div>
 
         <!-- Modal Nueva Sesión -->
         <div id="newSessionModal" class="modal">
@@ -516,6 +523,7 @@
     <script src="team-status.js"></script>
     <script src="wellness.js"></script>
     <script src="weekplan-medical.js"></script>
+    <script src="strength.js"></script>
     <script src="auth.js"></script>
     <script>
         function toggleAdvancedFilters() {
