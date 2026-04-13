@@ -4791,3 +4791,239 @@ details[open] .ewma-toggle-hint { display: none; }
     .db-players { overflow-y: visible; max-height: none; }
     .db-avail-list { overflow-y: visible; max-height: none; }
 }
+
+/* ============================================================
+   MÓDULO DE RENDIMIENTO FÍSICO — Gimnasio & Tests
+   ============================================================ */
+
+.str-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.25rem;
+}
+
+.str-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+.str-header h2 { margin: 0; flex: 1; font-size: 1.25rem; }
+.str-header-actions { display: flex; gap: 0.5rem; }
+
+.str-back-btn {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0.25rem 0;
+    font-weight: 500;
+}
+
+.str-player-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.75rem 0.3rem 0.4rem;
+    border-radius: 999px;
+    border: 1.5px solid;
+    flex: 1;
+}
+
+.str-player-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.str-player-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+.str-player-card:hover { background: var(--bg-elevated); box-shadow: var(--shadow-sm); }
+
+.str-player-avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 1rem;
+    flex-shrink: 0;
+}
+.str-player-avatar--sm { width: 26px; height: 26px; font-size: 0.75rem; }
+
+.str-player-info { flex: 1; min-width: 0; }
+.str-player-name { font-weight: 600; font-size: 0.9rem; }
+.str-player-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+.str-num { font-size: 0.72rem; color: var(--text-faint); font-weight: 400; margin-left: 4px; }
+.str-player-arrow { color: var(--text-faint); font-size: 1.3rem; }
+
+.str-badge {
+    font-size: 0.7rem; font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.str-badge--green { background: #e8f5e9; color: #2e7d32; }
+.str-badge--red   { background: #ffebee; color: #c62828; }
+.str-badge--grey  { background: var(--bg-subtle); color: var(--text-muted); }
+[data-theme="dark"] .str-badge--green { background: rgba(76,175,80,0.15); color: #81c784; }
+[data-theme="dark"] .str-badge--red   { background: rgba(244,67,54,0.15);  color: #ef9a9a; }
+
+.str-section { margin-bottom: 1.5rem; }
+.str-section-title { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; }
+
+.str-empty { color: var(--text-faint); font-size: 0.85rem; text-align: center; padding: 1.5rem 0; }
+
+/* Sugerencias */
+.str-suggestions { display: flex; flex-direction: column; gap: 0.5rem; }
+.str-suggestion {
+    display: flex; gap: 0.75rem; align-items: flex-start;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border-left: 3px solid;
+}
+.str-suggestion--info    { background: var(--info-soft);    border-color: #0288d1; }
+.str-suggestion--warning { background: var(--warning-soft); border-color: #f57c00; }
+.str-suggestion--danger  { background: var(--danger-soft);  border-color: #e53935; }
+.str-sug-icon  { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+.str-sug-title { font-weight: 600; font-size: 0.88rem; margin-bottom: 2px; }
+.str-sug-body  { font-size: 0.8rem; color: var(--text-muted); }
+
+/* Historial sesiones */
+.str-session-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.str-session-row {
+    display: grid;
+    grid-template-columns: 90px 100px 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.65rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.str-session-row:hover { background: var(--bg-elevated); }
+.str-session-row--test {
+    display: block;
+    cursor: default;
+}
+.str-session-row--test:hover { background: var(--bg-surface); }
+.str-session-date { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
+.str-session-info { font-size: 0.75rem; color: var(--text-muted); }
+.str-session-preview { font-size: 0.8rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.str-del-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 0.85rem; opacity: 0.4; transition: opacity 0.15s;
+    padding: 0.2rem;
+}
+.str-del-btn:hover { opacity: 1; }
+
+/* Modal de gimnasio */
+.modal-content--wide { max-width: 720px; }
+
+.gym-exercise-rows { display: flex; flex-direction: column; gap: 1rem; }
+.gym-ex-row {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+.gym-ex-header { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+.gym-ex-select { font-size: 0.88rem; }
+
+.gym-sets-wrap { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
+.gym-set-row {
+    display: grid;
+    grid-template-columns: 18px 70px 14px 70px 20px 32px 60px 24px;
+    align-items: center;
+    gap: 0.4rem;
+}
+.gym-set-num { font-size: 0.72rem; color: var(--text-faint); text-align: center; font-weight: 600; }
+.gym-set-sep { font-size: 0.75rem; color: var(--text-faint); text-align: center; }
+.gym-set-input {
+    padding: 0.3rem 0.4rem;
+    font-size: 0.85rem;
+    border: 1px solid var(--border-input);
+    border-radius: 5px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    text-align: center;
+    width: 100%;
+}
+.gym-set-input--weight { }
+.gym-set-input--rpe { }
+.gym-del-set-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 0.75rem; opacity: 0.35; transition: opacity 0.15s;
+}
+.gym-del-set-btn:hover { opacity: 1; }
+
+.gym-add-set-btn {
+    font-size: 0.75rem; color: var(--primary);
+    background: none; border: none; cursor: pointer;
+    padding: 0.2rem 0;
+    font-weight: 500;
+}
+.gym-add-set-btn:hover { text-decoration: underline; }
+
+.gym-1rm { font-size: 0.72rem; color: var(--text-faint); }
+.gym-detail-ex { margin-bottom: 1rem; }
+.gym-detail-ex-name { font-weight: 600; margin-bottom: 0.4rem; }
+.gym-detail-sets { display: flex; flex-direction: column; gap: 0.25rem; }
+.gym-detail-set { font-size: 0.82rem; color: var(--text-secondary); }
+
+/* Biblioteca */
+.lib-section { margin-bottom: 1.25rem; }
+.lib-section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 0.5rem; }
+.lib-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 0;
+    border-bottom: 0.5px solid var(--border);
+}
+.lib-ex-name { flex: 1; font-size: 0.88rem; font-weight: 500; }
+.lib-ex-meta { font-size: 0.72rem; color: var(--text-faint); width: 70px; text-align: right; }
+.lib-row-actions { display: flex; gap: 0.25rem; }
+.lib-btn { background: none; border: none; cursor: pointer; font-size: 0.85rem; opacity: 0.4; transition: opacity 0.15s; padding: 0.15rem 0.3rem; }
+.lib-btn:hover { opacity: 1; }
+
+/* Tests */
+.test-inputs-grid { display: flex; flex-direction: column; gap: 1rem; }
+.test-input-row {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+}
+.test-input-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; }
+.test-input-desc { font-weight: 400; font-size: 0.75rem; color: var(--text-muted); margin-left: 0.4rem; }
+.test-input-fields { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+.test-input-fields--bilateral { display: grid; grid-template-columns: 1fr 1fr 120px; gap: 1rem; align-items: start; }
+.test-height-calc { font-size: 0.78rem; color: var(--primary); font-weight: 600; margin-top: 4px; min-height: 18px; }
+.test-asym-display { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 4px; }
+.test-asym-label { font-size: 0.68rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+.test-asym-value { font-size: 1.2rem; font-weight: 700; }
+
+.test-result-row {
+    display: flex; align-items: center; gap: 1rem;
+    font-size: 0.82rem;
+    padding: 0.3rem 0;
+    border-bottom: 0.5px solid var(--border);
+}
+.test-result-row:last-child { border-bottom: none; }
+.test-result-name { flex: 1; font-weight: 500; color: var(--text-muted); }
+.test-asym { font-weight: 700; font-size: 0.8rem; }
+
+/* Responsive */
+@media (max-width: 600px) {
+    .gym-set-row { grid-template-columns: 18px 58px 12px 58px 18px 28px 52px 20px; gap: 0.3rem; }
+    .test-input-fields--bilateral { grid-template-columns: 1fr 1fr; }
+    .test-asym-display { grid-column: 1 / -1; flex-direction: row; gap: 0.5rem; justify-content: flex-start; }
+    .str-session-row { grid-template-columns: 80px 80px 1fr auto; gap: 0.5rem; }
+}
