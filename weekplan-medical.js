@@ -300,6 +300,7 @@ RPETracker.prototype._wpUpdateSession = function(day, slot, field, value) {
     if (!this.weekPlan.days[day]) this.weekPlan.days[day] = {};
     if (!this.weekPlan.days[day][slot]) this.weekPlan.days[day][slot] = { type:'rest', intensity:'none', duration:0, focus:'', enabled:false };
     this.weekPlan.days[day][slot][field] = value;
+    this.saveWeekPlan();
     // Si se activa/desactiva, re-renderizar para mostrar/ocultar controles
     if (field === 'enabled') this.renderWeeklyPlanning();
 };
