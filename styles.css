@@ -3768,10 +3768,9 @@ header h1 {
 .db-team-sparkline {
     display: block;
     width: 100%;
-    max-width: 160px;
-    height: 36px;
+    max-width: 200px;
+    height: 70px;
     margin-top: 0.4rem;
-    opacity: 0.9;
 }
 
 /* ===== NAV ALERT BADGE ===== */
@@ -5554,4 +5553,78 @@ details[open] .ewma-toggle-hint { display: none; }
     .exec-set-plan { flex-direction: column; gap: 0.2rem; }
     .exec-input { width: 44px; }
     .exec-input--kg { width: 50px; }
+}
+
+/* ===== TEST EVOLUTION CHARTS (fix #12) ===== */
+.test-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+}
+.test-tab-btn {
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.test-tab-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    font-weight: 600;
+}
+.test-charts-wrap {
+    width: 100%;
+}
+.test-chart-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.test-chart-side { display: flex; flex-direction: column; gap: 0.4rem; }
+.test-chart-full { margin-top: 0.5rem; }
+.test-chart-side-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.test-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem;
+}
+.test-summary-card {
+    background: var(--bg-subtle);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+}
+.test-summary-name {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.test-summary-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.test-summary-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+}
+@media (max-width: 600px) {
+    .test-chart-pair { grid-template-columns: 1fr; }
 }

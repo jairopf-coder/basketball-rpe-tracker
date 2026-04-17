@@ -469,3 +469,147 @@ RPETracker.prototype.buildTeamReportHTML = function(summary, reportType) {
 </body>
 </html>`;
 };
+
+// ========== HISTORIAL COMPLETO — PDF (fix #16) ==========
+
+RPETracker.prototype.exportSessionsHistoryPDF = function() {
+    const sorted = [...this.sessions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (sorted.length === 0) {
+        this.showToast('No hay sesiones que exportar', 'warning');
+        return;
+    }
+
+    const typeLabel = { training:'Entrenamiento', match:'Partido', shooting:'Tiro', gym:'Gym', recovery:'Recuperación' };
+    const rpeColor  = rpe => {
+        const c = { 1:'#4caf50',2:'#8bc34a',3:'#cddc39',4:'#ffeb3b',5:'#ffc107',
+                    6:'#ff9800',7:'#ff5722',8:'#f44336',9:'#e91e63',10:'#9c27b0' };
+        return c[rpe] || '#666';
+    };
+
+    // Group by player for summary at top
+    const summaryRows = this.players.map(p => {
+        const ps = sorted.filter(s => s.playerId === p.id);
+        if (!ps.length) return null;
+        const avgRPE = (ps.reduce((s,x)=>s+x.rpe,0)/ps.length).toFixed(1);
+        const totalLoad = ps.reduce((s,x)=>s+(x.load||x.rpe*(x.duration||60)),0);
+        const ratio = this.calculateAcuteChronicRatio(p.id);
+        const ratioCol = this.getRatioColor(ratio.ratio);
+        return `<tr>
+            <td><strong>${p.name}</strong>${p.number?` #${p.number}`:''}</td>
+            <td style="text-align:center">${ps.length}</td>
+            <td style="text-align:center">${avgRPE}</td>
+            <td style="text-align:center">${totalLoad.toLocaleString('es-ES')}</td>
+            <td style="text-align:center;color:${ratioCol};font-weight:700">${ratio.ratio}</td>
+        </tr>`;
+    }).filter(Boolean).join('');
+
+    const sessionRows = sorted.map(s => {
+        const player = this.players.find(p => p.id === s.playerId);
+        const pName = player ? player.name + (player.number ? ` #${player.number}` : '') : '—';
+        const load = s.load || (s.rpe * (s.duration || 60));
+        const date = new Date(s.date).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric' });
+        const time = s.timeOfDay === 'morning' ? 'Mañana' : 'Tarde';
+        return `<tr>
+            <td>${date}</td>
+            <td>${time}</td>
+            <td><strong>${pName}</strong></td>
+            <td>${typeLabel[s.type]||s.type}</td>
+            <td style="text-align:center;font-weight:700;color:${rpeColor(s.rpe)}">${s.rpe}</td>
+            <td style="text-align:center">${s.duration||60}</td>
+            <td style="text-align:center;font-weight:600">${load.toLocaleString('es-ES')}</td>
+            <td style="font-size:0.85em;color:#555">${s.notes||''}</td>
+        </tr>`;
+    }).join('');
+
+    const now = new Date();
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Historial de Sesiones — ${now.toLocaleDateString('es-ES')}</title>
+<style>
+  @media print { @page { margin: 1.5cm; size: A4 landscape; } }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #222; margin: 0; padding: 16px; }
+  h1 { color: #ff6600; margin: 0 0 4px; font-size: 18px; }
+  .subtitle { color: #666; font-size: 12px; margin-bottom: 20px; }
+  h2 { color: #ff6600; border-bottom: 2px solid #eee; padding-bottom: 4px; font-size: 13px; margin: 20px 0 8px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  th { background: #f5f5f5; font-weight: 700; padding: 6px 8px; text-align: left; border-bottom: 2px solid #ddd; font-size: 10px; text-transform: uppercase; }
+  td { padding: 5px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:hover { background: #fafafa; }
+  .footer { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 10px; color: #999; font-size: 10px; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>🏀 Historial de Sesiones</h1>
+  <div class="subtitle">Exportado el ${now.toLocaleString('es-ES')} · ${sorted.length} sesiones · ${this.players.length} jugadoras</div>
+
+  <h2>📊 Resumen por jugadora</h2>
+  <table>
+    <thead><tr>
+      <th>Jugadora</th><th style="text-align:center">Sesiones</th>
+      <th style="text-align:center">RPE medio</th><th style="text-align:center">Carga total</th>
+      <th style="text-align:center">Ratio A:C</th>
+    </tr></thead>
+    <tbody>${summaryRows}</tbody>
+  </table>
+
+  <h2>📋 Todas las sesiones</h2>
+  <table>
+    <thead><tr>
+      <th>Fecha</th><th>Momento</th><th>Jugadora</th><th>Tipo</th>
+      <th style="text-align:center">RPE</th><th style="text-align:center">Min</th>
+      <th style="text-align:center">Carga</th><th>Incidencias</th>
+    </tr></thead>
+    <tbody>${sessionRows}</tbody>
+  </table>
+
+  <div class="footer">Basketball RPE Tracker · Método EWMA · Generado ${now.toLocaleString('es-ES')}</div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 400);
+    this.showToast('📄 Historial exportado a PDF', 'success');
+};
+
+// Menú de exportación del jugador (añade opción historial)
+RPETracker.prototype.showPlayerReportMenu = function(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    // Remove existing menu
+    document.getElementById('reportMenuOverlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'reportMenuOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center';
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+    overlay.innerHTML = `
+        <div style="background:var(--bg-card);border-radius:16px;padding:1.5rem;min-width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.25)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+                <h3 style="margin:0;font-size:1rem">📄 Informe — ${player.name}</h3>
+                <button onclick="document.getElementById('reportMenuOverlay').remove()"
+                    style="background:none;border:none;font-size:1.25rem;cursor:pointer;color:var(--text-secondary)">✕</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.6rem">
+                <button onclick="window.rpeTracker.generatePDFReport('${playerId}','weekly');document.getElementById('reportMenuOverlay').remove()"
+                    style="padding:0.7rem 1rem;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-subtle);cursor:pointer;text-align:left;font-size:0.9rem">
+                    📅 Informe semanal
+                </button>
+                <button onclick="window.rpeTracker.generatePDFReport('${playerId}','monthly');document.getElementById('reportMenuOverlay').remove()"
+                    style="padding:0.7rem 1rem;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-subtle);cursor:pointer;text-align:left;font-size:0.9rem">
+                    📆 Informe mensual
+                </button>
+                <button onclick="window.rpeTracker.generatePDFReport('${playerId}','seasonal');document.getElementById('reportMenuOverlay').remove()"
+                    style="padding:0.7rem 1rem;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-subtle);cursor:pointer;text-align:left;font-size:0.9rem">
+                    📊 Informe trimestral
+                </button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+};

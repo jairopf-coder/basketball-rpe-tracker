@@ -111,22 +111,52 @@ function asymColor(pct) {
 
 RPETracker.prototype._loadStrengthData = function() {
     try {
-        const ex  = localStorage.getItem('bk_exercises');
-        const gs  = localStorage.getItem('bk_gym_sessions');
-        const ts  = localStorage.getItem('bk_test_sessions');
-        this.exerciseLibrary  = ex  ? JSON.parse(ex)  : DEFAULT_EXERCISES.map(e => ({...e}));
-        this.gymSessions      = gs  ? JSON.parse(gs)  : [];
-        this.testSessions     = ts  ? JSON.parse(ts)  : [];
+        const ex = localStorage.getItem('bk_exercises');
+        const gs = localStorage.getItem('bk_gym_sessions');
+        const ts = localStorage.getItem('bk_test_sessions');
+        this.exerciseLibrary = ex ? JSON.parse(ex) : DEFAULT_EXERCISES.map(e => ({...e}));
+        this.gymSessions     = gs ? JSON.parse(gs) : [];
+        this.testSessions    = ts ? JSON.parse(ts) : [];
     } catch(e) {
-        this.exerciseLibrary  = DEFAULT_EXERCISES.map(e => ({...e}));
-        this.gymSessions      = [];
-        this.testSessions     = [];
+        this.exerciseLibrary = DEFAULT_EXERCISES.map(e => ({...e}));
+        this.gymSessions     = [];
+        this.testSessions    = [];
+    }
+
+    // Subscribe to Firebase realtime updates if available
+    if (window.firebaseSync) {
+        window.firebaseSync.onGymSessionsChange(updated => {
+            this.gymSessions = updated;
+            if (this.currentView === 'gym') this.renderGymView();
+            console.log('🔄 GymSessions actualizadas desde Firebase');
+        });
+        window.firebaseSync.onTestSessionsChange(updated => {
+            this.testSessions = updated;
+            if (this.currentView === 'tests') this.renderTestsView();
+            console.log('🔄 TestSessions actualizadas desde Firebase');
+        });
     }
 };
 
-RPETracker.prototype._saveExercises    = function() { localStorage.setItem('bk_exercises',    JSON.stringify(this.exerciseLibrary)); };
-RPETracker.prototype._saveGymSessions  = function() { localStorage.setItem('bk_gym_sessions', JSON.stringify(this.gymSessions)); };
-RPETracker.prototype._saveTestSessions = function() { localStorage.setItem('bk_test_sessions',JSON.stringify(this.testSessions)); };
+RPETracker.prototype._saveExercises = function() {
+    localStorage.setItem('bk_exercises', JSON.stringify(this.exerciseLibrary));
+};
+
+RPETracker.prototype._saveGymSessions = function() {
+    if (window.firebaseSync) {
+        window.firebaseSync.saveGymSessions(this.gymSessions);
+    } else {
+        localStorage.setItem('bk_gym_sessions', JSON.stringify(this.gymSessions));
+    }
+};
+
+RPETracker.prototype._saveTestSessions = function() {
+    if (window.firebaseSync) {
+        window.firebaseSync.saveTestSessions(this.testSessions);
+    } else {
+        localStorage.setItem('bk_test_sessions', JSON.stringify(this.testSessions));
+    }
+};
 
 // ─────────────────────────────────────────
 //  NAVEGACIÓN PRINCIPAL: GIMNASIO
@@ -1240,44 +1270,117 @@ RPETracker.prototype._renderTestPlayer = function(el) {
 
     const color = PlayerTokens.get(player);
 
-    // ── Tabla resumen de tests ──
-    const testsHTML = sessions.length === 0
+    // ── Determine which tests have ≥2 data points (enough for a chart) ──
+    const testsWithHistory = TEST_DEFINITIONS.filter(def => {
+        return sessions.filter(s => {
+            const r = s.results?.[def.id];
+            if (!r) return false;
+            return def.bilateral
+                ? (r.left != null || r.right != null)
+                : r.value != null;
+        }).length >= 2;
+    });
+
+    // ── Selected test tab (default: first with history, else first definition) ──
+    if (!this._testChartTab || !testsWithHistory.find(d => d.id === this._testChartTab)) {
+        this._testChartTab = testsWithHistory[0]?.id || TEST_DEFINITIONS[0].id;
+    }
+
+    const tabsHTML = testsWithHistory.map(def => `
+        <button class="test-tab-btn ${def.id === this._testChartTab ? 'active' : ''}"
+            onclick="window.rpeTracker._testChartTab='${def.id}';window.rpeTracker._renderTestPlayer(document.getElementById('testsView'))">
+            ${def.name}
+        </button>`).join('');
+
+    // ── Chart data for selected test ──
+    const selectedDef = TEST_DEFINITIONS.find(d => d.id === this._testChartTab);
+    const chartSessions = sessions
+        .filter(s => s.results?.[this._testChartTab])
+        .map(s => ({ date: s.date, r: s.results[this._testChartTab] }))
+        .reverse();
+
+    const buildChartHTML = () => {
+        if (!selectedDef || chartSessions.length < 2) return '';
+        const canvases = selectedDef.bilateral
+            ? `<div class="test-chart-pair">
+                <div class="test-chart-side">
+                    <div class="test-chart-side-label" style="color:#2196f3">Pierna Izquierda</div>
+                    <canvas id="testChartL" height="130"></canvas>
+                </div>
+                <div class="test-chart-side">
+                    <div class="test-chart-side-label" style="color:#ff6600">Pierna Derecha</div>
+                    <canvas id="testChartR" height="130"></canvas>
+                </div>
+               </div>
+               <div class="test-chart-full">
+                    <div class="test-chart-side-label" style="color:#9c27b0">Índice de Asimetría (%)</div>
+                    <canvas id="testChartA" height="100"></canvas>
+               </div>`
+            : `<canvas id="testChartV" height="150" style="width:100%"></canvas>`;
+        return `<div class="str-section">
+            <h3 class="str-section-title">📈 Evolución — ${selectedDef.name}</h3>
+            <div class="test-tabs">${tabsHTML}</div>
+            <div class="test-charts-wrap">${canvases}</div>
+        </div>`;
+    };
+
+    // ── Last test summary cards ──
+    const lastSession = sessions[0];
+    const summaryHTML = lastSession ? (() => {
+        const cards = Object.entries(lastSession.results || {}).map(([testId, val]) => {
+            const def = TEST_DEFINITIONS.find(t => t.id === testId);
+            if (!def) return '';
+            if (def.bilateral) {
+                const asym = (val.left != null && val.right != null) ? asymmetry(val.left, val.right) : null;
+                return `<div class="test-summary-card">
+                    <div class="test-summary-name">${def.name}</div>
+                    <div class="test-summary-values">
+                        <span style="color:#2196f3">I: <strong>${val.left != null ? val.left + def.unit : '—'}</strong></span>
+                        <span style="color:#ff6600">D: <strong>${val.right != null ? val.right + def.unit : '—'}</strong></span>
+                        ${asym !== null ? `<span class="test-asym" style="color:${asymColor(asym)}">Δ ${asym}%</span>` : ''}
+                    </div>
+                </div>`;
+            }
+            return `<div class="test-summary-card">
+                <div class="test-summary-name">${def.name}</div>
+                <div class="test-summary-value">${val.value != null ? val.value + def.unit : '—'}</div>
+            </div>`;
+        }).join('');
+        return `<div class="str-section">
+            <h3 class="str-section-title">🏅 Último test — ${lastSession.date}</h3>
+            <div class="test-summary-grid">${cards}</div>
+        </div>`;
+    })() : '';
+
+    // ── Full history table ──
+    const historyHTML = sessions.length === 0
         ? '<p class="str-empty">Sin tests registrados</p>'
         : sessions.map(ts => {
-            const resultsHTML = Object.entries(ts.results || {}).map(([testId, val]) => {
+            const rowsHTML = Object.entries(ts.results || {}).map(([testId, val]) => {
                 const def = TEST_DEFINITIONS.find(t => t.id === testId);
                 if (!def) return '';
-                if (def.bilateral && val.left != null && val.right != null) {
-                    const asym = asymmetry(val.left, val.right);
-                    const col  = asymColor(asym);
+                if (def.bilateral) {
+                    const asym = (val.left != null && val.right != null) ? asymmetry(val.left, val.right) : null;
                     return `<div class="test-result-row">
                         <span class="test-result-name">${def.name}</span>
-                        <span>I: <strong>${val.left}${def.unit}</strong></span>
-                        <span>D: <strong>${val.right}${def.unit}</strong></span>
-                        <span class="test-asym" style="color:${col}">Δ ${asym}%</span>
+                        <span style="color:#2196f3">I: <strong>${val.left != null ? val.left + def.unit : '—'}</strong></span>
+                        <span style="color:#ff6600">D: <strong>${val.right != null ? val.right + def.unit : '—'}</strong></span>
+                        ${asym !== null ? `<span class="test-asym" style="color:${asymColor(asym)}">Δ ${asym}%</span>` : ''}
                     </div>`;
                 }
-                const display = val.value != null ? `${val.value}${def.unit}` : '—';
                 return `<div class="test-result-row">
                     <span class="test-result-name">${def.name}</span>
-                    <span><strong>${display}</strong></span>
+                    <span><strong>${val.value != null ? val.value + def.unit : '—'}</strong></span>
                 </div>`;
             }).join('');
-
-            return `
-            <div class="str-session-row str-session-row--test">
+            return `<div class="str-session-row str-session-row--test">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
                     <strong>${ts.date}</strong>
                     <button class="str-del-btn" onclick="window.rpeTracker._deleteTestSession('${ts.id}')">🗑</button>
                 </div>
-                ${resultsHTML}
+                ${rowsHTML}
             </div>`;
         }).join('');
-
-    // ── Evolución CMJ (si hay datos) ──
-    const cmjData = sessions.filter(s => s.results?.cmj?.value).map(s => ({
-        date: s.date, val: s.results.cmj.value
-    })).reverse();
 
     el.innerHTML = `
         <div class="str-container">
@@ -1289,60 +1392,128 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                 </div>
                 <button class="btn-primary" onclick="window.rpeTracker._openNewTest('${player.id}')">+ Nuevo Test</button>
             </div>
-
-            ${cmjData.length >= 2 ? `
+            ${summaryHTML}
+            ${buildChartHTML()}
             <div class="str-section">
-                <h3 class="str-section-title">📈 Evolución CMJ</h3>
-                <canvas id="cmjChart" height="120" style="width:100%;max-width:600px"></canvas>
-            </div>` : ''}
-
-            <div class="str-section">
-                <h3 class="str-section-title">📋 Historial de Tests</h3>
-                <div class="str-session-list">${testsHTML}</div>
+                <h3 class="str-section-title">📋 Historial completo</h3>
+                <div class="str-session-list">${historyHTML}</div>
             </div>
-        </div>
-    `;
+        </div>`;
 
-    // Draw CMJ chart
-    if (cmjData.length >= 2) {
+    // ── Draw charts ──
+    if (selectedDef && chartSessions.length >= 2) {
         requestAnimationFrame(() => {
-            const canvas = document.getElementById('cmjChart');
-            if (!canvas || typeof Chart === 'undefined') return;
-            if (canvas._chartInstance) { canvas._chartInstance.destroy(); }
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             const gridCol = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
             const textCol = isDark ? '#aaa' : '#666';
-            canvas._chartInstance = new Chart(canvas.getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: cmjData.map(d => d.date),
-                    datasets: [{
-                        label: 'CMJ (cm)',
-                        data: cmjData.map(d => d.val),
-                        borderColor: color,
-                        backgroundColor: color + '22',
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 5,
-                        pointBackgroundColor: color,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { ticks: { color: textCol }, grid: { color: gridCol } },
-                        y: { ticks: { color: textCol }, grid: { color: gridCol }, title: { display: true, text: 'cm', color: textCol } }
+            const labels = chartSessions.map(d => d.date);
+            const unitLabel = selectedDef.unit;
+
+            const makeChart = (canvasId, data, lineColor, label) => {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas) return;
+                if (canvas._chartInstance) canvas._chartInstance.destroy();
+                canvas._chartInstance = new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label,
+                            data,
+                            borderColor: lineColor,
+                            backgroundColor: lineColor + '22',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 5,
+                            pointBackgroundColor: lineColor,
+                            spanGaps: true,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        animation: { duration: 500 },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => `${ctx.raw} ${unitLabel}` } }
+                        },
+                        scales: {
+                            x: { ticks: { color: textCol, font: { size: 10 } }, grid: { color: gridCol } },
+                            y: {
+                                ticks: { color: textCol, font: { size: 10 } },
+                                grid: { color: gridCol },
+                                title: { display: true, text: unitLabel, color: textCol, font: { size: 10 } }
+                            }
+                        }
                     }
+                });
+            };
+
+            if (selectedDef.bilateral) {
+                const lefts  = chartSessions.map(d => d.r.left  ?? null);
+                const rights = chartSessions.map(d => d.r.right ?? null);
+                const asyms  = chartSessions.map(d =>
+                    (d.r.left != null && d.r.right != null)
+                        ? parseFloat(asymmetry(d.r.left, d.r.right))
+                        : null
+                );
+                makeChart('testChartL', lefts,  '#2196f3', 'Izquierda');
+                makeChart('testChartR', rights, '#ff6600', 'Derecha');
+                // Asimetría con banda de referencia
+                const asymCanvas = document.getElementById('testChartA');
+                if (asymCanvas) {
+                    if (asymCanvas._chartInstance) asymCanvas._chartInstance.destroy();
+                    // Zone plugin: mark >10% orange, >15% red
+                    const asymZone = {
+                        id: 'asymZones',
+                        beforeDraw(chart) {
+                            const { ctx, chartArea: ca, scales: { y } } = chart;
+                            if (!ca) return;
+                            ctx.save();
+                            [[0, 10, 'rgba(76,175,80,0.12)'], [10, 15, 'rgba(255,152,0,0.18)'], [15, 100, 'rgba(244,67,54,0.15)']].forEach(([lo, hi, fill]) => {
+                                const yTop    = Math.max(y.getPixelForValue(hi), ca.top);
+                                const yBottom = Math.min(y.getPixelForValue(lo), ca.bottom);
+                                if (yBottom <= yTop) return;
+                                ctx.fillStyle = fill;
+                                ctx.fillRect(ca.left, yTop, ca.width, yBottom - yTop);
+                            });
+                            ctx.restore();
+                        }
+                    };
+                    asymCanvas._chartInstance = new Chart(asymCanvas.getContext('2d'), {
+                        type: 'line',
+                        plugins: [asymZone],
+                        data: {
+                            labels,
+                            datasets: [{
+                                data: asyms,
+                                borderColor: '#9c27b0',
+                                backgroundColor: '#9c27b022',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 4,
+                                pointBackgroundColor: asyms.map(v =>
+                                    v == null ? 'transparent' : v >= 15 ? '#f44336' : v >= 10 ? '#ff9800' : '#4caf50'),
+                                spanGaps: true,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            animation: { duration: 500 },
+                            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.raw?.toFixed(1)}%` } } },
+                            scales: {
+                                x: { ticks: { color: textCol, font: { size: 10 } }, grid: { color: gridCol } },
+                                y: { min: 0, suggestedMax: 20, ticks: { color: textCol, font: { size: 10 }, callback: v => v + '%' }, grid: { color: gridCol } }
+                            }
+                        }
+                    });
                 }
-            });
+            } else {
+                const vals = chartSessions.map(d => d.r.value ?? null);
+                makeChart('testChartV', vals, color, selectedDef.name);
+            }
         });
     }
 };
-
-// ─────────────────────────────────────────
-//  MODAL NUEVO TEST
-// ─────────────────────────────────────────
 
 RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
     if (!this.testSessions) this._loadStrengthData();
