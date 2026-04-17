@@ -152,3 +152,81 @@ window.firebaseSync = new FirebaseSync();
 
 // Verificar conexión
 window.firebaseSync.checkConnection();
+
+
+// ========== GYM SESSIONS (Firebase sync) ==========
+
+FirebaseSync.prototype.saveGymSessions = async function(gymSessions) {
+    try {
+        const obj = {};
+        gymSessions.forEach(s => { obj[s.id] = s; });
+        await this.db.ref('gymSessions').set(obj);
+        localStorage.setItem('bk_gym_sessions', JSON.stringify(gymSessions));
+    } catch (e) {
+        console.error('Error saving gymSessions to Firebase:', e);
+        localStorage.setItem('bk_gym_sessions', JSON.stringify(gymSessions));
+    }
+};
+
+FirebaseSync.prototype.onGymSessionsChange = function(callback) {
+    this.db.ref('gymSessions').on('value', snapshot => {
+        const data = snapshot.val();
+        const sessions = data ? Object.values(data) : [];
+        callback(sessions);
+    });
+};
+
+// ========== TEST SESSIONS (Firebase sync) ==========
+
+FirebaseSync.prototype.saveTestSessions = async function(testSessions) {
+    try {
+        const obj = {};
+        testSessions.forEach(s => { obj[s.id] = s; });
+        await this.db.ref('testSessions').set(obj);
+        localStorage.setItem('bk_test_sessions', JSON.stringify(testSessions));
+    } catch (e) {
+        console.error('Error saving testSessions to Firebase:', e);
+        localStorage.setItem('bk_test_sessions', JSON.stringify(testSessions));
+    }
+};
+
+FirebaseSync.prototype.onTestSessionsChange = function(callback) {
+    this.db.ref('testSessions').on('value', snapshot => {
+        const data = snapshot.val();
+        const sessions = data ? Object.values(data) : [];
+        callback(sessions);
+    });
+};
+
+// ========== WELLNESS (Firebase sync) ==========
+
+FirebaseSync.prototype.saveWellnessData = async function(wellnessData) {
+    try {
+        const obj = {};
+        wellnessData.forEach(w => { obj[w.id] = w; });
+        await this.db.ref('wellness').set(obj);
+        localStorage.setItem('basketballWellness', JSON.stringify(wellnessData));
+    } catch (e) {
+        console.error('Error saving wellness to Firebase:', e);
+        localStorage.setItem('basketballWellness', JSON.stringify(wellnessData));
+    }
+};
+
+FirebaseSync.prototype.onWellnessChange = function(callback) {
+    this.db.ref('wellness').on('value', snapshot => {
+        const data = snapshot.val();
+        const entries = data ? Object.values(data) : [];
+        callback(entries);
+    });
+};
+
+// ========== GYM/TEST/WELLNESS MIGRATION ==========
+
+FirebaseSync.prototype.migrateStrengthData = async function() {
+    const gymRaw  = localStorage.getItem('bk_gym_sessions');
+    const testRaw = localStorage.getItem('bk_test_sessions');
+    const wellRaw = localStorage.getItem('basketballWellness');
+    if (gymRaw)  { await this.saveGymSessions(JSON.parse(gymRaw));   console.log('✅ GymSessions migradas a Firebase'); }
+    if (testRaw) { await this.saveTestSessions(JSON.parse(testRaw)); console.log('✅ TestSessions migradas a Firebase'); }
+    if (wellRaw) { await this.saveWellnessData(JSON.parse(wellRaw)); console.log('✅ Wellness migrado a Firebase'); }
+};

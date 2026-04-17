@@ -6,12 +6,26 @@
 RPETracker.prototype.loadWellnessData = function() {
     try {
         const raw = localStorage.getItem('basketballWellness');
-        return raw ? JSON.parse(raw) : [];
+        const data = raw ? JSON.parse(raw) : [];
+        // Subscribe to Firebase realtime updates if available
+        if (window.firebaseSync) {
+            window.firebaseSync.onWellnessChange(updated => {
+                this.wellnessData = updated;
+                if (this.currentView === 'wellness') this.renderWellnessDashboard();
+                if (this.currentView === 'dashboard') this.renderDashboard();
+                console.log('🔄 Wellness actualizado desde Firebase');
+            });
+        }
+        return data;
     } catch(e) { return []; }
 };
 
 RPETracker.prototype.saveWellnessData = function() {
-    localStorage.setItem('basketballWellness', JSON.stringify(this.wellnessData || []));
+    if (window.firebaseSync) {
+        window.firebaseSync.saveWellnessData(this.wellnessData || []);
+    } else {
+        localStorage.setItem('basketballWellness', JSON.stringify(this.wellnessData || []));
+    }
 };
 
 // ========== MAIN RENDER ==========

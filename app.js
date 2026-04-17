@@ -15,13 +15,23 @@ const NavMenu = {
         salud: {
             label: '❤️ Salud',
             items: [
-                { view: 'wellness', label: '❤️ Wellness' },
-                { view: 'injury',   label: '🏥 Lesiones' },
-                { view: 'rehab',    label: '💪 Readaptación' },
+                { view: 'wellness',    label: '❤️ Wellness' },
+                { view: 'injury',      label: '🏥 Lesiones' },
+                { view: 'rehab',       label: '💪 Readaptación' },
+                { view: 'medical',     label: '📋 Historial médico' },
+                { view: 'correlation', label: '📉 Correlación carga' },
+                { view: 'prediction',  label: '🔮 Predicción lesiones' },
             ],
             default: 'wellness'
         },
-        equipo: { label: '👥 Equipo', direct: 'players' },
+        equipo: {
+            label: '👥 Equipo',
+            items: [
+                { view: 'players',    label: '👥 Jugadoras' },
+                { view: 'teamstatus', label: '🚦 Estado equipo' },
+            ],
+            default: 'players'
+        },
         rendimiento: {
             label: '💪 Rendimiento',
             items: [
@@ -280,6 +290,7 @@ class RPETracker {
         document.getElementById('dashboardBtn')?.addEventListener('click', () => this.switchView('dashboard'));
         document.getElementById('playersBtn')?.addEventListener('click', () => this.switchView('players'));
         document.getElementById('exportBtn')?.addEventListener('click', () => this.exportData());
+        document.getElementById('exportPDFBtn')?.addEventListener('click', () => this.exportSessionsHistoryPDF());
         document.getElementById('backupBtn')?.addEventListener('click', () => this.showBackupMenu());
         document.getElementById('restoreFile')?.addEventListener('change', (e) => this.restoreBackup(e));
         
@@ -371,7 +382,7 @@ class RPETracker {
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    modal.classList.remove('active');
+                    this.closeModal(modal.id);
                 }
             });
         });
@@ -1032,7 +1043,17 @@ class RPETracker {
     }
 
     closeModal(modalId) {
-        document.getElementById(modalId).classList.remove('active');
+        // Guard: confirm if the new-session modal has players selected or step 2 is active
+        if (modalId === 'newSessionModal') {
+            const step2 = document.getElementById('sessionStep2');
+            const hasPlayers = (this.selectedPlayerIds || []).length > 0;
+            const inStep2 = step2 && step2.style.display !== 'none';
+            if (hasPlayers || inStep2) {
+                if (!confirm('¿Salir sin guardar la sesión?')) return;
+            }
+            this.selectedPlayerIds = [];
+        }
+        document.getElementById(modalId)?.classList.remove('active');
     }
     
     getBasicFilteredSessions() {
@@ -1047,45 +1068,6 @@ class RPETracker {
         }
         
         return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-    }
-
-    handleSessionSubmit(e) {
-        e.preventDefault();
-        // El guardado ahora se gestiona desde saveTeamSession()
-        const playerId = document.getElementById('sessionPlayer').value;
-        if (!playerId) {
-            return;
-        }
-        
-        const dateValue = document.getElementById('sessionDate').value;
-        const timeOfDay = document.querySelector('input[name="sessionTime"]:checked').value;
-        
-        // Create datetime string based on time of day
-        const timeString = timeOfDay === 'morning' ? 'T10:00:00' : 'T18:00:00';
-        const fullDateTime = dateValue + timeString;
-        
-        const rpe = parseInt(document.getElementById('rpeSlider').value);
-        const duration = parseInt(document.getElementById('sessionDuration').value);
-        const load = rpe * duration; // sRPE calculation
-        
-        const session = {
-            id: Date.now().toString(),
-            playerId: playerId,
-            date: fullDateTime,
-            timeOfDay: timeOfDay,
-            type: document.querySelector('input[name="sessionType"]:checked').value,
-            rpe: rpe,
-            duration: duration,
-            load: load,
-            notes: document.getElementById('sessionNotes').value
-        };
-        
-        this.sessions.push(session);
-        this.saveSessions();
-        this.renderSessions();
-        this.closeModal('newSessionModal');
-        
-        this.showToast('✅ Sesión guardada correctamente', 'success');
     }
 
     showSkeletonLoader() {
@@ -1381,8 +1363,8 @@ class RPETracker {
 
         // Wellness chips — jugadoras sin registro hoy
         const _wToday = new Date().toISOString().slice(0, 10);
-        const _wData  = this.wellnessData || {};
-        const _pendingW = this.players.filter(p => !(_wData[p.id] || []).some(e => e.date === _wToday));
+        const _wData  = this.wellnessData || [];
+        const _pendingW = this.players.filter(p => !(_wData).some(e => e.playerId === p.id && e.date === _wToday));
         const wellnessChips = this.players.length === 0 ? '' :
             _pendingW.length === 0
                 ? `<div class="db-w-all-ok">✅ Todas registradas hoy</div>`
@@ -1486,7 +1468,7 @@ class RPETracker {
                     <!-- Batch 3: team load sparkline -->
                     <div class="db-left-section">
                         <div class="db-left-label">Carga equipo 7d</div>
-                        <canvas id="teamSparklineCanvas" class="db-team-sparkline" width="160" height="36"></canvas>
+                        <canvas id="teamSparklineCanvas" class="db-team-sparkline" width="200" height="70"></canvas>
                     </div>
                     <div class="db-left-section">
                         <div class="db-left-label">Esta semana</div>
@@ -1573,12 +1555,15 @@ class RPETracker {
             </div>
         `;
 
-        // Batch 3: draw team sparkline
+        // Draw team load 7d chart with day labels
         requestAnimationFrame(() => {
             const canvas = document.getElementById('teamSparklineCanvas');
             if (canvas) {
+                if (canvas._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
                 const now = new Date();
                 const teamData = [];
+                const dayLabels = [];
+                const DAY_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
                 for (let d = 6; d >= 0; d--) {
                     const dayStart = new Date(now); dayStart.setDate(dayStart.getDate() - d); dayStart.setHours(0,0,0,0);
                     const dayEnd   = new Date(dayStart); dayEnd.setHours(23,59,59,999);
@@ -1586,10 +1571,38 @@ class RPETracker {
                         .filter(s => { const sd = new Date(s.date); return sd >= dayStart && sd <= dayEnd; })
                         .reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
                     teamData.push(dayLoad);
+                    const isToday = d === 0;
+                    dayLabels.push(isToday ? 'Hoy' : DAY_SHORT[dayStart.getDay()]);
                 }
-                this._drawSparkline(canvas, teamData, '#ff6600');
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                const textCol = isDark ? '#888' : '#999';
+                const gridCol = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+                canvas._chartInstance = new Chart(canvas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: dayLabels,
+                        datasets: [{
+                            data: teamData,
+                            backgroundColor: teamData.map((_, i) =>
+                                i === 6 ? '#ff6600' : 'rgba(255,102,0,0.35)'),
+                            borderRadius: 3,
+                            borderSkipped: false,
+                        }]
+                    },
+                    options: {
+                        responsive: false,
+                        animation: false,
+                        plugins: { legend: { display: false }, tooltip: {
+                            callbacks: { label: ctx => `Carga: ${ctx.raw}` }
+                        }},
+                        scales: {
+                            x: { ticks: { color: textCol, font: { size: 9 } }, grid: { display: false } },
+                            y: { display: false, beginAtZero: true }
+                        }
+                    }
+                });
             }
-            // Batch 3: nav alert badge
+            // nav alert badge
             this._updateNavAlertBadge();
         });
     }
@@ -1799,13 +1812,20 @@ class RPETracker {
         // Chronic: lambda = 2/(28+1) = 0.069 (28-day window)
         const lambdaAcute = 2 / (7 + 1);
         const lambdaChronic = 2 / (28 + 1);
-        
-        let ewmaAcute = 0;
-        let ewmaChronic = 0;
-        
+
+        // Seed EWMA with average daily load from all historical sessions,
+        // so it converges immediately instead of starting cold from 0.
+        const allLoads = playerSessions.map(s => s.load);
+        const seedLoad = allLoads.length > 0
+            ? allLoads.reduce((a, b) => a + b, 0) / allLoads.length
+            : 0;
+
+        let ewmaAcute = seedLoad;
+        let ewmaChronic = seedLoad;
+
         // Calculate EWMA for each day
         const now = new Date();
-        const maxDaysBack = 42; // Look back 42 days to ensure enough data
+        const maxDaysBack = 56; // Look back 56 days (8 weeks) for better chronic baseline
         
         for (let i = maxDaysBack; i >= 0; i--) {
             const currentDate = new Date(now);
@@ -2362,7 +2382,7 @@ class RPETracker {
         csv += 'Jugadora,Dorsal,Total Sesiones,RPE Medio,Carga Total,Ratio A:C,Estado\n';
         
         this.players.forEach(player => {
-            const playerSessions = this.sessions.filter(s => s.playerId === player.playerId);
+            const playerSessions = this.sessions.filter(s => s.playerId === player.id);
             const avgRPE = playerSessions.length > 0
                 ? (playerSessions.reduce((sum, s) => sum + s.rpe, 0) / playerSessions.length).toFixed(1)
                 : 0;
