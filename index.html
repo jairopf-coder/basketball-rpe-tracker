@@ -7,6 +7,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RPE Basketball">
     <meta name="theme-color" content="#ff6600">
+    <!-- Force reload of new service worker -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
     <title>🏀 RPE Basketball</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -512,6 +515,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="chart.js"></script>
     <script src="app.js"></script>
     <script src="backup.js"></script>
     <script src="improvements.js"></script>
@@ -523,6 +527,7 @@
     <script src="injury-management-2.js"></script>
     <script src="team-status.js"></script>
     <script src="wellness.js"></script>
+    <script src="batch4-modules.js"></script>
     <script src="weekplan-medical.js"></script>
     <script src="strength.js"></script>
     <script src="auth.js"></script>
@@ -613,11 +618,16 @@
     };
 
     // Hook into NavMenu.selectView to keep bottom nav in sync
-    const _origSelectView = NavMenu.selectView.bind(NavMenu);
-    NavMenu.selectView = function(viewKey) {
-        _origSelectView(viewKey);
-        BottomNav.syncToView(viewKey);
-    };
+    // Wrapped in DOMContentLoaded so NavMenu (defined in app.js) is available
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.NavMenu) {
+            const _origSelectView = NavMenu.selectView.bind(NavMenu);
+            NavMenu.selectView = function(viewKey) {
+                _origSelectView(viewKey);
+                BottomNav.syncToView(viewKey);
+            };
+        }
+    });
     </script>
 </body>
 </html>
