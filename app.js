@@ -267,19 +267,13 @@ class RPETracker {
             this.loadWeekPlan();
         }
 
-        // Register service worker (unregister stale ones first)
+        // Register service worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(regs => {
-                // Unregister any SW not pointing to our sw.js (stale registrations)
-                regs.forEach(reg => {
-                    if (reg.active && !reg.active.scriptURL.endsWith('sw.js')) {
-                        reg.unregister();
-                    }
-                });
-            });
             navigator.serviceWorker.register('sw.js').then(reg => {
-                // Force update check on every load
-                reg.update();
+                // Check for updates on every page load
+                reg.update().catch(() => {});
+            }).catch(err => {
+                console.warn('SW registration failed:', err);
             });
         }
 

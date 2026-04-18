@@ -76,7 +76,10 @@ RPETracker.prototype.renderTeamStatus = function() {
             ${entries.length ? entries.map(renderCard).join('') : `<div class="ts-empty">${emptyMsg}</div>`}
         </div>`;
 
-    const nextMatch = this.weekPlan ? this.weekPlan.find(d => d.type === 'match') : null;
+    // weekPlan = { weekOffset, days: { lun/mar/…: { morning: {type,…}, afternoon: {type,…} } } }
+    const _wpDays = this.weekPlan?.days ? Object.values(this.weekPlan.days) : [];
+    const _wpSlots = _wpDays.flatMap(d => [d?.morning, d?.afternoon].filter(Boolean));
+    const nextMatch = _wpSlots.find(s => s.type === 'match' && s.enabled) || null;
 
     container.innerHTML = `
         <div class="ts-header">
