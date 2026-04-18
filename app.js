@@ -267,9 +267,20 @@ class RPETracker {
             this.loadWeekPlan();
         }
 
-        // Register service worker
+        // Register service worker (unregister stale ones first)
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
+            navigator.serviceWorker.getRegistrations().then(regs => {
+                // Unregister any SW not pointing to our sw.js (stale registrations)
+                regs.forEach(reg => {
+                    if (reg.active && !reg.active.scriptURL.endsWith('sw.js')) {
+                        reg.unregister();
+                    }
+                });
+            });
+            navigator.serviceWorker.register('sw.js').then(reg => {
+                // Force update check on every load
+                reg.update();
+            });
         }
 
         // Show skeleton while Firebase loads
