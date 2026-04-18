@@ -64,21 +64,105 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     const container = document.getElementById('weeklyPlanView');
     if (!container) return;
     if (!this.weekPlan) this.loadWeekPlan();
-    // Guardia extra: si days sigue sin existir, recargar desde defaults
-    if (!this.weekPlan || !this.weekPlan.days) {
-        this.weekPlan = this._defaultWeekPlan();
-    }
+    if (!this.weekPlan || !this.weekPlan.days) this.weekPlan = this._defaultWeekPlan();
 
     const offset = this.weekPlan.weekOffset || 0;
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1 + offset * 7);
 
-    const days = ['lun','mar','mie','jue','vie','sab','dom'];
+    const dayKeys   = ['lun','mar','mie','jue','vie','sab','dom'];
     const dayLabels = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
-    // Compute week real sessions summary
     const weekRealSessions = this._getWeekRealSessions(weekStart);
     const plannedLoad = this._plannedWeekLoad();
+
+    const typeLabel = {training:'🏀 Entreno', shooting:'🎯 Tiro', gym:'🏋️ Gym', match:'🏟️ Partido', recovery:'💪 Recuperación'};
+    const typeColors = {training:'#2196f3', match:'#f44336', recovery:'#4caf50', shooting:'#9c27b0', gym:'#795548'};
+
+    const buildSlotHTML = (dayKey, slot, s) => {
+        const active = !!s.enabled;
+        const headerHTML =
+            `<div class="wp-session-header">
+                <span class="wp-session-label">${slot === 'morning' ? '🌅 Mañana' : '🌆 Tarde'}</span>
+                <label class="wp-toggle-mini" title="${active ? 'Desactivar' : 'Activar'}">
+                    <input type="checkbox"
+                        data-wp-day="${dayKey}"
+                        data-wp-slot="${slot}"
+                        data-wp-field="enabled"
+                        ${active ? 'checked' : ''}>
+                    <span class="wp-toggle-mini-slider"></span>
+                </label>
+            </div>`;
+
+        if (!active) {
+            return `<div class="wp-session-block wp-session-off-block">${headerHTML}
+                <span class="wp-session-off">🛌 Descanso</span>
+            </div>`;
+        }
+
+        const selType = Object.entries({training:'🏀 Entreno', shooting:'🎯 Tiro', gym:'🏋️ Gym', match:'🏟️ Partido', recovery:'💪 Recuperación'})
+            .map(([v,l]) => `<option value="${v}"${s.type===v?' selected':''}>${l}</option>`).join('');
+
+        const selIntensity = Object.entries({'none':'— Sin carga','low':'🟢 Baja','medium':'🟡 Media','high':'🟠 Alta','max':'🔴 Máxima'})
+            .map(([v,l]) => `<option value="${v}"${s.intensity===v?' selected':''}>${l}</option>`).join('');
+
+        return `<div class="wp-session-block wp-session-active" style="border-left:2px solid ${typeColors[s.type]||'#ccc'}">
+            ${headerHTML}
+            <select class="wp-select wp-select-xs" data-wp-day="${dayKey}" data-wp-slot="${slot}" data-wp-field="type">${selType}</select>
+            <select class="wp-select wp-select-xs" data-wp-day="${dayKey}" data-wp-slot="${slot}" data-wp-field="intensity">${selIntensity}</select>
+            <div style="display:flex;align-items:center;gap:.3rem;margin-top:.3rem">
+                <span style="font-size:.78rem;color:var(--text-secondary)">⏱</span>
+                <input type="number" class="wp-input-sm"
+                    min="0" max="240" step="5"
+                    value="${s.duration||0}"
+                    data-wp-day="${dayKey}" data-wp-slot="${slot}" data-wp-field="duration">
+                <span style="font-size:.72rem;color:var(--text-secondary)">min</span>
+            </div>
+            <input type="text" class="wp-input-focus" placeholder="Foco..."
+                value="${(s.focus||'').replace(/"/g,'&quot;')}"
+                data-wp-day="${dayKey}" data-wp-slot="${slot}" data-wp-field="focus">
+        </div>`;
+    };
+
+    const daysHTML = dayKeys.map((dayKey, i) => {
+        const dayData   = this.weekPlan.days[dayKey] || {};
+        const morning   = dayData.morning   || {type:'rest',intensity:'none',duration:0,focus:'',enabled:false};
+        const afternoon = dayData.afternoon || {type:'rest',intensity:'none',duration:0,focus:'',enabled:false};
+
+        const date = new Date(weekStart); date.setDate(date.getDate() + i);
+        const dateStr = date.toISOString().slice(0,10);
+        const isToday = dateStr === new Date().toISOString().slice(0,10);
+
+        const topColor = morning.enabled
+            ? (typeColors[morning.type]||'#ccc')
+            : afternoon.enabled ? (typeColors[afternoon.type]||'#ccc') : '#78909c';
+
+        const realSess = weekRealSessions.byDay[dateStr] || [];
+        const realLoad = realSess.reduce((s,x)=>s+(x.load||0),0);
+        const realChips = realSess.slice(0,3).map(s => {
+            const p = this.players.find(x => x.id === s.playerId);
+            return p ? `<span class="wp-real-chip">${PlayerTokens.avatar(p,14,'.45rem')} ${s.rpe}</span>` : '';
+        }).join('') + (realSess.length>3 ? `<span style="font-size:.7rem;color:var(--text-secondary)">+${realSess.length-3}</span>` : '');
+
+        const realHTML = realSess.length
+            ? `<div class="wp-real-sessions">
+                <span style="font-size:.68rem;color:var(--text-secondary);font-weight:700">REAL:</span>
+                ${realChips}
+                <span style="font-size:.68rem;color:var(--text-secondary);margin-left:auto">Carga: ${realLoad}</span>
+               </div>`
+            : '';
+
+        return `<div class="wp-day-card${isToday?' today':''}" style="border-top:3px solid ${topColor}">
+            <div class="wp-day-head">
+                <span class="wp-day-name">${dayLabels[i]}</span>
+                <span class="wp-day-date">${date.getDate()}/${date.getMonth()+1}</span>
+                ${isToday ? '<span class="wp-today-badge">HOY</span>' : ''}
+            </div>
+            ${buildSlotHTML(dayKey, 'morning', morning)}
+            ${buildSlotHTML(dayKey, 'afternoon', afternoon)}
+            ${realHTML}
+        </div>`;
+    }).join('');
 
     container.innerHTML = `
         <div class="weekplan-wrap">
@@ -89,15 +173,14 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                         Semana del ${this._wpFmtDate(weekStart)}
                     </p>
                 </div>
-                <div style="display:flex;gap:.5rem;align-items:center">
-                    <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._wpChangeWeek(-1)">← Anterior</button>
-                    <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._wpResetWeek()">Hoy</button>
-                    <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._wpChangeWeek(1)">Siguiente →</button>
-                    <button class="btn-primary btn-sm" onclick="window.rpeTracker?._wpSaveCurrentPlan()">💾 Guardar</button>
+                <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+                    <button class="btn-secondary btn-sm" id="wpPrev">← Anterior</button>
+                    <button class="btn-secondary btn-sm" id="wpToday">Hoy</button>
+                    <button class="btn-secondary btn-sm" id="wpNext">Siguiente →</button>
+                    <button class="btn-primary btn-sm" id="wpSave">💾 Guardar</button>
                 </div>
             </div>
 
-            <!-- Summary cards -->
             <div class="weekplan-summary-row">
                 <div class="wp-sum-card">
                     <span class="wp-sum-val">${plannedLoad}</span>
@@ -105,143 +188,106 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                 </div>
                 <div class="wp-sum-card">
                     <span class="wp-sum-val">${weekRealSessions.totalLoad}</span>
-                    <span class="wp-sum-label">Carga real (equipo)</span>
+                    <span class="wp-sum-label">Carga real</span>
                 </div>
                 <div class="wp-sum-card">
                     <span class="wp-sum-val">${weekRealSessions.sessions}</span>
                     <span class="wp-sum-label">Sesiones registradas</span>
                 </div>
                 <div class="wp-sum-card">
-                    <span class="wp-sum-val" style="color:${this._wpDiffColor(plannedLoad, weekRealSessions.totalLoad)}">${weekRealSessions.totalLoad > 0 ? (weekRealSessions.totalLoad / (plannedLoad||1) * 100).toFixed(0) + '%' : '—'}</span>
+                    <span class="wp-sum-val" style="color:${this._wpDiffColor(plannedLoad, weekRealSessions.totalLoad)}">
+                        ${weekRealSessions.totalLoad > 0 ? (weekRealSessions.totalLoad/(plannedLoad||1)*100).toFixed(0)+'%' : '—'}
+                    </span>
                     <span class="wp-sum-label">Cumplimiento</span>
                 </div>
             </div>
 
-            <!-- Day cards grid -->
-            <div class="weekplan-grid">
-                ${days.map((day, i) => {
-                    const dayData = this.weekPlan.days[day] || {};
-                    const morning   = dayData.morning   || { type:'rest', intensity:'none', duration:0, focus:'', enabled:false };
-                    const afternoon = dayData.afternoon || { type:'rest', intensity:'none', duration:0, focus:'', enabled:false };
-                    const date = new Date(weekStart); date.setDate(date.getDate() + i);
-                    const dateStr = date.toISOString().slice(0,10);
-                    const isToday = dateStr === new Date().toISOString().slice(0,10);
-                    const realSessions = weekRealSessions.byDay[dateStr] || [];
-                    const realLoad = realSessions.reduce((s,x) => s + (x.load||0), 0);
+            <div class="weekplan-grid" id="wpGrid">${daysHTML}</div>
 
-                    const typeColors = {training:'#2196f3', match:'#f44336', rest:'#9e9e9e', recovery:'#4caf50', shooting:'#9c27b0', gym:'#795548'};
-                    const isFullRestDay = !morning.enabled && !afternoon.enabled;
-                    const topColor = morning.enabled ? (typeColors[morning.type]||'#ccc') : (afternoon.enabled ? (typeColors[afternoon.type]||'#ccc') : (isFullRestDay ? '#78909c' : '#9e9e9e'));
+            ${this._renderWpLoadChart(dayKeys, dayLabels, weekStart)}
 
-                    const sessionBlock = (slot, label, emoji) => {
-                        const s = slot === 'morning' ? morning : afternoon;
-                        const isRest = !s.enabled;
-                        const blockClass = 'wp-session-block' + (isRest ? ' wp-session-rest' : '');
-                        const d = day, sl = slot;
-
-                        const onchangeSession = function(field) {
-                            return 'window.rpeTracker?._wpUpdateSession(' +
-                                JSON.stringify(d) + ',' + JSON.stringify(sl) + ',' +
-                                JSON.stringify(field) + ',this.value)';
-                        };
-                        const onchangeCheck = 'window.rpeTracker?._wpUpdateSession(' +
-                            JSON.stringify(d) + ',' + JSON.stringify(sl) + ',"enabled",this.checked)';
-                        const onchangeDur = 'window.rpeTracker?._wpUpdateSession(' +
-                            JSON.stringify(d) + ',' + JSON.stringify(sl) + ',"duration",parseInt(this.value))';
-                        const onchangeFocus = 'window.rpeTracker?._wpUpdateSession(' +
-                            JSON.stringify(d) + ',' + JSON.stringify(sl) + ',"focus",this.value)';
-
-                        // Build the block class with slot info
-                        const blockClass2 = blockClass + (s.enabled ? ' wp-session-active' : ' wp-session-off-block');
-
-                        let inner = '';
-                        if (s.enabled) {
-                            inner =
-                                '<select class="wp-select wp-select-xs" onchange="' + onchangeSession('type') + '">' +
-                                    '<option value="training"'  + (s.type==='training' ?' selected':'') + '>🏀 Entreno</option>' +
-                                    '<option value="shooting"'  + (s.type==='shooting' ?' selected':'') + '>🎯 Tiro</option>' +
-                                    '<option value="gym"'       + (s.type==='gym'      ?' selected':'') + '>🏋️ Gym</option>' +
-                                    '<option value="match"'     + (s.type==='match'    ?' selected':'') + '>🏟️ Partido</option>' +
-                                    '<option value="recovery"'  + (s.type==='recovery' ?' selected':'') + '>💪 Recuperación</option>' +
-                                '</select>' +
-                                '<select class="wp-select wp-select-xs" onchange="' + onchangeSession('intensity') + '">' +
-                                    '<option value="none"'   + (s.intensity==='none'  ?' selected':'') + '>— Sin carga</option>' +
-                                    '<option value="low"'    + (s.intensity==='low'   ?' selected':'') + '>🟢 Baja</option>' +
-                                    '<option value="medium"' + (s.intensity==='medium'?' selected':'') + '>🟡 Media</option>' +
-                                    '<option value="high"'   + (s.intensity==='high'  ?' selected':'') + '>🟠 Alta</option>' +
-                                    '<option value="max"'    + (s.intensity==='max'   ?' selected':'') + '>🔴 Máxima</option>' +
-                                '</select>' +
-                                '<div style="display:flex;align-items:center;gap:.3rem;margin-top:.25rem">' +
-                                    '<span style="color:var(--text-secondary);font-size:.8rem">⏱</span>' +
-                                    '<input type="number" class="wp-input-sm" min="0" max="240" step="5"' +
-                                    ' value="' + (s.duration||0) + '"' +
-                                    ' onchange="' + onchangeDur + '">' +
-                                    '<span style="color:var(--text-secondary);font-size:.72rem">min</span>' +
-                                '</div>' +
-                                '<input type="text" class="wp-input-focus" placeholder="Foco..."' +
-                                ' value="' + (s.focus||'').replace(/"/g,'&quot;') + '"' +
-                                ' onchange="' + onchangeFocus + '">';
-                        } else {
-                            inner = '<span class="wp-session-off">Sin sesión</span>';
-                        }
-
-                        return '<div class="' + blockClass2 + '">' +
-                            '<div class="wp-session-header">' +
-                                '<span class="wp-session-label">' + emoji + ' ' + label + '</span>' +
-                                '<label class="wp-toggle-mini">' +
-                                    '<input type="checkbox"' + (s.enabled ? ' checked' : '') +
-                                    ' onchange="' + onchangeCheck + '">' +
-                                    '<span class="wp-toggle-mini-slider"></span>' +
-                                '</label>' +
-                            '</div>' +
-                            inner +
-                        '</div>';
-                    };
-
-                    let realHtml = '';
-                    if (realSessions.length > 0) {
-                        const chips = realSessions.slice(0,3).map(s => {
-                            const p = this.players.find(x => x.id === s.playerId);
-                            return p ? '<span class="wp-real-chip">' + PlayerTokens.avatar(p,14,'.45rem') + ' RPE ' + s.rpe + '</span>' : '';
-                        }).join('');
-                        const more = realSessions.length > 3 ? '<span style="font-size:.72rem;color:var(--text-secondary)">+' + (realSessions.length-3) + '</span>' : '';
-                        realHtml = '<div class="wp-real-sessions">' +
-                            '<span style="font-size:.72rem;color:var(--text-secondary);font-weight:600">REAL:</span>' +
-                            chips + more +
-                            '<span style="font-size:.72rem;color:var(--text-secondary);margin-left:auto">Carga: ' + realLoad + '</span>' +
-                        '</div>';
-                    }
-
-                    return '<div class="wp-day-card' + (isToday ? ' today' : '') + (isFullRestDay ? ' wp-day-rest' : '') + '" style="border-top:3px solid ' + topColor + '">' +
-                        '<div class="wp-day-head">' +
-                            '<span class="wp-day-name">' + dayLabels[i] + '</span>' +
-                            '<span class="wp-day-date">' + date.getDate() + '/' + (date.getMonth()+1) + '</span>' +
-                            (isToday ? '<span class="wp-today-badge">HOY</span>' : '') +
-                        '</div>' +
-                        sessionBlock('morning',   'Mañana', '🌅') +
-                        sessionBlock('afternoon', 'Tarde',  '🌆') +
-                        realHtml +
-                    '</div>';
-                }).join('')}
-            </div>
-
-            <!-- Load distribution chart -->
-            ${this._renderWpLoadChart(days, dayLabels, weekStart)}
-
-            <!-- Instructions -->
             <div class="wellness-card" style="font-size:.84rem;color:var(--text-secondary)">
-                <p style="margin:0 0 .5rem"><strong>💡 Cómo usar:</strong></p>
+                <p style="margin:0 0 .4rem"><strong>💡 Cómo usar:</strong></p>
                 <ul style="margin:0;padding-left:1.2rem;line-height:1.8">
-                    <li>Configura el tipo y la intensidad de cada día de la semana</li>
-                    <li>Pulsa <strong>💾 Guardar</strong> para que la plantilla se aplique cada semana</li>
-                    <li>Los datos <strong>REAL</strong> muestran las sesiones ya registradas ese día</li>
-                    <li>El % de cumplimiento compara carga planificada vs registrada en el equipo</li>
+                    <li>Usa el toggle para activar/desactivar mañana o tarde de cada día</li>
+                    <li>Puedes tener mañana, tarde, ambas o ninguna (descanso) por día</li>
+                    <li>Puedes poner dos partidos en la misma semana en cualquier slot</li>
+                    <li>Los datos <strong>REAL</strong> muestran sesiones ya registradas ese día</li>
                 </ul>
             </div>
         </div>`;
 
-    this._drawWpLoadChart(days, dayLabels, weekStart);
+    // ── Attach events via delegation on the grid (no inline handlers) ──
+    const grid = document.getElementById('wpGrid');
+    if (!grid) return;
+
+    // Checkboxes (toggle enabled)
+    grid.addEventListener('change', (e) => {
+        const el = e.target;
+        const day   = el.dataset.wpDay;
+        const slot  = el.dataset.wpSlot;
+        const field = el.dataset.wpField;
+        if (!day || !slot || !field) return;
+
+        let value;
+        if (el.type === 'checkbox') {
+            value = el.checked;
+        } else if (el.type === 'number') {
+            value = parseInt(el.value) || 0;
+        } else {
+            value = el.value;
+        }
+
+        if (!this.weekPlan.days[day]) this.weekPlan.days[day] = {};
+        if (!this.weekPlan.days[day][slot]) {
+            this.weekPlan.days[day][slot] = {type:'training',intensity:'medium',duration:60,focus:'',enabled:false};
+        }
+        this.weekPlan.days[day][slot][field] = value;
+        this.saveWeekPlan();
+
+        if (field === 'enabled') {
+            // Re-render just this day card
+            this.renderWeeklyPlanning();
+        }
+    });
+
+    // Text inputs use 'input' + blur to avoid re-render on every keypress
+    grid.addEventListener('blur', (e) => {
+        const el = e.target;
+        const day   = el.dataset.wpDay;
+        const slot  = el.dataset.wpSlot;
+        const field = el.dataset.wpField;
+        if (!day || !slot || !field || el.type === 'checkbox') return;
+        if (!this.weekPlan.days[day]) this.weekPlan.days[day] = {};
+        if (!this.weekPlan.days[day][slot]) {
+            this.weekPlan.days[day][slot] = {type:'training',intensity:'medium',duration:60,focus:'',enabled:false};
+        }
+        const value = el.type === 'number' ? (parseInt(el.value)||0) : el.value;
+        this.weekPlan.days[day][slot][field] = value;
+        this.saveWeekPlan();
+    }, true); // capture for blur
+
+    // Navigation buttons
+    document.getElementById('wpPrev')?.addEventListener('click', () => {
+        this.weekPlan.weekOffset = (this.weekPlan.weekOffset||0) - 1;
+        this.renderWeeklyPlanning();
+    });
+    document.getElementById('wpToday')?.addEventListener('click', () => {
+        this.weekPlan.weekOffset = 0;
+        this.renderWeeklyPlanning();
+    });
+    document.getElementById('wpNext')?.addEventListener('click', () => {
+        this.weekPlan.weekOffset = (this.weekPlan.weekOffset||0) + 1;
+        this.renderWeeklyPlanning();
+    });
+    document.getElementById('wpSave')?.addEventListener('click', () => {
+        this.saveWeekPlan();
+        this.showToast('✅ Planificación guardada', 'success');
+    });
+
+    this._drawWpLoadChart(dayKeys, dayLabels, weekStart);
 };
+
 
 RPETracker.prototype._getWeekRealSessions = function(weekStart) {
     const byDay = {};
@@ -964,44 +1010,42 @@ RPETracker.prototype._drawCorrChart = function(data) {
     if(document.getElementById('batch4-styles')) return;
     const s=document.createElement('style');s.id='batch4-styles';
     s.textContent=`
-.weekplan-wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:1rem;padding:1rem}
+.weekplan-wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:1rem;padding:1rem}
 .weekplan-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .weekplan-summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem}
 .wp-sum-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:.85rem 1rem;text-align:center;display:flex;flex-direction:column;gap:.25rem}
 .wp-sum-val{font-size:1.6rem;font-weight:800;line-height:1}
 .wp-sum-label{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em}
 .weekplan-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.5rem}
-.wp-day-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:.75rem .6rem;font-size:.82rem}
-.wp-day-card.today{box-shadow:0 0 0 2px var(--primary-color)}
-.wp-day-head{display:flex;align-items:center;justify-content:space-between;gap:.25rem;margin-bottom:.35rem}
-.wp-day-name{font-weight:700;font-size:.85rem}
-.wp-day-date{font-size:.72rem;color:var(--text-secondary)}
-.wp-today-badge{font-size:.6rem;font-weight:700;background:var(--primary-color);color:white;padding:.1rem .3rem;border-radius:4px}
-.wp-select{width:100%;padding:.3rem .35rem;border-radius:6px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);font-size:.78rem;cursor:pointer}
-.wp-select-sm{font-size:.72rem}
-.wp-input-sm{width:52px;padding:.25rem .35rem;border:1px solid var(--border-color);border-radius:5px;background:var(--card-bg);color:var(--text-color);font-size:.78rem;text-align:center}
-.wp-input-focus{width:100%;padding:.25rem .35rem;border:1px solid var(--border-color);border-radius:5px;background:var(--card-bg);color:var(--text-color);font-size:.75rem;box-sizing:border-box}
-.wp-real-sessions{display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;margin-top:.4rem;padding-top:.4rem;border-top:1px solid var(--border-color)}
-.wp-real-chip{display:flex;align-items:center;gap:.2rem;font-size:.7rem;background:var(--border-color);border-radius:10px;padding:.1rem .35rem}
-.wp-filter-btn{padding:.3rem .7rem;border-radius:16px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);cursor:pointer;font-size:.78rem;display:flex;align-items:center;gap:.3rem;transition:all .15s}
-.wp-filter-btn.active{background:var(--primary-color);color:white;border-color:var(--primary-color)}
-.btn-sm{padding:.35rem .75rem;font-size:.82rem}
-.wp-session-block{margin-bottom:.4rem;padding:.4rem .35rem;border-radius:7px;border:1px solid var(--border-color)}
-.wp-session-rest{opacity:.7}
-.wp-session-active{background:rgba(33,150,243,.04);border-color:rgba(33,150,243,.25)}
-.wp-session-off-block{background:transparent}
-.wp-session-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem}
-.wp-session-label{font-size:.72rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em}
-.wp-session-off{font-size:.75rem;color:var(--text-secondary);font-style:italic}
-.wp-toggle-mini{position:relative;display:inline-block;width:28px;height:16px;flex-shrink:0}
+.wp-day-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:.6rem .5rem;font-size:.82rem}
+.wp-day-card.today{box-shadow:0 0 0 2px var(--primary-color,#ff6600)}
+.wp-day-head{display:flex;align-items:center;justify-content:space-between;gap:.25rem;margin-bottom:.4rem}
+.wp-day-name{font-weight:700;font-size:.82rem}
+.wp-day-date{font-size:.7rem;color:var(--text-secondary)}
+.wp-today-badge{font-size:.58rem;font-weight:700;background:var(--primary-color,#ff6600);color:white;padding:.1rem .3rem;border-radius:4px}
+.wp-session-block{margin-bottom:.4rem;padding:.35rem .4rem;border-radius:7px;border:1px solid var(--border-color)}
+.wp-session-active{background:rgba(255,102,0,.05);border-left:2px solid currentColor}
+.wp-session-off-block{opacity:.75}
+.wp-session-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem;gap:.25rem}
+.wp-session-label{font-size:.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;flex:1}
+.wp-session-off{font-size:.74rem;color:var(--text-secondary);font-style:italic;display:block;text-align:center;padding:.15rem 0}
+.wp-select{width:100%;padding:.28rem .3rem;border-radius:6px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);font-size:.75rem;cursor:pointer;margin-bottom:.25rem}
+.wp-select-xs{font-size:.72rem;padding:.22rem .28rem}
+.wp-input-sm{width:48px;padding:.22rem .3rem;border:1px solid var(--border-color);border-radius:5px;background:var(--card-bg);color:var(--text-color);font-size:.75rem;text-align:center}
+.wp-input-focus{width:100%;padding:.22rem .3rem;border:1px solid var(--border-color);border-radius:5px;background:var(--card-bg);color:var(--text-color);font-size:.72rem;box-sizing:border-box;margin-top:.2rem}
+.wp-toggle-mini{position:relative;display:inline-block;width:30px;height:17px;flex-shrink:0;cursor:pointer}
 .wp-toggle-mini input{opacity:0;width:0;height:0;position:absolute}
-.wp-toggle-mini-slider{position:absolute;cursor:pointer;inset:0;background:var(--border-color);border-radius:16px;transition:.2s}
-.wp-toggle-mini input:checked+.wp-toggle-mini-slider{background:var(--primary-color)}
-.wp-toggle-mini-slider:before{content:'';position:absolute;height:11px;width:11px;left:2px;bottom:2px;background:white;border-radius:50%;transition:.2s}
-.wp-toggle-mini input:checked+.wp-toggle-mini-slider:before{transform:translateX(12px)}
-.wp-select-xs{font-size:.75rem;padding:.2rem .25rem;margin-bottom:.25rem}
+.wp-toggle-mini-slider{position:absolute;cursor:pointer;inset:0;background:var(--border-color);border-radius:17px;transition:.2s}
+.wp-toggle-mini input:checked+.wp-toggle-mini-slider{background:var(--primary-color,#ff6600)}
+.wp-toggle-mini-slider:before{content:'';position:absolute;height:12px;width:12px;left:2px;bottom:2px;background:white;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.wp-toggle-mini input:checked+.wp-toggle-mini-slider:before{transform:translateX(13px)}
+.wp-real-sessions{display:flex;align-items:center;gap:.25rem;flex-wrap:wrap;margin-top:.35rem;padding-top:.35rem;border-top:1px solid var(--border-color)}
+.wp-real-chip{display:flex;align-items:center;gap:.15rem;font-size:.68rem;background:rgba(0,0,0,.05);border-radius:10px;padding:.1rem .3rem}
+.wp-filter-btn{padding:.3rem .7rem;border-radius:16px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);cursor:pointer;font-size:.78rem;display:flex;align-items:center;gap:.3rem;transition:all .15s}
+.wp-filter-btn.active{background:var(--primary-color,#ff6600);color:white;border-color:var(--primary-color,#ff6600)}
+.btn-sm{padding:.35rem .75rem;font-size:.82rem}
 .med-injury-card{margin-bottom:0}
-.med-info-cell{display:flex;flex-direction:column;gap:.15rem;background:var(--border-color);border-radius:7px;padding:.45rem .6rem}
+.med-info-cell{display:flex;flex-direction:column;gap:.15rem;background:rgba(0,0,0,.04);border-radius:7px;padding:.45rem .6rem}
 .mic-label{font-size:.7rem;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
 .mic-val{font-size:.88rem;font-weight:600}
 @media(max-width:900px){.weekplan-grid{grid-template-columns:repeat(4,1fr)}}
