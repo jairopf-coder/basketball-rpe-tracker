@@ -151,6 +151,9 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                         const onchangeFocus = 'window.rpeTracker?._wpUpdateSession(' +
                             JSON.stringify(d) + ',' + JSON.stringify(sl) + ',"focus",this.value)';
 
+                        // Build the block class with slot info
+                        const blockClass2 = blockClass + (s.enabled ? ' wp-session-active' : ' wp-session-off-block');
+
                         let inner = '';
                         if (s.enabled) {
                             inner =
@@ -182,7 +185,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                             inner = '<span class="wp-session-off">Sin sesión</span>';
                         }
 
-                        return '<div class="' + blockClass + '">' +
+                        return '<div class="' + blockClass2 + '">' +
                             '<div class="wp-session-header">' +
                                 '<span class="wp-session-label">' + emoji + ' ' + label + '</span>' +
                                 '<label class="wp-toggle-mini">' +
@@ -215,9 +218,6 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                             '<span class="wp-day-date">' + date.getDate() + '/' + (date.getMonth()+1) + '</span>' +
                             (isToday ? '<span class="wp-today-badge">HOY</span>' : '') +
                         '</div>' +
-                        (isFullRestDay
-                            ? '<div class="wp-rest-banner">🛌 <span>Descanso</span></div>'
-                            : '') +
                         sessionBlock('morning',   'Mañana', '🌅') +
                         sessionBlock('afternoon', 'Tarde',  '🌆') +
                         realHtml +
@@ -353,9 +353,15 @@ RPETracker.prototype._drawWpLoadChart = function(days, dayLabels, weekStart) {
 
     const intensityRPE={none:0,low:4,medium:6,high:7.5,max:9};
     const plan=this.weekPlan?.days||{};
+    // Fix: use morning+afternoon structure
     const planLoads=days.map(d=>{
         const dayPlan=plan[d]||{};
-        return (intensityRPE[dayPlan.intensity||'none']||0)*(dayPlan.duration||0);
+        let load=0;
+        ['morning','afternoon'].forEach(slot=>{
+            const s=dayPlan[slot];
+            if(s && s.enabled) load+=(intensityRPE[s.intensity||'none']||0)*(s.duration||0);
+        });
+        return load;
     });
 
     const realLoads=days.map((_,i)=>{
@@ -980,6 +986,20 @@ RPETracker.prototype._drawCorrChart = function(data) {
 .wp-filter-btn{padding:.3rem .7rem;border-radius:16px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);cursor:pointer;font-size:.78rem;display:flex;align-items:center;gap:.3rem;transition:all .15s}
 .wp-filter-btn.active{background:var(--primary-color);color:white;border-color:var(--primary-color)}
 .btn-sm{padding:.35rem .75rem;font-size:.82rem}
+.wp-session-block{margin-bottom:.4rem;padding:.4rem .35rem;border-radius:7px;border:1px solid var(--border-color)}
+.wp-session-rest{opacity:.7}
+.wp-session-active{background:rgba(33,150,243,.04);border-color:rgba(33,150,243,.25)}
+.wp-session-off-block{background:transparent}
+.wp-session-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem}
+.wp-session-label{font-size:.72rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em}
+.wp-session-off{font-size:.75rem;color:var(--text-secondary);font-style:italic}
+.wp-toggle-mini{position:relative;display:inline-block;width:28px;height:16px;flex-shrink:0}
+.wp-toggle-mini input{opacity:0;width:0;height:0;position:absolute}
+.wp-toggle-mini-slider{position:absolute;cursor:pointer;inset:0;background:var(--border-color);border-radius:16px;transition:.2s}
+.wp-toggle-mini input:checked+.wp-toggle-mini-slider{background:var(--primary-color)}
+.wp-toggle-mini-slider:before{content:'';position:absolute;height:11px;width:11px;left:2px;bottom:2px;background:white;border-radius:50%;transition:.2s}
+.wp-toggle-mini input:checked+.wp-toggle-mini-slider:before{transform:translateX(12px)}
+.wp-select-xs{font-size:.75rem;padding:.2rem .25rem;margin-bottom:.25rem}
 .med-injury-card{margin-bottom:0}
 .med-info-cell{display:flex;flex-direction:column;gap:.15rem;background:var(--border-color);border-radius:7px;padding:.45rem .6rem}
 .mic-label{font-size:.7rem;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
