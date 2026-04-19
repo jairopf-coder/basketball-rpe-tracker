@@ -1460,7 +1460,37 @@ class RPETracker {
                     ${entries.map(availRow).join('')}
                 </div>`;
 
+        // ── Alert banner data ──────────────────────────────────────
+        const alertPlayers = players.filter(p => parseFloat(p.ratio.ratio) > 1.5);
+        const warnPlayers  = players.filter(p => { const r = parseFloat(p.ratio.ratio); return r >= 1.3 && r <= 1.5; });
+        const pendingWellness = _pendingW.length;
+
+        let bannerHTML = '';
+        if (alertPlayers.length > 0 || warnPlayers.length > 0 || pendingWellness > 0) {
+            const items = [];
+            if (alertPlayers.length)  items.push(`🔴 <strong>${alertPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> con ratio en zona de peligro`);
+            if (warnPlayers.length)   items.push(`🟠 <strong>${warnPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> en precaución`);
+            if (pendingWellness > 0)  items.push(`📋 <strong>${pendingWellness} jugadora${pendingWellness>1?'s':''}</strong> sin wellness hoy`);
+            bannerHTML = `<div class="db-alert-banner">
+                ${items.map(i=>`<div class="db-alert-item">${i}</div>`).join('<div class="db-alert-sep">·</div>')}
+                ${pendingWellness > 0 ? `<button class="db-alert-btn" onclick="window.rpeTracker?.openWellnessBulk()">✏️ Pase rápido</button>` : ''}
+            </div>`;
+        }
+
+        // ── Match-day mode ─────────────────────────────────────────
+        const todayKey = ['dom','lun','mar','mie','jue','vie','sab'][new Date().getDay()];
+        const todayPlan = this.weekPlan?.days?.[todayKey] || {};
+        const isMatchDay = ['morning','afternoon'].some(s => todayPlan[s]?.type === 'match' && todayPlan[s]?.enabled);
+        const matchDayBtnLabel = this._matchDayMode ? '← Vista normal' : '🏟️ Modo partido';
+
         container.innerHTML = `
+            ${bannerHTML}
+            ${isMatchDay || this._matchDayMode ? `
+            <div class="db-matchday-bar">
+                <span class="db-matchday-badge">🏟️ DÍA DE PARTIDO</span>
+                <button class="db-matchday-toggle" onclick="window.rpeTracker?._toggleMatchDayMode()">${matchDayBtnLabel}</button>
+            </div>` : ''}
+            ${this._matchDayMode ? this._renderMatchDayView(availGroups, players) : `
             <div class="db-split">
 
                 <!-- Columna izquierda: métricas -->
@@ -1563,6 +1593,7 @@ class RPETracker {
                 </div>
 
             </div>
+            `}
         `;
 
         // Draw team load 7d chart with day labels
@@ -1617,6 +1648,67 @@ class RPETracker {
             // Render mini calendar column
             this.renderDashboardCalendar();
         });
+    }
+
+    _toggleMatchDayMode() {
+        this._matchDayMode = !this._matchDayMode;
+        this.renderDashboard();
+    }
+
+    _renderMatchDayView(availGroups, players) {
+        const today  = new Date().toISOString().slice(0, 10);
+        const wData  = this.wellnessData || [];
+
+        const playerCard = ({ player, ratio, icon, r }) => {
+            const w      = wData.find(e => e.playerId === player.id && e.date === today);
+            const wScore = w ? this._wOverall(w) : null;
+            const wColor = wScore ? this._wColor(wScore) : '#aaa';
+            const rColor = this.getRatioColor(ratio.ratio);
+            const inj    = (this.injuries||[]).find(i => i.playerId === player.id && i.status === 'active');
+            return `<div class="md-card ${inj ? 'md-card--out' : r > 1.5 ? 'md-card--danger' : r >= 1.3 ? 'md-card--warn' : ''}">
+                <div class="md-card-top">
+                    ${PlayerTokens.avatar(player, 30, '0.75rem')}
+                    <div class="md-card-name">${player.name}${player.number ? `<span class="db-num"> #${player.number}</span>` : ''}</div>
+                    <span class="md-card-icon">${icon}</span>
+                </div>
+                <div class="md-card-row">
+                    <span class="md-lbl">Ratio</span>
+                    <span class="md-val" style="color:${rColor}">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</span>
+                </div>
+                <div class="md-card-row">
+                    <span class="md-lbl">Wellness</span>
+                    <span class="md-val" style="color:${wColor}">${wScore !== null ? wScore.toFixed(1) : '—'}</span>
+                </div>
+                ${inj ? `<div class="md-card-inj">🚑 ${this.getLocationName?.(inj.location)||'Lesión activa'}</div>` : ''}
+            </div>`;
+        };
+
+        const okCards  = availGroups.ok.map(e =>
+            playerCard({ player: e.player, ratio: e.ratio, icon: '🟢', r: e.r })).join('');
+        const warnCards = availGroups.caution.map(e =>
+            playerCard({ player: e.player, ratio: e.ratio, icon: e.r > 1.5 ? '🔴' : '🔵', r: e.r })).join('');
+        const outCards = availGroups.out.map(e =>
+            playerCard({ player: e.player, ratio: e.ratio, icon: '🔴', r: e.r })).join('');
+
+        const todayW = wData.filter(e => e.date === today);
+        const avgW   = todayW.length
+            ? (todayW.reduce((s,e) => s + this._wOverall(e), 0) / todayW.length).toFixed(1) : '—';
+        const atRisk = players.filter(p => parseFloat(p.ratio.ratio) > 1.5).length;
+
+        return `<div class="md-wrap">
+            <div class="md-summary">
+                <div class="md-pill"><span class="md-pill-val">${availGroups.ok.length}</span><span class="md-pill-lbl">Disponibles</span></div>
+                <div class="md-pill md-pill--warn"><span class="md-pill-val">${availGroups.caution.length}</span><span class="md-pill-lbl">Precaución</span></div>
+                <div class="md-pill md-pill--out"><span class="md-pill-val">${availGroups.out.length}</span><span class="md-pill-lbl">No disp.</span></div>
+                <div class="md-pill"><span class="md-pill-val">${avgW}</span><span class="md-pill-lbl">Wellness</span></div>
+                <div class="md-pill ${atRisk > 0 ? 'md-pill--danger' : ''}"><span class="md-pill-val">${atRisk}</span><span class="md-pill-lbl">Riesgo alto</span></div>
+            </div>
+            ${warnCards || outCards ? `
+                <div class="md-section">⚠️ Requieren atención</div>
+                <div class="md-grid">${warnCards}${outCards}</div>` : ''}
+            <div class="md-section">✅ Disponibles para el partido</div>
+            <div class="md-grid">${okCards || '<p class="db-empty">Sin jugadoras disponibles</p>'}</div>
+        </div>`;
     }
 
     cycleDashSort() {
@@ -2008,6 +2100,224 @@ class RPETracker {
         }
     }
 
+    scrollToPlayerChart(playerId) {
+        const canvas = document.getElementById(`chart-${playerId}`);
+        if (canvas) {
+            canvas.closest('.chart-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    _setAnalyticsTab(tab) {
+        this._analyticsTab = tab;
+        this.renderAnalytics();
+    }
+
+    _renderACCurveTab() {
+        // Player selector checkboxes
+        const checks = this.players.map((p, i) => {
+            const color = PlayerTokens.get(p);
+            const checked = !this._acExcluded?.has(p.id);
+            return `<label class="ac-curve-check" style="--chk-color:${color}">
+                <input type="checkbox" value="${p.id}" ${checked?'checked':''}
+                    onchange="window.rpeTracker?._acTogglePlayer('${p.id}',this.checked)">
+                <span class="ac-chk-dot" style="background:${color}"></span>
+                ${p.name}${p.number?` <small>#${p.number}</small>`:''}
+            </label>`;
+        }).join('');
+
+        // Window selector
+        const win = this._acWindow || 28;
+
+        return `<div class="ac-curve-wrap">
+            <div class="ac-curve-controls">
+                <div class="ac-curve-players">${checks}</div>
+                <div class="ac-curve-right">
+                    <label class="ac-win-label">Ventana</label>
+                    <select class="ac-win-sel" onchange="window.rpeTracker?._acSetWindow(+this.value)">
+                        <option value="14" ${win===14?'selected':''}>14 días</option>
+                        <option value="28" ${win===28?'selected':''}>28 días</option>
+                        <option value="56" ${win===56?'selected':''}>56 días</option>
+                    </select>
+                </div>
+            </div>
+            <div class="ac-curve-chart-wrap">
+                <canvas id="acCurveCanvas" style="width:100%;height:300px"></canvas>
+            </div>
+            <div class="ac-curve-legend">
+                <span class="ac-legend-line" style="background:#e53935;opacity:.25;height:2px;width:20px;display:inline-block;vertical-align:middle"></span>
+                <span style="font-size:.72rem;color:var(--text-faint)">Zona peligro &gt;1.5</span>
+                <span class="ac-legend-line" style="background:#fb8c00;opacity:.25;height:2px;width:20px;display:inline-block;vertical-align:middle;margin-left:.75rem"></span>
+                <span style="font-size:.72rem;color:var(--text-faint)">Zona precaución 1.3–1.5</span>
+            </div>
+        </div>`;
+    }
+
+    _drawACCurveChart() {
+        const canvas = document.getElementById('acCurveCanvas');
+        if (!canvas || typeof Chart === 'undefined') return;
+        if (canvas._ci) { canvas._ci.destroy(); canvas._ci = null; }
+
+        const days  = this._acWindow || 28;
+        const now   = new Date();
+        const labels = [];
+        for (let d = days - 1; d >= 0; d--) {
+            const dt = new Date(now);
+            dt.setDate(now.getDate() - d);
+            labels.push(dt.toLocaleDateString('es-ES', { day:'numeric', month:'short' }));
+        }
+
+        const excluded = this._acExcluded || new Set();
+        const lambdaA  = 2 / (7 + 1);
+        const lambdaC  = 2 / (28 + 1);
+
+        const datasets = this.players
+            .filter(p => !excluded.has(p.id))
+            .map(p => {
+                const color  = PlayerTokens.get(p);
+                const psess  = this.sessions
+                    .filter(s => s.playerId === p.id)
+                    .map(s => ({ date: new Date(s.date), load: s.load || s.rpe * (s.duration || 60) }))
+                    .sort((a,b) => a.date - b.date);
+                const seed   = psess.length ? psess.reduce((s,x)=>s+x.load,0)/psess.length : 0;
+                let ewA = seed, ewC = seed;
+
+                // walk back far enough to stabilise
+                for (let i = 84; i >= 0; i--) {
+                    const d = new Date(now); d.setDate(now.getDate() - i); d.setHours(0,0,0,0);
+                    const load = psess.filter(s => { const sd=new Date(s.date); sd.setHours(0,0,0,0); return sd.getTime()===d.getTime(); }).reduce((s,x)=>s+x.load,0);
+                    ewA = lambdaA * load + (1-lambdaA) * ewA;
+                    ewC = lambdaC * load + (1-lambdaC) * ewC;
+                    if (i <= days) { /* we'll collect below */ }
+                }
+
+                // Now collect last `days` ratios
+                ewA = seed; ewC = seed;
+                const startFrom = 84;
+                const ratiosByDay = {};
+                for (let i = startFrom; i >= 0; i--) {
+                    const d = new Date(now); d.setDate(now.getDate() - i); d.setHours(0,0,0,0);
+                    const load = psess.filter(s => { const sd=new Date(s.date); sd.setHours(0,0,0,0); return sd.getTime()===d.getTime(); }).reduce((s,x)=>s+x.load,0);
+                    ewA = lambdaA * load + (1-lambdaA) * ewA;
+                    ewC = lambdaC * load + (1-lambdaC) * ewC;
+                    if (i < days) {
+                        ratiosByDay[days-1-i] = ewC > 0 ? parseFloat((ewA/ewC).toFixed(3)) : null;
+                    }
+                }
+                const data = Array.from({length: days}, (_, i) => ratiosByDay[i] ?? null);
+
+                return {
+                    label: p.name + (p.number ? ` #${p.number}` : ''),
+                    data,
+                    borderColor: color,
+                    backgroundColor: color + '18',
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    tension: 0.35,
+                    spanGaps: true
+                };
+            });
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const gridC  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+        const textC  = isDark ? '#888' : '#999';
+
+        canvas._ci = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 300 },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: textC } },
+                    tooltip: { mode: 'index', intersect: false,
+                        callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.raw?.toFixed(2) ?? '—'}` }
+                    },
+                    annotation: { annotations: {
+                        danger: { type:'line', yMin:1.5, yMax:1.5, borderColor:'rgba(229,57,53,.4)', borderWidth:1.5, borderDash:[4,4] },
+                        caution:{ type:'line', yMin:1.3, yMax:1.3, borderColor:'rgba(251,140,0,.35)', borderWidth:1.5, borderDash:[4,4] },
+                        low:    { type:'line', yMin:0.8, yMax:0.8, borderColor:'rgba(30,136,229,.35)', borderWidth:1.5, borderDash:[4,4] }
+                    }}
+                },
+                scales: {
+                    x: { ticks: { color: textC, maxTicksLimit: 7, font: { size: 10 } }, grid: { color: gridC } },
+                    y: { min: 0, max: 2.2, ticks: { color: textC, font: { size: 10 } }, grid: { color: gridC } }
+                }
+            }
+        });
+    }
+
+    _acTogglePlayer(id, checked) {
+        if (!this._acExcluded) this._acExcluded = new Set();
+        if (checked) this._acExcluded.delete(id); else this._acExcluded.add(id);
+        requestAnimationFrame(() => this._drawACCurveChart());
+    }
+
+    _acSetWindow(days) {
+        this._acWindow = days;
+        this.renderAnalytics();
+    }
+
+    _renderInjuryTrendTab() {
+        const injuries = this.injuries || [];
+        if (!injuries.length) return `<div class="an-empty">🦴 Sin lesiones registradas</div>`;
+
+        const zones = {};
+        injuries.forEach(inj => {
+            const loc = this.getLocationName?.(inj.location) || inj.location || 'Desconocida';
+            if (!zones[loc]) zones[loc] = { active: 0, resolved: 0, total: 0 };
+            zones[loc].total++;
+            if (inj.status === 'active') zones[loc].active++;
+            else zones[loc].resolved++;
+        });
+
+        const sorted = Object.entries(zones).sort((a,b) => b[1].total - a[1].total);
+        const maxVal = Math.max(...sorted.map(([,v]) => v.total), 1);
+
+        const bars = sorted.map(([loc, v]) => `
+            <div class="inj-trend-row">
+                <div class="inj-trend-loc">${loc}</div>
+                <div class="inj-trend-bar-wrap">
+                    <div class="inj-trend-bar-resolved" style="width:${(v.resolved/maxVal*100).toFixed(0)}%"></div>
+                    <div class="inj-trend-bar-active"   style="width:${(v.active/maxVal*100).toFixed(0)}%"></div>
+                </div>
+                <div class="inj-trend-count">${v.total}</div>
+            </div>`).join('');
+
+        // Monthly trend
+        const byMonth = {};
+        injuries.forEach(inj => {
+            if (!inj.date) return;
+            const key = inj.date.slice(0, 7);
+            if (!byMonth[key]) byMonth[key] = 0;
+            byMonth[key]++;
+        });
+        const monthKeys = Object.keys(byMonth).sort().slice(-12);
+        const monthBars = monthKeys.map(k => {
+            const n = byMonth[k];
+            const h = Math.min(n * 20, 80);
+            const [y, m] = k.split('-');
+            const lbl = new Date(+y, +m-1, 1).toLocaleDateString('es-ES',{month:'short'});
+            return `<div class="inj-month-col">
+                <div class="inj-month-bar" style="height:${h}px" title="${n} lesiones"></div>
+                <div class="inj-month-val">${n}</div>
+                <div class="inj-month-lbl">${lbl}</div>
+            </div>`;
+        }).join('');
+
+        return `<div class="inj-trend-wrap">
+            <h4 class="an-section-title">Lesiones por zona corporal</h4>
+            <div class="inj-trend-legend">
+                <span class="inj-leg-dot inj-leg-resolved"></span>Resueltas
+                <span class="inj-leg-dot inj-leg-active" style="margin-left:.75rem"></span>Activas
+            </div>
+            <div class="inj-trend-chart">${bars}</div>
+            ${monthKeys.length > 1 ? `
+            <h4 class="an-section-title" style="margin-top:1.5rem">Frecuencia mensual</h4>
+            <div class="inj-month-chart">${monthBars}</div>` : ''}
+        </div>`;
+    }
+
     // ========== ANALYTICS ==========
 
     renderAnalytics() {
@@ -2028,52 +2338,47 @@ class RPETracker {
         // Build sticky semaphore bar
         this._renderSemaphoreBar();
 
-        // EWMA box: contraída por defecto (solo se abre si el usuario lo guardó explícitamente)
+        if (!this._analyticsTab) this._analyticsTab = 'tabla';
         const ewmaOpen = localStorage.getItem('rpe_ewma_open') === 'true';
-        container.innerHTML = `
-            ${this.renderPlayerComparison()}
 
-            <details class="ewma-info-box" id="ewmaDetails" ${ewmaOpen ? 'open' : ''}>
-                <summary class="ewma-summary">
-                    <span>ℹ️ Método EWMA — ¿Cómo se calcula el ratio A:C?</span>
-                    <span class="ewma-toggle-hint">ver más</span>
-                </summary>
-                <div class="ewma-body">
-                    <p style="margin-bottom: 0.5rem;"><strong>Carga = RPE × Duración</strong> (método sRPE)</p>
-                    <p style="margin-bottom: 0.5rem;">Esta app usa el <strong>método EWMA</strong>, el estándar científico usado por equipos profesionales para calcular el ratio Agudo:Crónico.</p>
-                    
-                    <div style="background: var(--bg-subtle); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                        <strong>¿Por qué EWMA es mejor?</strong>
-                        <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem;">
-                            <li>✅ Pondera más los entrenamientos recientes</li>
-                            <li>✅ Se adapta más rápido a cambios de carga</li>
-                            <li>✅ Más sensible a picos de carga (mejor prevención)</li>
-                            <li>✅ Método validado científicamente</li>
-                        </ul>
-                    </div>
-                    
-                    <p style="margin-bottom: 0.5rem;"><strong>Interpretación del Ratio:</strong></p>
-                    <ul style="margin-left: 1.5rem; color: var(--gray);">
-                        <li><strong style="color: #2e7d32;">0.8 - 1.3 (Verde):</strong> 🟢 Zona óptima - Adaptación positiva</li>
-                        <li><strong style="color: #ef6c00;">1.3 - 1.5 (Naranja):</strong> 🟠 Precaución - Riesgo moderado de lesión</li>
-                        <li><strong style="color: #c62828;">> 1.5 (Rojo):</strong> 🔴 Peligro - Alto riesgo de lesión</li>
-                        <li><strong style="color: #1565c0;">< 0.8 (Azul):</strong> 🔵 Descarga - Puede perder condición</li>
-                    </ul>
-                    
-                    <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--gray); font-style: italic;">
-                        Nota: EWMA Aguda usa ventana de 7 días (λ=0.25), EWMA Crónica usa 28 días (λ=0.069)
-                    </p>
-                </div>
-            </details>
+        container.innerHTML = `
+            <div class="an-tabs">
+                <button class="an-tab ${this._analyticsTab==='tabla'?'active':''}"
+                    onclick="window.rpeTracker?._setAnalyticsTab('tabla')">📊 Comparativa</button>
+                <button class="an-tab ${this._analyticsTab==='curvas'?'active':''}"
+                    onclick="window.rpeTracker?._setAnalyticsTab('curvas')">📈 Curvas A:C</button>
+                <button class="an-tab ${this._analyticsTab==='lesiones'?'active':''}"
+                    onclick="window.rpeTracker?._setAnalyticsTab('lesiones')">🦴 Lesiones</button>
+            </div>
+
+            <div id="anTabContent">
+                ${this._analyticsTab === 'tabla' ? `
+                    ${this.renderPlayerComparison()}
+                    <details class="ewma-info-box" id="ewmaDetails" ${ewmaOpen?'open':''}>
+                        <summary class="ewma-summary">
+                            <span>ℹ️ Método EWMA — ¿Cómo se calcula el ratio A:C?</span>
+                            <span class="ewma-toggle-hint">ver más</span>
+                        </summary>
+                        <div class="ewma-body">
+                            <p style="margin-bottom:0.5rem"><strong>Carga = RPE × Duración</strong> (método sRPE)</p>
+                            <p style="margin-bottom:0.5rem">Esta app usa el <strong>método EWMA</strong>, el estándar científico usado por equipos profesionales para calcular el ratio Agudo:Crónico.</p>
+                            <p style="margin-bottom:0.5rem"><strong>Interpretación del Ratio:</strong></p>
+                            <ul style="margin-left:1.5rem;color:var(--gray)">
+                                <li><strong style="color:#2e7d32">0.8–1.3 (Verde):</strong> 🟢 Zona óptima</li>
+                                <li><strong style="color:#ef6c00">1.3–1.5 (Naranja):</strong> 🟠 Precaución</li>
+                                <li><strong style="color:#c62828">&gt;1.5 (Rojo):</strong> 🔴 Peligro</li>
+                                <li><strong style="color:#1565c0">&lt;0.8 (Azul):</strong> 🔵 Descarga</li>
+                            </ul>
+                        </div>
+                    </details>` :
+                this._analyticsTab === 'curvas' ? this._renderACCurveTab() :
+                this._renderInjuryTrendTab()}
+            </div>
         `;
-        
-        // Persist EWMA details open/closed state
-        setTimeout(() => {
-            const det = document.getElementById('ewmaDetails');
-            if (det) det.addEventListener('toggle', () => {
-                localStorage.setItem('rpe_ewma_open', det.open);
-            });
-        }, 0);
+        // Render chart after DOM is ready
+        if (this._analyticsTab === 'curvas') {
+            requestAnimationFrame(() => this._drawACCurveChart());
+        }
 
     }
 
