@@ -547,3 +547,170 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 `;
     document.head.appendChild(s);
 })();
+
+// ========== PASE RÁPIDO DE WELLNESS (BULK) ==========
+
+RPETracker.prototype.openWellnessBulk = function() {
+    if (!this.players.length) { this.showToast('Sin jugadoras registradas', 'warning'); return; }
+    if (!this.wellnessData) this.wellnessData = this.loadWellnessData();
+
+    const today = new Date().toISOString().slice(0, 10);
+    // Order: pending first, then already filled
+    const pending = this.players.filter(p => !this.wellnessData.some(w => w.playerId === p.id && w.date === today));
+    const done    = this.players.filter(p =>  this.wellnessData.some(w => w.playerId === p.id && w.date === today));
+    this._bulkQueue   = [...pending, ...done];
+    this._bulkIndex   = 0;
+    this._bulkDate    = today;
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'wellnessBulkOverlay';
+    overlay.className = 'wb-overlay';
+    document.body.appendChild(overlay);
+
+    this._renderBulkStep();
+};
+
+RPETracker.prototype._renderBulkStep = function() {
+    const overlay = document.getElementById('wellnessBulkOverlay');
+    if (!overlay) return;
+
+    const total  = this._bulkQueue.length;
+    const idx    = this._bulkIndex;
+    const player = this._bulkQueue[idx];
+    const today  = this._bulkDate;
+
+    if (!player) { this._closeBulk(true); return; }
+
+    const existing = (this.wellnessData||[]).find(w => w.playerId === player.id && w.date === today);
+    const metrics  = ['sleep','fatigue','mood','soreness'];
+    const cfg = {
+        sleep:    { label:'😴 Sueño',     lo:'Muy malo',    hi:'Excelente' },
+        fatigue:  { label:'⚡ Energía',    lo:'Muy cansada', hi:'Descansada' },
+        mood:     { label:'😊 Ánimo',      lo:'Muy bajo',    hi:'Excelente' },
+        soreness: { label:'💪 Muscular',   lo:'Mucho dolor', hi:'Sin dolor'  }
+    };
+
+    const sliders = metrics.map(m => {
+        const val = existing ? (existing[m] || 3) : 3;
+        const cap = m.charAt(0).toUpperCase() + m.slice(1);
+        return `<div class="wb-slider-group">
+            <div class="wb-slider-header">
+                <span class="wb-slider-label">${cfg[m].label}</span>
+                <span class="wb-slider-val" id="wbVal${cap}">${val}</span>
+            </div>
+            <div class="wb-slider-row">
+                <span class="wb-lo">${cfg[m].lo}</span>
+                <input type="range" class="wb-slider" id="wbSlider${cap}"
+                    min="1" max="5" step="1" value="${val}"
+                    oninput="window.rpeTracker?._wbUpdateSlider('${m}',this.value)">
+                <span class="wb-hi">${cfg[m].hi}</span>
+            </div>
+            <div class="wb-pips" id="wbPips${cap}"></div>
+        </div>`;
+    }).join('');
+
+    const pct = Math.round((idx / total) * 100);
+    const isDone = this.wellnessData.some(w => w.playerId === player.id && w.date === today);
+
+    overlay.innerHTML = `
+        <div class="wb-modal">
+            <div class="wb-header">
+                <div class="wb-progress-bar"><div class="wb-progress-fill" style="width:${pct}%"></div></div>
+                <div class="wb-header-row">
+                    <span class="wb-counter">${idx + 1} / ${total}</span>
+                    <span class="wb-title">Pase rápido de wellness</span>
+                    <button class="wb-close" onclick="window.rpeTracker?._closeBulk(false)">✕</button>
+                </div>
+            </div>
+            <div class="wb-player-bar">
+                ${PlayerTokens.avatar(player, 38, '0.9rem')}
+                <div class="wb-player-info">
+                    <div class="wb-player-name">${player.name}${player.number ? ` <span class="db-num">#${player.number}</span>` : ''}</div>
+                    ${isDone ? '<div class="wb-already-done">✅ Ya registrado — puedes editar</div>' : ''}
+                </div>
+            </div>
+            <div class="wb-body">${sliders}
+                <div class="wb-notes-row">
+                    <label class="wb-notes-label">📝 Notas</label>
+                    <input type="text" class="wb-notes-input" id="wbNotes"
+                        placeholder="Estrés, dolor, viaje..." value="${existing?.notes || ''}">
+                </div>
+            </div>
+            <div class="wb-footer">
+                ${idx > 0 ? `<button class="btn-secondary wb-btn-back" onclick="window.rpeTracker?._wbNav(-1)">← Anterior</button>` : '<div></div>'}
+                <div class="wb-overall-badge" id="wbBadge">—</div>
+                <button class="btn-primary wb-btn-next" onclick="window.rpeTracker?._wbSaveAndNav(1)">
+                    ${idx < total - 1 ? 'Guardar y siguiente →' : '✅ Finalizar'}
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Init pips and badge
+    metrics.forEach(m => {
+        const val = existing ? (existing[m] || 3) : 3;
+        this._wbUpdateSlider(m, val);
+    });
+    this._wbRefreshBadge();
+};
+
+RPETracker.prototype._wbUpdateSlider = function(metric, value) {
+    const v   = parseInt(value);
+    const cap = metric.charAt(0).toUpperCase() + metric.slice(1);
+    const valEl  = document.getElementById(`wbVal${cap}`);
+    const pipsEl = document.getElementById(`wbPips${cap}`);
+    if (valEl) { valEl.textContent = v; valEl.style.color = this._wColor(v); }
+    if (pipsEl) pipsEl.innerHTML = [1,2,3,4,5].map(i =>
+        `<span class="ws-pip ${i<=v?'active':''}" style="${i<=v?`background:${this._wColor(v)}`:''}" ></span>`).join('');
+    this._wbRefreshBadge();
+};
+
+RPETracker.prototype._wbRefreshBadge = function() {
+    const g = id => parseInt(document.getElementById(id)?.value || 3);
+    const score = this._wOverall({
+        sleep: g('wbSliderSleep'), fatigue: g('wbSliderFatigue'),
+        mood: g('wbSliderMood'), soreness: g('wbSliderSoreness')
+    });
+    const badge = document.getElementById('wbBadge');
+    if (badge) { badge.textContent = score.toFixed(1); badge.style.color = this._wColor(score); }
+};
+
+RPETracker.prototype._wbSaveAndNav = function(dir) {
+    if (!this.wellnessData) this.wellnessData = [];
+    const player = this._bulkQueue[this._bulkIndex];
+    const date   = this._bulkDate;
+    const g = id => parseInt(document.getElementById(id)?.value || 3);
+    const entry  = {
+        id: `w_${player.id}_${date}`,
+        playerId: player.id, date,
+        sleep:    g('wbSliderSleep'),
+        fatigue:  g('wbSliderFatigue'),
+        mood:     g('wbSliderMood'),
+        soreness: g('wbSliderSoreness'),
+        notes:    document.getElementById('wbNotes')?.value || '',
+        savedAt:  new Date().toISOString()
+    };
+    const idx = this.wellnessData.findIndex(w => w.playerId === player.id && w.date === date);
+    if (idx >= 0) this.wellnessData[idx] = entry; else this.wellnessData.push(entry);
+    this.saveWellnessData();
+
+    this._bulkIndex += dir;
+    if (this._bulkIndex >= this._bulkQueue.length) { this._closeBulk(true); return; }
+    this._renderBulkStep();
+};
+
+RPETracker.prototype._wbNav = function(dir) {
+    this._bulkIndex = Math.max(0, this._bulkIndex + dir);
+    this._renderBulkStep();
+};
+
+RPETracker.prototype._closeBulk = function(completed) {
+    const overlay = document.getElementById('wellnessBulkOverlay');
+    if (overlay) overlay.remove();
+    if (completed) {
+        this.showToast('✅ Wellness del equipo guardado', 'success');
+        if (this.currentView === 'wellness') this.renderWellnessDashboard();
+        if (this.currentView === 'dashboard') this.renderDashboard();
+    }
+};
