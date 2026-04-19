@@ -3141,13 +3141,13 @@ header h1 {
 /* ===== DASHBOARD LAYOUT A — DOS COLUMNAS ===== */
 .dashboard-container { padding: 0; max-width: 100%; }
 
-/* Split layout */
+/* Split layout — 4 columns */
 .db-split {
     display: grid;
-    grid-template-columns: 220px minmax(0, 420px) 260px;
+    grid-template-columns: 210px minmax(0,1fr) 280px 240px;
     height: calc(100vh - 110px);
     overflow: hidden;
-    max-width: 960px;
+    max-width: 1200px;
     margin: 0 auto;
     border-left: 0.5px solid var(--border);
     border-right: 0.5px solid var(--border);
@@ -3389,11 +3389,309 @@ header h1 {
 .db-avail-name  { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .db-avail-detail { font-size: 0.72rem; white-space: nowrap; flex-shrink: 0; }
 
+/* ── Dashboard Calendar column ─────────────────────────────────────── */
+.db-cal {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-left: 0.5px solid var(--border);
+    background: var(--bg-surface);
+}
+
+.db-cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 1rem 0.4rem;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg-surface);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.db-cal-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.db-cal-tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-subtle);
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.db-cal-tab {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.db-cal-tab.active {
+    background: var(--bg-surface);
+    color: #ff6600;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.db-cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 1rem;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg-subtle);
+}
+
+.db-cal-nav-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.db-cal-nav-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.db-cal-nav-btn:hover { background: var(--bg-elevated); color: #ff6600; }
+
+.db-cal-body {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.5rem;
+}
+
+/* Monthly mini-calendar */
+.db-mini-cal {
+    width: 100%;
+}
+
+.db-mini-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.db-mini-cal-dow {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-align: center;
+    padding: 2px 0 4px;
+    text-transform: uppercase;
+}
+
+.db-mini-day {
+    aspect-ratio: 1;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 3px 2px 2px;
+    cursor: default;
+    position: relative;
+    min-height: 30px;
+    transition: background 0.1s;
+}
+
+.db-mini-day.has-event { cursor: pointer; }
+.db-mini-day.has-event:hover { background: var(--bg-elevated) !important; }
+
+.db-mini-day-num {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+.db-mini-day.today .db-mini-day-num {
+    background: #ff6600;
+    color: #fff;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.db-mini-day.empty { cursor: default; }
+
+.db-mini-day-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.db-mini-day-bar {
+    width: 80%;
+    height: 3px;
+    border-radius: 2px;
+    margin-top: 2px;
+}
+
+.db-mini-day-icon {
+    font-size: 0.7rem;
+    line-height: 1;
+    margin-top: 1px;
+}
+
+/* Weekly view */
+.db-week-view {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.db-week-day-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 0.5px solid var(--border);
+    min-height: 36px;
+}
+
+.db-week-day-row.today-row {
+    border-color: #ff6600;
+    box-shadow: 0 0 0 1px #ff660022;
+}
+
+.db-week-day-label {
+    width: 36px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-subtle);
+    padding: 4px 0;
+    border-right: 0.5px solid var(--border);
+}
+
+.db-week-day-name {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+}
+
+.db-week-day-num {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.db-week-day-row.today-row .db-week-day-label {
+    background: #ff660015;
+}
+
+.db-week-day-row.today-row .db-week-day-num { color: #ff6600; }
+
+.db-week-sessions {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 8px;
+}
+
+.db-week-session-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.db-week-session-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.db-week-rest {
+    font-size: 0.68rem;
+    color: var(--text-faint);
+    font-style: italic;
+    padding: 4px 8px;
+    align-self: center;
+}
+
+/* Legend strip */
+.db-cal-legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 0.4rem 0.5rem 0.2rem;
+    border-top: 0.5px solid var(--border);
+    margin-top: 0.4rem;
+}
+
+.db-cal-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.62rem;
+    color: var(--text-faint);
+}
+
+.db-cal-legend-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+[data-theme="dark"] .db-cal { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .db-cal-header { background: var(--bg-surface); }
+[data-theme="dark"] .db-cal-nav { background: var(--bg-subtle); }
+[data-theme="dark"] .db-mini-day-dot { opacity: 0.85; }
+[data-theme="dark"] .db-week-day-label { background: var(--bg-subtle); }
+[data-theme="dark"] .db-week-day-row.today-row .db-week-day-label { background: #ff660020; }
+
 /* Mobile: stack all columns */
+@media (min-width: 769px) and (max-width: 1100px) {
+    .db-split {
+        grid-template-columns: 190px minmax(0,1fr) 240px 200px;
+        max-width: 100%;
+    }
+}
+
 @media (max-width: 768px) {
     .db-split { grid-template-columns: 1fr; min-height: auto; }
     .db-left { border-right: none; border-bottom: 0.5px solid var(--border); }
     .db-avail { border-left: none; border-top: 0.5px solid var(--border); }
+    .db-cal   { border-left: none; border-top: 0.5px solid var(--border); }
     .db-left-section { padding: 0.5rem 1rem 0.6rem; }
     .db-metric-row { font-size: 0.82rem; }
     .db-right-header { padding: 0.5rem 1rem 0.35rem; }
@@ -4787,6 +5085,7 @@ details[open] .ewma-toggle-hint { display: none; }
     }
     .db-left { border-right: none; border-bottom: 0.5px solid var(--border); overflow-y: visible; }
     .db-avail { border-left: none; border-top: 0.5px solid var(--border); overflow-y: visible; }
+    .db-cal   { border-left: none; border-top: 0.5px solid var(--border); overflow-y: visible; min-height: 320px; }
     .db-players { overflow-y: visible; max-height: none; }
     .db-avail-list { overflow-y: visible; max-height: none; }
 }

@@ -1536,6 +1536,11 @@ class RPETracker {
                 </div>
 
                 <!-- Columna disponibilidad -->
+                <div class="db-cal" id="dbCalColumn">
+                    <!-- filled by renderDashboardCalendar() -->
+                </div>
+
+                <!-- Columna disponibilidad -->
                 <div class="db-avail">
                     <div class="db-right-header">
                         <span class="db-right-label">Disponibilidad</span>
@@ -1609,6 +1614,8 @@ class RPETracker {
             }
             // nav alert badge
             this._updateNavAlertBadge();
+            // Render mini calendar column
+            this.renderDashboardCalendar();
         });
     }
 
@@ -1617,6 +1624,288 @@ class RPETracker {
         this._dashSort = next[this._dashSort] || 'risk';
         this.renderDashboard();
     }
+
+    // ── Dashboard Mini Calendar ────────────────────────────────────────────
+    renderDashboardCalendar() {
+        const col = document.getElementById('dbCalColumn');
+        if (!col) return;
+
+        // Init state
+        if (!this._dbCal) {
+            const now = new Date();
+            this._dbCal = { mode: 'month', year: now.getFullYear(), month: now.getMonth(), weekOffset: 0 };
+        }
+
+        const { mode, year, month, weekOffset } = this._dbCal;
+
+        // Color map by session type
+        const typeColor = {
+            training: '#2196f3',
+            match:    '#f44336',
+            recovery: '#4caf50',
+            shooting: '#9c27b0',
+            gym:      '#795548',
+            rest:     '#bdbdbd'
+        };
+        const typeIcon = {
+            training: '🏀',
+            match:    '🏟️',
+            recovery: '💪',
+            shooting: '🎯',
+            gym:      '🏋️',
+            rest:     '—'
+        };
+        const typeLabel = {
+            training: 'Entreno',
+            match:    'Partido',
+            recovery: 'Recuperación',
+            shooting: 'Tiro',
+            gym:      'Gym',
+            rest:     'Descanso'
+        };
+
+        // Build a map: dateStr → [{type, source:'real'|'plan'}]
+        const eventMap = {};
+
+        const addEvent = (dateStr, type, source) => {
+            if (!eventMap[dateStr]) eventMap[dateStr] = [];
+            eventMap[dateStr].push({ type, source });
+        };
+
+        // Real sessions (unique dates with dominant type)
+        this.sessions.forEach(s => {
+            if (s.date) addEvent(s.date, s.type || 'training', 'real');
+        });
+
+        // WeekPlan events — expand the current plan across ±8 weeks from today
+        if (this.weekPlan && this.weekPlan.days) {
+            const dayKeys   = ['lun','mar','mie','jue','vie','sab','dom'];
+            // JS getDay(): 0=Sun,1=Mon... we want Mon=0
+            const now = new Date();
+            const todayDow = (now.getDay() + 6) % 7; // 0=Mon
+            // Find Monday of this week
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - todayDow);
+            monday.setHours(0,0,0,0);
+
+            for (let wOff = -4; wOff <= 8; wOff++) {
+                dayKeys.forEach((key, idx) => {
+                    const dayData = this.weekPlan.days[key];
+                    if (!dayData) return;
+                    const d = new Date(monday);
+                    d.setDate(monday.getDate() + wOff * 7 + idx);
+                    const dateStr = d.toISOString().slice(0, 10);
+                    // Only add planned events if no real sessions exist for that date
+                    ['morning','afternoon'].forEach(slot => {
+                        const s = dayData[slot];
+                        if (s && s.enabled && s.type && s.type !== 'rest') {
+                            addEvent(dateStr, s.type, 'plan');
+                        }
+                    });
+                });
+            }
+        }
+
+        // Nav label
+        const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                            'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+        let navLabel = '';
+        if (mode === 'month') {
+            navLabel = `${monthNames[month]} ${year}`;
+        } else {
+            // Weekly: find Mon of offset week
+            const now2 = new Date();
+            const todayDow2 = (now2.getDay() + 6) % 7;
+            const mon = new Date(now2);
+            mon.setDate(now2.getDate() - todayDow2 + weekOffset * 7);
+            const sun = new Date(mon);
+            sun.setDate(mon.getDate() + 6);
+            navLabel = `${mon.getDate()} – ${sun.getDate()} ${monthNames[sun.getMonth()]}`;
+        }
+
+        // Build content
+        let bodyHTML = '';
+
+        if (mode === 'month') {
+            const firstDay = new Date(year, month, 1);
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            // start on Monday: JS getDay 0=Sun → convert to Mon-based
+            let startDow = (firstDay.getDay() + 6) % 7; // 0=Mon
+            const today = new Date().toISOString().slice(0, 10);
+
+            bodyHTML += `<div class="db-mini-cal">
+                <div class="db-mini-cal-grid">
+                    <div class="db-mini-cal-dow">L</div>
+                    <div class="db-mini-cal-dow">M</div>
+                    <div class="db-mini-cal-dow">X</div>
+                    <div class="db-mini-cal-dow">J</div>
+                    <div class="db-mini-cal-dow">V</div>
+                    <div class="db-mini-cal-dow">S</div>
+                    <div class="db-mini-cal-dow">D</div>`;
+
+            // Empty cells before first day
+            for (let i = 0; i < startDow; i++) {
+                bodyHTML += `<div class="db-mini-day empty"></div>`;
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const isToday = dateStr === today;
+                const events  = eventMap[dateStr] || [];
+
+                // Dominant event for this day (real > plan, match > training > rest)
+                const realEvents = events.filter(e => e.source === 'real');
+                const planEvents = events.filter(e => e.source === 'plan');
+                const dominant  = realEvents.length ? realEvents : planEvents;
+                const hasMatch  = dominant.some(e => e.type === 'match');
+                const topType   = hasMatch ? 'match' : (dominant[0]?.type || null);
+
+                let dotHTML = '';
+                if (topType) {
+                    const isReal = realEvents.length > 0;
+                    const color  = typeColor[topType] || '#ccc';
+                    dotHTML = `<div class="db-mini-day-dot" style="background:${color};opacity:${isReal ? 1 : 0.45};"></div>`;
+                    // Second dot if two different types on same day
+                    const types = [...new Set(dominant.map(e => e.type))];
+                    if (types.length > 1) {
+                        const second = types.find(t => t !== topType);
+                        if (second) dotHTML += `<div class="db-mini-day-dot" style="background:${typeColor[second]||'#ccc'};opacity:${isReal?1:0.45};"></div>`;
+                    }
+                }
+
+                const hasBg   = topType && topType !== 'rest';
+                const bgStyle = hasBg ? `background:${typeColor[topType]}12;` : '';
+                const hasEvt  = events.length > 0;
+
+                bodyHTML += `<div class="db-mini-day${isToday ? ' today' : ''}${hasEvt ? ' has-event' : ''}"
+                    style="${bgStyle}"
+                    title="${topType ? typeLabel[topType] : 'Sin actividad'}">
+                    <div class="db-mini-day-num">${d}</div>
+                    <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;margin-top:1px;">${dotHTML}</div>
+                </div>`;
+            }
+
+            bodyHTML += `</div></div>`; // close grid + mini-cal
+
+            // Legend
+            bodyHTML += `<div class="db-cal-legend">
+                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#2196f3"></div>Entreno</div>
+                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#f44336"></div>Partido</div>
+                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#4caf50"></div>Rec.</div>
+                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#795548"></div>Gym</div>
+                <div class="db-cal-legend-item" style="opacity:0.55">● plan &nbsp; <span style="opacity:1">●</span> real</div>
+            </div>`;
+
+        } else {
+            // Weekly view
+            const now3  = new Date();
+            const dow3  = (now3.getDay() + 6) % 7;
+            const mon   = new Date(now3);
+            mon.setDate(now3.getDate() - dow3 + weekOffset * 7);
+            mon.setHours(0,0,0,0);
+            const today3 = new Date().toISOString().slice(0,10);
+            const dayShort = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(mon);
+                d.setDate(mon.getDate() + i);
+                const dateStr = d.toISOString().slice(0,10);
+                const isToday = dateStr === today3;
+                const events  = eventMap[dateStr] || [];
+
+                // Deduplicate by type+source
+                const seen = new Set();
+                const uniq = events.filter(e => {
+                    const k = e.type + e.source;
+                    if (seen.has(k)) return false;
+                    seen.add(k); return true;
+                });
+
+                let sessHTML = '';
+                if (uniq.length === 0) {
+                    sessHTML = `<span class="db-week-rest">Descanso</span>`;
+                } else {
+                    sessHTML = `<div class="db-week-sessions">` +
+                        uniq.map(e => `
+                            <div class="db-week-session-chip">
+                                <div class="db-week-session-dot" style="background:${typeColor[e.type]||'#ccc'};opacity:${e.source==='plan'?0.45:1};"></div>
+                                <span>${typeIcon[e.type]} ${typeLabel[e.type]}${e.source==='plan'?' <span style="font-size:0.6rem;opacity:0.6">(plan)</span>':''}</span>
+                            </div>`).join('') +
+                        `</div>`;
+                }
+
+                bodyHTML += `<div class="db-week-day-row${isToday ? ' today-row' : ''}">
+                    <div class="db-week-day-label">
+                        <div class="db-week-day-name">${dayShort[i]}</div>
+                        <div class="db-week-day-num">${d.getDate()}</div>
+                    </div>
+                    ${uniq.length === 0
+                        ? `<span class="db-week-rest">Descanso</span>`
+                        : `<div class="db-week-sessions">${
+                            uniq.map(e => `
+                                <div class="db-week-session-chip">
+                                    <div class="db-week-session-dot" style="background:${typeColor[e.type]||'#ccc'};opacity:${e.source==='plan'?0.45:1};"></div>
+                                    <span>${typeIcon[e.type]} ${typeLabel[e.type]}${e.source==='plan'?' <span style="font-size:0.6rem;opacity:0.55">(plan)</span>':''}</span>
+                                </div>`).join('')
+                        }</div>`
+                    }
+                </div>`;
+            }
+
+            bodyHTML = `<div class="db-week-view">${bodyHTML}</div>`;
+
+            // Legend
+            bodyHTML += `<div class="db-cal-legend">
+                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#2196f3"></div>Entreno</div>
+                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#f44336"></div>Partido</div>
+                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#4caf50"></div>Rec.</div>
+                <div class="db-cal-legend-item" style="opacity:0.55">● plan &nbsp; <span style="opacity:1">●</span> real</div>
+            </div>`;
+        }
+
+        col.innerHTML = `
+            <div class="db-cal-header">
+                <span class="db-cal-title">Calendario</span>
+                <div class="db-cal-tabs">
+                    <button class="db-cal-tab${mode==='week'?' active':''}"
+                        onclick="window.rpeTracker?._dbCalSetMode('week')">Sem</button>
+                    <button class="db-cal-tab${mode==='month'?' active':''}"
+                        onclick="window.rpeTracker?._dbCalSetMode('month')">Mes</button>
+                </div>
+            </div>
+            <div class="db-cal-nav">
+                <button class="db-cal-nav-btn" onclick="window.rpeTracker?._dbCalNav(-1)">‹</button>
+                <span class="db-cal-nav-label">${navLabel}</span>
+                <button class="db-cal-nav-btn" onclick="window.rpeTracker?._dbCalNav(1)">›</button>
+            </div>
+            <div class="db-cal-body">
+                ${bodyHTML}
+            </div>
+        `;
+    }
+
+    _dbCalSetMode(mode) {
+        if (!this._dbCal) {
+            const now = new Date();
+            this._dbCal = { mode, year: now.getFullYear(), month: now.getMonth(), weekOffset: 0 };
+        }
+        this._dbCal.mode = mode;
+        this.renderDashboardCalendar();
+    }
+
+    _dbCalNav(dir) {
+        if (!this._dbCal) return;
+        if (this._dbCal.mode === 'month') {
+            this._dbCal.month += dir;
+            if (this._dbCal.month > 11) { this._dbCal.month = 0;  this._dbCal.year++; }
+            if (this._dbCal.month < 0)  { this._dbCal.month = 11; this._dbCal.year--; }
+        } else {
+            this._dbCal.weekOffset = (this._dbCal.weekOffset || 0) + dir;
+        }
+        this.renderDashboardCalendar();
+    }
+    // ── End Dashboard Mini Calendar ────────────────────────────────────────
 
     renderTeamRatios() {
         if (this.players.length === 0) {
