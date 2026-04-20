@@ -5011,6 +5011,26 @@ details[open] .ewma-toggle-hint { display: none; }
 
 /* PDF icon button en cabecera Disponibilidad */
 .db-sort-btn--icon { padding: 3px 7px; font-size: 0.85rem; }
+.db-sort-btn--pass {
+    padding: 3px 8px;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.db-sort-btn--pass:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+.db-pass-badge {
+    background: var(--primary);
+    color: #fff;
+    border-radius: 10px;
+    font-size: 0.6rem;
+    padding: 0px 4px;
+    font-weight: 700;
+    transition: background 0.15s;
+}
+.db-sort-btn--pass:hover .db-pass-badge { background: rgba(255,255,255,0.3); }
 
 /* --- Vista lesiones: layout wrap --- */
 .inj-wrap {
