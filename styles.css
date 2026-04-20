@@ -6535,3 +6535,188 @@ details[open] .ewma-toggle-hint { display: none; }
     .wb-modal { max-height: 100vh; border-radius: 0; max-width: 100%; }
     .md-grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); }
 }
+
+/* ═══════════════════════════════════════════════════════
+   GEAR MENU
+   ═══════════════════════════════════════════════════════ */
+.gear-btn {
+    background: var(--bg-surface);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 0.4rem 0.65rem;
+    font-size: 1rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: background 0.15s, color 0.15s;
+    line-height: 1;
+}
+.gear-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+
+.gear-dropdown {
+    position: fixed;
+    background: var(--bg-card, #fff);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    min-width: 230px;
+    padding: 6px 0;
+    z-index: 2001;
+}
+.gear-section-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 6px 14px 2px;
+}
+.gear-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 14px;
+    background: none;
+    border: none;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s;
+}
+.gear-item:hover { background: var(--bg-subtle); }
+.gear-item--danger { color: #c62828; }
+.gear-item--danger:hover { background: #ffebee; }
+.gear-icon { font-size: 1rem; width: 20px; text-align: center; flex-shrink: 0; }
+.gear-divider { height: 0.5px; background: var(--border); margin: 4px 0; }
+
+/* ═══════════════════════════════════════════════════════
+   WELLNESS BULK — BOTONES 1-5
+   ═══════════════════════════════════════════════════════ */
+.wb-btn-group { display: flex; flex-direction: column; gap: 0.3rem; }
+.wb-val-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.wb-val-btns {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+    justify-content: center;
+}
+.wb-val-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 2px solid;
+    background: transparent;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    flex-shrink: 0;
+}
+.wb-val-btn:hover { transform: scale(1.08); }
+.wb-val-btn--active { box-shadow: 0 2px 8px rgba(0,0,0,0.2); transform: scale(1.05); }
+@media (max-width: 380px) {
+    .wb-val-btn { width: 34px; height: 34px; font-size: 0.9rem; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   CLEAR SEASON CONFIRM MODAL
+   ═══════════════════════════════════════════════════════ */
+.clear-confirm-modal {
+    background: var(--bg-card, #fff);
+    border-radius: 16px;
+    padding: 2rem 1.75rem;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.clear-confirm-icon { font-size: 2.5rem; text-align: center; }
+.clear-confirm-title { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0; text-align: center; }
+.clear-confirm-desc { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6; text-align: center; margin: 0; }
+.clear-confirm-challenge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-subtle);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+}
+.clear-challenge-label { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
+.clear-challenge-sum { font-size: 1.5rem; font-weight: 800; color: #c62828; }
+.clear-challenge-input {
+    width: 100px;
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+    padding: 0.4rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+}
+.clear-challenge-input:focus { border-color: #ff6600; }
+.clear-challenge-error { font-size: 0.78rem; color: #f44336; font-weight: 600; }
+.clear-confirm-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+
+/* ═══════════════════════════════════════════════════════
+   SEASON VIEWER MODAL
+   ═══════════════════════════════════════════════════════ */
+.sv-modal {
+    background: var(--bg-card, #fff);
+    border-radius: 16px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.25);
+    overflow: hidden;
+}
+.sv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.25rem 1.5rem 1rem;
+    border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+}
+.sv-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); }
+.sv-subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+.sv-kpis {
+    display: flex;
+    gap: 10px;
+    padding: 1rem 1.5rem;
+    flex-wrap: wrap;
+    border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+}
+.sv-kpi {
+    flex: 1;
+    min-width: 80px;
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    text-align: center;
+}
+.sv-kpi-num { font-size: 1.4rem; font-weight: 700; color: #ff6600; line-height: 1; }
+.sv-kpi-lbl { font-size: 0.65rem; color: var(--text-faint); margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
+.sv-body { flex: 1; overflow-y: auto; }
+.sv-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    border-top: 0.5px solid var(--border);
+    flex-shrink: 0;
+}
