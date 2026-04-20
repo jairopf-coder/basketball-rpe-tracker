@@ -1596,10 +1596,6 @@ class RPETracker {
                             <span class="db-metric-val" style="color:#f44336">${activeInjuries}</span>
                         </div>` : ''}
                     </div>
-                    ${this.players.length > 0 ? `<div class="db-left-section db-left-section--wellness">
-                        <div class="db-left-label">Wellness hoy <button class="db-w-link" onclick="NavMenu.selectGroup('salud')">ver →</button></div>
-                        <div class="db-w-chips-full">${wellnessChipsExpanded}</div>
-                    </div>` : ''}
                     <div class="db-left-section db-left-section--action">
                         <button class="db-quick-pass-btn" onclick="window.rpeTracker?.openWellnessBulk()">
                             ✏️ Pase rápido
@@ -1624,6 +1620,9 @@ class RPETracker {
                                 </button>
                                 <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Generar informe PDF">
                                     📄
+                                </button>
+                                <button class="db-sort-btn db-sort-btn--pass" onclick="window.rpeTracker?.openWellnessBulk()" title="Pase rápido de wellness">
+                                    ✏️${_pendingW.length > 0 ? ` <span class="db-pass-badge">${_pendingW.length}</span>` : ''}
                                 </button>
                             </div>
                         </div>
