@@ -3172,6 +3172,8 @@ header h1 {
     padding: 1rem 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
 }
 
 .db-left-section {
@@ -4863,6 +4865,122 @@ details[open] .ewma-toggle-hint { display: none; }
     font-weight: 500;
     float: right;
 }
+
+/* Wellness chips expandidas (con score por jugadora) */
+.db-left-section--wellness { flex: 1; overflow-y: auto; }
+.db-w-chips-full {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 4px;
+}
+.db-w-chip-full {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 6px 3px 4px;
+    border-radius: 8px;
+    border: 0.5px solid var(--border);
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: opacity 0.15s;
+}
+.db-w-chip-full:hover { opacity: 0.8; }
+.db-w-chip-name {
+    flex: 1;
+    color: var(--text-primary);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.db-w-chip-val {
+    font-weight: 700;
+    font-size: 0.72rem;
+    flex-shrink: 0;
+}
+
+/* Botón pase rápido anclado al fondo de columna izquierda */
+.db-left-section--action {
+    padding: 0.6rem 1.25rem;
+    border-top: 0.5px solid var(--border);
+    margin-top: auto;
+    flex-shrink: 0;
+}
+.db-quick-pass-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    border: 0.5px solid var(--primary);
+    background: transparent;
+    color: var(--primary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.db-quick-pass-btn:hover {
+    background: var(--primary);
+    color: #fff;
+}
+.db-quick-pass-badge {
+    background: var(--primary);
+    color: #fff;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    font-weight: 700;
+    transition: background 0.15s;
+}
+.db-quick-pass-btn:hover .db-quick-pass-badge {
+    background: rgba(255,255,255,0.3);
+}
+
+/* Mini resumen wellness al fondo de columna Ratio */
+.db-wsum {
+    border-top: 0.5px solid var(--border);
+    padding: 0.5rem 1.25rem 0.75rem;
+    background: var(--bg-subtle);
+    flex-shrink: 0;
+}
+.db-wsum-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.3rem;
+}
+.db-wsum-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.db-wsum-coverage {
+    font-size: 0.65rem;
+    color: var(--text-faint);
+    background: var(--bg-elevated);
+    padding: 1px 5px;
+    border-radius: 10px;
+}
+.db-wsum-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.18rem 0;
+    font-size: 0.75rem;
+    border-bottom: 0.5px solid var(--border);
+}
+.db-wsum-row:last-child { border-bottom: none; }
+.db-wsum-metric { color: var(--text-muted); }
+.db-wsum-val { font-weight: 700; }
+
+/* PDF icon button en cabecera Disponibilidad */
+.db-sort-btn--icon { padding: 3px 7px; font-size: 0.85rem; }
 
 /* --- Vista lesiones: layout wrap --- */
 .inj-wrap {
