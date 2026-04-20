@@ -156,22 +156,8 @@ const AppAuth = {
     },
 
     addLogoutButton() {
-        const header = document.querySelector('.header-actions');
-        if (!header) return;
-        const btn = document.createElement('button');
-        btn.className = 'btn-secondary';
-        btn.style.cssText = 'font-size:0.8rem;padding:0.4rem 0.75rem;';
-        btn.textContent = '🔒 Salir';
-        btn.onclick = () => AppAuth.logout();
-        header.appendChild(btn);
-
-        // Add settings button for PIN management
-        const settingsBtn = document.createElement('button');
-        settingsBtn.className = 'btn-secondary';
-        settingsBtn.style.cssText = 'font-size:0.8rem;padding:0.4rem 0.75rem;';
-        settingsBtn.textContent = '⚙️ PINs';
-        settingsBtn.onclick = () => AppAuth.showPinSettings();
-        header.appendChild(settingsBtn);
+        // Logout and PIN management are now handled via the gear menu (⚙️)
+        // Nothing to inject — gear menu reads AppAuth.logout() and AppAuth.showPinSettings() directly
     },
 
     showPinSettings() {

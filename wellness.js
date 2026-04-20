@@ -583,35 +583,43 @@ RPETracker.prototype._renderBulkStep = function() {
     if (!player) { this._closeBulk(true); return; }
 
     const existing = (this.wellnessData||[]).find(w => w.playerId === player.id && w.date === today);
-    const metrics  = ['sleep','fatigue','mood','soreness'];
     const cfg = {
-        sleep:    { label:'😴 Sueño',     lo:'Muy malo',    hi:'Excelente' },
-        fatigue:  { label:'⚡ Energía',    lo:'Muy cansada', hi:'Descansada' },
-        mood:     { label:'😊 Ánimo',      lo:'Muy bajo',    hi:'Excelente' },
-        soreness: { label:'💪 Muscular',   lo:'Mucho dolor', hi:'Sin dolor'  }
+        sleep:    { label:'😴 Sueño',    lo:'Pésimo', hi:'Excelente', id:'wbBtnSleep'    },
+        fatigue:  { label:'⚡ Energía',  lo:'Agotada', hi:'Descansada', id:'wbBtnFatigue' },
+        mood:     { label:'😊 Ánimo',    lo:'Muy bajo', hi:'Excelente', id:'wbBtnMood'    },
+        soreness: { label:'💪 Muscular', lo:'Mucho dolor', hi:'Sin dolor', id:'wbBtnSoreness' }
     };
+    const btnColors = ['#f44336','#ff9800','#ffc107','#8bc34a','#4caf50'];
+    const btnLabels = ['1','2','3','4','5'];
 
-    const sliders = metrics.map(m => {
+    const metrics = Object.keys(cfg);
+    const btnGroups = metrics.map(m => {
         const val = existing ? (existing[m] || 3) : 3;
-        const cap = m.charAt(0).toUpperCase() + m.slice(1);
-        return `<div class="wb-slider-group">
+        const buttons = [1,2,3,4,5].map(n => {
+            const active = n === val;
+            const col = btnColors[n-1];
+            return `<button class="wb-val-btn ${active?'wb-val-btn--active':''}"
+                style="${active?`background:${col};color:#fff;border-color:${col}`:`border-color:${col};color:${col}`}"
+                data-metric="${m}" data-val="${n}"
+                onclick="window.rpeTracker?._wbSelectBtn('${m}',${n},this)">${btnLabels[n-1]}</button>`;
+        }).join('');
+        return `<div class="wb-btn-group">
             <div class="wb-slider-header">
                 <span class="wb-slider-label">${cfg[m].label}</span>
-                <span class="wb-slider-val" id="wbVal${cap}">${val}</span>
+                <span class="wb-slider-val" id="wbVal${m.charAt(0).toUpperCase()+m.slice(1)}" style="color:${btnColors[val-1]}">${val}</span>
             </div>
-            <div class="wb-slider-row">
+            <div class="wb-val-row">
                 <span class="wb-lo">${cfg[m].lo}</span>
-                <input type="range" class="wb-slider" id="wbSlider${cap}"
-                    min="1" max="5" step="1" value="${val}"
-                    oninput="window.rpeTracker?._wbUpdateSlider('${m}',this.value)">
+                <div class="wb-val-btns" id="${cfg[m].id}">${buttons}</div>
                 <span class="wb-hi">${cfg[m].hi}</span>
             </div>
-            <div class="wb-pips" id="wbPips${cap}"></div>
         </div>`;
     }).join('');
 
     const pct = Math.round((idx / total) * 100);
     const isDone = this.wellnessData.some(w => w.playerId === player.id && w.date === today);
+    const score = this._wbCurrentScore();
+    const scoreColor = this._wColor(score);
 
     overlay.innerHTML = `
         <div class="wb-modal">
@@ -619,7 +627,7 @@ RPETracker.prototype._renderBulkStep = function() {
                 <div class="wb-progress-bar"><div class="wb-progress-fill" style="width:${pct}%"></div></div>
                 <div class="wb-header-row">
                     <span class="wb-counter">${idx + 1} / ${total}</span>
-                    <span class="wb-title">Pase rápido de wellness</span>
+                    <span class="wb-title">Pase rápido</span>
                     <button class="wb-close" onclick="window.rpeTracker?._closeBulk(false)">✕</button>
                 </div>
             </div>
@@ -627,10 +635,11 @@ RPETracker.prototype._renderBulkStep = function() {
                 ${PlayerTokens.avatar(player, 38, '0.9rem')}
                 <div class="wb-player-info">
                     <div class="wb-player-name">${player.name}${player.number ? ` <span class="db-num">#${player.number}</span>` : ''}</div>
-                    ${isDone ? '<div class="wb-already-done">✅ Ya registrado — puedes editar</div>' : ''}
+                    ${isDone ? '<div class="wb-already-done">✅ Ya registrado — editando</div>' : ''}
                 </div>
+                <div class="wb-overall-badge" id="wbBadge" style="color:${scoreColor}">${score.toFixed(1)}</div>
             </div>
-            <div class="wb-body">${sliders}
+            <div class="wb-body">${btnGroups}
                 <div class="wb-notes-row">
                     <label class="wb-notes-label">📝 Notas</label>
                     <input type="text" class="wb-notes-input" id="wbNotes"
@@ -639,55 +648,61 @@ RPETracker.prototype._renderBulkStep = function() {
             </div>
             <div class="wb-footer">
                 ${idx > 0 ? `<button class="btn-secondary wb-btn-back" onclick="window.rpeTracker?._wbNav(-1)">← Anterior</button>` : '<div></div>'}
-                <div class="wb-overall-badge" id="wbBadge">—</div>
                 <button class="btn-primary wb-btn-next" onclick="window.rpeTracker?._wbSaveAndNav(1)">
                     ${idx < total - 1 ? 'Guardar y siguiente →' : '✅ Finalizar'}
                 </button>
             </div>
         </div>
     `;
-
-    // Init pips and badge
-    metrics.forEach(m => {
-        const val = existing ? (existing[m] || 3) : 3;
-        this._wbUpdateSlider(m, val);
-    });
-    this._wbRefreshBadge();
 };
 
-RPETracker.prototype._wbUpdateSlider = function(metric, value) {
-    const v   = parseInt(value);
+RPETracker.prototype._wbSelectBtn = function(metric, val, btn) {
     const cap = metric.charAt(0).toUpperCase() + metric.slice(1);
-    const valEl  = document.getElementById(`wbVal${cap}`);
-    const pipsEl = document.getElementById(`wbPips${cap}`);
-    if (valEl) { valEl.textContent = v; valEl.style.color = this._wColor(v); }
-    if (pipsEl) pipsEl.innerHTML = [1,2,3,4,5].map(i =>
-        `<span class="ws-pip ${i<=v?'active':''}" style="${i<=v?`background:${this._wColor(v)}`:''}" ></span>`).join('');
-    this._wbRefreshBadge();
-};
-
-RPETracker.prototype._wbRefreshBadge = function() {
-    const g = id => parseInt(document.getElementById(id)?.value || 3);
-    const score = this._wOverall({
-        sleep: g('wbSliderSleep'), fatigue: g('wbSliderFatigue'),
-        mood: g('wbSliderMood'), soreness: g('wbSliderSoreness')
+    const btnColors = ['#f44336','#ff9800','#ffc107','#8bc34a','#4caf50'];
+    const col = btnColors[val-1];
+    // Update all buttons in this group
+    btn.closest('.wb-val-btns').querySelectorAll('.wb-val-btn').forEach((b, i) => {
+        const n = i + 1;
+        const isActive = n === val;
+        const c = btnColors[i];
+        b.className = 'wb-val-btn' + (isActive ? ' wb-val-btn--active' : '');
+        b.style.cssText = isActive ? `background:${c};color:#fff;border-color:${c}` : `border-color:${c};color:${c}`;
     });
+    // Update display val
+    const valEl = document.getElementById(`wbVal${cap}`);
+    if (valEl) { valEl.textContent = val; valEl.style.color = col; }
+    // Refresh badge
+    const score = this._wbCurrentScore();
     const badge = document.getElementById('wbBadge');
     if (badge) { badge.textContent = score.toFixed(1); badge.style.color = this._wColor(score); }
 };
+
+RPETracker.prototype._wbCurrentScore = function() {
+    const getVal = (metric) => {
+        const grp = document.querySelector(`[data-metric="${metric}"].wb-val-btn--active`);
+        return grp ? parseInt(grp.dataset.val) : 3;
+    };
+    return this._wOverall({ sleep: getVal('sleep'), fatigue: getVal('fatigue'), mood: getVal('mood'), soreness: getVal('soreness') });
+};
+
+RPETracker.prototype._wbUpdateSlider = function() {}; // kept for compat
+RPETracker.prototype._wbRefreshBadge = function() {};  // kept for compat
 
 RPETracker.prototype._wbSaveAndNav = function(dir) {
     if (!this.wellnessData) this.wellnessData = [];
     const player = this._bulkQueue[this._bulkIndex];
     const date   = this._bulkDate;
-    const g = id => parseInt(document.getElementById(id)?.value || 3);
+    const getBtn = m => {
+        const el = document.querySelector(`[data-metric="${m}"].wb-val-btn--active`);
+        return el ? parseInt(el.dataset.val) : 3;
+    };
     const entry  = {
         id: `w_${player.id}_${date}`,
         playerId: player.id, date,
-        sleep:    g('wbSliderSleep'),
-        fatigue:  g('wbSliderFatigue'),
-        mood:     g('wbSliderMood'),
-        soreness: g('wbSliderSoreness'),
+        sleep:    getBtn('sleep'),
+        fatigue:  getBtn('fatigue'),
+        mood:     getBtn('mood'),
+        soreness: getBtn('soreness'),
         notes:    document.getElementById('wbNotes')?.value || '',
         savedAt:  new Date().toISOString()
     };

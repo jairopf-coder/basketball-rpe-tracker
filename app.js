@@ -294,10 +294,8 @@ class RPETracker {
         document.getElementById('addBtn').addEventListener('click', () => this.openNewSessionModal());
         document.getElementById('dashboardBtn')?.addEventListener('click', () => this.switchView('dashboard'));
         document.getElementById('playersBtn')?.addEventListener('click', () => this.switchView('players'));
-        document.getElementById('exportBtn')?.addEventListener('click', () => this.exportData());
-        document.getElementById('exportPDFBtn')?.addEventListener('click', () => this.exportSessionsHistoryPDF());
-        document.getElementById('backupBtn')?.addEventListener('click', () => this.showBackupMenu());
         document.getElementById('restoreFile')?.addEventListener('change', (e) => this.restoreBackup(e));
+        document.getElementById('seasonFileInput')?.addEventListener('change', (e) => this.loadSeasonArchive(e));
         
         // Session modal controls
         document.getElementById('closeModal')?.addEventListener('click', () => this.closeModal('newSessionModal'));
@@ -1524,14 +1522,12 @@ class RPETracker {
         const pendingWellness = _pendingW.length;
 
         let bannerHTML = '';
-        if (alertPlayers.length > 0 || warnPlayers.length > 0 || pendingWellness > 0) {
+        if (alertPlayers.length > 0 || warnPlayers.length > 0) {
             const items = [];
-            if (alertPlayers.length)  items.push(`🔴 <strong>${alertPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> con ratio en zona de peligro`);
-            if (warnPlayers.length)   items.push(`🟠 <strong>${warnPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> en precaución`);
-            if (pendingWellness > 0)  items.push(`📋 <strong>${pendingWellness} jugadora${pendingWellness>1?'s':''}</strong> sin wellness hoy`);
+            if (alertPlayers.length) items.push(`🔴 <strong>${alertPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> ratio en zona de peligro`);
+            if (warnPlayers.length)  items.push(`🟠 <strong>${warnPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> en precaución`);
             bannerHTML = `<div class="db-alert-banner">
                 ${items.map(i=>`<div class="db-alert-item">${i}</div>`).join('<div class="db-alert-sep">·</div>')}
-                ${pendingWellness > 0 ? `<button class="db-alert-btn" onclick="window.rpeTracker?.openWellnessBulk()">✏️ Pase rápido</button>` : ''}
             </div>`;
         }
 
