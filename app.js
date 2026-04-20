@@ -1366,14 +1366,61 @@ class RPETracker {
         // Active injuries
         const activeInjuries = (this.injuries || []).filter(i => i.status === 'active').length;
 
-        // Wellness chips — jugadoras sin registro hoy
+        // Wellness data — hoy
         const _wToday = new Date().toISOString().slice(0, 10);
         const _wData  = this.wellnessData || [];
-        const _pendingW = this.players.filter(p => !(_wData).some(e => e.playerId === p.id && e.date === _wToday));
-        const wellnessChips = this.players.length === 0 ? '' :
-            _pendingW.length === 0
-                ? `<div class="db-w-all-ok">✅ Todas registradas hoy</div>`
-                : _pendingW.map(p => `<button class="db-w-chip" onclick="NavMenu.selectGroup('salud')" title="${p.name}">${PlayerTokens.avatar(p,16,'0.5rem')}<span>${p.name.split(' ')[0]}</span></button>`).join('');
+        const _pendingW = this.players.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
+
+        // Chips de wellness expandidas con color por estado
+        const wellnessChipsExpanded = this.players.length === 0 ? '' : (() => {
+            const chipColor = (p) => {
+                const todayEntry = _wData.find(e => e.playerId === p.id && e.date === _wToday);
+                if (!todayEntry) return { bg: 'var(--bg-subtle)', border: 'var(--border)', dot: '#bbb', label: '—' };
+                const overall = (todayEntry.sleep + (6 - todayEntry.fatigue) + todayEntry.mood + (6 - todayEntry.soreness)) / 4;
+                if (overall >= 4)   return { bg: '#e8f5e9', border: '#a5d6a7', dot: '#4caf50', label: overall.toFixed(1) };
+                if (overall >= 2.5) return { bg: '#fff8e1', border: '#ffe082', dot: '#ff9800', label: overall.toFixed(1) };
+                return { bg: '#ffebee', border: '#ef9a9a', dot: '#f44336', label: overall.toFixed(1) };
+            };
+            return this.players.map(p => {
+                const c = chipColor(p);
+                return `<div class="db-w-chip-full" style="background:${c.bg};border-color:${c.border}" onclick="NavMenu.selectGroup('salud')" title="${p.name}">
+                    ${PlayerTokens.avatar(p, 18, '0.55rem')}
+                    <span class="db-w-chip-name">${p.name.split(' ')[0]}</span>
+                    <span class="db-w-chip-val" style="color:${c.dot}">${c.label}</span>
+                </div>`;
+            }).join('');
+        })();
+
+        // Mini resumen wellness equipo para columna Ratio
+        const wellnessMiniSummary = (() => {
+            if (!this.players.length) return '';
+            const todayEntries = _wData.filter(e => e.date === _wToday);
+            if (!todayEntries.length) return '';
+            const avg = (field) => {
+                const vals = todayEntries.map(e => e[field]).filter(v => v != null);
+                return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : '—';
+            };
+            const sleep = avg('sleep'), fatigue = avg('fatigue'), mood = avg('mood'), soreness = avg('soreness');
+            const dot = (val, invert = false) => {
+                const n = parseFloat(val);
+                if (isNaN(n)) return '#ccc';
+                const good = invert ? n <= 2.5 : n >= 3.5;
+                const bad  = invert ? n >= 3.5 : n <= 2.5;
+                return good ? '#4caf50' : bad ? '#f44336' : '#ff9800';
+            };
+            const covered = todayEntries.length;
+            const total   = this.players.length;
+            return `<div class="db-wsum">
+                <div class="db-wsum-header">
+                    <span class="db-wsum-label">Wellness hoy</span>
+                    <span class="db-wsum-coverage">${covered}/${total}</span>
+                </div>
+                <div class="db-wsum-row"><span class="db-wsum-metric">😴 Sueño</span><span class="db-wsum-val" style="color:${dot(sleep)}">${sleep}</span></div>
+                <div class="db-wsum-row"><span class="db-wsum-metric">⚡ Fatiga</span><span class="db-wsum-val" style="color:${dot(fatigue,true)}">${fatigue}</span></div>
+                <div class="db-wsum-row"><span class="db-wsum-metric">😊 Humor</span><span class="db-wsum-val" style="color:${dot(mood)}">${mood}</span></div>
+                <div class="db-wsum-row"><span class="db-wsum-metric">💪 Agujetas</span><span class="db-wsum-val" style="color:${dot(soreness,true)}">${soreness}</span></div>
+            </div>`;
+        })();
 
         // Sort order — persisted on instance
         if (!this._dashSort) this._dashSort = 'risk'; // 'risk' | 'safe' | 'name'
@@ -1493,14 +1540,8 @@ class RPETracker {
             ${this._matchDayMode ? this._renderMatchDayView(availGroups, players) : `
             <div class="db-split">
 
-                <!-- Columna izquierda: métricas -->
+                <!-- Columna izquierda: métricas + wellness -->
                 <div class="db-left">
-                    <!-- Wellness rápido -->
-                    ${this.players.length > 0 ? `<div class="db-left-section">
-                        <div class="db-left-label">Wellness hoy <button class="db-w-link" onclick="NavMenu.selectGroup('salud')">ver →</button></div>
-                        <div class="db-w-chips">${wellnessChips}</div>
-                    </div>` : ''}
-                    <!-- Batch 3: team load sparkline -->
                     <div class="db-left-section">
                         <div class="db-left-label">Carga equipo 7d</div>
                         <canvas id="teamSparklineCanvas" class="db-team-sparkline" width="200" height="70"></canvas>
@@ -1544,9 +1585,19 @@ class RPETracker {
                             <span class="db-metric-val" style="color:#f44336">${activeInjuries}</span>
                         </div>` : ''}
                     </div>
+                    ${this.players.length > 0 ? `<div class="db-left-section db-left-section--wellness">
+                        <div class="db-left-label">Wellness hoy <button class="db-w-link" onclick="NavMenu.selectGroup('salud')">ver →</button></div>
+                        <div class="db-w-chips-full">${wellnessChipsExpanded}</div>
+                    </div>` : ''}
+                    <div class="db-left-section db-left-section--action">
+                        <button class="db-quick-pass-btn" onclick="window.rpeTracker?.openWellnessBulk()">
+                            ✏️ Pase rápido
+                            ${_pendingW.length > 0 ? `<span class="db-quick-pass-badge">${_pendingW.length}</span>` : ''}
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Columna derecha: ratio jugadoras -->
+                <!-- Columna central: ratio jugadoras -->
                 <div class="db-right">
                     <div class="db-right-header">
                         <span class="db-right-label">Ratio A:C</span>
@@ -1563,9 +1614,10 @@ class RPETracker {
                     <div class="db-players">
                         ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
                     </div>
+                    ${wellnessMiniSummary}
                 </div>
 
-                <!-- Columna disponibilidad -->
+                <!-- Columna calendario -->
                 <div class="db-cal" id="dbCalColumn">
                     <!-- filled by renderDashboardCalendar() -->
                 </div>
@@ -1574,8 +1626,8 @@ class RPETracker {
                 <div class="db-avail">
                     <div class="db-right-header">
                         <span class="db-right-label">Disponibilidad</span>
-                        <button class="db-sort-btn" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Generar informe PDF">
-                            📄 Informe PDF
+                        <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Generar informe PDF">
+                            📄
                         </button>
                     </div>
                     <div class="db-avail-summary">
