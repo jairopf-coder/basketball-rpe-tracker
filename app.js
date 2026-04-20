@@ -1597,13 +1597,25 @@ class RPETracker {
                     </div>
                 </div>
 
-                <!-- Columna central: ratio jugadoras -->
+                <!-- Columna central: ratio A:C + disponibilidad -->
                 <div class="db-right">
                     <div class="db-right-header">
                         <span class="db-right-label">Ratio A:C</span>
-                        <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
-                            ${sortLabel[this._dashSort]}
-                        </button>
+                        <div class="db-right-header-actions">
+                            <div class="db-avail-pills-inline">
+                                <span class="db-avail-pill db-avail-ok">${availGroups.ok.length} <span>aptas</span></span>
+                                <span class="db-avail-pill db-avail-caution">${availGroups.caution.length} <span>precaución</span></span>
+                                <span class="db-avail-pill db-avail-out">${availGroups.out.length} <span>no disp.</span></span>
+                            </div>
+                            <div class="db-right-header-btns">
+                                <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
+                                    ${sortLabel[this._dashSort]}
+                                </button>
+                                <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Generar informe PDF">
+                                    📄
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div class="db-right-legend">
                         <span style="color:#4caf50">● óptimo</span>
@@ -1620,28 +1632,6 @@ class RPETracker {
                 <!-- Columna calendario -->
                 <div class="db-cal" id="dbCalColumn">
                     <!-- filled by renderDashboardCalendar() -->
-                </div>
-
-                <!-- Columna disponibilidad -->
-                <div class="db-avail">
-                    <div class="db-right-header">
-                        <span class="db-right-label">Disponibilidad</span>
-                        <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Generar informe PDF">
-                            📄
-                        </button>
-                    </div>
-                    <div class="db-avail-summary">
-                        <div class="db-avail-pill db-avail-ok">${availGroups.ok.length} <span>aptas</span></div>
-                        <div class="db-avail-pill db-avail-caution">${availGroups.caution.length} <span>precaución</span></div>
-                        <div class="db-avail-pill db-avail-out">${availGroups.out.length} <span>no disp.</span></div>
-                    </div>
-                    <div class="db-avail-list">
-                        ${this.players.length === 0
-                            ? '<div class="db-empty">Sin jugadoras</div>'
-                            : availSection('Precaución', availGroups.caution, '') +
-                              availSection('No disponibles', availGroups.out, '') +
-                              availSection('Disponibles', availGroups.ok, '')}
-                    </div>
                 </div>
 
             </div>

@@ -3156,7 +3156,7 @@ header h1 {
 /* Split layout — 4 columns */
 .db-split {
     display: grid;
-    grid-template-columns: 210px minmax(0,1fr) 280px 240px;
+    grid-template-columns: 210px minmax(0,1fr) 280px;
     height: calc(100vh - 110px);
     overflow: hidden;
     max-width: 1200px;
@@ -3214,14 +3214,35 @@ header h1 {
 
 .db-right-header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.65rem 1.25rem 0.4rem;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.55rem 1.25rem 0.45rem;
     border-bottom: 0.5px solid var(--border);
     background: var(--bg-surface);
     position: sticky;
     top: 0;
     z-index: 1;
+}
+
+.db-right-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.5rem;
+}
+
+.db-avail-pills-inline {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.db-right-header-btns {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
 }
 
 .db-right-label {
@@ -3344,12 +3365,12 @@ header h1 {
 }
 
 .db-avail-pill {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 0.78rem;
+    gap: 3px;
+    font-size: 0.72rem;
     font-weight: 700;
-    padding: 3px 10px;
+    padding: 2px 7px;
     border-radius: 20px;
 }
 
