@@ -1450,6 +1450,16 @@ class RPETracker {
 
         const playerRows = players.map(({ player, ratio, st, r }) => {
             const barW = Math.min(r / 2 * 100, 100).toFixed(0);
+            // Wellness de hoy para esta jugadora
+            const wEntry = _wData.find(e => e.playerId === player.id && e.date === _wToday);
+            let wScore = '—', wColor = 'var(--text-faint)', wBg = 'var(--bg-subtle)';
+            if (wEntry) {
+                const overall = (wEntry.sleep + (6 - wEntry.fatigue) + wEntry.mood + (6 - wEntry.soreness)) / 4;
+                wScore = overall.toFixed(1);
+                if (overall >= 4)        { wColor = '#2e7d32'; wBg = '#e8f5e9'; }
+                else if (overall >= 2.5) { wColor = '#e65100'; wBg = '#fff3e0'; }
+                else                     { wColor = '#c62828'; wBg = '#ffebee'; }
+            }
             return `
                 <div class="db-player-row">
                     ${PlayerTokens.avatar(player, 20, '0.6rem')}
@@ -1461,6 +1471,7 @@ class RPETracker {
                     </div>
                     <div class="db-player-ratio" style="color:${st.color}">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
                     <div class="db-player-icon">${st.icon}</div>
+                    <div class="db-player-wellness" style="color:${wColor};background:${wBg}">${wScore}</div>
                 </div>`;
         }).join('');
 
