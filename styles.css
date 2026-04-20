@@ -3289,7 +3289,7 @@ header h1 {
 
 .db-player-row {
     display: grid;
-    grid-template-columns: 20px 120px 1fr 42px 18px;
+    grid-template-columns: 20px 120px 1fr 42px 18px 36px;
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 0;
@@ -3344,6 +3344,15 @@ header h1 {
 
 .db-player-ratio { font-size: 0.88rem; font-weight: 700; text-align: right; }
 .db-player-icon  { font-size: 13px; text-align: center; }
+.db-player-wellness {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 2px 4px;
+    border-radius: 6px;
+    background: var(--bg-subtle);
+    min-width: 30px;
+}
 .db-empty        { color: var(--text-faint); font-size: 0.85rem; padding: 1rem 0; text-align: center; }
 
 /* Availability column */
