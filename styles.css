@@ -67,6 +67,7 @@
     --text-faint:     #a1a1aa;
     --shadow-sm:      0 1px 4px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
     --shadow-md:      0 4px 12px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.08);
+    --bg-card:        #ffffff;
 
     /* ── Radio y transición global ──────────────────────── */
     --radius-sm: 6px;
@@ -90,6 +91,7 @@
     --text-faint:     #44444e;
     --shadow-sm:      0 1px 4px rgba(0,0,0,0.50), 0 2px 8px rgba(0,0,0,0.40);
     --shadow-md:      0 4px 16px rgba(0,0,0,0.60), 0 8px 32px rgba(0,0,0,0.50);
+    --bg-card:        #1c1c20;
 
     /* Override brand softs for dark */
     --primary-soft:   rgba(245,90,0,0.15);
@@ -6586,9 +6588,14 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 .gear-item:hover { background: var(--bg-subtle); }
 .gear-item--danger { color: #c62828; }
-.gear-item--danger:hover { background: #ffebee; }
+.gear-item--danger:hover { background: var(--danger-soft); }
 .gear-icon { font-size: 1rem; width: 20px; text-align: center; flex-shrink: 0; }
 .gear-divider { height: 0.5px; background: var(--border); margin: 4px 0; }
+
+[data-theme="dark"] .gear-dropdown {
+    box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+}
+[data-theme="dark"] .gear-item--danger { color: #ef9a9a; }
 
 /* ═══════════════════════════════════════════════════════
    WELLNESS BULK — BOTONES 1-5
@@ -6711,6 +6718,9 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 .sv-kpi-num { font-size: 1.4rem; font-weight: 700; color: #ff6600; line-height: 1; }
 .sv-kpi-lbl { font-size: 0.65rem; color: var(--text-faint); margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
+.sv-kpi--danger { border-color: var(--danger); }
+.sv-kpi--danger .sv-kpi-num { color: var(--danger); }
+.sv-kpi--ok .sv-kpi-num { color: var(--success); }
 .sv-body { flex: 1; overflow-y: auto; }
 .sv-footer {
     display: flex;
@@ -6720,3 +6730,27 @@ details[open] .ewma-toggle-hint { display: none; }
     border-top: 0.5px solid var(--border);
     flex-shrink: 0;
 }
+.sv-filename { font-size: 11px; color: var(--text-faint); }
+.sv-thead-row { background: var(--bg-subtle); }
+.sv-th {
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: .04em;
+    border-bottom: 1.5px solid var(--border);
+}
+.sv-th--left { text-align: left; }
+.sv-td {
+    padding: 7px 12px;
+    border-bottom: 0.5px solid var(--border);
+    color: var(--text-primary);
+}
+.sv-td--center { text-align: center; }
+.sv-td--name { font-weight: 500; }
+.sv-td--rpe { font-weight: 600; color: var(--primary); }
+.sv-td--inj { color: var(--success); }
+.sv-td--inj-active { color: var(--danger); }
+.sv-number { color: var(--text-faint); font-size: 11px; }

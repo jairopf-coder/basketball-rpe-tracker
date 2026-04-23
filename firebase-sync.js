@@ -226,7 +226,52 @@ FirebaseSync.prototype.migrateStrengthData = async function() {
     const gymRaw  = localStorage.getItem('bk_gym_sessions');
     const testRaw = localStorage.getItem('bk_test_sessions');
     const wellRaw = localStorage.getItem('basketballWellness');
+    const injRaw  = localStorage.getItem('basketballInjuries');
+    const planRaw = localStorage.getItem('basketballWeekPlan');
     if (gymRaw)  { await this.saveGymSessions(JSON.parse(gymRaw));   console.log('✅ GymSessions migradas a Firebase'); }
     if (testRaw) { await this.saveTestSessions(JSON.parse(testRaw)); console.log('✅ TestSessions migradas a Firebase'); }
     if (wellRaw) { await this.saveWellnessData(JSON.parse(wellRaw)); console.log('✅ Wellness migrado a Firebase'); }
+    if (injRaw)  { await this.saveInjuries(JSON.parse(injRaw));      console.log('✅ Lesiones migradas a Firebase'); }
+    if (planRaw) { await this.saveWeekPlan(JSON.parse(planRaw));     console.log('✅ Plan semanal migrado a Firebase'); }
+};
+
+// ========== INJURIES (Firebase sync) ==========
+
+FirebaseSync.prototype.saveInjuries = async function(injuries) {
+    try {
+        const obj = {};
+        injuries.forEach(inj => { obj[inj.id] = inj; });
+        await this.db.ref('injuries').set(obj);
+        localStorage.setItem('basketballInjuries', JSON.stringify(injuries));
+    } catch (e) {
+        console.error('Error saving injuries to Firebase:', e);
+        localStorage.setItem('basketballInjuries', JSON.stringify(injuries));
+    }
+};
+
+FirebaseSync.prototype.onInjuriesChange = function(callback) {
+    this.db.ref('injuries').on('value', snapshot => {
+        const data = snapshot.val();
+        const injuries = data ? Object.values(data) : [];
+        callback(injuries);
+    });
+};
+
+// ========== WEEK PLAN (Firebase sync) ==========
+
+FirebaseSync.prototype.saveWeekPlan = async function(weekPlan) {
+    try {
+        await this.db.ref('weekPlan').set(weekPlan);
+        localStorage.setItem('basketballWeekPlan', JSON.stringify(weekPlan));
+    } catch (e) {
+        console.error('Error saving weekPlan to Firebase:', e);
+        localStorage.setItem('basketballWeekPlan', JSON.stringify(weekPlan));
+    }
+};
+
+FirebaseSync.prototype.onWeekPlanChange = function(callback) {
+    this.db.ref('weekPlan').on('value', snapshot => {
+        const data = snapshot.val();
+        callback(data || null);
+    });
 };
