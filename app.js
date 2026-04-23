@@ -1046,14 +1046,7 @@ class RPETracker {
     }
 
     closeModal(modalId) {
-        // Guard: confirm if the new-session modal has players selected or step 2 is active
         if (modalId === 'newSessionModal') {
-            const step2 = document.getElementById('sessionStep2');
-            const hasPlayers = (this.selectedPlayerIds || []).length > 0;
-            const inStep2 = step2 && step2.style.display !== 'none';
-            if (hasPlayers || inStep2) {
-                if (!confirm('¿Salir sin guardar la sesión?')) return;
-            }
             this.selectedPlayerIds = [];
         }
         document.getElementById(modalId)?.classList.remove('active');
