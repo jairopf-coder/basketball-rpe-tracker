@@ -111,7 +111,11 @@ RPETracker.prototype.loadInjuries = function() {
 };
 
 RPETracker.prototype.saveInjuries = function() {
-    localStorage.setItem('basketballInjuries', JSON.stringify(this.injuries));
+    if (window.firebaseSync) {
+        window.firebaseSync.saveInjuries(this.injuries);
+    } else {
+        localStorage.setItem('basketballInjuries', JSON.stringify(this.injuries));
+    }
 };
 
 RPETracker.prototype.loadAvailability = function() {

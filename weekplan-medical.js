@@ -40,7 +40,11 @@ RPETracker.prototype.loadWeekPlan = function() {
 };
 
 RPETracker.prototype.saveWeekPlan = function() {
-    localStorage.setItem('basketballWeekPlan', JSON.stringify(this.weekPlan));
+    if (window.firebaseSync) {
+        window.firebaseSync.saveWeekPlan(this.weekPlan);
+    } else {
+        localStorage.setItem('basketballWeekPlan', JSON.stringify(this.weekPlan));
+    }
 };
 
 RPETracker.prototype._defaultWeekPlan = function() {

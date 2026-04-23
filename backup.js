@@ -8,6 +8,8 @@ RPETracker.prototype.showGearMenu = function() {
     overlay.id = 'gearMenuOverlay';
     overlay.style.cssText = 'position:fixed;inset:0;z-index:2000';
     overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+    const _escGear = e => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', _escGear); } };
+    document.addEventListener('keydown', _escGear);
 
     overlay.innerHTML = `
         <div class="gear-dropdown" id="gearDropdown">
@@ -68,6 +70,7 @@ RPETracker.prototype.downloadBackup = function() {
         sessions:    this.sessions    || [],
         wellnessData: this.wellnessData || [],
         injuries:    this.injuries    || [],
+        gymSessions: this.gymSessions  || [],
         weekPlan:    this.weekPlan    || null
     };
     const now = new Date();
@@ -89,6 +92,7 @@ RPETracker.prototype.restoreBackup = function(event) {
                 this.sessions     = backup.sessions;
                 this.wellnessData = backup.wellnessData || [];
                 this.injuries     = backup.injuries     || [];
+                this.gymSessions  = backup.gymSessions  || [];
                 if (backup.weekPlan) this.weekPlan = backup.weekPlan;
                 this.savePlayers(); this.saveSessions(); this.saveWellnessData(); this.saveInjuries();
                 this.showToast('✅ Datos restaurados correctamente');
@@ -162,6 +166,7 @@ RPETracker.prototype._confirmSeasonClear = function(expectedAnswer) {
         sessions:     this.sessions     || [],
         wellnessData: this.wellnessData || [],
         injuries:     this.injuries     || [],
+        gymSessions:  this.gymSessions  || [],
         weekPlan:     this.weekPlan     || null
     };
     const fn = `RPE_Temporada_${season}_${String(now.getMonth()+1).padStart(2,'0')}${now.getDate()}.json`;
@@ -222,13 +227,13 @@ RPETracker.prototype._showSeasonViewer = function(data, filename) {
         const rpe7 = ps.length ? (ps.reduce((s,x)=>s+x.rpe,0)/ps.length).toFixed(1) : '—';
         const inj = (data.injuries||[]).filter(i=>i.playerId===p.id).length;
         const wCount = (data.wellnessData||[]).filter(w=>w.playerId===p.id).length;
-        return `<tr>
-            <td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-weight:500">${p.name}${p.number?` <span style="color:#aaa;font-size:11px">#${p.number}</span>`:''}</td>
-            <td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center">${ps.length}</td>
-            <td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:600;color:#ff6600">${rpe7}</td>
-            <td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center">${load.toLocaleString('es-ES')}</td>
-            <td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center">${wCount}</td>
-            <td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center;color:${inj>0?'#f44336':'#4caf50'}">${inj>0?inj:'—'}</td>
+        return `<tr class="sv-player-row">
+            <td class="sv-td sv-td--name">${p.name}${p.number?` <span class="sv-number">#${p.number}</span>`:''}</td>
+            <td class="sv-td sv-td--center">${ps.length}</td>
+            <td class="sv-td sv-td--center sv-td--rpe">${rpe7}</td>
+            <td class="sv-td sv-td--center">${load.toLocaleString('es-ES')}</td>
+            <td class="sv-td sv-td--center">${wCount}</td>
+            <td class="sv-td sv-td--center sv-td--inj ${inj>0?'sv-td--inj-active':''}">${inj>0?inj:'—'}</td>
         </tr>`;
     }).join('');
 
@@ -246,23 +251,23 @@ RPETracker.prototype._showSeasonViewer = function(data, filename) {
                 <div class="sv-kpi"><div class="sv-kpi-num">${totalSessions}</div><div class="sv-kpi-lbl">Sesiones</div></div>
                 <div class="sv-kpi"><div class="sv-kpi-num">${avgRPE}</div><div class="sv-kpi-lbl">RPE medio</div></div>
                 <div class="sv-kpi"><div class="sv-kpi-num">${wEntries}</div><div class="sv-kpi-lbl">Registros wellness</div></div>
-                <div class="sv-kpi" style="border-color:${activeInj>0?'#ef9a9a':'#a5d6a7'}"><div class="sv-kpi-num" style="color:${activeInj>0?'#c62828':'#2e7d32'}">${activeInj}</div><div class="sv-kpi-lbl">Lesiones activas</div></div>
+                <div class="sv-kpi ${activeInj>0?'sv-kpi--danger':'sv-kpi--ok'}"><div class="sv-kpi-num">${activeInj}</div><div class="sv-kpi-lbl">Lesiones activas</div></div>
             </div>
             <div class="sv-body">
                 <table style="width:100%;border-collapse:collapse;font-size:13px">
-                    <thead><tr style="background:#fafafa">
-                        <th style="padding:8px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase;border-bottom:1.5px solid #eee">Jugadora</th>
-                        <th style="padding:8px 12px;text-align:center;font-size:11px;color:#888;text-transform:uppercase;border-bottom:1.5px solid #eee">Sesiones</th>
-                        <th style="padding:8px 12px;text-align:center;font-size:11px;color:#888;text-transform:uppercase;border-bottom:1.5px solid #eee">RPE med.</th>
-                        <th style="padding:8px 12px;text-align:center;font-size:11px;color:#888;text-transform:uppercase;border-bottom:1.5px solid #eee">Carga UA</th>
-                        <th style="padding:8px 12px;text-align:center;font-size:11px;color:#888;text-transform:uppercase;border-bottom:1.5px solid #eee">Wellness</th>
-                        <th style="padding:8px 12px;text-align:center;font-size:11px;color:#888;text-transform:uppercase;border-bottom:1.5px solid #eee">Lesiones</th>
+                    <thead><tr class="sv-thead-row">
+                        <th class="sv-th sv-th--left">Jugadora</th>
+                        <th class="sv-th">Sesiones</th>
+                        <th class="sv-th">RPE med.</th>
+                        <th class="sv-th">Carga UA</th>
+                        <th class="sv-th">Wellness</th>
+                        <th class="sv-th">Lesiones</th>
                     </tr></thead>
                     <tbody>${playerRows}</tbody>
                 </table>
             </div>
             <div class="sv-footer">
-                <span style="font-size:11px;color:#aaa">${filename}</span>
+                <span class="sv-filename">${filename}</span>
                 <button class="btn-secondary" onclick="document.getElementById('seasonViewerOverlay').remove()">Cerrar</button>
             </div>
         </div>`;

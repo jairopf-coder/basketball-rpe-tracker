@@ -1,47 +1,6 @@
 // Basketball RPE Tracker - UI Helpers & Utilities
 
-// ========== PLAYER REPORT MENU ==========
-
-RPETracker.prototype.showPlayerReportMenu = function(playerId) {
-    const player = this.players.find(p => p.id === playerId);
-    if (!player) return;
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal active';
-    modal.innerHTML = `
-        <div class="modal-content modal-small">
-            <div class="modal-header">
-                <h2>📄 Informes de ${player.name}</h2>
-                <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
-            </div>
-            <div style="padding: 1.5rem;">
-                <p style="margin-bottom: 1rem; color: var(--gray);">Selecciona el tipo de informe:</p>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <button onclick="window.rpeTracker?.generatePDFReport('${playerId}', 'weekly'); this.closest('.modal').remove();" 
-                            class="btn-primary" style="width: 100%;">
-                        📅 Informe Semanal
-                    </button>
-                    <button onclick="window.rpeTracker?.generatePDFReport('${playerId}', 'monthly'); this.closest('.modal').remove();" 
-                            class="btn-primary" style="width: 100%;">
-                        📊 Informe Mensual
-                    </button>
-                    <button onclick="window.rpeTracker?.generatePDFReport('${playerId}', 'seasonal'); this.closest('.modal').remove();" 
-                            class="btn-primary" style="width: 100%;">
-                        🏆 Informe Trimestral
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.remove();
-        }
-    });
-};
+// NOTE: showPlayerReportMenu → superseded by pdf-reports.js (better implementation)
 
 // ========== TEMPLATE MANAGEMENT UI ==========
 
