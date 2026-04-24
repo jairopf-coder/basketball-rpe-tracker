@@ -1581,12 +1581,6 @@ class RPETracker {
                             <span class="db-metric-val" style="color:#f44336">${activeInjuries}</span>
                         </div>` : ''}
                     </div>
-                    <div class="db-left-section db-left-section--action">
-                        <button class="db-quick-pass-btn" onclick="window.rpeTracker?.openWellnessBulk()">
-                            ✏️ Pase rápido
-                            ${_pendingW.length > 0 ? `<span class="db-quick-pass-badge">${_pendingW.length}</span>` : ''}
-                        </button>
-                    </div>
                 </div>
 
                 <!-- Columna central: ratio A:C + disponibilidad -->
