@@ -3155,10 +3155,10 @@ header h1 {
 /* ===== DASHBOARD LAYOUT A — DOS COLUMNAS ===== */
 .dashboard-container { padding: 0; max-width: 100%; }
 
-/* Split layout — 4 columns */
+/* Split layout — 3 columns */
 .db-split {
     display: grid;
-    grid-template-columns: 210px minmax(0,1fr) 280px;
+    grid-template-columns: 240px minmax(0,1fr) 310px;
     height: calc(100vh - 110px);
     overflow: hidden;
     max-width: 1200px;
@@ -3728,7 +3728,7 @@ header h1 {
 /* Mobile: stack all columns */
 @media (min-width: 769px) and (max-width: 1100px) {
     .db-split {
-        grid-template-columns: 190px minmax(0,1fr) 240px 200px;
+        grid-template-columns: 210px minmax(0,1fr) 270px;
         max-width: 100%;
     }
 }
