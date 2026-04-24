@@ -1057,3 +1057,397 @@ RPETracker.prototype._drawCorrChart = function(data) {
 `;
     document.head.appendChild(s);
 })();
+
+// ============================================================
+// INJURY HUB — Vista unificada de Lesiones (reemplaza medical + injury list)
+// Tabs: Gestión | Individual | Equipo
+// ============================================================
+
+RPETracker.prototype.renderInjuryHub = function() {
+    const container = document.getElementById('injuryView');
+    if (!container) return;
+
+    if (!this._injuryHubTab) this._injuryHubTab = 'gestion';
+
+    const injuries  = this.injuries || [];
+    const activeInj = injuries.filter(i => i.status === 'active').length;
+
+    container.innerHTML = `
+        <div class="ijh-wrap">
+            <!-- Header + Nueva lesión -->
+            <div class="ijh-header">
+                <div>
+                    <h2 class="ijh-title">🏥 Lesiones</h2>
+                    <p class="ijh-sub">${injuries.length} registradas · <span style="color:var(--danger,#e53935)">${activeInj} activa${activeInj!==1?'s':''}</span></p>
+                </div>
+                <button class="btn-primary" onclick="window.rpeTracker?.showNewInjuryForm()">➕ Nueva lesión</button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="an-tabs" style="margin-bottom:0">
+                <button class="an-tab ${this._injuryHubTab==='gestion'?'active':''}"
+                    onclick="window.rpeTracker?._injHubTab('gestion')">🏥 Gestión</button>
+                <button class="an-tab ${this._injuryHubTab==='individual'?'active':''}"
+                    onclick="window.rpeTracker?._injHubTab('individual')">👤 Individual</button>
+                <button class="an-tab ${this._injuryHubTab==='equipo'?'active':''}"
+                    onclick="window.rpeTracker?._injHubTab('equipo')">👥 Equipo</button>
+            </div>
+
+            <!-- Tab content -->
+            <div id="injHubContent">
+                ${this._renderInjHubTab()}
+            </div>
+        </div>`;
+
+    if (this._injuryHubTab === 'equipo') {
+        requestAnimationFrame(() => this._injDrawZoneChart());
+    }
+};
+
+RPETracker.prototype._injHubTab = function(tab) {
+    this._injuryHubTab = tab;
+    this.renderInjuryHub();
+};
+
+RPETracker.prototype.showNewInjuryForm = function() {
+    // Redirect to the existing injury management form
+    if (typeof this.renderInjuryManagement === 'function') {
+        // Temporarily swap injuryView content to the form
+        this.renderInjuryManagement();
+    }
+};
+
+RPETracker.prototype._renderInjHubTab = function() {
+    switch (this._injuryHubTab) {
+        case 'gestion':    return this._renderInjGestion();
+        case 'individual': return this._renderInjIndividual();
+        case 'equipo':     return this._renderInjEquipo();
+        default:           return '';
+    }
+};
+
+// ── TAB: Gestión (formulario existente + activas) ──────────────
+RPETracker.prototype._renderInjGestion = function() {
+    const injuries = this.injuries || [];
+    const active   = injuries.filter(i => i.status === 'active')
+                             .sort((a,b) => new Date(b.startDate)-new Date(a.startDate));
+    const recent   = injuries.filter(i => i.status !== 'active')
+                             .sort((a,b) => new Date(b.startDate)-new Date(a.startDate))
+                             .slice(0, 5);
+
+    const renderCard = inj => this._renderMedCard(inj);
+
+    return `
+        ${active.length ? `
+        <div class="ijh-section-title">🔴 Lesiones activas</div>
+        <div class="ijh-cards">${active.map(renderCard).join('')}</div>` : `
+        <div class="wellness-card" style="text-align:center;padding:2rem;color:var(--text-secondary)">
+            <p style="font-size:2rem">✅</p>
+            <p style="margin:0">No hay jugadoras lesionadas</p>
+        </div>`}
+
+        ${recent.length ? `
+        <div class="ijh-section-title" style="margin-top:1.25rem">📋 Últimas recuperadas</div>
+        <div class="ijh-cards">${recent.map(renderCard).join('')}</div>` : ''}
+
+        <div style="margin-top:1rem;text-align:center">
+            <button class="btn-secondary" onclick="window.rpeTracker?._injHubTab('individual')">
+                Ver historial completo →
+            </button>
+        </div>`;
+};
+
+// ── TAB: Individual ────────────────────────────────────────────
+RPETracker.prototype._renderInjIndividual = function() {
+    const injuries = this.injuries || [];
+    if (!this._injSelPlayer) this._injSelPlayer = 'all';
+
+    // Build per-player stats
+    const playerStats = this.players.map(p => {
+        const pInj = injuries.filter(i => i.playerId === p.id);
+        const totalDays = pInj.reduce((sum, i) => {
+            const end = i.endDate ? new Date(i.endDate) : new Date();
+            return sum + Math.max(0, Math.ceil((end - new Date(i.startDate)) / 86400000));
+        }, 0);
+        const missedTrainings = pInj.reduce((sum, i) => sum + this._calcMissedByType(i, 'training'), 0);
+        const missedMatches   = pInj.reduce((sum, i) => sum + this._calcMissedByType(i, 'match'), 0);
+        return { p, pInj, totalDays, missedTrainings, missedMatches };
+    }).filter(d => d.pInj.length > 0)
+      .sort((a, b) => b.totalDays - a.totalDays);
+
+    // Filter injuries for accordion
+    const selInj = this._injSelPlayer === 'all'
+        ? injuries
+        : injuries.filter(i => i.playerId === this._injSelPlayer);
+    const sorted = [...selInj].sort((a,b) => new Date(b.startDate)-new Date(a.startDate));
+
+    const playerBtns = [
+        `<button class="wp-filter-btn ${this._injSelPlayer==='all'?'active':''}"
+            onclick="window.rpeTracker?._injSelPlayer='all';window.rpeTracker?.renderInjuryHub()">Todas</button>`,
+        ...this.players.filter(p => injuries.some(i=>i.playerId===p.id)).map(p =>
+            `<button class="wp-filter-btn ${this._injSelPlayer===p.id?'active':''}"
+                onclick="window.rpeTracker._injSelPlayer='${p.id}';window.rpeTracker.renderInjuryHub()">
+                ${PlayerTokens.avatar(p,16,'.4rem')} ${p.name}
+            </button>`)
+    ].join('');
+
+    // Summary cards per player
+    const summaryCards = playerStats.map(({ p, pInj, totalDays, missedTrainings, missedMatches }) => {
+        const color = PlayerTokens.get(p);
+        const activeNow = pInj.some(i => i.status === 'active');
+        return `
+        <div class="ijh-player-summary" style="border-left:4px solid ${color}" onclick="window.rpeTracker._injSelPlayer='${p.id}';window.rpeTracker.renderInjuryHub()">
+            <div class="ijh-ps-header">
+                ${PlayerTokens.avatar(p, 28, '.65rem')}
+                <div class="ijh-ps-name">${p.name}${p.number?` <span class="sv-number">#${p.number}</span>`:''}</div>
+                ${activeNow ? `<span class="ijh-badge-active">● Activa</span>` : ''}
+            </div>
+            <div class="ijh-ps-stats">
+                <div class="ijh-ps-stat"><span class="ijh-ps-num">${pInj.length}</span><span class="ijh-ps-lbl">Lesiones</span></div>
+                <div class="ijh-ps-stat"><span class="ijh-ps-num" style="color:var(--danger,#e53935)">${totalDays}d</span><span class="ijh-ps-lbl">Días baja</span></div>
+                <div class="ijh-ps-stat"><span class="ijh-ps-num">${missedTrainings}</span><span class="ijh-ps-lbl">Entrenos perdidos</span></div>
+                <div class="ijh-ps-stat"><span class="ijh-ps-num">${missedMatches}</span><span class="ijh-ps-lbl">Partidos perdidos</span></div>
+            </div>
+        </div>`;
+    }).join('');
+
+    return `
+        ${playerStats.length ? `
+        <div class="ijh-section-title">📊 Resumen por jugadora <span style="font-size:.75rem;opacity:.6">(pulsa para filtrar)</span></div>
+        <div class="ijh-player-grid">${summaryCards}</div>` : ''}
+
+        <div class="wellness-card" style="padding:.75rem 1.25rem;margin-top:1rem">
+            <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+                <span style="font-weight:600;font-size:.85rem;color:var(--text-secondary)">Filtrar:</span>
+                ${playerBtns}
+            </div>
+        </div>
+
+        ${sorted.length === 0
+            ? `<div class="wellness-card" style="text-align:center;padding:2rem;color:var(--text-secondary)">
+                <p style="font-size:2rem">🏥</p><p>No hay lesiones${this._injSelPlayer!=='all'?' para esta jugadora':''}.</p>
+               </div>`
+            : `<div style="display:flex;flex-direction:column;gap:.75rem;margin-top:.75rem">
+                ${sorted.map(inj => this._renderMedCard(inj)).join('')}
+               </div>`}`;
+};
+
+// ── TAB: Equipo ────────────────────────────────────────────────
+RPETracker.prototype._renderInjEquipo = function() {
+    const injuries = this.injuries || [];
+    if (!injuries.length) return `
+        <div class="wellness-card" style="text-align:center;padding:2.5rem;color:var(--text-secondary)">
+            <p style="font-size:2rem">📊</p>
+            <p>Sin datos suficientes para el análisis de equipo.</p>
+        </div>`;
+
+    if (!this._injTeamView) this._injTeamView = 'zona';
+
+    // ── Totales globales ──
+    const totalInj   = injuries.length;
+    const totalDays  = injuries.reduce((sum, i) => {
+        const end = i.endDate ? new Date(i.endDate) : new Date();
+        return sum + Math.max(0, Math.ceil((end - new Date(i.startDate)) / 86400000));
+    }, 0);
+    const totalTrainings = injuries.reduce((sum, i) => sum + this._calcMissedByType(i, 'training'), 0);
+    const totalMatches   = injuries.reduce((sum, i) => sum + this._calcMissedByType(i, 'match'), 0);
+    const avgDays = totalInj ? Math.round(totalDays / totalInj) : 0;
+
+    // ── Por zona ──
+    const byZone = {};
+    injuries.forEach(inj => {
+        const loc = this.getLocationName?.(inj.location) || inj.location || 'Otra';
+        if (!byZone[loc]) byZone[loc] = { count: 0, days: 0, trainings: 0, matches: 0, active: 0 };
+        const end = inj.endDate ? new Date(inj.endDate) : new Date();
+        byZone[loc].count++;
+        byZone[loc].days      += Math.max(0, Math.ceil((end - new Date(inj.startDate)) / 86400000));
+        byZone[loc].trainings += this._calcMissedByType(inj, 'training');
+        byZone[loc].matches   += this._calcMissedByType(inj, 'match');
+        if (inj.status === 'active') byZone[loc].active++;
+    });
+    const sortedZones = Object.entries(byZone).sort((a,b) => b[1].count - a[1].count);
+    const maxZoneCount = sortedZones[0]?.[1].count || 1;
+
+    // ── Por jugadora (ranking) ──
+    const byPlayer = this.players.map(p => {
+        const pInj = injuries.filter(i => i.playerId === p.id);
+        if (!pInj.length) return null;
+        const days = pInj.reduce((sum, i) => {
+            const end = i.endDate ? new Date(i.endDate) : new Date();
+            return sum + Math.max(0, Math.ceil((end - new Date(i.startDate)) / 86400000));
+        }, 0);
+        return {
+            p,
+            count:     pInj.length,
+            days,
+            trainings: pInj.reduce((s,i) => s + this._calcMissedByType(i,'training'), 0),
+            matches:   pInj.reduce((s,i) => s + this._calcMissedByType(i,'match'), 0),
+            active:    pInj.some(i => i.status === 'active')
+        };
+    }).filter(Boolean).sort((a,b) => b.days - a.days);
+    const maxPlayerDays = byPlayer[0]?.days || 1;
+
+    // ── Zona: render ──
+    const zoneRows = sortedZones.map(([loc, d]) => `
+        <div class="ijh-zone-row">
+            <div class="ijh-zone-name">${loc}</div>
+            <div class="ijh-zone-bar-wrap">
+                <div class="ijh-zone-bar" style="width:${(d.count/maxZoneCount*100).toFixed(0)}%"></div>
+            </div>
+            <div class="ijh-zone-count">${d.count} caso${d.count!==1?'s':''}</div>
+            <div class="ijh-zone-meta">
+                <span class="ijh-zone-chip">⏱ ${d.days}d</span>
+                <span class="ijh-zone-chip">🏀 -${d.trainings}</span>
+                <span class="ijh-zone-chip">🏟 -${d.matches}</span>
+                ${d.active ? `<span class="ijh-zone-chip ijh-chip-active">● activa</span>` : ''}
+            </div>
+        </div>`).join('');
+
+    // ── Jugadora: render ──
+    const playerRows = byPlayer.map(({ p, count, days, trainings, matches, active }) => {
+        const color = PlayerTokens.get(p);
+        return `
+        <div class="ijh-zone-row">
+            <div class="ijh-zone-name" style="display:flex;align-items:center;gap:.4rem">
+                ${PlayerTokens.avatar(p,18,'.4rem')} ${p.name}
+                ${active ? `<span class="ijh-badge-active" style="font-size:.65rem">● activa</span>` : ''}
+            </div>
+            <div class="ijh-zone-bar-wrap">
+                <div class="ijh-zone-bar" style="width:${(days/maxPlayerDays*100).toFixed(0)}%;background:${color}"></div>
+            </div>
+            <div class="ijh-zone-count">${count} lesión${count!==1?'es':''}</div>
+            <div class="ijh-zone-meta">
+                <span class="ijh-zone-chip" style="color:var(--danger,#e53935)">⏱ ${days}d</span>
+                <span class="ijh-zone-chip">🏀 -${trainings}</span>
+                <span class="ijh-zone-chip">🏟 -${matches}</span>
+            </div>
+        </div>`;
+    }).join('');
+
+    return `
+        <!-- KPIs globales -->
+        <div class="weekplan-summary-row" style="margin-bottom:1rem">
+            <div class="wp-sum-card"><span class="wp-sum-val">${totalInj}</span><span class="wp-sum-label">Total lesiones</span></div>
+            <div class="wp-sum-card"><span class="wp-sum-val" style="color:var(--danger,#e53935)">${totalDays}d</span><span class="wp-sum-label">Días de baja totales</span></div>
+            <div class="wp-sum-card"><span class="wp-sum-val">${avgDays}d</span><span class="wp-sum-label">Días baja promedio</span></div>
+            <div class="wp-sum-card"><span class="wp-sum-val">${totalTrainings}</span><span class="wp-sum-label">Entrenos perdidos</span></div>
+            <div class="wp-sum-card"><span class="wp-sum-val">${totalMatches}</span><span class="wp-sum-label">Partidos perdidos</span></div>
+        </div>
+
+        <!-- Toggle vista -->
+        <div class="wellness-card" style="padding:.6rem 1rem;margin-bottom:.75rem">
+            <div style="display:flex;gap:.5rem;align-items:center">
+                <span style="font-size:.82rem;color:var(--text-secondary);font-weight:600">Ver por:</span>
+                <button class="wp-filter-btn ${this._injTeamView==='zona'?'active':''}"
+                    onclick="window.rpeTracker._injTeamView='zona';window.rpeTracker.renderInjuryHub()">📍 Zona corporal</button>
+                <button class="wp-filter-btn ${this._injTeamView==='jugadora'?'active':''}"
+                    onclick="window.rpeTracker._injTeamView='jugadora';window.rpeTracker.renderInjuryHub()">👤 Jugadora</button>
+            </div>
+        </div>
+
+        <!-- Gráfico de zona o jugadora -->
+        <div class="wellness-card">
+            ${this._injTeamView === 'zona' ? `
+                <h3 class="wellness-section-title">📍 Lesiones por zona corporal</h3>
+                <div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.75rem">
+                    Barra = nº de casos · chips = días de baja / entrenos perdidos / partidos perdidos
+                </div>
+                ${zoneRows}
+                <canvas id="injZoneCanvas" height="0" style="display:none"></canvas>
+            ` : `
+                <h3 class="wellness-section-title">👤 Ranking por días de baja</h3>
+                <div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.75rem">
+                    Ordenado por días de baja acumulados en la temporada
+                </div>
+                ${playerRows}
+            `}
+        </div>
+
+        <!-- Correlación carga-lesión heredada -->
+        ${this._renderInjCorrelationCompact()}`;
+};
+
+// ── Helper: sesiones perdidas por tipo ────────────────────────
+RPETracker.prototype._calcMissedByType = function(inj, type) {
+    if (!inj.startDate) return 0;
+    const start = new Date(inj.startDate);
+    const end   = inj.endDate ? new Date(inj.endDate) : new Date();
+    return this.sessions.filter(s =>
+        s.playerId !== inj.playerId &&  // use team sessions as proxy
+        (s.type === type || (type === 'match' && s.type === 'match')) &&
+        new Date(s.date) >= start &&
+        new Date(s.date) <= end
+    ).length > 0
+        ? this.sessions.filter(s =>
+            s.playerId === inj.playerId &&
+            (s.type === type) &&
+            new Date(s.date) >= start &&
+            new Date(s.date) <= end
+          ).length === 0
+            // fallback: count team sessions of that type in window / avg players
+            ? Math.round(this.sessions.filter(s =>
+                (s.type === type) &&
+                new Date(s.date) >= start &&
+                new Date(s.date) <= end
+              ).length / Math.max(this.players.length, 1))
+            : 0
+        : 0;
+};
+
+// ── Inline correlation block (compact version) ────────────────
+RPETracker.prototype._renderInjCorrelationCompact = function() {
+    const injuries = this.injuries || [];
+    if (injuries.length < 2) return '';
+
+    const rows = [];
+    injuries.forEach(inj => {
+        const player = this.players.find(p => p.id === inj.playerId);
+        if (!player) return;
+        const injDate   = new Date(inj.startDate);
+        const w1s = new Date(injDate); w1s.setDate(w1s.getDate()-7);
+        const w4s = new Date(injDate); w4s.setDate(w4s.getDate()-28);
+        const load1w = this.sessions.filter(s=>s.playerId===player.id&&new Date(s.date)>=w1s&&new Date(s.date)<injDate)
+                           .reduce((s,x)=>s+(x.load||0),0);
+        const load4w = this.sessions.filter(s=>s.playerId===player.id&&new Date(s.date)>=w4s&&new Date(s.date)<injDate)
+                           .reduce((s,x)=>s+(x.load||0),0);
+        const ratioPrev = load4w > 0 ? (load1w / (load4w/4)).toFixed(2) : null;
+        if (!ratioPrev) return;
+        rows.push({ player, ratioPrev: parseFloat(ratioPrev),
+            date: injDate.toLocaleDateString('es-ES',{day:'numeric',month:'short'}),
+            type: this.getTypeName?.(inj.type)||inj.type });
+    });
+
+    if (!rows.length) return '';
+    const highRisk = rows.filter(r=>r.ratioPrev>1.3).length;
+    const pct = Math.round(highRisk/rows.length*100);
+
+    return `
+    <div class="wellness-card" style="margin-top:.75rem">
+        <h3 class="wellness-section-title">🔗 Ratio A:C previo a lesiones</h3>
+        <p style="font-size:.82rem;color:var(--text-secondary);margin:0 0 .75rem">
+            ${pct >= 50
+                ? `⚠️ El ${pct}% de las lesiones ocurrieron con ratio A:C &gt;1.3 (zona de riesgo).`
+                : `El ${pct}% de las lesiones ocurrieron en zona de riesgo A:C.`}
+        </p>
+        <div style="overflow-x:auto">
+            <table class="wellness-player-table" style="font-size:.82rem">
+                <thead><tr>
+                    <th>Jugadora</th><th>Lesión</th><th>Fecha</th><th>Ratio A:C previo</th><th>Riesgo</th>
+                </tr></thead>
+                <tbody>
+                    ${rows.sort((a,b)=>b.ratioPrev-a.ratioPrev).map(r=>`<tr>
+                        <td><div style="display:flex;align-items:center;gap:.35rem">
+                            ${PlayerTokens.avatar(r.player,16,'.4rem')} ${r.player.name}
+                        </div></td>
+                        <td>${r.type}</td>
+                        <td>${r.date}</td>
+                        <td style="font-weight:700;color:${r.ratioPrev>1.5?'#e53935':r.ratioPrev>1.3?'#fb8c00':'#43a047'}">${r.ratioPrev}</td>
+                        <td>${r.ratioPrev>1.5?'🔴 Alto':r.ratioPrev>1.3?'🟠 Moderado':'🟢 Normal'}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>
+    </div>`;
+};
+
+RPETracker.prototype._injDrawZoneChart = function() { /* reserved for future canvas chart */ };

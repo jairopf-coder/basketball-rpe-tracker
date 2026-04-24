@@ -18,9 +18,7 @@ const NavMenu = {
                 { view: 'wellness',    label: '❤️ Wellness' },
                 { view: 'injury',      label: '🏥 Lesiones' },
                 { view: 'rehab',       label: '💪 Readaptación' },
-                { view: 'medical',     label: '📋 Historial médico' },
-                { view: 'correlation', label: '📉 Correlación carga' },
-                { view: 'prediction',  label: '🔮 Predicción lesiones' },
+                { view: 'prediction',  label: '🔮 Predicción' },
             ],
             default: 'wellness'
         },
@@ -463,10 +461,14 @@ class RPETracker {
                 }
                 break;
             case 'injury':
-                if (typeof this.renderInjuryManagement === 'function') {
+                if (typeof this.renderInjuryHub === 'function') {
                     this.updateMissedSessions();
-                    this.renderInjuryManagement();
+                    this.renderInjuryHub();
                 }
+                break;
+            case 'medical':      // legacy redirect
+            case 'correlation':  // legacy redirect
+                if (typeof NavMenu !== 'undefined') NavMenu.selectView('injury');
                 break;
             case 'prediction':
                 if (typeof this.renderInjuryPredictionDashboard === 'function') {
@@ -482,14 +484,8 @@ class RPETracker {
             case 'weekplan':
                 if (typeof this.renderWeeklyPlanning === 'function') this.renderWeeklyPlanning();
                 break;
-            case 'medical':
-                if (typeof this.renderMedicalHistory === 'function') this.renderMedicalHistory();
-                break;
             case 'rehab':
                 if (typeof this.renderRehabLoad === 'function') this.renderRehabLoad();
-                break;
-            case 'correlation':
-                if (typeof this.renderLoadInjuryCorrelation === 'function') this.renderLoadInjuryCorrelation();
                 break;
             case 'gym':
                 if (typeof this.renderGymView === 'function') this.renderGymView();
@@ -2388,8 +2384,6 @@ class RPETracker {
                     onclick="window.rpeTracker?._setAnalyticsTab('tabla')">📊 Comparativa</button>
                 <button class="an-tab ${this._analyticsTab==='curvas'?'active':''}"
                     onclick="window.rpeTracker?._setAnalyticsTab('curvas')">📈 Curvas A:C</button>
-                <button class="an-tab ${this._analyticsTab==='lesiones'?'active':''}"
-                    onclick="window.rpeTracker?._setAnalyticsTab('lesiones')">🦴 Lesiones</button>
             </div>
 
             <div id="anTabContent">
@@ -2412,15 +2406,12 @@ class RPETracker {
                             </ul>
                         </div>
                     </details>` :
-                this._analyticsTab === 'curvas' ? this._renderACCurveTab() :
-                this._renderInjuryTrendTab()}
+                this._renderACCurveTab()}
             </div>
         `;
-        // Render chart after DOM is ready
         if (this._analyticsTab === 'curvas') {
             requestAnimationFrame(() => this._drawACCurveChart());
         }
-
     }
 
     // ========== ACUTE:CHRONIC RATIO CALCULATION (EWMA METHOD) ==========
