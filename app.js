@@ -451,6 +451,10 @@ class RPETracker {
                 break;
             case 'analytics':
                 this.renderAnalytics();
+                if ((this._analyticsTab || 'tabla') === 'tabla') {
+                    this.renderEvolutionCharts();
+                    setTimeout(() => this.renderComparisonModule(), 50);
+                }
                 break;
             case 'calendar':
                 if (typeof this.renderCalendar === 'function') {
@@ -2138,6 +2142,10 @@ class RPETracker {
     _setAnalyticsTab(tab) {
         this._analyticsTab = tab;
         this.renderAnalytics();
+        if (tab === 'tabla') {
+            this.renderEvolutionCharts();
+            setTimeout(() => this.renderComparisonModule(), 50);
+        }
     }
 
     _renderACCurveTab() {
