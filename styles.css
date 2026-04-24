@@ -6297,6 +6297,11 @@ details[open] .ewma-toggle-hint { display: none; }
     color: #ff6600;
     border-bottom-color: var(--bg-surface);
 }
+.an-section-block {
+    border-bottom: 0.5px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+}
 .an-empty {
     text-align: center;
     padding: 3rem;
