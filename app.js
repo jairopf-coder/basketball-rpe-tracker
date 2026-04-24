@@ -451,9 +451,6 @@ class RPETracker {
                 break;
             case 'analytics':
                 this.renderAnalytics();
-                this.renderEvolutionCharts();
-                setTimeout(() => this.renderComparisonModule(), 50);
-                // checkAndShowAlerts se mantiene pero el contenedor está oculto
                 break;
             case 'calendar':
                 if (typeof this.renderCalendar === 'function') {
