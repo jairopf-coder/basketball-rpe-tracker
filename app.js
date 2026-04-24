@@ -451,10 +451,6 @@ class RPETracker {
                 break;
             case 'analytics':
                 this.renderAnalytics();
-                if ((this._analyticsTab || 'tabla') === 'tabla') {
-                    this.renderEvolutionCharts();
-                    setTimeout(() => this.renderComparisonModule(), 50);
-                }
                 break;
             case 'calendar':
                 if (typeof this.renderCalendar === 'function') {
@@ -2140,12 +2136,8 @@ class RPETracker {
     }
 
     _setAnalyticsTab(tab) {
-        this._analyticsTab = tab;
+        // Legacy: tab switching removed, single scrollable view
         this.renderAnalytics();
-        if (tab === 'tabla') {
-            this.renderEvolutionCharts();
-            setTimeout(() => this.renderComparisonModule(), 50);
-        }
     }
 
     _renderACCurveTab() {
@@ -2359,7 +2351,7 @@ class RPETracker {
     renderAnalytics() {
         const container = document.getElementById('analyticsContent');
         if (!container) return;
-        
+
         if (this.players.length === 0) {
             container.innerHTML = `
                 <div class="empty-state active">
@@ -2370,47 +2362,48 @@ class RPETracker {
             `;
             return;
         }
-        
-        // Build sticky semaphore bar
-        this._renderSemaphoreBar();
 
-        if (!this._analyticsTab) this._analyticsTab = 'tabla';
+        this._renderSemaphoreBar();
         const ewmaOpen = localStorage.getItem('rpe_ewma_open') === 'true';
 
         container.innerHTML = `
-            <div class="an-tabs">
-                <button class="an-tab ${this._analyticsTab==='tabla'?'active':''}"
-                    onclick="window.rpeTracker?._setAnalyticsTab('tabla')">📊 Comparativa</button>
-                <button class="an-tab ${this._analyticsTab==='curvas'?'active':''}"
-                    onclick="window.rpeTracker?._setAnalyticsTab('curvas')">📈 Curvas A:C</button>
+            <!-- 1. Curvas A:C — protagonista -->
+            <div class="an-section-block">
+                ${this._renderACCurveTab()}
+                <details class="ewma-info-box" id="ewmaDetails" ${ewmaOpen?'open':''}>
+                    <summary class="ewma-summary">
+                        <span>ℹ️ Método EWMA — ¿Cómo se calcula el ratio A:C?</span>
+                        <span class="ewma-toggle-hint">ver más</span>
+                    </summary>
+                    <div class="ewma-body">
+                        <p style="margin-bottom:0.5rem"><strong>Carga = RPE × Duración</strong> (método sRPE)</p>
+                        <p style="margin-bottom:0.5rem">Esta app usa el <strong>método EWMA</strong>, el estándar científico usado por equipos profesionales para calcular el ratio Agudo:Crónico.</p>
+                        <p style="margin-bottom:0.5rem"><strong>Interpretación del Ratio:</strong></p>
+                        <ul style="margin-left:1.5rem;color:var(--gray)">
+                            <li><strong style="color:#2e7d32">0.8–1.3 (Verde):</strong> 🟢 Zona óptima</li>
+                            <li><strong style="color:#ef6c00">1.3–1.5 (Naranja):</strong> 🟠 Precaución</li>
+                            <li><strong style="color:#c62828">&gt;1.5 (Rojo):</strong> 🔴 Peligro</li>
+                            <li><strong style="color:#1565c0">&lt;0.8 (Azul):</strong> 🔵 Descarga</li>
+                        </ul>
+                    </div>
+                </details>
             </div>
 
-            <div id="anTabContent">
-                ${this._analyticsTab === 'tabla' ? `
-                    ${this.renderPlayerComparison()}
-                    <details class="ewma-info-box" id="ewmaDetails" ${ewmaOpen?'open':''}>
-                        <summary class="ewma-summary">
-                            <span>ℹ️ Método EWMA — ¿Cómo se calcula el ratio A:C?</span>
-                            <span class="ewma-toggle-hint">ver más</span>
-                        </summary>
-                        <div class="ewma-body">
-                            <p style="margin-bottom:0.5rem"><strong>Carga = RPE × Duración</strong> (método sRPE)</p>
-                            <p style="margin-bottom:0.5rem">Esta app usa el <strong>método EWMA</strong>, el estándar científico usado por equipos profesionales para calcular el ratio Agudo:Crónico.</p>
-                            <p style="margin-bottom:0.5rem"><strong>Interpretación del Ratio:</strong></p>
-                            <ul style="margin-left:1.5rem;color:var(--gray)">
-                                <li><strong style="color:#2e7d32">0.8–1.3 (Verde):</strong> 🟢 Zona óptima</li>
-                                <li><strong style="color:#ef6c00">1.3–1.5 (Naranja):</strong> 🟠 Precaución</li>
-                                <li><strong style="color:#c62828">&gt;1.5 (Rojo):</strong> 🔴 Peligro</li>
-                                <li><strong style="color:#1565c0">&lt;0.8 (Azul):</strong> 🔵 Descarga</li>
-                            </ul>
-                        </div>
-                    </details>` :
-                this._renderACCurveTab()}
+            <!-- 2. Tabla comparativa -->
+            <div class="an-section-block">
+                ${this.renderPlayerComparison()}
             </div>
+
+            <!-- 3. Evolución individual -->
+            <div id="evolutionCharts"></div>
+
+            <!-- 4. Comparador -->
+            <div id="comparisonModule"></div>
         `;
-        if (this._analyticsTab === 'curvas') {
-            requestAnimationFrame(() => this._drawACCurveChart());
-        }
+
+        requestAnimationFrame(() => this._drawACCurveChart());
+        this.renderEvolutionCharts();
+        setTimeout(() => this.renderComparisonModule(), 50);
     }
 
     // ========== ACUTE:CHRONIC RATIO CALCULATION (EWMA METHOD) ==========
