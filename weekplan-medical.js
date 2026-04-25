@@ -1183,7 +1183,7 @@ RPETracker.prototype._renderInjIndividual = function() {
 
     const playerBtns = [
         `<button class="wp-filter-btn ${this._injSelPlayer==='all'?'active':''}"
-            onclick="window.rpeTracker?._injSelPlayer='all';window.rpeTracker?.renderInjuryHub()">Todas</button>`,
+            onclick="if(window.rpeTracker){window.rpeTracker._injSelPlayer='all';window.rpeTracker.renderInjuryHub()}">Todas</button>`,
         ...this.players.filter(p => injuries.some(i=>i.playerId===p.id)).map(p =>
             `<button class="wp-filter-btn ${this._injSelPlayer===p.id?'active':''}"
                 onclick="window.rpeTracker._injSelPlayer='${p.id}';window.rpeTracker.renderInjuryHub()">
