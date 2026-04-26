@@ -1011,7 +1011,7 @@ class RPETracker {
             const p = this.players.find(pl => pl.id === pid);
             const ratio = this.calculateAcuteChronicRatio(pid);
             const r = parseFloat(ratio.ratio);
-            const icon = isNaN(r) ? '' : r > 1.5 ? '🔴' : r > 1.3 ? '🟠' : r < 0.8 ? '🔵' : '🟢';
+            const _t1 = this.getPlayerThresholds(playerId); const icon = isNaN(r) ? '' : r > _t1.high ? '🔴' : r > _t1.opt ? '🟠' : r < _t1.low ? '🔵' : '🟢';
             const rLabel = ratio.ratio === 'N/A' ? '' : ` · Ratio A:C: ${ratio.ratio} ${icon}`;
             this.showToast(`✅ Sesión guardada${rLabel}`, 'success');
         } else {
@@ -1155,9 +1155,10 @@ class RPETracker {
         const ratioIcon = (() => {
             const r = parseFloat(ratioVal);
             if (isNaN(r)) return '—';
-            if (r > 1.5) return '🔴';
-            if (r > 1.3) return '🟠';
-            if (r < 0.8) return '🔵';
+            const _t2 = this.getPlayerThresholds(null);
+            if (r > _t2.high) return '🔴';
+            if (r > _t2.opt)  return '🟠';
+            if (r < _t2.low)  return '🔵';
             return '🟢';
         })();
 
@@ -1331,6 +1332,65 @@ class RPETracker {
         });
     }
 
+    // ========== READINESS SCORE ==========
+    // Composite 0-100 score: sleep + mood - fatigue - soreness + A:C zone bonus
+    // Returns null if no wellness data for today.
+    calculateReadiness(playerId) {
+        const today = new Date().toISOString().slice(0, 10);
+        const wellnessKey = `wellness_${playerId}_${today}`;
+
+        // Try localStorage first (wellness.js stores here before Firebase sync)
+        let w = null;
+        try { w = JSON.parse(localStorage.getItem(wellnessKey)); } catch(_) {}
+
+        // Also check in-memory wellness array if present
+        if (!w && this.wellnessData) {
+            w = this.wellnessData.find(x => x.playerId === playerId && x.date === today);
+        }
+
+        if (!w) return null;
+
+        // Wellness fields: sleep, mood, fatigue, soreness — each 1-5
+        const sleep    = Number(w.sleep    || w.sueno    || 0);
+        const mood     = Number(w.mood     || w.humor    || 0);
+        const fatigue  = Number(w.fatigue  || w.cansancio|| 0);
+        const soreness = Number(w.soreness || w.agujetas || 0);
+
+        if (!sleep && !mood && !fatigue && !soreness) return null;
+
+        // Normalise to 0-1 (1→0, 5→1)
+        const norm = v => Math.max(0, Math.min(1, (v - 1) / 4));
+
+        // A:C zone bonus (0, 5, 10, 20)
+        const ratio = this.calculateAcuteChronicRatio(playerId);
+        const r = parseFloat(ratio.ratio);
+        const t = this.getPlayerThresholds(playerId);
+        let acBonus = 10; // neutral when no data
+        if (!isNaN(r)) {
+            if      (r >= t.low && r <= t.opt) acBonus = 20;
+            else if (r > t.opt && r <= t.high) acBonus = 10;
+            else if (r < t.low && r > 0)       acBonus = 5;
+            else if (r > t.high)               acBonus = 0;
+        }
+
+        const score = Math.round(
+            norm(sleep)    * 25 +
+            norm(mood)     * 20 -
+            norm(fatigue)  * 20 -
+            norm(soreness) * 15 +
+            acBonus
+        );
+
+        return Math.max(0, Math.min(100, score));
+    }
+
+    readinessLabel(score) {
+        if (score === null) return { icon: '—', color: '#999', bg: 'transparent', cls: 'rdy-none' };
+        if (score >= 70)    return { icon: '🟢', color: '#2e7d32', bg: '#e8f5e9', cls: 'rdy-green' };
+        if (score >= 45)    return { icon: '🟡', color: '#f9a825', bg: '#fffde7', cls: 'rdy-yellow' };
+        return               { icon: '🔴', color: '#c62828', bg: '#ffebee', cls: 'rdy-red' };
+    }
+
     renderDashboard() {
         const container = document.getElementById('dashboardContent');
         if (!container) return;
@@ -1410,18 +1470,19 @@ class RPETracker {
         if (!this._dashSort) this._dashSort = 'risk'; // 'risk' | 'safe' | 'name'
 
         // Build player data
-        const getStatus = (r) => {
+        const getStatus = (r, playerId) => {
             const n = parseFloat(r);
             if (isNaN(n) || r === 'N/A') return { icon: '—', color: '#ccc', risk: -1 };
-            if (n > 1.5)  return { icon: '🔴', color: '#f44336', risk: 4 };
-            if (n > 1.3)  return { icon: '🟠', color: '#ff9800', risk: 3 };
-            if (n < 0.8)  return { icon: '🔵', color: '#2196f3', risk: 1 };
+            const _tS = this.getPlayerThresholds(playerId || null);
+            if (n > _tS.high) return { icon: '🔴', color: '#f44336', risk: 4 };
+            if (n > _tS.opt)  return { icon: '🟠', color: '#ff9800', risk: 3 };
+            if (n < _tS.low)  return { icon: '🔵', color: '#2196f3', risk: 1 };
             return           { icon: '🟢', color: '#4caf50', risk: 2 };
         };
 
         let players = this.players.map(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
-            const st = getStatus(ratio.ratio);
+            const st = getStatus(ratio.ratio, player.id);
             return { player, ratio, st, r: parseFloat(ratio.ratio) || 0 };
         });
 
@@ -1444,6 +1505,11 @@ class RPETracker {
                 else if (overall >= 2.5) { wColor = '#e65100'; wBg = '#fff3e0'; }
                 else                     { wColor = '#c62828'; wBg = '#ffebee'; }
             }
+            // Readiness Score
+            const rdyScore = this.calculateReadiness(player.id);
+            const rdyLbl   = this.readinessLabel(rdyScore);
+            const rdyTxt   = rdyScore !== null ? rdyScore : '—';
+
             return `
                 <div class="db-player-row">
                     ${PlayerTokens.avatar(player, 20, '0.6rem')}
@@ -1456,6 +1522,7 @@ class RPETracker {
                     <div class="db-player-ratio" style="color:${st.color}">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
                     <div class="db-player-icon">${st.icon}</div>
                     <div class="db-player-wellness" style="color:${wColor};background:${wBg}">${wScore}</div>
+                    <div class="db-player-readiness ${rdyLbl.cls}" title="Readiness: ${rdyTxt}/100" style="color:${rdyLbl.color};background:${rdyLbl.bg}">${rdyLbl.icon} ${rdyTxt}</div>
                 </div>`;
         }).join('');
 
@@ -1469,19 +1536,21 @@ class RPETracker {
             const last7 = playerSessions.filter(s => (new Date() - new Date(s.date)) / 86400000 <= 7);
             const avgRPE7 = last7.length ? (last7.reduce((s, x) => s + x.rpe, 0) / last7.length).toFixed(1) : null;
             const entry = { player, ratio, r, activeInjury, avgRPE7 };
-            if (activeInjury)                        availGroups.out.push(entry);
-            else if (r > 1.5 || (r > 0 && r < 0.8)) availGroups.caution.push(entry);
-            else                                      availGroups.ok.push(entry);
+            const _tAv = this.getPlayerThresholds(player.id);
+            if (activeInjury)                                       availGroups.out.push(entry);
+            else if (r > _tAv.high || (r > 0 && r < _tAv.low))    availGroups.caution.push(entry);
+            else                                                     availGroups.ok.push(entry);
         });
 
         const availRow = ({ player, activeInjury, avgRPE7, r, ratio }) => {
             let icon, color, detail;
+            const _tAR = this.getPlayerThresholds(player.id);
             if (activeInjury) {
                 icon = '🔴'; color = '#f44336';
                 detail = activeInjury.location ? this.getLocationName(activeInjury.location) : 'lesión activa';
-            } else if (r > 1.5) {
+            } else if (r > _tAR.high) {
                 icon = '🟠'; color = '#ff9800'; detail = `Ratio ${ratio.ratio}`;
-            } else if (r > 0 && r < 0.8) {
+            } else if (r > 0 && r < _tAR.low) {
                 icon = '🔵'; color = '#2196f3'; detail = `Ratio ${ratio.ratio}`;
             } else {
                 icon = '🟢'; color = '#4caf50'; detail = avgRPE7 ? `RPE 7d: ${avgRPE7}` : 'Sin datos';
@@ -1503,8 +1572,8 @@ class RPETracker {
                 </div>`;
 
         // ── Alert banner data ──────────────────────────────────────
-        const alertPlayers = players.filter(p => parseFloat(p.ratio.ratio) > 1.5);
-        const warnPlayers  = players.filter(p => { const r = parseFloat(p.ratio.ratio); return r >= 1.3 && r <= 1.5; });
+        const alertPlayers = players.filter(p => { const _t=this.getPlayerThresholds(p.player.id); return parseFloat(p.ratio.ratio) > _t.high; });
+        const warnPlayers  = players.filter(p => { const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
         const pendingWellness = _pendingW.length;
 
         let bannerHTML = '';
@@ -1522,6 +1591,41 @@ class RPETracker {
         const todayPlan = this.weekPlan?.days?.[todayKey] || {};
         const isMatchDay = ['morning','afternoon'].some(s => todayPlan[s]?.type === 'match' && todayPlan[s]?.enabled);
         const matchDayBtnLabel = this._matchDayMode ? '← Vista normal' : '🏟️ Modo partido';
+
+        // ---- Team Readiness Widget ----
+        const rdyPlayerData = this.players.map(player => ({
+            player,
+            score: this.calculateReadiness(player.id)
+        })).sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+
+        const withData = rdyPlayerData.filter(d => d.score !== null);
+        const teamAvg  = withData.length
+            ? Math.round(withData.reduce((s, d) => s + d.score, 0) / withData.length)
+            : null;
+        const teamLbl  = this.readinessLabel(teamAvg);
+
+        const rdyRows = rdyPlayerData.map(({ player, score }) => {
+            const lbl = this.readinessLabel(score);
+            const txt = score !== null ? score : '—';
+            return `<div class="rdy-row">
+                ${PlayerTokens.avatar(player, 18, '0.55rem')}
+                <span class="rdy-name">${player.name}</span>
+                <div class="rdy-bar-wrap"><div class="rdy-bar-fill ${lbl.cls}" style="width:${score !== null ? score : 0}%"></div></div>
+                <span class="rdy-val" style="color:${lbl.color}">${lbl.icon} ${txt}</span>
+            </div>`;
+        }).join('');
+
+        const teamReadinessWidget = withData.length === 0 ? '' : `
+            <div class="db-readiness-widget">
+                <div class="db-readiness-header">
+                    <span class="db-readiness-title">⚡ Readiness del Equipo</span>
+                    <span class="db-readiness-avg ${teamLbl.cls}" style="color:${teamLbl.color};background:${teamLbl.bg}">
+                        ${teamLbl.icon} ${teamAvg !== null ? teamAvg + '/100' : '—'}
+                    </span>
+                </div>
+                <div class="rdy-rows">${rdyRows}</div>
+            </div>`;
+        // ---- End Team Readiness Widget ----
 
         container.innerHTML = `
             ${bannerHTML}
@@ -1613,6 +1717,7 @@ class RPETracker {
                         ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
                     </div>
                     ${wellnessMiniSummary}
+                    ${teamReadinessWidget}
                 </div>
 
                 <!-- Columna calendario -->
@@ -1693,7 +1798,7 @@ class RPETracker {
             const wColor = wScore ? this._wColor(wScore) : '#aaa';
             const rColor = this.getRatioColor(ratio.ratio);
             const inj    = (this.injuries||[]).find(i => i.playerId === player.id && i.status === 'active');
-            return `<div class="md-card ${inj ? 'md-card--out' : r > 1.5 ? 'md-card--danger' : r >= 1.3 ? 'md-card--warn' : ''}">
+            const _tMD = this.getPlayerThresholds(player?.id); return `<div class="md-card ${inj ? 'md-card--out' : r > _tMD.high ? 'md-card--danger' : r >= _tMD.opt ? 'md-card--warn' : ''}">
                 <div class="md-card-top">
                     ${PlayerTokens.avatar(player, 30, '0.75rem')}
                     <div class="md-card-name">${player.name}${player.number ? `<span class="db-num"> #${player.number}</span>` : ''}</div>
@@ -1714,14 +1819,14 @@ class RPETracker {
         const okCards  = availGroups.ok.map(e =>
             playerCard({ player: e.player, ratio: e.ratio, icon: '🟢', r: e.r })).join('');
         const warnCards = availGroups.caution.map(e =>
-            playerCard({ player: e.player, ratio: e.ratio, icon: e.r > 1.5 ? '🔴' : '🔵', r: e.r })).join('');
+            playerCard({ player: e.player, ratio: e.ratio, icon: e.r > (this.getPlayerThresholds(e.player.id).high) ? '🔴' : '🔵', r: e.r })).join('');
         const outCards = availGroups.out.map(e =>
             playerCard({ player: e.player, ratio: e.ratio, icon: '🔴', r: e.r })).join('');
 
         const todayW = wData.filter(e => e.date === today);
         const avgW   = todayW.length
             ? (todayW.reduce((s,e) => s + this._wOverall(e), 0) / todayW.length).toFixed(1) : '—';
-        const atRisk = players.filter(p => parseFloat(p.ratio.ratio) > 1.5).length;
+        const atRisk = players.filter(p => parseFloat(p.ratio.ratio) > this.getPlayerThresholds(p.player.id).high).length;
 
         return `<div class="md-wrap">
             <div class="md-summary">
@@ -2035,15 +2140,16 @@ class RPETracker {
         const getStatus = (r) => {
             const n = parseFloat(r);
             if (isNaN(n) || r === 'N/A') return { label: 'Sin datos', cls: 'status-nodata', icon: '—' };
-            if (n > 1.5)  return { label: 'Peligro',   cls: 'status-danger',  icon: '🔴' };
-            if (n > 1.3)  return { label: 'Precaución', cls: 'status-caution', icon: '🟠' };
-            if (n < 0.8)  return { label: 'Por debajo', cls: 'status-low',     icon: '🔵' };
+            const _tL = this.getPlayerThresholds(pid || null);
+            if (n > _tL.high) return { label: 'Peligro',   cls: 'status-danger',  icon: '🔴' };
+            if (n > _tL.opt)  return { label: 'Precaución', cls: 'status-caution', icon: '🟠' };
+            if (n < _tL.low)  return { label: 'Por debajo', cls: 'status-low',     icon: '🔵' };
             return           { label: 'Óptimo',    cls: 'status-ok',      icon: '🟢' };
         };
 
         const cards = this.players.map(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
-            const st = getStatus(ratio.ratio);
+            const st = getStatus(ratio.ratio, player.id);
             const num = player.number ? `<span class="rcard-number">#${player.number}</span>` : '';
             return `
                 <div class="rcard ${st.cls}">
@@ -2095,15 +2201,16 @@ class RPETracker {
         const getStatus = (r) => {
             const n = parseFloat(r);
             if (isNaN(n) || r === 'N/A') return { color: '#9e9e9e', icon: '⚪', label: 'Sin datos' };
-            if (n > 1.5)  return { color: '#e53935', icon: '🔴', label: 'Peligro' };
-            if (n > 1.3)  return { color: '#fb8c00', icon: '🟠', label: 'Precaución' };
-            if (n < 0.8)  return { color: '#1e88e5', icon: '🔵', label: 'Por debajo' };
+            const _tP = this.getPlayerThresholds(pid || null);
+            if (n > _tP.high) return { color: '#e53935', icon: '🔴', label: 'Peligro' };
+            if (n > _tP.opt)  return { color: '#fb8c00', icon: '🟠', label: 'Precaución' };
+            if (n < _tP.low)  return { color: '#1e88e5', icon: '🔵', label: 'Por debajo' };
             return           { color: '#43a047', icon: '🟢', label: 'Óptimo' };
         };
 
         const pills = this.players.map(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
-            const st = getStatus(ratio.ratio);
+            const st = getStatus(ratio.ratio, player.id);
             const ratioDisplay = ratio.ratio === 'N/A' ? '—' : ratio.ratio;
             const avatar = PlayerTokens.avatar(player, 22, '0.6rem');
             return `<div class="sema-pill" style="--sema-color:${st.color}" title="${player.name} · Ratio A:C ${ratioDisplay} · ${st.label}"
@@ -2407,14 +2514,20 @@ class RPETracker {
     }
 
     // ========== ACUTE:CHRONIC RATIO CALCULATION (EWMA METHOD) ==========
-    
+
+    // Match load multiplier: partidos generan mayor estrés fisiológico que
+    // entrenamientos equivalentes en RPE×duración. Factor 1.5 basado en
+    // literatura (Gabbett 2016, Hulin et al. 2016). Ajustar si es necesario.
+    static get MATCH_LOAD_MULTIPLIER() { return 1.5; }
+
     calculateAcuteChronicRatio(playerId) {
+        const MATCH_MULT = RPETracker.MATCH_LOAD_MULTIPLIER;
         const playerSessions = this.sessions
             .filter(s => s.playerId === playerId)
             .map(s => ({
                 ...s,
                 date: new Date(s.date),
-                load: s.load || (s.rpe * (s.duration || 60))
+                load: (s.load || (s.rpe * (s.duration || 60))) * (s.type === 'match' ? MATCH_MULT : 1)
             }))
             .sort((a, b) => a.date - b.date); // Sort chronologically
         
@@ -2501,27 +2614,41 @@ class RPETracker {
         };
     }
 
-    getRatioColor(ratio) {
+    // ========== INDIVIDUAL A:C THRESHOLDS ==========
+    // Returns thresholds for a player, falling back to global defaults if not set.
+    getPlayerThresholds(playerId) {
+        const player = playerId ? this.players.find(p => p.id === playerId) : null;
+        return {
+            low:  (player?.acThresholdLow  != null) ? Number(player.acThresholdLow)  : 0.8,
+            opt:  (player?.acThresholdOpt  != null) ? Number(player.acThresholdOpt)  : 1.3,
+            high: (player?.acThresholdHigh != null) ? Number(player.acThresholdHigh) : 1.5
+        };
+    }
+
+    // getRatioColor accepts optional playerId for individual thresholds
+    getRatioColor(ratio, playerId) {
         if (ratio === 'N/A') return '#999';
         const r = parseFloat(ratio);
-        if (r < 0.8) return '#1565c0'; // Blue - Detraining
-        if (r <= 1.3) return '#2e7d32'; // Green - Optimal
-        if (r <= 1.5) return '#ef6c00'; // Orange - Caution
+        const t = this.getPlayerThresholds(playerId);
+        if (r < t.low)   return '#1565c0'; // Blue - Detraining
+        if (r <= t.opt)  return '#2e7d32'; // Green - Optimal
+        if (r <= t.high) return '#ef6c00'; // Orange - Caution
         return '#c62828'; // Red - Danger
     }
 
     getRatioClass(ratio) {
         if (ratio === 'N/A') return 'ratio-safe';
         const r = parseFloat(ratio);
-        if (r >= 0.8 && r <= 1.3) return 'ratio-safe';
-        if (r > 1.3 && r <= 1.5) return 'ratio-caution';
+        const _tRC = this.getPlayerThresholds(null);
+        if (r >= _tRC.low && r <= _tRC.opt) return 'ratio-safe';
+        if (r > _tRC.opt && r <= _tRC.high) return 'ratio-caution';
         return 'ratio-danger';
     }
 
     getRatioStatus(ratio) {
         if (ratio === 'N/A') return 'Sin datos';
         const r = parseFloat(ratio);
-        if (r < 0.8) return '⬇️ Descarga';
+        const _tRS = this.getPlayerThresholds(null); if (r < _tRS.low) return '⬇️ Descarga';
         if (r <= 1.3) return '✅ Óptimo';
         if (r <= 1.5) return '⚠️ Precaución';
         return '🚨 Peligro';
@@ -2644,7 +2771,7 @@ class RPETracker {
         const chipsHTML = this.players.map(p => {
             const ratio = this.calculateAcuteChronicRatio(p.id);
             const r = parseFloat(ratio.ratio);
-            const dot = isNaN(r) ? '#999' : r > 1.5 ? '#e53935' : r > 1.3 ? '#fb8c00' : r < 0.8 ? '#1e88e5' : '#43a047';
+            const _tDot = this.getPlayerThresholds(player.id); const dot = isNaN(r) ? '#999' : r > _tDot.high ? '#e53935' : r > _tDot.opt ? '#fb8c00' : r < _tDot.low ? '#1e88e5' : '#43a047';
             const ratioDisplay = ratio.ratio === 'N/A' ? '—' : ratio.ratio;
             const active = selected.includes(p.id) ? 'chart-chip--active' : '';
             const avatar = PlayerTokens.avatar(p, 20, '0.55rem');
@@ -2722,9 +2849,10 @@ class RPETracker {
             canvas._chartInstance = null;
         }
 
+        const MATCH_MULT = RPETracker.MATCH_LOAD_MULTIPLIER;
         const playerSessions = this.sessions
             .filter(s => s.playerId === playerId)
-            .map(s => ({ ...s, date: new Date(s.date), load: s.load || (s.rpe * (s.duration || 60)) }))
+            .map(s => ({ ...s, date: new Date(s.date), load: (s.load || (s.rpe * (s.duration || 60))) * (s.type === 'match' ? MATCH_MULT : 1) }))
             .sort((a, b) => a.date - b.date);
 
         if (playerSessions.length === 0) return;
@@ -2842,9 +2970,10 @@ class RPETracker {
                         pointBackgroundColor: (ctx) => {
                             const v = ratioData[ctx.dataIndex];
                             if (v <= 0) return 'transparent';
-                            if (v < 0.8) return '#1565c0';
-                            if (v <= 1.3) return '#2e7d32';
-                            if (v <= 1.5) return '#ef6c00';
+                            const _tPt = this.getPlayerThresholds(playerId);
+                            if (v < _tPt.low)   return '#1565c0';
+                            if (v <= _tPt.opt)  return '#2e7d32';
+                            if (v <= _tPt.high) return '#ef6c00';
                             return '#c62828';
                         },
                         borderWidth: 2,
@@ -2879,14 +3008,15 @@ class RPETracker {
                         borderWidth: 1,
                         padding: 10,
                         callbacks: {
-                            afterBody(items) {
+                            afterBody: (items) => {
                                 const ratio = items.find(i => i.dataset.label === 'Ratio A:C');
                                 if (!ratio) return [];
                                 const v = ratio.raw;
                                 if (v <= 0) return ['Estado: Sin datos'];
-                                if (v < 0.8)  return [`Estado: ⬇️ Descarga (${v.toFixed(2)})`];
-                                if (v <= 1.3) return [`Estado: ✅ Óptimo (${v.toFixed(2)})`];
-                                if (v <= 1.5) return [`Estado: ⚠️ Precaución (${v.toFixed(2)})`];
+                                const _tTt = this.getPlayerThresholds(playerId);
+                                if (v < _tTt.low)   return [`Estado: ⬇️ Descarga (${v.toFixed(2)})`];
+                                if (v <= _tTt.opt)  return [`Estado: ✅ Óptimo (${v.toFixed(2)})`];
+                                if (v <= _tTt.high) return [`Estado: ⚠️ Precaución (${v.toFixed(2)})`];
                                 return [`Estado: 🚨 Peligro (${v.toFixed(2)})`];
                             }
                         }
@@ -2936,21 +3066,22 @@ class RPETracker {
             
             if (ratio.ratio === 'N/A') return;
             
-            if (r > 1.5) {
+            const _tAl = this.getPlayerThresholds(player.id);
+            if (r > _tAl.high) {
                 alerts.push({
                     type: 'danger',
                     icon: '🚨',
                     title: `ALERTA: ${player.name}`,
                     message: `Ratio A:C de ${ratio.ratio} - Alto riesgo de lesión. Reducir carga inmediatamente.`
                 });
-            } else if (r > 1.3) {
+            } else if (r > _tAl.opt) {
                 alerts.push({
                     type: 'warning',
                     icon: '⚠️',
                     title: `Precaución: ${player.name}`,
                     message: `Ratio A:C de ${ratio.ratio} - Riesgo moderado. Monitorizar carga de cerca.`
                 });
-            } else if (r < 0.8 && ratio.sessions7d > 0) {
+            } else if (r < _tAl.low && ratio.sessions7d > 0) {
                 alerts.push({
                     type: 'info',
                     icon: 'ℹ️',
@@ -3094,7 +3225,8 @@ class RPETracker {
 
         const combo = suggestCombo(loadOptimal);
 
-        if (r > 1.5) {
+        const _tRec = this.getPlayerThresholds(playerId);
+        if (r > _tRec.high) {
             const loadSafe = loadMax > 0 ? loadMax : Math.round(loadOptimal * 0.5);
             const safeCombo = suggestCombo(loadSafe);
             return {
@@ -3105,7 +3237,7 @@ class RPETracker {
                 loadMin, loadMax,
                 advice: `Máx. recomendado: ~${loadSafe.toLocaleString('es-ES')} UA${safeCombo ? ' (ej: ' + safeCombo + ')' : ''}. Sesión de recuperación activa.`
             };
-        } else if (r > 1.3) {
+        } else if (r > _tRec.opt) {
             const loadSafe = loadMax > 0 ? Math.round((loadOptimal + loadMax) / 2) : Math.round(loadOptimal * 0.8);
             const safeCombo = suggestCombo(loadSafe);
             return {
@@ -3116,7 +3248,7 @@ class RPETracker {
                 loadMin, loadMax,
                 advice: `Recomendado: ~${loadSafe.toLocaleString('es-ES')} UA${safeCombo ? ' (ej: ' + safeCombo + ')' : ''}. Reducir intensidad.`
             };
-        } else if (r < 0.8) {
+        } else if (r < _tRec.low) {
             const loadSafe = loadMin > 0 ? Math.round((loadOptimal + loadMin) / 2) : Math.round(loadOptimal * 1.1);
             const safeCombo = suggestCombo(loadSafe);
             return {
@@ -3223,12 +3355,13 @@ class RPETracker {
                         borderWidth: 1,
                         padding: 10,
                         callbacks: {
-                            label(ctx) {
+                            label: (ctx) => {
                                 const v = ctx.raw;
+                                const _tChart = this.getPlayerThresholds(null);
                                 const estado = v <= 0 ? 'Sin datos'
-                                    : v < 0.8  ? '⬇️ Descarga'
-                                    : v <= 1.3 ? '✅ Óptimo'
-                                    : v <= 1.5 ? '⚠️ Precaución'
+                                    : v < _tChart.low  ? '⬇️ Descarga'
+                                    : v <= _tChart.opt ? '✅ Óptimo'
+                                    : v <= _tChart.high? '⚠️ Precaución'
                                     : '🚨 Peligro';
                                 return `Ratio A:C: ${v.toFixed(2)}  •  ${estado}`;
                             }
@@ -3325,13 +3458,14 @@ class RPETracker {
         const rows = comparisonData.map(({ player, ratio, avgRPE, sparkData, totalLoad7d, rec, color }) => {
             const rVal      = parseFloat(ratio.ratio) || 0;
             const ratioCol  = this.getRatioColor(ratio.ratio);
+            const _tBadge = this.getPlayerThresholds(player.id);
             const statusBadge = ratio.ratio === 'N/A'
                 ? `<span class="cmp-badge cmp-badge--grey">N/A</span>`
-                : rVal < 0.8
+                : rVal < _tBadge.low
                     ? `<span class="cmp-badge cmp-badge--blue">⬇ Descarga</span>`
-                    : rVal <= 1.3
+                    : rVal <= _tBadge.opt
                         ? `<span class="cmp-badge cmp-badge--green">✅ Óptimo</span>`
-                        : rVal <= 1.5
+                        : rVal <= _tBadge.high
                             ? `<span class="cmp-badge cmp-badge--orange">⚠ Precaución</span>`
                             : `<span class="cmp-badge cmp-badge--red">🚨 Peligro</span>`;
 
@@ -3796,7 +3930,7 @@ class RPETracker {
         const alertCount = this.players.filter(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
             const r = parseFloat(ratio.ratio);
-            return !isNaN(r) && r > 1.3;
+            return !isNaN(r) && r > this.getPlayerThresholds(p.id).opt;
         }).length;
 
         // Find the "Carga" nav group button

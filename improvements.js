@@ -117,6 +117,11 @@ RPETracker.prototype.editPlayer = function(playerId) {
     document.getElementById('editPlayerName').value = player.name;
     document.getElementById('editPlayerNumber').value = player.number || '';
 
+    // Individual A:C thresholds (empty = use global defaults)
+    document.getElementById('editAcThresholdLow').value  = player.acThresholdLow  != null ? player.acThresholdLow  : '';
+    document.getElementById('editAcThresholdOpt').value  = player.acThresholdOpt  != null ? player.acThresholdOpt  : '';
+    document.getElementById('editAcThresholdHigh').value = player.acThresholdHigh != null ? player.acThresholdHigh : '';
+
     // Render color picker with current color preselected
     const currentColor = PlayerTokens.get(player);
     this._renderColorPicker('editPlayerColorPicker', 'editPlayerColor', currentColor);
@@ -139,6 +144,14 @@ RPETracker.prototype.handleEditPlayerSubmit = function(e) {
     player.number = document.getElementById('editPlayerNumber').value || null;
     const chosenColor = document.getElementById('editPlayerColor').value;
     if (chosenColor) player.color = chosenColor;
+
+    // Individual A:C thresholds — null if empty (means "use global")
+    const _low  = document.getElementById('editAcThresholdLow').value.trim();
+    const _opt  = document.getElementById('editAcThresholdOpt').value.trim();
+    const _high = document.getElementById('editAcThresholdHigh').value.trim();
+    player.acThresholdLow  = _low  !== '' ? parseFloat(_low)  : null;
+    player.acThresholdOpt  = _opt  !== '' ? parseFloat(_opt)  : null;
+    player.acThresholdHigh = _high !== '' ? parseFloat(_high) : null;
 
     this.savePlayers();
     this.renderPlayers();

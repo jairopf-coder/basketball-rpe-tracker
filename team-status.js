@@ -26,7 +26,7 @@ RPETracker.prototype.renderTeamStatus = function() {
 
         if (activeInjury) {
             groups.out.push(entry);
-        } else if (r > 1.5 || (r > 0 && r < 0.8)) {
+        } else if ((() => { const _t=this.getPlayerThresholds(player.id); return r > _t.high || (r > 0 && r < _t.low); })()) {
             groups.caution.push(entry);
         } else {
             groups.ok.push(entry);
@@ -39,11 +39,11 @@ RPETracker.prototype.renderTeamStatus = function() {
             statusBadge = 'ts-badge-out';
             borderClass = 'ts-card-out';
             statusText = `Lesionada · ${activeInjury.location ? this.getLocationName(activeInjury.location) : 'lesión activa'}`;
-        } else if (r > 1.5) {
+        } else { const _tC = this.getPlayerThresholds(player.id); if (r > _tC.high) {
             statusBadge = 'ts-badge-danger';
             borderClass = 'ts-card-danger';
             statusText = `Ratio ${ratio.ratio} — Reducir carga`;
-        } else if (r > 0 && r < 0.8) {
+        } else if (r > 0 && r < _tC.low) {
             statusBadge = 'ts-badge-low';
             borderClass = 'ts-card-low';
             statusText = `Ratio ${ratio.ratio} — Por debajo`;
@@ -51,7 +51,7 @@ RPETracker.prototype.renderTeamStatus = function() {
             statusBadge = 'ts-badge-ok';
             borderClass = 'ts-card-ok';
             statusText = ratio.ratio !== 'N/A' ? `Ratio ${ratio.ratio} — Óptimo` : 'Sin datos suficientes';
-        }
+        } }
 
         return `
             <div class="ts-card ${borderClass}">
@@ -150,7 +150,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
     const ratioBar = (r, ratioStr) => {
         if (isNaN(r) || ratioStr === 'N/A') return '<span style="color:#bbb">—</span>';
         const pct = Math.min(r / 2 * 100, 100).toFixed(0);
-        const col = r > 1.5 ? '#f44336' : r > 1.3 ? '#ff9800' : r < 0.8 ? '#2196f3' : '#4caf50';
+        const _tBar = this.getPlayerThresholds(player.id); const col = r > _tBar.high ? '#f44336' : r > _tBar.opt ? '#ff9800' : r < _tBar.low ? '#2196f3' : '#4caf50';
         return `<div style="display:flex;align-items:center;gap:6px">
             <div style="flex:1;height:6px;border-radius:3px;background:#eee;overflow:hidden;position:relative">
                 <div style="width:${pct}%;height:100%;background:${col};border-radius:3px"></div>
@@ -172,16 +172,17 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
         const ws = wScore(player.id);
         let statusTxt, statusCol, statusBg;
         if (injury)       { statusTxt='Lesionada';   statusCol='#c62828'; statusBg='#ffebee'; }
-        else if (r > 1.5) { statusTxt='Peligro';     statusCol='#e65100'; statusBg='#fff3e0'; }
-        else if (r > 1.3) { statusTxt='Precaución';  statusCol='#f57f17'; statusBg='#fffde7'; }
-        else if (r < 0.8 && r > 0) { statusTxt='Descarga'; statusCol='#1565c0'; statusBg='#e3f2fd'; }
-        else if (r >= 0.8){ statusTxt='Óptima';      statusCol='#2e7d32'; statusBg='#e8f5e9'; }
+        const _tSt = this.getPlayerThresholds(player.id);
+        if      (r > _tSt.high)          { statusTxt='Peligro';     statusCol='#e65100'; statusBg='#fff3e0'; }
+        else if (r > _tSt.opt)           { statusTxt='Precaución';  statusCol='#f57f17'; statusBg='#fffde7'; }
+        else if (r < _tSt.low && r > 0)  { statusTxt='Descarga';    statusCol='#1565c0'; statusBg='#e3f2fd'; }
+        else if (r >= _tSt.low)          { statusTxt='Óptima';      statusCol='#2e7d32'; statusBg='#e8f5e9'; }
         else               { statusTxt='Sin datos';   statusCol='#999';    statusBg='#f5f5f5'; }
         return { player, ratio, r, injury, week, weekLoad, avgRPE, ws, statusTxt, statusCol, statusBg };
     });
 
-    const ok      = playerData.filter(d => !d.injury && d.r >= 0.8 && d.r <= 1.3);
-    const caution = playerData.filter(d => !d.injury && (d.r > 1.3 || (d.r > 0 && d.r < 0.8)));
+    const ok      = playerData.filter(d => { const _t=this.getPlayerThresholds(d.player.id); return !d.injury && d.r >= _t.low && d.r <= _t.opt; });
+    const caution = playerData.filter(d => { const _t=this.getPlayerThresholds(d.player.id); return !d.injury && (d.r > _t.opt || (d.r > 0 && d.r < _t.low)); });
     const out     = playerData.filter(d =>  d.injury);
     const weekSessions = this.sessions.filter(s => { const d = new Date(s.date); return d >= monday && d <= sunday; });
     const activeInj = (this.injuries||[]).filter(i => i.status==='active');
