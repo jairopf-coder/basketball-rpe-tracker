@@ -3930,7 +3930,7 @@ class RPETracker {
         const alertCount = this.players.filter(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
             const r = parseFloat(ratio.ratio);
-            return !isNaN(r) && r > this.getPlayerThresholds(p.id).opt;
+            return !isNaN(r) && r > this.getPlayerThresholds(player.id).opt;
         }).length;
 
         // Find the "Carga" nav group button
