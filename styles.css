@@ -7466,3 +7466,153 @@ details[open] .ewma-toggle-hint { display: none; }
     .ijh-zone-meta { display: none; }
     .ijh-player-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ========== READINESS SCORE — BLOQUE C ========== */
+
+/* Dashboard player row: Readiness chip (6th column) */
+.db-player-readiness {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.18rem 0.45rem;
+    border-radius: 20px;
+    white-space: nowrap;
+    min-width: 44px;
+    text-align: center;
+    border: 1px solid transparent;
+}
+.db-player-readiness.rdy-none {
+    color: var(--text-muted) !important;
+    background: transparent !important;
+    font-weight: 400;
+}
+.db-player-readiness.rdy-green  { border-color: rgba(46,125,50,.25); }
+.db-player-readiness.rdy-yellow { border-color: rgba(249,168,37,.35); }
+.db-player-readiness.rdy-red    { border-color: rgba(198,40,40,.25); }
+
+/* Extend the db-player-row grid to include the readiness column */
+.db-player-row {
+    grid-template-columns: 24px 1fr 80px 42px 22px 38px 52px !important;
+}
+@media (max-width: 768px) {
+    .db-player-readiness { display: none; }
+    .db-player-row {
+        grid-template-columns: 24px 1fr 70px 36px 20px 34px !important;
+    }
+}
+
+/* ---- Team Readiness Widget ---- */
+.db-readiness-widget {
+    margin-top: 0.85rem;
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 10px);
+    padding: 0.75rem 0.9rem;
+}
+.db-readiness-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.65rem;
+}
+.db-readiness-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.db-readiness-avg {
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+}
+.rdy-rows { display: flex; flex-direction: column; gap: 0.35rem; }
+.rdy-row {
+    display: grid;
+    grid-template-columns: 20px 1fr 70px 46px;
+    align-items: center;
+    gap: 0.4rem;
+}
+.rdy-name {
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.rdy-bar-wrap {
+    background: var(--bg-subtle);
+    border-radius: 4px;
+    height: 7px;
+    overflow: hidden;
+}
+.rdy-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+.rdy-bar-fill.rdy-green  { background: #4caf50; }
+.rdy-bar-fill.rdy-yellow { background: #ffca28; }
+.rdy-bar-fill.rdy-red    { background: #ef5350; }
+.rdy-bar-fill.rdy-none   { background: var(--border); }
+.rdy-val {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* ---- Edit Player Modal — A:C Thresholds section ---- */
+.ac-thresholds-details {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    margin-top: -0.25rem;
+}
+.ac-thresholds-details summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.ac-thresholds-details summary::-webkit-details-marker { display: none; }
+.ac-thresh-hint {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 0.25rem;
+}
+.ac-thresholds-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+}
+.ac-thresholds-grid label {
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+.ac-thresholds-grid input[type="number"] {
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background: var(--bg-input, var(--bg-surface));
+    color: var(--text-primary);
+}
+.ac-thresh-note {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin: 0.5rem 0 0.15rem;
+    font-style: italic;
+}

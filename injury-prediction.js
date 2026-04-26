@@ -11,7 +11,7 @@ RPETracker.prototype.predictInjuryRisk = function(playerId) {
         .map(s => ({
             ...s,
             date: new Date(s.date),
-            load: s.load || (s.rpe * (s.duration || 60))
+            load: (s.load || (s.rpe * (s.duration || 60))) * (s.type === 'match' ? RPETracker.MATCH_LOAD_MULTIPLIER : 1)
         }))
         .sort((a, b) => a.date - b.date);
 
@@ -43,10 +43,11 @@ RPETracker.prototype.predictInjuryRisk = function(playerId) {
     const ratio = this.calculateAcuteChronicRatio(playerId);
     const r = parseFloat(ratio.ratio) || 0;
 
-    if (r > 1.5)      riskScore += weights.ratioAC * 100;
-    else if (r > 1.3) riskScore += weights.ratioAC * 70;
-    else if (r < 0.8) riskScore += weights.ratioAC * 40;
-    else              riskScore += weights.ratioAC * 20;
+    const _tIP = this.getPlayerThresholds(playerId);
+    if (r > _tIP.high)      riskScore += weights.ratioAC * 100;
+    else if (r > _tIP.opt)  riskScore += weights.ratioAC * 70;
+    else if (r < _tIP.low)  riskScore += weights.ratioAC * 40;
+    else                    riskScore += weights.ratioAC * 20;
 
     const spikeRisk = factors.spikeLoad;
     riskScore += weights.spikeLoad * spikeRisk;
@@ -101,8 +102,8 @@ RPETracker.prototype.predictInjuryRisk = function(playerId) {
             {
                 name: 'Ratio A:C',
                 value: ratio.ratio,
-                impact: r > 1.5 ? 'Alto' : r > 1.3 ? 'Moderado' : r < 0.8 ? 'Bajo-Mod' : 'Mínimo',
-                status: r > 1.5 ? 'danger' : r > 1.3 ? 'warning' : 'ok'
+                impact: r > _tIP.high ? 'Alto' : r > _tIP.opt ? 'Moderado' : r < _tIP.low ? 'Bajo-Mod' : 'Mínimo',
+                status: r > _tIP.high ? 'danger' : r > _tIP.opt ? 'warning' : 'ok'
             },
             {
                 name: 'Picos de Carga',
@@ -208,7 +209,7 @@ RPETracker.prototype.getInjuryPreventionRecommendations = function(riskLevel, fa
     }
 
     const r = parseFloat(ratio.ratio) || 0;
-    if (r > 1.5)                           recommendations.push('🚨 Ratio A:C crítico: reducir carga ya');
+    const _tRec = this.getPlayerThresholds(playerId); if (r > _tRec.high) recommendations.push('🚨 Ratio A:C crítico: reducir carga ya');
     if (factors.spikeLoad > 50)            recommendations.push('📊 Detectado pico de carga: evitar aumentos bruscos');
     if (factors.insufficientRecovery > 50) recommendations.push('⏰ Aumentar tiempo entre sesiones (48h mínimo)');
 
