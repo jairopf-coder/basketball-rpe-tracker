@@ -2771,7 +2771,7 @@ class RPETracker {
         const chipsHTML = this.players.map(p => {
             const ratio = this.calculateAcuteChronicRatio(p.id);
             const r = parseFloat(ratio.ratio);
-            const _tDot = this.getPlayerThresholds(player.id); const dot = isNaN(r) ? '#999' : r > _tDot.high ? '#e53935' : r > _tDot.opt ? '#fb8c00' : r < _tDot.low ? '#1e88e5' : '#43a047';
+            const _tDot = this.getPlayerThresholds(p.id); const dot = isNaN(r) ? '#999' : r > _tDot.high ? '#e53935' : r > _tDot.opt ? '#fb8c00' : r < _tDot.low ? '#1e88e5' : '#43a047';
             const ratioDisplay = ratio.ratio === 'N/A' ? '—' : ratio.ratio;
             const active = selected.includes(p.id) ? 'chart-chip--active' : '';
             const avatar = PlayerTokens.avatar(p, 20, '0.55rem');
