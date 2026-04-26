@@ -2137,10 +2137,10 @@ class RPETracker {
             return '<p style="color: var(--gray); text-align: center;">No hay jugadoras registradas</p>';
         }
 
-        const getStatus = (r) => {
+        const getStatus = (r, playerId) => {
             const n = parseFloat(r);
             if (isNaN(n) || r === 'N/A') return { label: 'Sin datos', cls: 'status-nodata', icon: '—' };
-            const _tL = this.getPlayerThresholds(pid || null);
+            const _tL = this.getPlayerThresholds(playerId || null);
             if (n > _tL.high) return { label: 'Peligro',   cls: 'status-danger',  icon: '🔴' };
             if (n > _tL.opt)  return { label: 'Precaución', cls: 'status-caution', icon: '🟠' };
             if (n < _tL.low)  return { label: 'Por debajo', cls: 'status-low',     icon: '🔵' };
@@ -2198,10 +2198,10 @@ class RPETracker {
             else return;
         }
 
-        const getStatus = (r) => {
+        const getStatus = (r, playerId) => {
             const n = parseFloat(r);
             if (isNaN(n) || r === 'N/A') return { color: '#9e9e9e', icon: '⚪', label: 'Sin datos' };
-            const _tP = this.getPlayerThresholds(pid || null);
+            const _tP = this.getPlayerThresholds(playerId || null);
             if (n > _tP.high) return { color: '#e53935', icon: '🔴', label: 'Peligro' };
             if (n > _tP.opt)  return { color: '#fb8c00', icon: '🟠', label: 'Precaución' };
             if (n < _tP.low)  return { color: '#1e88e5', icon: '🔵', label: 'Por debajo' };
