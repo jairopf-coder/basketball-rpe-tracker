@@ -217,17 +217,42 @@ RPETracker.prototype.getInjuryPreventionRecommendations = function(riskLevel, fa
 
 // ========== RENDER INJURY PREDICTION UI ==========
 
+// State for prediction dashboard
+RPETracker.prototype._predState = {
+    sortOrder: 'desc',      // 'desc' = mayor riesgo primero, 'asc' = menor
+    selected: new Set(),    // Set of player IDs selected via mini-chips
+    expanded: new Set()     // Set of player IDs whose cards are expanded
+};
+
 RPETracker.prototype.renderInjuryPredictionDashboard = function() {
     const container = document.getElementById('injuryPredictionView');
     if (!container) return;
 
+    // Ensure state object exists (in case of first load)
+    if (!this._predState) {
+        this._predState = { sortOrder: 'desc', selected: new Set(), expanded: new Set() };
+    }
+
     // ── 1. Compute all predictions ───────────────────────────────────────
-    const predictions = this.players.map(player => ({
+    let predictions = this.players.map(player => ({
         player,
         prediction: this.predictInjuryRisk(player.id)
     }));
 
-    // ── 2. Team summary banner ───────────────────────────────────────────
+    // ── 2. Sort by risk ──────────────────────────────────────────────────
+    const riskOrder = { high: 4, moderate: 3, low: 2, minimal: 1, unknown: 0 };
+    predictions.sort((a, b) => {
+        const ra = riskOrder[a.prediction.riskLevel] ?? 0;
+        const rb = riskOrder[b.prediction.riskLevel] ?? 0;
+        const byLevel = rb - ra;
+        if (byLevel !== 0) return this._predState.sortOrder === 'desc' ? byLevel : -byLevel;
+        // Secondary sort: probability
+        return this._predState.sortOrder === 'desc'
+            ? b.prediction.probability - a.prediction.probability
+            : a.prediction.probability - b.prediction.probability;
+    });
+
+    // ── 3. Team summary banner ───────────────────────────────────────────
     const counts = { high: 0, moderate: 0, low: 0, minimal: 0, unknown: 0 };
     predictions.forEach(({ prediction: p }) => {
         if (counts[p.riskLevel] !== undefined) counts[p.riskLevel]++;
@@ -243,6 +268,8 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
         { level: 'minimal',  label: 'Mínimo',    color: '#4caf50', count: counts.minimal  },
         { level: 'unknown',  label: 'Sin datos', color: '#9e9e9e', count: counts.unknown  },
     ].filter(c => c.count > 0);
+
+    const allSelected = total > 0 && this._predState.selected.size === total;
 
     const summaryHtml = total === 0 ? '' : `
         <div class="pred-team-summary">
@@ -263,25 +290,56 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                 `).join('')}
             </div>
             <div class="pred-summary-minichips">
-                ${predictions.map(({ player, prediction: p }) => `
-                    <div class="pred-mini-chip" style="--chip-color:${p.colorHex}" title="${player.name}${player.number ? ' #' + player.number : ''} · ${p.riskLevel === 'unknown' ? 'Sin datos' : p.probability + '% riesgo'}">
+                <button class="pred-select-all-btn ${allSelected ? 'pred-select-all-btn--active' : ''}"
+                    onclick="window._rpeTracker._predSelectAll()"
+                    title="${allSelected ? 'Deseleccionar todas' : 'Seleccionar todas'}">
+                    ${allSelected ? '✓ Todas' : 'Todas'}
+                </button>
+                ${predictions.map(({ player, prediction: p }) => {
+                    const isSel = this._predState.selected.has(player.id);
+                    return `
+                    <div class="pred-mini-chip ${isSel ? 'pred-mini-chip--selected' : ''}"
+                        style="--chip-color:${p.colorHex}"
+                        title="${player.name}${player.number ? ' #' + player.number : ''} · ${p.riskLevel === 'unknown' ? 'Sin datos' : p.probability + '% riesgo'}"
+                        onclick="window._rpeTracker._predToggleSelect('${player.id}')">
                         ${player.name.split(' ')[0]}
-                    </div>
-                `).join('')}
+                        ${isSel ? '<span class="pred-mini-check">✓</span>' : ''}
+                    </div>`;
+                }).join('')}
+                ${this._predState.selected.size > 0 ? `
+                    <span class="pred-selected-count">${this._predState.selected.size} sel.</span>
+                ` : ''}
             </div>
         </div>
     `;
 
-    // ── 3. Player cards – two-column grid ────────────────────────────────
+    // ── 4. Sort controls ─────────────────────────────────────────────────
+    const sortBarHtml = predictions.length === 0 ? '' : `
+        <div class="pred-sort-bar">
+            <span class="pred-sort-label">Ordenar por riesgo:</span>
+            <button class="pred-sort-btn ${this._predState.sortOrder === 'desc' ? 'pred-sort-btn--active' : ''}"
+                onclick="window._rpeTracker._predSetSort('desc')">
+                ↓ Mayor primero
+            </button>
+            <button class="pred-sort-btn ${this._predState.sortOrder === 'asc' ? 'pred-sort-btn--active' : ''}"
+                onclick="window._rpeTracker._predSetSort('asc')">
+                ↑ Menor primero
+            </button>
+        </div>
+    `;
+
+    // ── 5. Player cards – collapsible two-column grid ────────────────────
     const cardsHtml = predictions.length === 0
         ? `<div class="pred-empty">No hay jugadoras registradas. Añade jugadoras para activar la predicción.</div>`
         : `<div class="pred-grid">
             ${predictions.map(({ player, prediction: pred }) => {
                 const isUnknown = pred.riskLevel === 'unknown';
                 const hex       = pred.colorHex;
+                const isExpanded = this._predState.expanded.has(player.id);
+                const isSelected = this._predState.selected.has(player.id);
 
-                // SVG ring
-                const R    = 28;
+                // Compact ring values (smaller for collapsed header)
+                const R    = 20;
                 const circ = Math.round(2 * Math.PI * R);
                 const dash = Math.round((pred.probability / 100) * circ);
 
@@ -310,45 +368,86 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                     </ul>
                 ` : '';
 
+                // Compact inline ring for the collapsed header
+                const compactRingHtml = !isUnknown ? `
+                    <div class="pred-compact-ring" style="--ring-color:${hex}">
+                        <svg viewBox="0 0 46 46" width="46" height="46">
+                            <circle cx="23" cy="23" r="${R}" fill="none" stroke-width="4" class="pred-ring-track"/>
+                            <circle cx="23" cy="23" r="${R}" fill="none" stroke-width="4"
+                                stroke="${hex}" stroke-linecap="round"
+                                stroke-dasharray="${dash} ${circ - dash}"
+                                transform="rotate(-90 23 23)"/>
+                        </svg>
+                        <div class="pred-compact-ring-label">
+                            <span style="color:${hex};font-weight:800;font-size:0.75rem;line-height:1">${pred.probability}%</span>
+                        </div>
+                    </div>
+                ` : `<div class="pred-compact-ring-unknown">—</div>`;
+
+                // Full ring for expanded view (larger)
+                const R2 = 28, circ2 = Math.round(2 * Math.PI * R2), dash2 = Math.round((pred.probability / 100) * circ2);
+                const fullRingHtml = !isUnknown ? `
+                    <div class="pred-ring-wrap">
+                        <svg class="pred-ring" viewBox="0 0 70 70" width="64" height="64">
+                            <circle cx="35" cy="35" r="${R2}" fill="none" stroke-width="6" class="pred-ring-track"/>
+                            <circle cx="35" cy="35" r="${R2}" fill="none" stroke-width="6"
+                                stroke="${hex}" stroke-linecap="round"
+                                stroke-dasharray="${dash2} ${circ2 - dash2}"
+                                transform="rotate(-90 35 35)"/>
+                        </svg>
+                        <div class="pred-ring-label">
+                            <span class="pred-ring-pct" style="color:${hex}">${pred.probability}%</span>
+                            <span class="pred-ring-sub">riesgo</span>
+                        </div>
+                    </div>
+                ` : `<div class="pred-ring-unknown">—</div>`;
+
                 return `
-                    <div class="pred-card pred-card--${pred.riskLevel}">
-                        <div class="pred-card-header">
-                            <div class="pred-player-info">
+                    <div class="pred-card pred-card--${pred.riskLevel} ${isExpanded ? 'pred-card--expanded' : ''} ${isSelected ? 'pred-card--selected' : ''}"
+                         id="pred-card-${player.id}">
+
+                        <!-- Collapsed header (always visible) -->
+                        <div class="pred-card-collapsed"
+                             onclick="window._rpeTracker._predToggleExpand('${player.id}')">
+                            <div class="pred-collapsed-left">
                                 <div class="pred-player-name">
                                     ${player.name}
                                     ${player.number ? `<span class="pred-player-num">#${player.number}</span>` : ''}
                                 </div>
                                 <div class="pred-level-badge pred-level-badge--${pred.riskLevel}">${levelLabel}</div>
                             </div>
-                            ${!isUnknown ? `
-                            <div class="pred-ring-wrap">
-                                <svg class="pred-ring" viewBox="0 0 70 70" width="64" height="64">
-                                    <circle cx="35" cy="35" r="${R}" fill="none" stroke-width="6" class="pred-ring-track"/>
-                                    <circle cx="35" cy="35" r="${R}" fill="none" stroke-width="6"
-                                        stroke="${hex}" stroke-linecap="round"
-                                        stroke-dasharray="${dash} ${circ - dash}"
-                                        transform="rotate(-90 35 35)"/>
-                                </svg>
-                                <div class="pred-ring-label">
-                                    <span class="pred-ring-pct" style="color:${hex}">${pred.probability}%</span>
-                                    <span class="pred-ring-sub">riesgo</span>
-                                </div>
+                            <div class="pred-collapsed-right">
+                                ${compactRingHtml}
+                                <span class="pred-expand-chevron">${isExpanded ? '▲' : '▼'}</span>
                             </div>
-                            ` : `<div class="pred-ring-unknown">—</div>`}
                         </div>
 
-                        <div class="pred-message pred-message--${pred.riskLevel}" style="border-left-color:${hex}; background:${hex}18">
-                            ${pred.message}
+                        <!-- Expanded content -->
+                        ${isExpanded ? `
+                        <div class="pred-card-expanded-body">
+                            <div class="pred-card-header">
+                                <div class="pred-player-info">
+                                    <div class="pred-player-name">
+                                        ${player.name}
+                                        ${player.number ? `<span class="pred-player-num">#${player.number}</span>` : ''}
+                                    </div>
+                                    <div class="pred-level-badge pred-level-badge--${pred.riskLevel}">${levelLabel}</div>
+                                </div>
+                                ${fullRingHtml}
+                            </div>
+                            <div class="pred-message pred-message--${pred.riskLevel}" style="border-left-color:${hex}; background:${hex}18">
+                                ${pred.message}
+                            </div>
+                            ${factorsHtml}
+                            ${recsHtml}
                         </div>
-
-                        ${factorsHtml}
-                        ${recsHtml}
+                        ` : ''}
                     </div>
                 `;
             }).join('')}
         </div>`;
 
-    // ── 4. "Cómo funciona" collapsible at bottom ─────────────────────────
+    // ── 6. "Cómo funciona" collapsible at bottom ─────────────────────────
     const howItWorksHtml = `
         <details class="pred-how-details">
             <summary class="pred-how-summary">
@@ -370,13 +469,59 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
         </details>
     `;
 
-    // ── 5. Final assembly ────────────────────────────────────────────────
+    // ── 7. Final assembly ────────────────────────────────────────────────
     container.innerHTML = `
         <div class="pred-page-header">
             <h2>🔮 Predicción de Riesgo de Lesión</h2>
         </div>
         ${summaryHtml}
+        ${sortBarHtml}
         ${cardsHtml}
         ${howItWorksHtml}
     `;
+
+    // Expose tracker reference for onclick handlers
+    window._rpeTracker = this;
+};
+
+// ── Toggle expand/collapse of a player card ──────────────────────────────────
+RPETracker.prototype._predToggleExpand = function(playerId) {
+    if (!this._predState) this._predState = { sortOrder: 'desc', selected: new Set(), expanded: new Set() };
+    if (this._predState.expanded.has(playerId)) {
+        this._predState.expanded.delete(playerId);
+    } else {
+        this._predState.expanded.add(playerId);
+    }
+    this.renderInjuryPredictionDashboard();
+};
+
+// ── Toggle selection of a player from the summary mini-chips ─────────────────
+RPETracker.prototype._predToggleSelect = function(playerId) {
+    if (!this._predState) this._predState = { sortOrder: 'desc', selected: new Set(), expanded: new Set() };
+    if (this._predState.selected.has(playerId)) {
+        this._predState.selected.delete(playerId);
+    } else {
+        this._predState.selected.add(playerId);
+    }
+    // Also scroll/expand the selected card if selecting
+    this.renderInjuryPredictionDashboard();
+};
+
+// ── Select / deselect all players ────────────────────────────────────────────
+RPETracker.prototype._predSelectAll = function() {
+    if (!this._predState) this._predState = { sortOrder: 'desc', selected: new Set(), expanded: new Set() };
+    const allIds = this.players.map(p => p.id);
+    if (this._predState.selected.size === allIds.length) {
+        this._predState.selected.clear();
+    } else {
+        this._predState.selected = new Set(allIds);
+    }
+    this.renderInjuryPredictionDashboard();
+};
+
+// ── Change sort order ─────────────────────────────────────────────────────────
+RPETracker.prototype._predSetSort = function(order) {
+    if (!this._predState) this._predState = { sortOrder: 'desc', selected: new Set(), expanded: new Set() };
+    this._predState.sortOrder = order;
+    this.renderInjuryPredictionDashboard();
 };
