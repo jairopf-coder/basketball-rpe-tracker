@@ -130,7 +130,7 @@ RPETracker.prototype.predictInjuryRisk = function(playerId) {
                 status: factors.insufficientRecovery > 50 ? 'warning' : 'ok'
             }
         ],
-        recommendations: this.getInjuryPreventionRecommendations(riskLevel, factors, ratio)
+        recommendations: this.getInjuryPreventionRecommendations(riskLevel, factors, ratio, playerId)
     };
 };
 
@@ -179,7 +179,7 @@ RPETracker.prototype.calculateRiskFactors = function(playerId, playerSessions) {
     return { spikeLoad: spikeRisk, recentHighLoad, insufficientRecovery };
 };
 
-RPETracker.prototype.getInjuryPreventionRecommendations = function(riskLevel, factors, ratio) {
+RPETracker.prototype.getInjuryPreventionRecommendations = function(riskLevel, factors, ratio, playerId) {
     const recommendations = [];
 
     switch (riskLevel) {
