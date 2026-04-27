@@ -139,6 +139,53 @@ RPETracker.prototype._renderWTeamSummary = function(sevenDaysAgo) {
     </div>`;
 };
 
+RPETracker.prototype._wTrendAlerts = function() {
+    const alerts = [];
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    this.players.forEach(p => {
+        // Get last 7 days of data for this player, sorted ascending
+        const pData = (this.wellnessData || [])
+            .filter(w => w.playerId === p.id)
+            .map(w => ({ ...w, _d: new Date(w.date) }))
+            .filter(w => { const d = new Date(w._d); d.setHours(0,0,0,0); return (today - d) <= 7 * 86400000; })
+            .sort((a, b) => a._d - b._d);
+
+        if (pData.length < 3) return;
+
+        // Check consecutive streak for a condition over last N days
+        const checkStreak = (fieldFn, minRun) => {
+            let run = 0, maxRun = 0;
+            pData.forEach(w => {
+                if (fieldFn(w)) { run++; maxRun = Math.max(maxRun, run); }
+                else run = 0;
+            });
+            return maxRun >= minRun;
+        };
+
+        // Sueño ≤ 2 (raw value: 1 or 2 on 1-5 scale)
+        if (checkStreak(w => w.sleep != null && w.sleep <= 2, 3)) {
+            alerts.push({
+                icon: '🔁',
+                type: 'trend',
+                name: p.name,
+                message: 'Sueño deficiente 3+ días consecutivos (≤2/5)'
+            });
+        }
+
+        // Agujetas ≥ 4 en escala inversa: soreness raw ≤ 2 significa mucho dolor
+        if (checkStreak(w => w.soreness != null && w.soreness <= 2, 3)) {
+            alerts.push({
+                icon: '🔁',
+                type: 'trend',
+                name: p.name,
+                message: 'Dolor muscular acumulado 3+ días consecutivos'
+            });
+        }
+    });
+    return alerts;
+};
+
 RPETracker.prototype._wAlerts = function(recentData) {
     const alerts = [];
     this.players.forEach(p => {
@@ -152,6 +199,16 @@ RPETracker.prototype._wAlerts = function(recentData) {
         else if (fatigue!==null && fatigue<2) alerts.push({icon:'⚡',name:p.name,message:`Fatiga elevada (energía ${fatigue.toFixed(1)}/5)`});
         else if (soreness!==null && soreness<2) alerts.push({icon:'💪',name:p.name,message:`Dolor muscular elevado (${soreness.toFixed(1)}/5)`});
     });
+
+    // Add trend alerts (3-day streaks)
+    const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
+    trendAlerts.forEach(ta => {
+        // Avoid duplicate if player already has a snapshot alert
+        if (!alerts.some(a => a.name === ta.name && a.icon === ta.icon)) {
+            alerts.push(ta);
+        }
+    });
+
     return alerts;
 };
 

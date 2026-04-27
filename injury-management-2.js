@@ -122,110 +122,162 @@ RPETracker.prototype.toggleAvailability = function(playerId, dateKey) {
 RPETracker.prototype.updateRTPPhase = function(injuryId) {
     const injury = this.injuries.find(i => i.id === injuryId);
     if (!injury) return;
-    
+
     const player = this.players.find(p => p.id === injury.playerId);
     const currentPhase = RTP_PHASES[injury.rtpPhase];
-    
+
+    // Retrieve last saved criteriaChecks for current phase
+    const lastChecks = (injury.history || []).slice().reverse()
+        .find(h => h.criteriaChecks && Array.isArray(h.criteriaChecks))?.criteriaChecks || [];
+    const checkedSet = new Set(lastChecks);
+
+    const buildCriteriaHTML = (phaseNum) => {
+        const ph = RTP_PHASES[phaseNum];
+        if (!ph?.criteria?.conditions) return '';
+        const minReq = ph.criteria.minConditions || ph.criteria.conditions.length;
+        return `
+        <div class="form-group" id="criteriaBlock">
+            <label style="margin-bottom:0.5rem;display:block">📋 Criterios para avanzar a Fase ${parseInt(phaseNum)+1} <span style="font-weight:400;color:var(--text-muted)">(mín. ${minReq} de ${ph.criteria.conditions.length})</span></label>
+            <div class="inj-criteria-checklist" id="criteriaChecklist">
+                ${ph.criteria.conditions.map(c => `
+                <label class="inj-criteria-check-row ${checkedSet.has(c.id) ? 'checked' : ''}">
+                    <input type="checkbox" name="rtpCriteria" value="${c.id}" ${checkedSet.has(c.id) ? 'checked' : ''} onchange="window.rpeTracker?._onCriteriaChange('${phaseNum}')">
+                    <span>${c.label}</span>
+                </label>`).join('')}
+            </div>
+            <div id="criteriaStatus" class="inj-criteria-status"></div>
+        </div>`;
+    };
+
     const modal = document.createElement('div');
     modal.className = 'modal active';
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h2>🔄 Actualizar Fase RTP - ${player.name}</h2>
+                <h2>🔄 Actualizar Fase RTP — ${player.name}</h2>
                 <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
             </div>
-            <div style="padding: 1.5rem;">
-                <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <strong>Fase Actual: ${injury.rtpPhase} - ${currentPhase.name}</strong>
-                    <p style="margin-top: 0.5rem; color: #666;">${currentPhase.description}</p>
+            <div style="padding:1.5rem">
+                <div style="background:var(--bg-subtle);padding:1rem;border-radius:8px;margin-bottom:1rem">
+                    <strong>Fase Actual: ${injury.rtpPhase} — ${currentPhase.name}</strong>
+                    <p style="margin-top:0.5rem;color:var(--text-muted)">${currentPhase.description}</p>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Nueva Fase</label>
                     <select id="newRTPPhase" class="filter-select">
                         ${Object.keys(RTP_PHASES).map(phaseNum => `
                             <option value="${phaseNum}" ${phaseNum == injury.rtpPhase ? 'selected' : ''}>
                                 Fase ${phaseNum}: ${RTP_PHASES[phaseNum].name}
-                            </option>
-                        `).join('')}
+                            </option>`).join('')}
                     </select>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Progreso en esta Fase (%)</label>
-                    <div style="display: flex; align-items: center; gap: 1rem;">
-                        <input type="range" id="rtpProgress" min="0" max="100" value="${injury.rtpProgress}" 
-                               style="flex: 1;" oninput="document.getElementById('progressValue').textContent = this.value + '%'">
-                        <span id="progressValue" style="font-weight: bold; min-width: 50px;">${injury.rtpProgress}%</span>
+                    <div style="display:flex;align-items:center;gap:1rem">
+                        <input type="range" id="rtpProgress" min="0" max="100" value="${injury.rtpProgress}"
+                               style="flex:1" oninput="document.getElementById('progressValue').textContent=this.value+'%'">
+                        <span id="progressValue" style="font-weight:bold;min-width:50px">${injury.rtpProgress}%</span>
                     </div>
                 </div>
-                
+
+                ${buildCriteriaHTML(injury.rtpPhase)}
+
                 <div class="form-group">
                     <label>Notas de Progreso</label>
                     <textarea id="rtpNotes" rows="3" placeholder="Estado actual, pruebas superadas, próximos pasos..."></textarea>
                 </div>
-                
-                <div id="phaseInfo" style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                    <!-- Phase info will be updated here -->
-                </div>
-                
+
+                <div id="phaseInfo" style="background:var(--bg-subtle);padding:1rem;border-radius:8px;margin-top:1rem"></div>
+
                 <div class="modal-footer">
                     <button onclick="this.closest('.modal').remove()" class="btn-secondary">Cancelar</button>
-                    <button onclick="window.rpeTracker?.saveRTPUpdate('${injuryId}'); this.closest('.modal').remove();" 
+                    <button id="saveRTPBtn" onclick="window.rpeTracker?.saveRTPUpdate('${injuryId}');this.closest('.modal').remove();"
                             class="btn-primary">💾 Guardar Actualización</button>
                 </div>
             </div>
-        </div>
-    `;
-    
+        </div>`;
+
     document.body.appendChild(modal);
-    
-    // Update phase info on change
+
     const updatePhaseInfo = () => {
         const phaseNum = document.getElementById('newRTPPhase').value;
-        const phase = RTP_PHASES[phaseNum];
+        const ph = RTP_PHASES[phaseNum];
+        // Rebuild criteria when phase selector changes
+        const criteriaBlock = document.getElementById('criteriaBlock');
+        if (criteriaBlock) {
+            criteriaBlock.outerHTML = buildCriteriaHTML(phaseNum) || '';
+        }
         document.getElementById('phaseInfo').innerHTML = `
             <strong>Actividades recomendadas:</strong>
-            <ul style="margin: 0.5rem 0 0 1.5rem;">
-                ${phase.activities.map(a => `<li>${a}</li>`).join('')}
-            </ul>
-            <p style="margin-top: 0.5rem;"><strong>Criterio para avanzar:</strong> ${phase.criteria}</p>
-            <p style="margin-top: 0.5rem;"><strong>Carga recomendada:</strong> RPE ${phase.loadRecommendation.rpe} × ${phase.loadRecommendation.duration}min</p>
-        `;
+            <ul style="margin:0.5rem 0 0 1.5rem">${ph.activities.map(a => `<li>${a}</li>`).join('')}</ul>
+            <p style="margin-top:0.5rem"><strong>Carga recomendada:</strong> RPE ${ph.loadRecommendation.rpe} × ${ph.loadRecommendation.duration} min</p>`;
+        this._onCriteriaChange(phaseNum);
     };
-    
+
     document.getElementById('newRTPPhase').addEventListener('change', updatePhaseInfo);
-    updatePhaseInfo(); // Initial call
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.remove();
+    updatePhaseInfo();
+
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+};
+
+RPETracker.prototype._onCriteriaChange = function(phaseNum) {
+    const ph = RTP_PHASES[phaseNum];
+    if (!ph?.criteria?.conditions) return;
+    const checkboxes = document.querySelectorAll('#criteriaChecklist input[type=checkbox]');
+    const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+    const total   = ph.criteria.conditions.length;
+    const minReq  = ph.criteria.minConditions || total;
+    const ready   = checkedCount >= minReq;
+    const status  = document.getElementById('criteriaStatus');
+    const saveBtn = document.getElementById('saveRTPBtn');
+    if (status) {
+        status.textContent = ready
+            ? `✅ ${checkedCount}/${total} criterios cumplidos — listo para avanzar`
+            : `⬜ ${checkedCount}/${total} criterios — se necesitan ${minReq} para avanzar (puedes guardar igualmente)`;
+        status.style.color = ready ? '#4caf50' : '#ff9800';
+    }
+    // Visually highlight save button when ready but never disable it
+    if (saveBtn) {
+        saveBtn.style.background = ready ? '#4caf50' : '';
+    }
+    // Update row styling
+    document.querySelectorAll('.inj-criteria-check-row').forEach(row => {
+        const cb = row.querySelector('input');
+        row.classList.toggle('checked', cb?.checked || false);
     });
 };
 
 RPETracker.prototype.saveRTPUpdate = function(injuryId) {
     const injury = this.injuries.find(i => i.id === injuryId);
     if (!injury) return;
-    
-    const newPhase = parseInt(document.getElementById('newRTPPhase').value);
+
+    const newPhase    = parseInt(document.getElementById('newRTPPhase').value);
     const newProgress = parseInt(document.getElementById('rtpProgress').value);
-    const notes = document.getElementById('rtpNotes').value;
-    
-    // Add to history
+    const notes       = document.getElementById('rtpNotes').value;
+
+    // Collect criteria checks
+    const criteriaChecks = Array.from(
+        document.querySelectorAll('#criteriaChecklist input[type=checkbox]:checked')
+    ).map(cb => cb.value);
+
     injury.history.push({
         date: new Date().toISOString(),
         phase: newPhase,
         progress: newProgress,
-        notes: notes
+        notes,
+        criteriaChecks
     });
-    
-    injury.rtpPhase = newPhase;
+
+    injury.rtpPhase    = newPhase;
     injury.rtpProgress = newProgress;
-    
+
     if (notes) {
-        injury.notes = (injury.notes ? injury.notes + '\n\n' : '') + 
+        injury.notes = (injury.notes ? injury.notes + '\n\n' : '') +
                        `[${new Date().toLocaleDateString('es-ES')}] ${notes}`;
     }
-    
+
     this.saveInjuries();
     this.renderInjuryManagement();
     this.showToast('🔄 Fase RTP actualizada');

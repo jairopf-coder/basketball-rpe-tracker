@@ -1586,6 +1586,17 @@ class RPETracker {
             </div>`;
         }
 
+        // Wellness trend alerts in dashboard banner
+        const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
+        if (trendAlerts.length > 0) {
+            const trendItems = trendAlerts.map(a =>
+                `🔁 <strong>${a.name.split(' ')[0]}</strong> — ${a.message}`
+            );
+            bannerHTML += `<div class="db-alert-banner db-alert-banner--trend">
+                ${trendItems.map(i=>`<div class="db-alert-item">${i}</div>`).join('<div class="db-alert-sep">·</div>')}
+            </div>`;
+        }
+
         // ── Match-day mode ─────────────────────────────────────────
         const todayKey = ['dom','lun','mar','mie','jue','vie','sab'][new Date().getDay()];
         const todayPlan = this.weekPlan?.days?.[todayKey] || {};
@@ -3935,17 +3946,29 @@ class RPETracker {
 
         // Find the "Carga" nav group button
         const cargaBtn = document.querySelector('.nav-group-btn[data-group="carga"]');
-        if (!cargaBtn) return;
+        if (cargaBtn) {
+            const existing = cargaBtn.querySelector('.nav-alert-badge');
+            if (existing) existing.remove();
+            if (alertCount > 0) {
+                const badge = document.createElement('span');
+                badge.className = 'nav-alert-badge';
+                badge.textContent = alertCount;
+                cargaBtn.appendChild(badge);
+            }
+        }
 
-        // Remove existing badge
-        const existing = cargaBtn.querySelector('.nav-alert-badge');
-        if (existing) existing.remove();
-
-        if (alertCount > 0) {
-            const badge = document.createElement('span');
-            badge.className = 'nav-alert-badge';
-            badge.textContent = alertCount;
-            cargaBtn.appendChild(badge);
+        // Wellness trend badge on "Salud" nav group
+        const saludBtn = document.querySelector('.nav-group-btn[data-group="salud"]');
+        if (saludBtn) {
+            const existingW = saludBtn.querySelector('.nav-alert-badge');
+            if (existingW) existingW.remove();
+            const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
+            if (trendAlerts.length > 0) {
+                const badge = document.createElement('span');
+                badge.className = 'nav-alert-badge nav-alert-badge--trend';
+                badge.textContent = trendAlerts.length;
+                saludBtn.appendChild(badge);
+            }
         }
     }
 }

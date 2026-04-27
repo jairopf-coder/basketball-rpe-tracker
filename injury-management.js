@@ -56,46 +56,271 @@ const RTP_PHASES = {
         description: 'Sin actividad. Tratamiento médico y fisioterapia.',
         activities: ['Reposo', 'Fisioterapia', 'Movilidad pasiva'],
         loadRecommendation: { rpe: 0, duration: 0 },
-        criteria: 'Sin dolor en reposo'
+        criteria: {
+            summary: 'Sin dolor en reposo',
+            minConditions: 2,
+            conditions: [
+                { id: 'p1c1', label: 'Sin dolor en reposo (EVA = 0)' },
+                { id: 'p1c2', label: 'Inflamación/edema controlado' },
+                { id: 'p1c3', label: 'Aprobación médica para iniciar movilidad' }
+            ]
+        }
     },
     2: {
         name: 'Movilidad Activa',
         description: 'Ejercicios de movilidad sin carga.',
         activities: ['Movilidad activa', 'Ejercicios isométricos', 'Bicicleta estática'],
         loadRecommendation: { rpe: 2, duration: 20 },
-        criteria: 'Movilidad completa sin dolor'
+        criteria: {
+            summary: 'Movilidad completa sin dolor',
+            minConditions: 3,
+            conditions: [
+                { id: 'p2c1', label: 'Rango de movimiento completo (ROM ≥ 90% contralateral)' },
+                { id: 'p2c2', label: 'Sin dolor en movilidad activa (EVA ≤ 1)' },
+                { id: 'p2c3', label: 'Isométricos sin compensación ni dolor' },
+                { id: 'p2c4', label: 'Marcha normal sin cojera' }
+            ]
+        }
     },
     3: {
         name: 'Ejercicios con Carga Progresiva',
         description: 'Introducción de ejercicios con peso corporal.',
         activities: ['Sentadillas', 'Estocadas', 'Trabajo de fuerza básico'],
         loadRecommendation: { rpe: 3, duration: 30 },
-        criteria: 'Fuerza >70% de la pierna sana'
+        criteria: {
+            summary: 'Fuerza >70% miembro sano',
+            minConditions: 3,
+            conditions: [
+                { id: 'p3c1', label: 'Fuerza muscular >70% del miembro contralateral (dinamómetro o test manual)' },
+                { id: 'p3c2', label: 'Sentadilla monopodal sin dolor ni compensación' },
+                { id: 'p3c3', label: 'Sin dolor durante ni 24h post-ejercicio (EVA ≤ 2)' },
+                { id: 'p3c4', label: 'Equilibrio monopodal ≥ 20 segundos' }
+            ]
+        }
     },
     4: {
         name: 'Ejercicios Específicos del Deporte',
         description: 'Movimientos propios del baloncesto sin contacto.',
         activities: ['Dribling', 'Tiro estático', 'Pases', 'Desplazamientos laterales'],
         loadRecommendation: { rpe: 4, duration: 45 },
-        criteria: 'Sin dolor en movimientos específicos'
+        criteria: {
+            summary: 'Sin dolor en gestos específicos de baloncesto',
+            minConditions: 3,
+            conditions: [
+                { id: 'p4c1', label: 'Carrera continua 10 min sin dolor ni cojera' },
+                { id: 'p4c2', label: 'Cambios de dirección y pivotes sin dolor (EVA = 0)' },
+                { id: 'p4c3', label: 'Salto y aterrizaje bilateral sin asimetría visible' },
+                { id: 'p4c4', label: 'Dribling y gestos técnicos a velocidad moderada sin molestias' }
+            ]
+        }
     },
     5: {
         name: 'Entrenamiento Modificado',
         description: 'Participación parcial en entrenamientos del equipo.',
         activities: ['Entrenamiento técnico', 'Juegos reducidos', 'Sin contacto'],
         loadRecommendation: { rpe: 5, duration: 60 },
-        criteria: 'Completa ejercicios sin limitaciones'
+        criteria: {
+            summary: 'Completa sesiones de equipo sin limitaciones funcionales',
+            minConditions: 4,
+            conditions: [
+                { id: 'p5c1', label: 'Completa entrenamiento completo sin restricciones de carga' },
+                { id: 'p5c2', label: 'Confianza plena de la jugadora en el gesto lesionado' },
+                { id: 'p5c3', label: 'Ratio A:C en zona óptima (0.8–1.3) durante 7 días' },
+                { id: 'p5c4', label: 'Sin dolor ni inflamación post-entrenamiento' },
+                { id: 'p5c5', label: 'Aval del cuerpo médico para competición' }
+            ]
+        }
     },
     6: {
         name: 'Retorno Completo',
         description: 'Participación completa sin restricciones.',
         activities: ['Entrenamiento completo', 'Contacto', 'Competición'],
         loadRecommendation: { rpe: 7, duration: 75 },
-        criteria: 'Sin dolor, fuerza 100%, confianza total'
+        criteria: {
+            summary: 'Sin dolor, fuerza 100%, confianza total',
+            minConditions: 3,
+            conditions: [
+                { id: 'p6c1', label: 'Sin dolor en ningún gesto deportivo (EVA = 0)' },
+                { id: 'p6c2', label: 'Fuerza ≥ 90% miembro contralateral' },
+                { id: 'p6c3', label: 'La jugadora se siente lista para competir' }
+            ]
+        }
     }
 };
 
 // ========== INJURY MANAGEMENT SYSTEM ==========
+
+// ---- A:C chart data for 4 weeks prior to injury date ----
+RPETracker.prototype._getACDataForInjury = function(injury) {
+    const MATCH_MULT = RPETracker.MATCH_LOAD_MULTIPLIER || 1.5;
+    const injuryDate = new Date(injury.startDate);
+    injuryDate.setHours(0, 0, 0, 0);
+
+    const playerSessions = (this.sessions || [])
+        .filter(s => s.playerId === injury.playerId)
+        .map(s => ({
+            ...s,
+            date: new Date(s.date),
+            load: (s.load || (s.rpe * (s.duration || 60))) * (s.type === 'match' ? MATCH_MULT : 1)
+        }))
+        .filter(s => s.date <= injuryDate);
+
+    const lambdaAcute   = 2 / (7 + 1);
+    const lambdaChronic = 2 / (28 + 1);
+
+    // Seed from all available history before injury
+    const allLoads = playerSessions.map(s => s.load);
+    const seedLoad = allLoads.length > 0 ? allLoads.reduce((a, b) => a + b, 0) / allLoads.length : 0;
+    let ewmaAcute   = seedLoad;
+    let ewmaChronic = seedLoad;
+
+    // Walk day by day over the 28 days before injury (+ seed 28 more days for chronic warmup)
+    const WARMUP_DAYS = 28;
+    const WINDOW_DAYS = 28; // 4 weeks to display
+    const labels = [];
+    const ratioData = [];
+    const sessionDays = []; // indices with real sessions
+
+    for (let i = WARMUP_DAYS + WINDOW_DAYS; i >= 0; i--) {
+        const d = new Date(injuryDate);
+        d.setDate(injuryDate.getDate() - i);
+        d.setHours(0, 0, 0, 0);
+
+        const dailySessions = playerSessions.filter(s => {
+            const sd = new Date(s.date); sd.setHours(0, 0, 0, 0);
+            return sd.getTime() === d.getTime();
+        });
+        const dailyLoad = dailySessions.reduce((sum, s) => sum + s.load, 0);
+
+        ewmaAcute   = (lambdaAcute   * dailyLoad) + ((1 - lambdaAcute)   * ewmaAcute);
+        ewmaChronic = (lambdaChronic * dailyLoad) + ((1 - lambdaChronic) * ewmaChronic);
+        const ratio = ewmaChronic > 0 ? ewmaAcute / ewmaChronic : 0;
+
+        // Only collect display window (last WINDOW_DAYS)
+        if (i <= WINDOW_DAYS) {
+            labels.push(`${d.getDate()}/${d.getMonth() + 1}`);
+            ratioData.push(parseFloat(ratio.toFixed(3)));
+            if (dailySessions.length > 0) sessionDays.push(labels.length - 1);
+        }
+    }
+
+    // Check minimum data requirement
+    const sessionsInWindow = playerSessions.filter(s => {
+        const sd = new Date(s.date); sd.setHours(0, 0, 0, 0);
+        const windowStart = new Date(injuryDate); windowStart.setDate(injuryDate.getDate() - WINDOW_DAYS);
+        return sd >= windowStart && sd <= injuryDate;
+    });
+
+    return { labels, ratioData, sessionDays, sessionsInWindow: sessionsInWindow.length };
+};
+
+RPETracker.prototype._renderInjuryACChart = function(injury) {
+    const canvasId = `acInjuryChart_${injury.id}`;
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const { labels, ratioData, sessionDays, sessionsInWindow } = this._getACDataForInjury(injury);
+    if (sessionsInWindow < 3) return; // not enough data — placeholder already shown
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    const textColor = isDark ? '#aaa' : '#666';
+    const sevColors = { minor: '#4caf50', moderate: '#ff9800', severe: '#f44336' };
+    const lineColor = sevColors[injury.severity] || '#ff6600';
+
+    const zonePlugin = {
+        id: 'injuryACZones',
+        beforeDraw(chart) {
+            const { ctx, chartArea: ca, scales: { y } } = chart;
+            if (!ca) return;
+            const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const zones = [
+                { min: 0,   max: 0.8, color: dark ? 'rgba(30,120,220,0.18)' : 'rgba(21,101,192,0.10)' },
+                { min: 0.8, max: 1.3, color: dark ? 'rgba(34,168,97,0.18)'  : 'rgba(76,175,80,0.12)'  },
+                { min: 1.3, max: 1.5, color: dark ? 'rgba(245,166,35,0.22)' : 'rgba(255,152,0,0.16)'  },
+                { min: 1.5, max: 3.0, color: dark ? 'rgba(229,57,53,0.20)'  : 'rgba(244,67,54,0.12)'  },
+            ];
+            ctx.save();
+            zones.forEach(z => {
+                const yTop    = y.getPixelForValue(z.max);
+                const yBottom = y.getPixelForValue(z.min);
+                const top    = Math.max(yTop, ca.top);
+                const bottom = Math.min(yBottom, ca.bottom);
+                if (bottom <= top) return;
+                ctx.fillStyle = z.color;
+                ctx.fillRect(ca.left, top, ca.width, bottom - top);
+            });
+            // Threshold lines
+            [0.8, 1.3, 1.5].forEach(v => {
+                const yLine = y.getPixelForValue(v);
+                if (yLine < ca.top || yLine > ca.bottom) return;
+                ctx.strokeStyle = dark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.18)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath(); ctx.moveTo(ca.left, yLine); ctx.lineTo(ca.right, yLine); ctx.stroke();
+                ctx.setLineDash([]);
+            });
+            // Injury marker — last day vertical line
+            const lastX = ca.right;
+            ctx.strokeStyle = dark ? 'rgba(244,67,54,0.70)' : 'rgba(244,67,54,0.60)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath(); ctx.moveTo(lastX, ca.top); ctx.lineTo(lastX, ca.bottom); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.font = 'bold 9px system-ui';
+            ctx.fillStyle = dark ? 'rgba(255,100,100,0.85)' : 'rgba(200,30,30,0.75)';
+            ctx.textAlign = 'right';
+            ctx.fillText('🏥 lesión', lastX - 3, ca.top + 11);
+            ctx.restore();
+        }
+    };
+
+    if (canvas._chartInstance) canvas._chartInstance.destroy();
+    canvas._chartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        plugins: [zonePlugin],
+        data: {
+            labels,
+            datasets: [{
+                label: 'Ratio A:C',
+                data: ratioData,
+                borderColor: lineColor,
+                backgroundColor: 'transparent',
+                fill: false,
+                tension: 0.35,
+                pointRadius: (ctx) => sessionDays.includes(ctx.dataIndex) ? 3 : 0,
+                pointHoverRadius: 5,
+                pointBackgroundColor: lineColor,
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `A:C ${ctx.parsed.y.toFixed(2)}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: textColor, font: { size: 9 }, maxTicksLimit: 7 },
+                    grid: { color: gridColor }
+                },
+                y: {
+                    min: 0,
+                    max: 2.2,
+                    ticks: { color: textColor, font: { size: 9 }, stepSize: 0.5 },
+                    grid: { color: gridColor }
+                }
+            }
+        }
+    });
+};
 
 RPETracker.prototype.initializeInjuryManagement = function() {
     this.injuries = this.loadInjuries();
@@ -340,6 +565,17 @@ RPETracker.prototype.renderInjuryManagement = function() {
             ${statsBar}${tabBar}
             <div class="inj-tab-content">${tabContent}</div>
         </div>`;
+
+    // Init A:C charts for active injury cards after DOM paint
+    if (tab === 'activas') {
+        setTimeout(() => {
+            activeInjuries.forEach(inj => {
+                if (typeof this._renderInjuryACChart === 'function') {
+                    this._renderInjuryACChart(inj);
+                }
+            });
+        }, 0);
+    }
 };
 
 RPETracker.prototype._setInjuryTab = function(tab) {
@@ -411,6 +647,53 @@ RPETracker.prototype.renderInjuryCard = function(injury) {
 
             ${injury.description ? `<div class="inj-desc">📝 ${injury.description}</div>` : ''}
             ${injury.initialTreatment ? `<div class="inj-desc" style="background:var(--bg-subtle)">🩹 ${injury.initialTreatment}</div>` : ''}
+
+            ${(() => {
+                // ── Criterios de progresión de fase actual ──────────────────
+                if (!phase || !phase.criteria || !phase.criteria.conditions) return '';
+                const savedChecks = (injury.history || []).slice().reverse()
+                    .find(h => h.criteriaChecks && Array.isArray(h.criteriaChecks))?.criteriaChecks || [];
+                const checkedIds  = new Set(savedChecks);
+                const total       = phase.criteria.conditions.length;
+                const checked     = phase.criteria.conditions.filter(c => checkedIds.has(c.id)).length;
+                const minReq      = phase.criteria.minConditions || total;
+                const ready       = checked >= minReq;
+                const pct         = Math.round((checked / total) * 100);
+                const barColor    = ready ? '#4caf50' : checked > 0 ? '#ff9800' : '#ccc';
+                const criteriaRows = phase.criteria.conditions.map(c => {
+                    const isChecked = checkedIds.has(c.id);
+                    return `<div class="inj-criteria-row ${isChecked ? 'inj-criteria-met' : ''}">
+                        <span class="inj-criteria-icon">${isChecked ? '✅' : '⬜'}</span>
+                        <span class="inj-criteria-label">${c.label}</span>
+                    </div>`;
+                }).join('');
+                return `
+                <div class="inj-criteria-section">
+                    <div class="inj-criteria-header">
+                        <span class="inj-criteria-title">📋 Criterios para avanzar a Fase ${curPhase + 1}</span>
+                        <span class="inj-criteria-badge" style="background:${barColor === '#4caf50' ? '#e8f5e9' : barColor === '#ff9800' ? '#fff8e1' : 'var(--bg-subtle)'};color:${barColor}">${checked}/${total} · mín ${minReq}${ready ? ' ✓' : ''}</span>
+                    </div>
+                    <div class="inj-criteria-bar-wrap">
+                        <div class="inj-criteria-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+                    </div>
+                    <div class="inj-criteria-list">${criteriaRows}</div>
+                </div>`;
+            })()}
+
+            ${(() => {
+                // ── Gráfico A:C 4 semanas previas ──────────────────────────
+                const acData = typeof this._getACDataForInjury === 'function'
+                    ? this._getACDataForInjury(injury) : null;
+                const hasData = acData && acData.sessionsInWindow >= 3;
+                return `
+                <div class="inj-ac-section">
+                    <div class="inj-ac-header">📈 Ratio A:C — 4 semanas previas a la lesión</div>
+                    ${hasData
+                        ? `<div class="inj-ac-canvas-wrap"><canvas id="acInjuryChart_${injury.id}"></canvas></div>`
+                        : `<div class="inj-ac-nodata">Sin datos de carga suficientes (mín. 3 sesiones en las 4 semanas previas)</div>`
+                    }
+                </div>`;
+            })()}
 
             <div class="inj-card-actions">
                 <button onclick="window.rpeTracker?.updateRTPPhase('${injury.id}')" class="btn-primary" style="flex:1">🔄 Actualizar Fase</button>

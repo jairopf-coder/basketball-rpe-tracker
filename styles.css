@@ -5922,6 +5922,124 @@ details[open] .ewma-toggle-hint { display: none; }
 [data-theme="dark"] .inj-stats-bar { background: var(--bg-elevated); }
 [data-theme="dark"] .rtp-stepper-wrap { background: var(--bg-elevated); }
 
+/* ── Criterios de progresión RTP ─────────────────────────────────── */
+.inj-criteria-section {
+    margin-top: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.inj-criteria-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.8rem;
+    background: var(--bg-subtle);
+    border-bottom: 1px solid var(--border);
+}
+.inj-criteria-title { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+.inj-criteria-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+.inj-criteria-bar-wrap {
+    height: 3px;
+    background: var(--border);
+}
+.inj-criteria-bar-fill {
+    height: 100%;
+    transition: width 0.4s ease;
+}
+.inj-criteria-list { padding: 0.5rem 0; }
+.inj-criteria-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.32rem 0.8rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    transition: background 0.15s;
+}
+.inj-criteria-row.inj-criteria-met { color: var(--text-primary); }
+.inj-criteria-icon { flex-shrink: 0; font-size: 0.9rem; line-height: 1.3; }
+.inj-criteria-label { line-height: 1.4; }
+
+/* Modal criteria checklist */
+.inj-criteria-checklist { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.5rem; }
+.inj-criteria-check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    transition: background 0.15s, color 0.15s;
+}
+.inj-criteria-check-row.checked {
+    background: rgba(76,175,80,0.09);
+    border-color: rgba(76,175,80,0.35);
+    color: var(--text-primary);
+}
+.inj-criteria-check-row input[type=checkbox] { margin-top: 1px; flex-shrink: 0; }
+.inj-criteria-status {
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-top: 0.35rem;
+    min-height: 1.2em;
+}
+
+/* ── A:C chart en ficha de lesión ────────────────────────────────── */
+.inj-ac-section {
+    margin-top: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.inj-ac-header {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: var(--bg-subtle);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+}
+.inj-ac-canvas-wrap {
+    padding: 0.5rem 0.6rem 0.4rem;
+    height: 130px;
+    position: relative;
+}
+.inj-ac-canvas-wrap canvas { width: 100% !important; height: 100% !important; }
+.inj-ac-nodata {
+    padding: 0.85rem 0.8rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+}
+[data-theme="dark"] .inj-criteria-section,
+[data-theme="dark"] .inj-ac-section { border-color: var(--border); }
+[data-theme="dark"] .inj-criteria-header,
+[data-theme="dark"] .inj-ac-header { background: var(--bg-elevated); }
+
+/* ── Trend alert banner variant ──────────────────────────────────── */
+.db-alert-banner--trend {
+    background: linear-gradient(135deg, rgba(156,39,176,0.10), rgba(63,81,181,0.08));
+    border-left: 3px solid #9c27b0;
+}
+[data-theme="dark"] .db-alert-banner--trend {
+    background: rgba(156,39,176,0.14);
+    border-left-color: #ce93d8;
+}
+
+/* Nav badge – trend variant (purple) */
+.nav-alert-badge--trend { background: #9c27b0 !important; }
+
 /* Mobile responsive dashboard — columna única */
 @media (max-width: 640px) {
     .db-split {
