@@ -3054,7 +3054,9 @@ class RPETracker {
         const highMismatches = rows.filter(r => r.isHighMismatch).length;
 
         const fmtDate = d => {
-            const obj = new Date(d + 'T12:00:00');
+            const dateOnly = String(d).slice(0, 10);
+            const obj = new Date(dateOnly + 'T12:00:00');
+            if (isNaN(obj.getTime())) return d;
             return obj.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
         };
         const fmtSlot = s => s === 'morning' ? '🌅 Mañana' : '🌆 Tarde';
