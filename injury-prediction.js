@@ -15,18 +15,25 @@ RPETracker.prototype.predictInjuryRisk = function(playerId) {
         }))
         .sort((a, b) => a.date - b.date);
 
-    if (playerSessions.length < 14) {
+    const SESSION_FULL  = 14;
+    const SESSION_MIN   = 8;
+    const sessionCount  = playerSessions.length;
+
+    if (sessionCount < SESSION_MIN) {
         return {
             riskLevel: 'unknown',
             probability: 0,
-            confidence: 'low',
+            confidence: 'none',
+            sessionCount,
             color: '#9e9e9e',
             colorHex: '#9e9e9e',
-            message: `Datos insuficientes (${playerSessions.length}/14 sesiones). Se necesitan al menos 14 sesiones para predicción confiable.`,
+            message: `Datos insuficientes (${sessionCount}/${SESSION_MIN} sesiones). Se necesitan al menos ${SESSION_MIN} sesiones para activar la predicción.`,
             factors: [],
             recommendations: ['Registra más sesiones para activar la predicción de riesgo.']
         };
     }
+
+    const isLowConfidence = sessionCount < SESSION_FULL;
 
     const factors = this.calculateRiskFactors(playerId, playerSessions);
 
@@ -94,7 +101,8 @@ RPETracker.prototype.predictInjuryRisk = function(playerId) {
     return {
         riskLevel,
         probability: Math.round(riskScore),
-        confidence,
+        confidence: isLowConfidence ? 'low' : 'normal',
+        sessionCount,
         message,
         color: colorHex,
         colorHex,
@@ -334,7 +342,8 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
         ? `<div class="pred-empty">No hay jugadoras registradas. Añade jugadoras para activar la predicción.</div>`
         : `<div class="pred-grid">
             ${predictions.map(({ player, prediction: pred }) => {
-                const isUnknown = pred.riskLevel === 'unknown';
+                const isUnknown      = pred.riskLevel === 'unknown';
+                const isLowConf      = pred.confidence === 'low';
                 const hex       = pred.colorHex;
                 const isExpanded = this._predState.expanded.has(player.id);
                 const isSelected = this._predState.selected.has(player.id);
@@ -415,7 +424,10 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                                     ${player.name}
                                     ${player.number ? `<span class="pred-player-num">#${player.number}</span>` : ''}
                                 </div>
-                                <div class="pred-level-badge pred-level-badge--${pred.riskLevel}">${levelLabel}</div>
+                                <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
+                                    <div class="pred-level-badge pred-level-badge--${pred.riskLevel}">${levelLabel}</div>
+                                    ${isLowConf ? `<div class="pred-conf-badge">⚠️ ${pred.sessionCount}/14</div>` : ''}
+                                </div>
                             </div>
                             <div class="pred-collapsed-right">
                                 ${compactRingHtml}
@@ -439,6 +451,14 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                             <div class="pred-message pred-message--${pred.riskLevel}" style="border-left-color:${hex}; background:${hex}18">
                                 ${pred.message}
                             </div>
+                            ${isLowConf ? `
+                            <div class="pred-low-conf-bar">
+                                <div class="pred-low-conf-label">⚠️ <strong>Confianza baja</strong> — ${pred.sessionCount} de 14 sesiones registradas. La predicción mejora con más datos.</div>
+                                <div class="pred-low-conf-track">
+                                    <div class="pred-low-conf-fill" style="width:${Math.round((pred.sessionCount/14)*100)}%"></div>
+                                </div>
+                                <div class="pred-low-conf-hint">${pred.sessionCount}/14 sesiones · ${14 - pred.sessionCount} para confianza plena</div>
+                            </div>` : ''}
                             ${factorsHtml}
                             ${recsHtml}
                         </div>
@@ -465,7 +485,7 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                     <div class="pred-how-item"><strong>10%</strong> Carga reciente — sesiones con RPE ≥ 8 en los últimos 3 días</div>
                     <div class="pred-how-item"><strong>5%</strong> Recuperación — sesiones con menos de 24h de descanso entre sí</div>
                 </div>
-                <p class="pred-how-note">Requiere <strong>mínimo 14 sesiones</strong> por jugadora. Metodología basada en ACWR (Hulin et al., 2016) y Strain de Foster.</p>
+                <p class="pred-how-note">Requiere <strong>mínimo 8 sesiones</strong> por jugadora para activar la predicción (confianza plena con 14+). Metodología basada en ACWR (Hulin et al., 2016) y Strain de Foster.</p>
             </div>
         </details>
     `;

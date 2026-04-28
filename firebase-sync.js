@@ -269,9 +269,22 @@ FirebaseSync.prototype.saveWeekPlan = async function(weekPlan) {
     }
 };
 
-FirebaseSync.prototype.onWeekPlanChange = function(callback) {
-    this.db.ref('weekPlan').on('value', snapshot => {
+FirebaseSync.prototype.saveClinicalNotes = async function(notes) {
+    try {
+        const obj = {};
+        notes.forEach(n => { obj[n.id] = n; });
+        await this.db.ref('clinicalNotes').set(obj);
+        localStorage.setItem('basketballClinicalNotes', JSON.stringify(notes));
+    } catch (e) {
+        console.error('Error saving clinicalNotes to Firebase:', e);
+        localStorage.setItem('basketballClinicalNotes', JSON.stringify(notes));
+    }
+};
+
+FirebaseSync.prototype.onClinicalNotesChange = function(callback) {
+    this.db.ref('clinicalNotes').on('value', snapshot => {
         const data = snapshot.val();
-        callback(data || null);
+        const notes = data ? Object.values(data) : [];
+        callback(notes);
     });
 };

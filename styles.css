@@ -8088,3 +8088,215 @@ details[open] .ewma-toggle-hint { display: none; }
     .pvr-slot { display: none; }
     .db-presession-btn { font-size: 0.72rem; padding: 0.35rem 0.65rem; }
 }
+
+/* ========================================================
+   SESSION 5 — CLINICAL NOTES, PRE/POST CHART, LOW-CONF
+   ======================================================== */
+
+/* ── Clinical Notes Panel ──────────────────────────── */
+.cn-form {
+    background: var(--bg-subtle);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+.cn-form-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+.cn-filters {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+.cn-notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+.cn-note-row {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    position: relative;
+}
+.cn-note-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+    flex-wrap: wrap;
+}
+.cn-note-player {
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.cn-note-date {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+}
+.cn-note-del {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    opacity: 0.5;
+    padding: 0;
+    transition: opacity 0.15s;
+}
+.cn-note-del:hover { opacity: 1; }
+.cn-note-text {
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+.cn-note-edit-btn {
+    margin-top: 0.4rem;
+    background: none;
+    border: none;
+    font-size: 0.78rem;
+    color: var(--primary);
+    cursor: pointer;
+    padding: 0;
+}
+.cn-note-edit-btn:hover { text-decoration: underline; }
+
+/* ── Pre/Post Injury Comparison ────────────────────── */
+.inj-history-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.inj-history-card {
+    background: var(--bg-card);
+    border-radius: 10px;
+    padding: 1rem;
+    box-shadow: var(--shadow-sm, 0 1px 4px rgba(0,0,0,.08));
+}
+.inj-history-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+.inj-prepost-section {
+    margin-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+}
+.inj-prepost-header {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+}
+.inj-prepost-body { }
+.inj-prepost-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.inj-prepost-col {
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+.inj-prepost-col-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.inj-prepost-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    padding: 0.2rem 0;
+    border-bottom: 1px solid var(--border);
+}
+.inj-prepost-stat:last-child { border-bottom: none; }
+.inj-prepost-stat-lbl { color: var(--text-secondary); }
+.inj-prepost-stat-val { font-weight: 600; }
+.inj-prepost-chart-wrap {
+    position: relative;
+    height: 160px;
+    margin-bottom: 0.5rem;
+}
+.inj-prepost-warning {
+    font-size: 0.78rem;
+    color: #ff9800;
+    background: rgba(255,152,0,0.10);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    margin-top: 0.4rem;
+}
+
+/* ── Low-Confidence Badge & Bar ─────────────────────── */
+.pred-conf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: rgba(255,152,0,0.15);
+    color: #ff9800;
+    border: 1px solid rgba(255,152,0,0.35);
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    white-space: nowrap;
+}
+.pred-low-conf-bar {
+    background: rgba(255,152,0,0.10);
+    border: 1px solid rgba(255,152,0,0.30);
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+    margin: 0.5rem 0;
+}
+.pred-low-conf-label {
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    margin-bottom: 0.4rem;
+}
+.pred-low-conf-track {
+    background: var(--border);
+    height: 5px;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.35rem;
+}
+.pred-low-conf-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff9800, #ffc107);
+    border-radius: 3px;
+    transition: width 0.4s;
+}
+.pred-low-conf-hint {
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    text-align: right;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .inj-prepost-col { background: rgba(255,255,255,0.05); }
+[data-theme="dark"] .cn-note-row { background: var(--bg-subtle); }
+
+/* Mobile */
+@media (max-width: 600px) {
+    .inj-prepost-cols { grid-template-columns: 1fr; }
+    .cn-form-row { flex-direction: column; }
+    .pred-conf-badge { font-size: 0.65rem; }
+}
