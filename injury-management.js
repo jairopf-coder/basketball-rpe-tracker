@@ -541,6 +541,9 @@ RPETracker.prototype.renderInjuryManagement = function() {
             <button class="inj-tab${tab==='disponibilidad'?' active':''}" onclick="window.rpeTracker?._setInjuryTab('disponibilidad')">
                 📅 Disponibilidad
             </button>
+            <button class="inj-tab${tab==='notas'?' active':''}" onclick="window.rpeTracker?._setInjuryTab('notas')">
+                📓 Notas
+            </button>
         </div>`;
 
     let tabContent = '';
@@ -554,6 +557,8 @@ RPETracker.prototype.renderInjuryManagement = function() {
             : `<div class="inj-history-grid">${recoveredInjuries.map(inj => this.renderCompactInjuryCard(inj)).join('')}</div>`;
     } else if (tab === 'disponibilidad') {
         tabContent = this.renderAvailabilityTable();
+    } else if (tab === 'notas') {
+        tabContent = '<div id="clinicalNotesPanelContent" style="padding:0"></div>';
     }
 
     container.innerHTML = `
@@ -573,7 +578,28 @@ RPETracker.prototype.renderInjuryManagement = function() {
                 if (typeof this._renderInjuryACChart === 'function') {
                     this._renderInjuryACChart(inj);
                 }
+                if (typeof this._renderPrePostChart === 'function') {
+                    this._renderPrePostChart(inj);
+                }
             });
+        }, 0);
+    }
+    if (tab === 'historial') {
+        setTimeout(() => {
+            recoveredInjuries.forEach(inj => {
+                if (typeof this._renderPrePostChart === 'function') {
+                    this._renderPrePostChart(inj);
+                }
+            });
+        }, 0);
+    }
+    if (tab === 'notas') {
+        setTimeout(() => {
+            const c = document.getElementById('clinicalNotesPanelContent');
+            if (c && typeof this._renderClinicalNotesPanel === 'function') {
+                this.initClinicalNotes();
+                this._renderClinicalNotesPanel(c, '', '');
+            }
         }, 0);
     }
 };
@@ -698,6 +724,7 @@ RPETracker.prototype.renderInjuryCard = function(injury) {
             <div class="inj-card-actions">
                 <button onclick="window.rpeTracker?.updateRTPPhase('${injury.id}')" class="btn-primary" style="flex:1">🔄 Actualizar Fase</button>
                 <button onclick="window.rpeTracker?.showRTPProgram('${injury.id}')" class="btn-secondary" style="flex:1">📋 Programa</button>
+                <button onclick="window.rpeTracker?.openClinicalNotesPanel('${injury.playerId}')" class="btn-secondary" style="flex:0 0 auto">📓 Notas</button>
                 <button onclick="window.rpeTracker?.markAsRecovered('${injury.id}')" class="btn-secondary" style="color:#4caf50;border-color:#4caf50">✅ Alta</button>
             </div>
         </div>`;
@@ -708,26 +735,269 @@ RPETracker.prototype.renderInjuryCard = function(injury) {
 RPETracker.prototype.renderCompactInjuryCard = function(injury) {
     const player = this.players.find(p => p.id === injury.playerId);
     if (!player) return '';
-    
+
     const daysInjured = injury.getDaysInjured();
-    
+    const sevLabel = { minor:'Leve', moderate:'Moderada', severe:'Grave' };
+    const sevColor = { minor:'#4caf50', moderate:'ff9800', severe:'#f44336' };
+    const col = '#' + (sevColor[injury.severity] || '999').replace('#','');
+
+    // Pre/post comparison data
+    const ppData = typeof this._getPrePostData === 'function' ? this._getPrePostData(injury) : null;
+
     return `
-        <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <strong>${player.name}</strong> - ${this.getLocationName(injury.location)}
-                <br>
-                <small style="color: #666;">
-                    ${new Date(injury.startDate).toLocaleDateString('es-ES')} - 
-                    ${injury.endDate ? new Date(injury.endDate).toLocaleDateString('es-ES') : 'Activa'}
-                    (${daysInjured} días)
-                </small>
+        <div class="inj-history-card" style="border-left:4px solid #${(sevColor[injury.severity]||'999').replace('#','')}">
+            <div class="inj-history-top">
+                <div>
+                    <div class="inj-card-name">${player.name}${player.number ? ` <span class="inj-num">#${player.number}</span>` : ''}</div>
+                    <div class="inj-card-badges" style="margin-top:.3rem">
+                        <span class="inj-badge" style="background:#${(sevColor[injury.severity]||'999').replace('#','')}">${sevLabel[injury.severity]||'—'}</span>
+                        <span class="inj-badge inj-badge-blue">${this.getLocationName(injury.location)}</span>
+                        <span class="inj-badge inj-badge-gray">✅ Alta</span>
+                    </div>
+                </div>
+                <div style="text-align:right;font-size:.85rem;color:var(--text-secondary)">
+                    <div>${new Date(injury.startDate).toLocaleDateString('es-ES')} → ${injury.endDate ? new Date(injury.endDate).toLocaleDateString('es-ES') : '—'}</div>
+                    <div style="font-weight:600;color:var(--text-primary)">${daysInjured} días · ${injury.missedSessions||0} sesiones perdidas</div>
+                </div>
             </div>
-            <div style="text-align: right;">
-                <div>${injury.missedSessions} sesiones</div>
-                <small style="color: #666;">perdidas</small>
+
+            ${ppData ? `
+            <div class="inj-prepost-section">
+                <div class="inj-prepost-header">📊 Comparativa pre/post lesión — 4 semanas</div>
+                ${ppData.hasData ? `
+                <div class="inj-prepost-body">
+                    <div class="inj-prepost-cols">
+                        ${this._renderPrePostColumn('Antes de lesión', ppData.pre, ppData.post, '#ff9800')}
+                        ${this._renderPrePostColumn('Tras el alta', ppData.post, ppData.pre, '#4caf50')}
+                    </div>
+                    <div class="inj-prepost-chart-wrap">
+                        <canvas id="prepost_${injury.id}" height="140"></canvas>
+                    </div>
+                    ${ppData.warning ? `<div class="inj-prepost-warning">⚠️ ${ppData.warning}</div>` : ''}
+                </div>
+                ` : `<div class="inj-ac-nodata">${ppData.noDataReason}</div>`}
+            </div>
+            ` : ''}
+
+            <div style="display:flex;gap:.5rem;margin-top:.75rem">
+                <button onclick="window.rpeTracker?.openClinicalNotesPanel('${injury.playerId}')" class="btn-secondary" style="flex:1;font-size:.82rem">📓 Notas clínicas</button>
             </div>
         </div>
     `;
 };
 
 // Continue in next file...
+
+
+// ========== PRE/POST INJURY COMPARISON ==========
+
+RPETracker.prototype._getPrePostData = function(injury) {
+    if (!injury.endDate) return null;
+
+    const startDate = new Date(injury.startDate);
+    const endDate   = new Date(injury.endDate);
+    const msWeek    = 7 * 24 * 3600 * 1000;
+    const ms4w      = 4 * msWeek;
+
+    const preStart  = new Date(startDate.getTime() - ms4w);
+    const postEnd   = new Date(endDate.getTime()   + ms4w);
+
+    const playerSessions = (this.sessions || [])
+        .filter(s => s.playerId === injury.playerId)
+        .map(s => ({ ...s, dt: new Date(s.date), load: s.load || (s.rpe * (s.duration || 60)) }));
+
+    const preSess  = playerSessions.filter(s => s.dt >= preStart  && s.dt <  startDate);
+    const postSess = playerSessions.filter(s => s.dt >  endDate   && s.dt <= postEnd);
+
+    const wellness = (this.wellnessData || []).filter(w => w.playerId === injury.playerId);
+    const wOverall = (arr) => {
+        const vals = arr.map(w => {
+            const m = ['sleep','fatigue','mood','soreness'].map(k => w[k]).filter(v => v != null);
+            return m.length ? m.reduce((a,b)=>a+b,0)/m.length : null;
+        }).filter(v => v != null);
+        return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    };
+
+    const preWell  = wellness.filter(w => { const d=new Date(w.date); return d>=preStart && d<startDate; });
+    const postWell = wellness.filter(w => { const d=new Date(w.date); return d>endDate && d<=postEnd; });
+
+    const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+    const weeklyLoad = arr => {
+        if (!arr.length) return null;
+        const total = arr.reduce((s,s2) => s + s2.load, 0);
+        return total / 4; // 4-week average
+    };
+
+    const warnings = [];
+    if (preSess.length  < 3) warnings.push(`pocas sesiones pre-lesión (${preSess.length})`);
+    if (postSess.length < 3) warnings.push(`pocas sesiones post-alta (${postSess.length})`);
+
+    if (preSess.length < 2 && postSess.length < 2) {
+        return { hasData: false, noDataReason: 'Sin suficientes sesiones en las ventanas de comparación (mín. 2 en cada período)' };
+    }
+
+    // Build weekly series for chart (4 buckets each side)
+    const weekBuckets = (sessions, refDate, direction) => {
+        const buckets = [0,0,0,0];
+        sessions.forEach(s => {
+            const diffMs = direction === 'pre'
+                ? (refDate.getTime() - s.dt.getTime())
+                : (s.dt.getTime() - refDate.getTime());
+            const weekIdx = Math.min(3, Math.floor(diffMs / msWeek));
+            buckets[weekIdx] += s.load;
+        });
+        return direction === 'pre' ? buckets.reverse() : buckets;
+    };
+
+    return {
+        hasData: true,
+        warning: warnings.length ? warnings.join(' · ') : null,
+        pre: {
+            sessions:    preSess.length,
+            sessionsPerWeek: preSess.length / 4,
+            avgWeeklyLoad: weeklyLoad(preSess),
+            peakLoad:    preSess.length ? Math.max(...preSess.map(s => s.load)) : null,
+            wellness:    wOverall(preWell),
+            weeklyBuckets: weekBuckets(preSess, startDate, 'pre')
+        },
+        post: {
+            sessions:    postSess.length,
+            sessionsPerWeek: postSess.length / 4,
+            avgWeeklyLoad: weeklyLoad(postSess),
+            peakLoad:    postSess.length ? Math.max(...postSess.map(s => s.load)) : null,
+            wellness:    wOverall(postWell),
+            weeklyBuckets: weekBuckets(postSess, endDate, 'post')
+        }
+    };
+};
+
+RPETracker.prototype._renderPrePostColumn = function(label, data, other, color) {
+    const fmt  = v => v != null ? Math.round(v) : '—';
+    const fmtW = v => v != null ? v.toFixed(1) : '—';
+    const delta = (a, b, higherIsBetter = true) => {
+        if (a == null || b == null || b === 0) return '';
+        const pct = Math.round(((a - b) / b) * 100);
+        const positive = higherIsBetter ? pct > 0 : pct < 0;
+        const arrow = pct > 0 ? '↑' : pct < 0 ? '↓' : '→';
+        return `<span style="color:${positive?'#4caf50':'#f44336'};font-size:.75rem;margin-left:.3rem">${arrow}${Math.abs(pct)}%</span>`;
+    };
+
+    return `
+        <div class="inj-prepost-col" style="border-top:3px solid ${color}">
+            <div class="inj-prepost-col-title" style="color:${color}">${label}</div>
+            <div class="inj-prepost-stat">
+                <span class="inj-prepost-stat-lbl">Sesiones/semana</span>
+                <span class="inj-prepost-stat-val">${fmtW(data.sessionsPerWeek)}${delta(data.sessionsPerWeek, other.sessionsPerWeek)}</span>
+            </div>
+            <div class="inj-prepost-stat">
+                <span class="inj-prepost-stat-lbl">Carga media/semana</span>
+                <span class="inj-prepost-stat-val">${fmt(data.avgWeeklyLoad)}${delta(data.avgWeeklyLoad, other.avgWeeklyLoad)}</span>
+            </div>
+            <div class="inj-prepost-stat">
+                <span class="inj-prepost-stat-lbl">Carga pico</span>
+                <span class="inj-prepost-stat-val">${fmt(data.peakLoad)}${delta(data.peakLoad, other.peakLoad, false)}</span>
+            </div>
+            <div class="inj-prepost-stat">
+                <span class="inj-prepost-stat-lbl">Wellness medio</span>
+                <span class="inj-prepost-stat-val">${data.wellness != null ? data.wellness.toFixed(1)+'/5' : '—'}${data.wellness && other.wellness ? delta(data.wellness, other.wellness) : ''}</span>
+            </div>
+        </div>`;
+};
+
+RPETracker.prototype._renderPrePostChart = function(injury) {
+    if (injury.status !== 'recovered' || !injury.endDate) return;
+    const canvasId = `prepost_${injury.id}`;
+    const canvas   = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const ppData = this._getPrePostData(injury);
+    if (!ppData?.hasData) return;
+
+    const isDark    = document.documentElement.getAttribute('data-theme') === 'dark';
+    const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    const textColor = isDark ? '#aaa' : '#666';
+
+    const labels = ['–4 sem', '–3 sem', '–2 sem', '–1 sem', '+1 sem', '+2 sem', '+3 sem', '+4 sem'];
+    const preData  = [...ppData.pre.weeklyBuckets,  null, null, null, null];
+    const postData = [null, null, null, null, ...ppData.post.weeklyBuckets];
+
+    // Injury/alta marker plugin
+    const markerPlugin = {
+        id: 'prepostMarker',
+        afterDraw(chart) {
+            const { ctx, chartArea: ca, scales: { x } } = chart;
+            if (!ca) return;
+            const midX = x.getPixelForValue(3.5);
+            const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+            ctx.save();
+            ctx.strokeStyle = dark ? 'rgba(244,67,54,0.70)' : 'rgba(244,67,54,0.60)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath(); ctx.moveTo(midX, ca.top); ctx.lineTo(midX, ca.bottom); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.font = 'bold 9px system-ui';
+            ctx.fillStyle = dark ? 'rgba(255,100,100,0.85)' : 'rgba(200,30,30,0.75)';
+            ctx.textAlign = 'center';
+            ctx.fillText('🏥 lesión / alta', midX, ca.top + 11);
+            ctx.restore();
+        }
+    };
+
+    if (canvas._chartInstance) canvas._chartInstance.destroy();
+    canvas._chartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        plugins: [markerPlugin],
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Pre-lesión',
+                    data: preData,
+                    backgroundColor: 'rgba(255,152,0,0.7)',
+                    borderColor: '#ff9800',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    skipNull: true
+                },
+                {
+                    label: 'Post-alta',
+                    data: postData,
+                    backgroundColor: 'rgba(76,175,80,0.7)',
+                    borderColor: '#4caf50',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    skipNull: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: { color: textColor, boxWidth: 12, font: { size: 11 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)} UA`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: textColor, font: { size: 10 } },
+                    grid: { color: gridColor }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Carga (UA)', color: textColor, font: { size: 10 } },
+                    ticks: { color: textColor, font: { size: 10 } },
+                    grid: { color: gridColor }
+                }
+            }
+        }
+    });
+};

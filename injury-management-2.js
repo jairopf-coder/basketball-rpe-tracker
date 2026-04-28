@@ -495,7 +495,186 @@ RPETracker.prototype.getLocationName = function(location) {
     return locations[location] || location;
 };
 
-// Auto-calculate missed sessions
+// ========== CLINICAL NOTES DIARY ==========
+
+RPETracker.prototype._loadClinicalNotes = function() {
+    try {
+        return JSON.parse(localStorage.getItem('basketballClinicalNotes') || '[]');
+    } catch { return []; }
+};
+
+RPETracker.prototype._saveClinicalNotes = function() {
+    if (window.firebaseSync?.saveClinicalNotes) {
+        window.firebaseSync.saveClinicalNotes(this.clinicalNotes || []);
+    } else {
+        localStorage.setItem('basketballClinicalNotes', JSON.stringify(this.clinicalNotes || []));
+    }
+};
+
+RPETracker.prototype.initClinicalNotes = function() {
+    if (this.clinicalNotes) return;
+    this.clinicalNotes = this._loadClinicalNotes();
+    if (window.firebaseSync?.onClinicalNotesChange) {
+        window.firebaseSync.onClinicalNotesChange(notes => {
+            this.clinicalNotes = notes;
+            // Refresh panel if open
+            const panel = document.getElementById('clinicalNotesPanelContent');
+            if (panel) this._renderClinicalNotesPanel(panel);
+        });
+    }
+};
+
+RPETracker.prototype.openClinicalNotesPanel = function(filterPlayerId) {
+    this.initClinicalNotes();
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'clinicalNotesModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:720px">
+            <div class="modal-header">
+                <h2>📓 Diario de Notas Clínicas</h2>
+                <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
+            </div>
+            <div id="clinicalNotesPanelContent" style="padding:1.5rem;max-height:75vh;overflow-y:auto"></div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    this._renderClinicalNotesPanel(
+        document.getElementById('clinicalNotesPanelContent'),
+        filterPlayerId || ''
+    );
+};
+
+RPETracker.prototype._renderClinicalNotesPanel = function(container, filterPlayerId, filterText) {
+    if (!container) return;
+    const fp   = filterPlayerId !== undefined ? filterPlayerId : (container._filterPlayer || '');
+    const ft   = filterText     !== undefined ? filterText     : (container._filterText  || '');
+    container._filterPlayer = fp;
+    container._filterText   = ft;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const playerOptions = this.players
+        .map(p => `<option value="${p.id}" ${fp === p.id ? 'selected' : ''}>${p.name}</option>`)
+        .join('');
+
+    let notes = [...(this.clinicalNotes || [])].sort((a, b) => b.date.localeCompare(a.date));
+    if (fp)  notes = notes.filter(n => n.playerId === fp);
+    if (ft)  notes = notes.filter(n => n.text.toLowerCase().includes(ft.toLowerCase()));
+
+    const noteRows = notes.length === 0
+        ? `<div style="text-align:center;color:var(--text-muted);padding:2rem">Sin notas registradas</div>`
+        : notes.map(n => {
+            const player = this.players.find(p => p.id === n.playerId);
+            if (!player) return '';
+            return `
+            <div class="cn-note-row" id="cn-row-${n.id}">
+                <div class="cn-note-meta">
+                    <span class="cn-note-player">${typeof PlayerTokens !== 'undefined' ? PlayerTokens.avatar(player, 22, '0.65rem') : ''} ${player.name}</span>
+                    <span class="cn-note-date">${new Date(n.date).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})}</span>
+                    <button class="cn-note-del" onclick="window.rpeTracker?._deleteClinicalNote('${n.id}')" title="Eliminar">🗑</button>
+                </div>
+                <div class="cn-note-text" id="cn-text-${n.id}">${n.text.replace(/\n/g,'<br>')}</div>
+                <button class="cn-note-edit-btn" onclick="window.rpeTracker?._editClinicalNoteInline('${n.id}')">✏️ Editar</button>
+            </div>`;
+        }).join('');
+
+    container.innerHTML = `
+        <div class="cn-form">
+            <div class="cn-form-row">
+                <select class="filter-select" id="cnNewPlayer" style="flex:1">
+                    <option value="">— Seleccionar jugadora —</option>
+                    ${this.players.map(p => `<option value="${p.id}" ${fp===p.id?'selected':''}>${p.name}</option>`).join('')}
+                </select>
+                <input type="date" id="cnNewDate" class="filter-select" value="${today}" style="flex:0 0 auto">
+            </div>
+            <textarea id="cnNewText" rows="3" placeholder="Nota clínica: tratamiento, observación, evolución..." style="width:100%;margin:.5rem 0;padding:.6rem;border:1px solid var(--border);border-radius:8px;resize:vertical;font-family:inherit;background:var(--bg-card);color:var(--text-primary)"></textarea>
+            <button class="btn-primary" onclick="window.rpeTracker?._saveClinicalNoteFromForm()" style="width:100%">💾 Guardar nota</button>
+        </div>
+
+        <div class="cn-filters">
+            <select class="filter-select" style="flex:1" onchange="window.rpeTracker?._cnFilter(this.value,null)">
+                <option value="">Todas las jugadoras</option>
+                ${playerOptions}
+            </select>
+            <input class="filter-select" type="search" placeholder="🔍 Buscar en notas…" value="${ft}"
+                   oninput="window.rpeTracker?._cnFilter(null,this.value)"
+                   style="flex:2;min-width:0">
+        </div>
+
+        <div class="cn-notes-list">${noteRows}</div>`;
+};
+
+RPETracker.prototype._cnFilter = function(playerVal, textVal) {
+    const c = document.getElementById('clinicalNotesPanelContent');
+    if (!c) return;
+    const fp = playerVal !== null ? playerVal : c._filterPlayer;
+    const ft = textVal   !== null ? textVal   : c._filterText;
+    this._renderClinicalNotesPanel(c, fp, ft);
+};
+
+RPETracker.prototype._saveClinicalNoteFromForm = function() {
+    this.initClinicalNotes();
+    const playerId = document.getElementById('cnNewPlayer')?.value;
+    const date     = document.getElementById('cnNewDate')?.value;
+    const text     = (document.getElementById('cnNewText')?.value || '').trim();
+    if (!playerId) { this.showToast('⚠️ Selecciona una jugadora', 'warning'); return; }
+    if (!text)     { this.showToast('⚠️ Escribe una nota', 'warning'); return; }
+    const note = { id: Date.now().toString(), playerId, date, text, createdAt: new Date().toISOString() };
+    this.clinicalNotes.push(note);
+    this._saveClinicalNotes();
+    this.showToast('📓 Nota guardada');
+    const c = document.getElementById('clinicalNotesPanelContent');
+    if (c) this._renderClinicalNotesPanel(c);
+};
+
+RPETracker.prototype._deleteClinicalNote = function(noteId) {
+    if (!confirm('¿Eliminar esta nota clínica?')) return;
+    this.clinicalNotes = (this.clinicalNotes || []).filter(n => n.id !== noteId);
+    this._saveClinicalNotes();
+    const c = document.getElementById('clinicalNotesPanelContent');
+    if (c) this._renderClinicalNotesPanel(c);
+};
+
+RPETracker.prototype._editClinicalNoteInline = function(noteId) {
+    const note = (this.clinicalNotes || []).find(n => n.id === noteId);
+    if (!note) return;
+    const textDiv = document.getElementById(`cn-text-${noteId}`);
+    if (!textDiv) return;
+    const original = note.text;
+    textDiv.innerHTML = `
+        <textarea style="width:100%;padding:.5rem;border:1px solid var(--primary);border-radius:6px;font-family:inherit;background:var(--bg-card);color:var(--text-primary);resize:vertical" rows="3">${original}</textarea>
+        <div style="display:flex;gap:.5rem;margin-top:.4rem">
+            <button class="btn-primary" style="flex:1;padding:.35rem" onclick="window.rpeTracker?._saveEditedNote('${noteId}',this)">💾 Guardar</button>
+            <button class="btn-secondary" style="flex:1;padding:.35rem" onclick="window.rpeTracker?._cancelEditNote('${noteId}','${original.replace(/'/g,'\\\'').replace(/\n/g,'\\n')}')">✕ Cancelar</button>
+        </div>`;
+};
+
+RPETracker.prototype._saveEditedNote = function(noteId, btn) {
+    const textarea = btn.closest('div').previousElementSibling;
+    const newText  = textarea?.value.trim();
+    if (!newText) return;
+    const note = (this.clinicalNotes || []).find(n => n.id === noteId);
+    if (!note) return;
+    note.text = newText;
+    note.updatedAt = new Date().toISOString();
+    this._saveClinicalNotes();
+    this.showToast('✏️ Nota actualizada');
+    const c = document.getElementById('clinicalNotesPanelContent');
+    if (c) this._renderClinicalNotesPanel(c);
+};
+
+RPETracker.prototype._cancelEditNote = function(noteId, original) {
+    const textDiv = document.getElementById(`cn-text-${noteId}`);
+    if (textDiv) textDiv.innerHTML = original.replace(/\n/g,'<br>');
+};
+
+RPETracker.prototype._getClinicalNotesForPlayer = function(playerId) {
+    this.initClinicalNotes();
+    return (this.clinicalNotes || [])
+        .filter(n => n.playerId === playerId)
+        .sort((a, b) => b.date.localeCompare(a.date));
+};
 RPETracker.prototype.updateMissedSessions = function() {
     if (!this.injuries || !this.sessions) return;
     
