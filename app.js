@@ -1576,12 +1576,28 @@ class RPETracker {
         const warnPlayers  = players.filter(p => { const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
         const pendingWellness = _pendingW.length;
 
+        // ── C) Team-level A:C alert (3+ players simultaneously over individual threshold) ──
+        const TEAM_ALERT_THRESHOLD = 3;
         let bannerHTML = '';
+        if (alertPlayers.length >= TEAM_ALERT_THRESHOLD) {
+            const combinedAtRisk = alertPlayers.length + warnPlayers.length;
+            const teamMsg = alertPlayers.length >= TEAM_ALERT_THRESHOLD
+                ? `⚠️ <strong>${alertPlayers.length} jugadoras en zona de riesgo A:C simultáneamente</strong> — revisar carga de equipo hoy`
+                : '';
+            const teamSecondary = combinedAtRisk >= TEAM_ALERT_THRESHOLD + 1 && warnPlayers.length > 0
+                ? `<div class="db-alert-sep">·</div><div class="db-alert-item">🟠 <strong>${warnPlayers.length} más</strong> en precaución</div>`
+                : '';
+            bannerHTML = `<div class="db-alert-banner db-alert-banner--team">
+                <div class="db-alert-item">${teamMsg}</div>${teamSecondary}
+                <button class="db-alert-btn-team" onclick="window.rpeTracker?.openPreSessionModal()">Ver detalle →</button>
+            </div>`;
+        }
+
         if (alertPlayers.length > 0 || warnPlayers.length > 0) {
             const items = [];
             if (alertPlayers.length) items.push(`🔴 <strong>${alertPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> ratio en zona de peligro`);
             if (warnPlayers.length)  items.push(`🟠 <strong>${warnPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> en precaución`);
-            bannerHTML = `<div class="db-alert-banner">
+            bannerHTML += `<div class="db-alert-banner">
                 ${items.map(i=>`<div class="db-alert-item">${i}</div>`).join('<div class="db-alert-sep">·</div>')}
             </div>`;
         }
@@ -1706,6 +1722,9 @@ class RPETracker {
                                 <span class="db-avail-pill db-avail-out">${availGroups.out.length} <span>no disp.</span></span>
                             </div>
                             <div class="db-right-header-btns">
+                                <button class="db-presession-btn" onclick="window.rpeTracker?.openPreSessionModal()" title="Resumen pre-entrenamiento">
+                                    ▶ Pre-sesión
+                                </button>
                                 <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
                                     ${sortLabel[this._dashSort]}
                                 </button>
@@ -1861,7 +1880,183 @@ class RPETracker {
         this.renderDashboard();
     }
 
-    // ── Dashboard Mini Calendar ────────────────────────────────────────────
+    // ── A) Pre-session Modal ───────────────────────────────────────────────
+    openPreSessionModal() {
+        const existing = document.getElementById('preSessionModal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'preSessionModal';
+        modal.className = 'modal active presession-modal';
+        modal.innerHTML = this._renderPreSessionModal();
+        document.body.appendChild(modal);
+
+        // Close on backdrop click
+        modal.addEventListener('click', e => {
+            if (e.target === modal) modal.remove();
+        });
+    }
+
+    _renderPreSessionModal() {
+        const today = new Date().toISOString().slice(0, 10);
+        const dateLabel = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        const wData = this.wellnessData || [];
+        const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
+
+        // Section 1: Low readiness (<60)
+        const lowReadiness = this.players.map(p => ({
+            player: p,
+            score: this.calculateReadiness(p.id)
+        })).filter(d => d.score !== null && d.score < 60)
+          .sort((a, b) => a.score - b.score);
+
+        // Section 2: A:C out of individual threshold
+        const acOutOfRange = this.players.map(p => {
+            const ratio = this.calculateAcuteChronicRatio(p.id);
+            const r = parseFloat(ratio.ratio);
+            const t = this.getPlayerThresholds(p.id);
+            if (isNaN(r)) return null;
+            let status = null, icon = '', color = '';
+            if (r > t.high)            { status = 'danger';   icon = '🔴'; color = '#f44336'; }
+            else if (r > t.opt)        { status = 'caution';  icon = '🟠'; color = '#ff9800'; }
+            else if (r > 0 && r < t.low) { status = 'low';   icon = '🔵'; color = '#2196f3'; }
+            if (!status) return null;
+            return { player: p, ratio: ratio.ratio, icon, color, status };
+        }).filter(Boolean).sort((a, b) => {
+            const order = { danger: 0, caution: 1, low: 2 };
+            return order[a.status] - order[b.status];
+        });
+
+        // Section 3: Injured / in rehab
+        const injured = this.players.map(p => {
+            const inj = (this.injuries || []).find(i => i.playerId === p.id && i.status === 'active');
+            if (!inj) return null;
+            const loc = this.getLocationName ? this.getLocationName(inj.location) : (inj.location || 'lesión activa');
+            const phase = inj.rtpPhase ? `Fase ${inj.rtpPhase} RTP` : 'En baja';
+            return { player: p, injury: inj, loc, phase };
+        }).filter(Boolean);
+
+        // Section 4: 3+ day low wellness trend (from _wTrendAlerts)
+        const wellnessTrend = trendAlerts.reduce((acc, a) => {
+            const existing = acc.find(x => x.name === a.name);
+            if (existing) { existing.messages.push(a.message); }
+            else acc.push({ name: a.name, messages: [a.message] });
+            return acc;
+        }, []);
+
+        // Players clear (no alerts in any section)
+        const alertedIds = new Set([
+            ...lowReadiness.map(d => d.player.id),
+            ...acOutOfRange.map(d => d.player.id),
+            ...injured.map(d => d.player.id),
+            ...trendAlerts.map(a => {
+                const p = this.players.find(pl => pl.name === a.name);
+                return p ? p.id : null;
+            }).filter(Boolean)
+        ]);
+        const clearPlayers = this.players.filter(p => !alertedIds.has(p.id));
+
+        const allClear = lowReadiness.length === 0 && acOutOfRange.length === 0 &&
+                         injured.length === 0 && wellnessTrend.length === 0;
+
+        const renderSection = (title, count, colorClass, items, emptyMsg) => {
+            const isEmpty = items.length === 0;
+            return `<div class="pss-section ${isEmpty ? 'pss-section--ok' : ''}">
+                <div class="pss-section-header">
+                    <span class="pss-section-title">${title}</span>
+                    <span class="pss-section-badge ${colorClass}">${count}</span>
+                </div>
+                ${isEmpty
+                    ? `<div class="pss-empty">✅ ${emptyMsg}</div>`
+                    : `<div class="pss-rows">${items}</div>`
+                }
+            </div>`;
+        };
+
+        const rdyRows = lowReadiness.map(d => {
+            const lbl = this.readinessLabel(d.score);
+            return `<div class="pss-row">
+                ${PlayerTokens.avatar(d.player, 22, '0.65rem')}
+                <span class="pss-name">${d.player.name}</span>
+                <span class="pss-tag" style="color:${lbl.color};background:${lbl.bg}">${lbl.icon} ${d.score}/100</span>
+            </div>`;
+        }).join('');
+
+        const acRows = acOutOfRange.map(d => `<div class="pss-row">
+            ${PlayerTokens.avatar(d.player, 22, '0.65rem')}
+            <span class="pss-name">${d.player.name}</span>
+            <span class="pss-tag" style="color:${d.color}">${d.icon} Ratio ${d.ratio}</span>
+        </div>`).join('');
+
+        const injRows = injured.map(d => `<div class="pss-row">
+            ${PlayerTokens.avatar(d.player, 22, '0.65rem')}
+            <span class="pss-name">${d.player.name}</span>
+            <span class="pss-tag pss-tag--inj">🏥 ${d.loc} — ${d.phase}</span>
+        </div>`).join('');
+
+        const trendRows = wellnessTrend.map(d => `<div class="pss-row pss-row--trend">
+            <span class="pss-trend-name">${d.name.split(' ')[0]}</span>
+            <span class="pss-trend-msgs">${d.messages.join(' · ')}</span>
+        </div>`).join('');
+
+        return `
+        <div class="modal-content presession-content">
+            <div class="modal-header presession-header">
+                <div class="presession-title-wrap">
+                    <span class="presession-icon">▶</span>
+                    <div>
+                        <div class="presession-title">Resumen Pre-sesión</div>
+                        <div class="presession-date">${dateLabel}</div>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="document.getElementById('preSessionModal')?.remove()">&times;</button>
+            </div>
+            <div class="presession-body">
+                ${allClear ? `
+                <div class="pss-all-clear">
+                    <div class="pss-all-clear-icon">✅</div>
+                    <div class="pss-all-clear-title">Equipo listo para entrenar</div>
+                    <div class="pss-all-clear-sub">Sin alertas activas hoy — todas las jugadoras en estado óptimo</div>
+                </div>` : `
+                ${renderSection(
+                    '🔴 Readiness bajo (&lt;60)',
+                    lowReadiness.length,
+                    lowReadiness.length ? 'pss-badge--red' : 'pss-badge--ok',
+                    rdyRows,
+                    'Todas con readiness adecuado'
+                )}
+                ${renderSection(
+                    '⚠️ A:C fuera de umbral individual',
+                    acOutOfRange.length,
+                    acOutOfRange.length ? 'pss-badge--orange' : 'pss-badge--ok',
+                    acRows,
+                    'Todas dentro de su umbral individual'
+                )}
+                ${renderSection(
+                    '🏥 Lesionadas / Rehab',
+                    injured.length,
+                    injured.length ? 'pss-badge--red' : 'pss-badge--ok',
+                    injRows,
+                    'Sin lesiones activas'
+                )}
+                ${renderSection(
+                    '📉 Wellness bajo 3+ días consecutivos',
+                    wellnessTrend.length,
+                    wellnessTrend.length ? 'pss-badge--purple' : 'pss-badge--ok',
+                    trendRows,
+                    'Sin tendencias negativas'
+                )}
+                `}
+                ${clearPlayers.length > 0 && !allClear ? `
+                <div class="pss-clear-row">
+                    ✅ <strong>${clearPlayers.length} jugadora${clearPlayers.length !== 1 ? 's' : ''}</strong> sin alertas:
+                    ${clearPlayers.map(p => `<span class="pss-clear-chip">${p.name.split(' ')[0]}</span>`).join('')}
+                </div>` : ''}
+            </div>
+        </div>`;
+    }
+
+
     renderDashboardCalendar() {
         const col = document.getElementById('dbCalColumn');
         if (!col) return;
@@ -2512,10 +2707,15 @@ class RPETracker {
                 ${this.renderPlayerComparison()}
             </div>
 
-            <!-- 3. Evolución individual -->
+            <!-- 3. RPE Plan vs Real -->
+            <div class="an-section-block" id="rpePlanVsRealBlock">
+                ${this._renderRpePlanVsReal()}
+            </div>
+
+            <!-- 4. Evolución individual -->
             <div id="evolutionCharts"></div>
 
-            <!-- 4. Comparador -->
+            <!-- 5. Comparador -->
             <div id="comparisonModule"></div>
         `;
 
@@ -2759,6 +2959,189 @@ class RPETracker {
             toast.classList.add('hiding');
             setTimeout(() => toast.remove(), 280);
         }, 2500);
+    }
+
+    // ========== B) RPE PLAN VS REAL ==========
+
+    _renderRpePlanVsReal() {
+        const INTENSITY_RPE = { none: 0, low: 4, medium: 6, high: 7.5, max: 9 };
+        const INTENSITY_LABEL = { none: 'Descanso', low: 'Baja', medium: 'Media', high: 'Alta', max: 'Máx.' };
+        const DAY_KEYS = ['dom','lun','mar','mie','jue','vie','sab'];
+
+        // Build lookup: { "YYYY-MM-DD_morning": { intensity, rpe, type, focus, duration }, ... }
+        // Covering last 8 weeks with a sliding weekOffset per-week
+        const planLookup = {};
+        const plan = this.weekPlan?.days || {};
+
+        // Reconstruct each week for the last 8 weeks by re-applying weekOffset logic
+        // weekPlan.days is keyed by DAY_KEY (lun, mar…) — same plan repeats each week
+        // We map sessions to the plan by day-of-week + timeOfDay slot
+        // (The weekPlan is a template, not date-specific — same pattern each week)
+        const planByDaySlot = {}; // { "lun_morning": {...}, "lun_afternoon": {...}, ... }
+        DAY_KEYS.forEach(dk => {
+            const d = plan[dk] || {};
+            ['morning', 'afternoon'].forEach(slot => {
+                const s = d[slot];
+                if (s && s.enabled && s.type !== 'rest') {
+                    planByDaySlot[`${dk}_${slot}`] = {
+                        intensity: s.intensity || 'none',
+                        plannedRpe: INTENSITY_RPE[s.intensity] || 0,
+                        intensityLabel: INTENSITY_LABEL[s.intensity] || '—',
+                        type: s.type || 'training',
+                        focus: s.focus || '',
+                        duration: s.duration || 0
+                    };
+                }
+            });
+        });
+
+        // If no plan at all, show empty state
+        const hasPlan = Object.keys(planByDaySlot).length > 0;
+
+        // Build rows: for each session in last 8 weeks, try to match to plan slot
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 56); // 8 weeks back
+        const recentSessions = this.sessions.filter(s => {
+            if (!s.date || !s.rpe) return false;
+            return new Date(s.date) >= cutoff;
+        });
+
+        const rows = [];
+        recentSessions.forEach(s => {
+            const dateObj = new Date(s.date);
+            const dayKey  = DAY_KEYS[dateObj.getDay()];
+            const slot    = s.timeOfDay || 'morning';
+            const lookupKey = `${dayKey}_${slot}`;
+            const planSlot = planByDaySlot[lookupKey];
+            if (!planSlot) return; // no plan for this slot — skip
+            if (planSlot.plannedRpe === 0) return; // rest day — skip
+
+            const player = this.players.find(p => p.id === s.playerId);
+            if (!player) return;
+
+            const delta = parseFloat((s.rpe - planSlot.plannedRpe).toFixed(1));
+            const absDelta = Math.abs(delta);
+            const isMismatch = absDelta >= 2;
+            const isHighMismatch = absDelta >= 3;
+            let deltaIcon = '', deltaColor = 'var(--text-secondary)';
+            if (isMismatch) {
+                deltaIcon = delta > 0 ? '▲' : '▼';
+                deltaColor = isHighMismatch ? '#f44336' : '#ff9800';
+            } else {
+                deltaIcon = '✓';
+                deltaColor = '#4caf50';
+            }
+
+            rows.push({
+                date: s.date,
+                dateObj,
+                player,
+                planSlot,
+                rpe: s.rpe,
+                delta,
+                absDelta,
+                isMismatch,
+                isHighMismatch,
+                deltaIcon,
+                deltaColor,
+                slot
+            });
+        });
+
+        rows.sort((a, b) => b.dateObj - a.dateObj);
+
+        const mismatches = rows.filter(r => r.isMismatch).length;
+        const highMismatches = rows.filter(r => r.isHighMismatch).length;
+
+        const fmtDate = d => {
+            const obj = new Date(d + 'T12:00:00');
+            return obj.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+        };
+        const fmtSlot = s => s === 'morning' ? '🌅 Mañana' : '🌆 Tarde';
+
+        // Player filter state (stored on instance)
+        const filterPlayer = this._pvr_playerFilter || 'all';
+
+        const filteredRows = filterPlayer === 'all'
+            ? rows
+            : rows.filter(r => r.player.id === filterPlayer);
+
+        const playerOptions = this.players
+            .filter(p => rows.some(r => r.player.id === p.id))
+            .map(p => `<option value="${p.id}"${filterPlayer === p.id ? ' selected' : ''}>${p.name}</option>`)
+            .join('');
+
+        const tableRows = filteredRows.length === 0
+            ? `<tr><td colspan="6" class="pvr-empty">Sin sesiones con plan asignado en el período seleccionado</td></tr>`
+            : filteredRows.map(r => `
+            <tr class="pvr-row${r.isMismatch ? ' pvr-row--mismatch' : ''}${r.isHighMismatch ? ' pvr-row--high' : ''}">
+                <td class="pvr-date">${fmtDate(r.date)}</td>
+                <td class="pvr-player">
+                    ${PlayerTokens.avatar(r.player, 20, '0.6rem')}
+                    <span>${r.player.name.split(' ')[0]}</span>
+                </td>
+                <td class="pvr-slot">${fmtSlot(r.slot)}</td>
+                <td class="pvr-plan">
+                    <span class="pvr-intensity pvr-intensity--${r.planSlot.intensity}">${r.planSlot.intensityLabel}</span>
+                    <span class="pvr-rpe-val">${r.planSlot.plannedRpe}</span>
+                </td>
+                <td class="pvr-real">
+                    <span class="pvr-rpe-val pvr-rpe-real">${r.rpe}</span>
+                </td>
+                <td class="pvr-delta" style="color:${r.deltaColor}">
+                    <span class="pvr-delta-icon">${r.deltaIcon}</span>
+                    <span class="pvr-delta-val">${r.delta > 0 ? '+' : ''}${r.delta}</span>
+                </td>
+            </tr>`).join('');
+
+        return `
+        <div class="an-section-title-row">
+            <h4 class="an-section-title">📋 RPE Planificado vs. Percibido</h4>
+            ${mismatches > 0 ? `<span class="pvr-summary-badge pvr-summary-badge--warn">⚠️ ${mismatches} desajuste${mismatches !== 1 ? 's' : ''} ≥2 pts</span>` : ''}
+            ${highMismatches > 0 ? `<span class="pvr-summary-badge pvr-summary-badge--crit">🔴 ${highMismatches} crítico${highMismatches !== 1 ? 's' : ''} ≥3 pts</span>` : ''}
+            ${mismatches === 0 && rows.length > 0 ? `<span class="pvr-summary-badge pvr-summary-badge--ok">✅ Sin desajustes</span>` : ''}
+        </div>
+        ${!hasPlan ? `
+        <div class="pvr-no-plan">
+            <span>📅</span> No hay plan semanal configurado. Actívalo en la pestaña <strong>Planificación</strong> para cruzar los datos.
+        </div>` : rows.length === 0 ? `
+        <div class="pvr-no-plan">
+            <span>📋</span> No hay sesiones recientes que coincidan con el plan semanal (últimas 8 semanas).
+        </div>` : `
+        <div class="pvr-controls">
+            <label class="pvr-filter-label">Jugadora:
+                <select class="pvr-player-select" onchange="window.rpeTracker?._pvrSetFilter(this.value)">
+                    <option value="all"${filterPlayer === 'all' ? ' selected' : ''}>Todas</option>
+                    ${playerOptions}
+                </select>
+            </label>
+            <span class="pvr-legend">
+                <span style="color:#4caf50">✓ OK</span>
+                <span style="color:#ff9800">▲▼ ≥2 pts</span>
+                <span style="color:#f44336">▲▼ ≥3 pts (crítico)</span>
+            </span>
+        </div>
+        <div class="pvr-table-wrap">
+            <table class="pvr-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Jugadora</th>
+                        <th>Sesión</th>
+                        <th>RPE Plan</th>
+                        <th>RPE Real</th>
+                        <th>Δ</th>
+                    </tr>
+                </thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+        </div>`}`;
+    }
+
+    _pvrSetFilter(playerId) {
+        this._pvr_playerFilter = playerId;
+        const block = document.getElementById('rpePlanVsRealBlock');
+        if (block) block.innerHTML = this._renderRpePlanVsReal();
     }
 
     // ========== FEATURE 1: EVOLUTION CHARTS ==========
