@@ -137,7 +137,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
         return (e.sleep + (6 - e.fatigue) + e.mood + (6 - e.soreness)) / 4;
     };
     const wBar = (val) => {
-        if (val === null) return '<span style="color:#bbb;font-size:11px">—</span>';
+        if (val === null) return '<span style="color:var(--text-faint);font-size:11px">—</span>';
         const pct = ((val - 1) / 4) * 100;
         const col = val >= 4 ? '#4caf50' : val >= 2.5 ? '#ff9800' : '#f44336';
         return `<div style="display:flex;align-items:center;gap:6px">
@@ -148,7 +148,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
         </div>`;
     };
     const ratioBar = (r, ratioStr) => {
-        if (isNaN(r) || ratioStr === 'N/A') return '<span style="color:#bbb">—</span>';
+        if (isNaN(r) || ratioStr === 'N/A') return '<span style="color:var(--text-faint)">—</span>';
         const pct = Math.min(r / 2 * 100, 100).toFixed(0);
         const _tBar = this.getPlayerThresholds(player.id); const col = r > _tBar.high ? '#f44336' : r > _tBar.opt ? '#ff9800' : r < _tBar.low ? '#2196f3' : '#4caf50';
         return `<div style="display:flex;align-items:center;gap:6px">
@@ -190,23 +190,24 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
 
     const playerRow = ({player, ratio, r, injury, weekLoad, avgRPE, ws, statusTxt, statusCol, statusBg}) => {
         const initials = player.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        const bd = 'border-bottom:1px solid var(--border,#e8e8e8)';
         return `<tr>
-            <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0">
+            <td style="padding:10px 14px;${bd}">
                 <div style="display:flex;align-items:center;gap:10px">
-                    <div style="width:32px;height:32px;border-radius:50%;background:#ff6600;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${initials}</div>
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--primary,#ff6600);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${initials}</div>
                     <div>
-                        <div style="font-weight:600;font-size:13px">${player.name}</div>
-                        ${player.number ? `<div style="font-size:11px;color:#999">#${player.number}</div>` : ''}
+                        <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${player.name}</div>
+                        ${player.number ? `<div style="font-size:11px;color:var(--text-muted)">#${player.number}</div>` : ''}
                     </div>
                 </div>
             </td>
-            <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;min-width:120px">${ratioBar(r, ratio.ratio)}</td>
-            <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;min-width:120px">${wBar(ws)}</td>
-            <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:600;color:#555">${avgRPE}</td>
-            <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:600;color:#555">${weekLoad ? weekLoad.toLocaleString('es-ES') : '—'}</td>
-            <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0">
+            <td style="padding:10px 14px;${bd};min-width:120px">${ratioBar(r, ratio.ratio)}</td>
+            <td style="padding:10px 14px;${bd};min-width:120px">${wBar(ws)}</td>
+            <td style="padding:10px 14px;${bd};text-align:center;font-weight:600;color:var(--text-secondary)">${avgRPE}</td>
+            <td style="padding:10px 14px;${bd};text-align:center;font-weight:600;color:var(--text-secondary)">${weekLoad ? weekLoad.toLocaleString('es-ES') : '—'}</td>
+            <td style="padding:10px 14px;${bd}">
                 <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${statusBg};color:${statusCol}">${statusTxt}</span>
-                ${injury ? `<div style="font-size:10px;color:#999;margin-top:2px">${injury.location ? this.getLocationName(injury.location) : 'lesión activa'}</div>` : ''}
+                ${injury ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${injury.location ? this.getLocationName(injury.location) : 'lesión activa'}</div>` : ''}
             </td>
         </tr>`;
     };
@@ -214,12 +215,12 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
     const injuryRows = activeInj.map(inj => {
         const p = this.players.find(x => x.id === inj.playerId);
         return `<tr>
-            <td style="padding:8px 14px;border-bottom:1px solid #f0f0f0;font-weight:600">${p?.name || '?'}</td>
-            <td style="padding:8px 14px;border-bottom:1px solid #f0f0f0">${inj.location ? this.getLocationName(inj.location) : '—'}</td>
-            <td style="padding:8px 14px;border-bottom:1px solid #f0f0f0;text-align:center">${typeof inj.getDaysInjured === 'function' ? inj.getDaysInjured() : '?'} días</td>
-            <td style="padding:8px 14px;border-bottom:1px solid #f0f0f0">Fase RTP ${inj.rtpPhase || 1}/6</td>
+            <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);font-weight:600">${p?.name || '?'}</td>
+            <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8)">${inj.location ? this.getLocationName(inj.location) : '—'}</td>
+            <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);text-align:center">${typeof inj.getDaysInjured === 'function' ? inj.getDaysInjured() : '?'} días</td>
+            <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8)">Fase RTP ${inj.rtpPhase || 1}/6</td>
         </tr>`;
-    }).join('') || `<tr><td colspan="4" style="padding:14px;color:#bbb;text-align:center;font-style:italic">Ninguna jugadora lesionada</td></tr>`;
+    }).join('') || `<tr><td colspan="4" style="padding:14px;color:var(--text-faint);text-align:center;font-style:italic">Ninguna jugadora lesionada</td></tr>`;
 
     const wTeamRows = this.players.map(player => {
         const e7 = wData.filter(x => x.playerId === player.id).slice(-7);
@@ -232,23 +233,23 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
             { f:'soreness', inv:true,  label:'Agujetas' },
         ].map(({f, inv}) => {
             const val = todayE ? todayE[f] : null;
-            if (val === null) return `<td style="padding:8px 14px;border-bottom:1px solid #f0f0f0;text-align:center;color:#ccc">—</td>`;
+            if (val === null) return `<td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);text-align:center;color:var(--text-faint)">—</td>`;
             const good = inv ? val <= 2 : val >= 4;
             const bad  = inv ? val >= 4 : val <= 2;
             const col  = good ? '#2e7d32' : bad ? '#c62828' : '#e65100';
             const bg   = good ? '#e8f5e9' : bad ? '#ffebee' : '#fff3e0';
-            return `<td style="padding:8px 14px;border-bottom:1px solid #f0f0f0;text-align:center"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${bg};color:${col};font-weight:700;font-size:12px;line-height:24px">${val}</span></td>`;
+            return `<td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);text-align:center"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${bg};color:${col};font-weight:700;font-size:12px;line-height:24px">${val}</span></td>`;
         }).join('');
         const initials = player.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
         return `<tr>
-            <td style="padding:8px 14px;border-bottom:1px solid #f0f0f0">
+            <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8)">
                 <div style="display:flex;align-items:center;gap:8px">
-                    <div style="width:26px;height:26px;border-radius:50%;background:#ff6600;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${initials}</div>
+                    <div style="width:26px;height:26px;border-radius:50%;background:var(--primary,#ff6600);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${initials}</div>
                     <span style="font-weight:500;font-size:12px">${player.name}</span>
                 </div>
             </td>
             ${cells}
-            <td style="padding:8px 14px;border-bottom:1px solid #f0f0f0;text-align:center;font-size:11px;color:#888">${avg('sleep')} / ${avg('mood')}</td>
+            <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);text-align:center;font-size:11px;color:var(--text-muted)">${avg('sleep')} / ${avg('mood')}</td>
         </tr>`;
     }).join('');
 

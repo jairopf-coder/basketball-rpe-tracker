@@ -615,13 +615,34 @@
             <span class="bn-icon">👥</span>
             <span class="bn-label">Equipo</span>
         </button>
+        <button class="bottom-nav-btn" id="bnMoreBtn" onclick="BottomNav.toggleMore()" aria-label="Más">
+            <span class="bn-icon">⋯</span>
+            <span class="bn-label">Más</span>
+        </button>
     </nav>
+
+    <!-- Menú "Más" flotante para acceso a Rendimiento en móvil -->
+    <div id="bnMoreMenu" class="bn-more-menu" style="display:none">
+        <button class="bn-more-item" onclick="BottomNav.selectMore('rendimiento','strength')">
+            <span>🏋️</span> Gym / Fuerza
+        </button>
+        <button class="bn-more-item" onclick="BottomNav.selectMore('rendimiento','performance')">
+            <span>📈</span> Tests físicos
+        </button>
+        <button class="bn-more-item" onclick="BottomNav.selectMore('rendimiento','acAnalysis')">
+            <span>📉</span> Análisis A:C
+        </button>
+        <button class="bn-more-item" onclick="BottomNav.selectMore('planificacion','weekPlan')">
+            <span>📅</span> Planificación
+        </button>
+    </div>
 
     <script>
     const BottomNav = {
         select(btn) {
             const group = btn.dataset.bnGroup;
             const view  = btn.dataset.bnView;
+            BottomNav.closeMore();
             // Update active state
             document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
@@ -633,6 +654,36 @@
                     b.classList.toggle('active', b.dataset.group === group));
             }
             if (window.rpeTracker) window.rpeTracker.switchView(view);
+        },
+        toggleMore() {
+            const menu = document.getElementById('bnMoreMenu');
+            const open = menu.style.display !== 'none';
+            if (open) { BottomNav.closeMore(); return; }
+            menu.style.display = 'flex';
+            document.getElementById('bnMoreBtn').classList.add('active');
+            // Close on outside tap
+            setTimeout(() => document.addEventListener('click', BottomNav._outsideClose, { once: true }), 0);
+        },
+        closeMore() {
+            document.getElementById('bnMoreMenu').style.display = 'none';
+            document.getElementById('bnMoreBtn').classList.remove('active');
+        },
+        selectMore(group, view) {
+            BottomNav.closeMore();
+            document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('bnMoreBtn').classList.add('active');
+            if (window.NavMenu) {
+                NavMenu.activeGroup = group;
+                NavMenu.activeView  = view;
+                document.querySelectorAll('.nav-group-btn').forEach(b =>
+                    b.classList.toggle('active', b.dataset.group === group));
+            }
+            if (window.rpeTracker) window.rpeTracker.switchView(view);
+        },
+        _outsideClose(e) {
+            const menu = document.getElementById('bnMoreMenu');
+            const btn  = document.getElementById('bnMoreBtn');
+            if (!menu.contains(e.target) && !btn.contains(e.target)) BottomNav.closeMore();
         },
         // Call from app when view changes programmatically
         syncToView(viewKey) {
