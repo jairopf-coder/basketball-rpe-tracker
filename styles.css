@@ -5522,6 +5522,77 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 
 /* ============================================================
+   MOBILE UX FIXES — padding, gym, overflow
+   ============================================================ */
+
+/* Reducir padding de vistas en móvil (375px → solo 311px de contenido con 1.5rem) */
+@media (max-width: 640px) {
+    .analytics-container,
+    .injury-container,
+    .str-container,
+    .players-container,
+    .pred-page { padding: 0.75rem !important; }
+
+    /* Gym modal: series en 2 columnas (Peso / Reps) en vez de 8 cols fijas */
+    .gym-set-row {
+        display: grid;
+        grid-template-columns: 20px 1fr 1fr auto;
+        gap: 0.4rem;
+        align-items: center;
+    }
+    /* Ocultar columna RIR y velocidad en móvil (poco espacio) */
+    .gym-set-sep,
+    .gym-set-num + .gym-set-sep { display: none; }
+
+    /* inj-tabs ya tiene overflow-x, asegurar min-width en botones */
+    .inj-tab { white-space: nowrap; }
+
+    /* Contenedores de tabla: scroll horizontal si el contenido desborda */
+    .ts-table-wrap,
+    .cmp-table-wrap,
+    .pvr-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* Bottom nav — menú "Más" (Rendimiento en móvil) */
+.bn-more-menu {
+    position: fixed;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    right: 0.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    z-index: 1100;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 180px;
+}
+
+.bn-more-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    text-align: left;
+    min-height: 44px;
+    touch-action: manipulation;
+    width: 100%;
+}
+.bn-more-item:last-child { border-bottom: none; }
+.bn-more-item:active { background: var(--bg-subtle); }
+
+/* Ocultar menú Más en desktop */
+@media (min-width: 641px) {
+    #bnMoreBtn, #bnMoreMenu { display: none !important; }
+}
+
+/* ============================================================
    BATCH 6 — Nuevas clases
    ============================================================ */
 
@@ -5744,7 +5815,10 @@ details[open] .ewma-toggle-hint { display: none; }
     border-bottom: 1px solid var(--border);
     margin-bottom: 1rem;
     gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
+.inj-tabs::-webkit-scrollbar { display: none; }
 .inj-tab {
     padding: 0.5rem 1rem;
     border: none;
@@ -6614,9 +6688,22 @@ details[open] .ewma-toggle-hint { display: none; }
 @media (max-width: 600px) {
     .gym-modal-top { grid-template-columns: 1fr; }
     .gym-ex-block-header { flex-direction: column; align-items: flex-start; }
-    .gym-set-detail-row { grid-template-columns: 16px 52px 12px 56px 48px 48px 20px; gap: 0.25rem; }
     .gym-def-input { width: 44px; }
     .gym-def-input--kg { width: 52px; }
+}
+
+/* Gym sets en móvil estrecho: 2 columnas (Reps / Peso) apiladas, legibles */
+@media (max-width: 500px) {
+    .gym-set-detail-row {
+        display: grid;
+        grid-template-columns: 16px 1fr 1fr 24px;
+        gap: 0.35rem;
+        align-items: center;
+    }
+    /* Ocultar separadores y columnas RPE en pantallas muy estrechas */
+    .gym-set-sep { display: none; }
+    .gym-set-input { min-height: 38px; font-size: 0.95rem; padding: 0.3rem 0.4rem; }
+    .gym-set-input--rpe { display: none; }
 }
 
 /* ── Estado de sesión: plan vs ejecutada ── */
