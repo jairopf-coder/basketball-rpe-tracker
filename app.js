@@ -49,7 +49,7 @@ const NavMenu = {
 
         this.activeGroup = groupKey;
 
-        // Update group buttons
+        // Update group buttons (desktop nav bar)
         document.querySelectorAll('.nav-group-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.group === groupKey);
         });
@@ -1427,7 +1427,7 @@ class RPETracker {
             };
             return this.players.map(p => {
                 const c = chipColor(p);
-                return `<div class="db-w-chip-full" style="background:${c.bg};border-color:${c.border}" onclick="NavMenu.selectGroup('salud')" title="${p.name}">
+                return `<div class="db-w-chip-full" style="background:${c.bg};border-color:${c.border}" onclick="window.rpeTracker?.switchView('wellness')" title="${p.name}">
                     ${PlayerTokens.avatar(p, 18, '0.55rem')}
                     <span class="db-w-chip-name">${p.name.split(' ')[0]}</span>
                     <span class="db-w-chip-val" style="color:${c.dot}">${c.label}</span>
@@ -4329,31 +4329,20 @@ class RPETracker {
             return !isNaN(r) && r > this.getPlayerThresholds(player.id).opt;
         }).length;
 
-        // Find the "Carga" nav group button
-        const cargaBtn = document.querySelector('.nav-group-btn[data-group="carga"]');
-        if (cargaBtn) {
-            const existing = cargaBtn.querySelector('.nav-alert-badge');
-            if (existing) existing.remove();
-            if (alertCount > 0) {
-                const badge = document.createElement('span');
-                badge.className = 'nav-alert-badge';
-                badge.textContent = alertCount;
-                cargaBtn.appendChild(badge);
-            }
+        // Bottom-nav "Análisis" badge (A:C alerts)
+        const alertBadge = document.getElementById('bnAlertBadge');
+        if (alertBadge) {
+            alertBadge.textContent = alertCount;
+            alertBadge.style.display = alertCount > 0 ? '' : 'none';
         }
 
-        // Wellness trend badge on "Salud" nav group
-        const saludBtn = document.querySelector('.nav-group-btn[data-group="salud"]');
-        if (saludBtn) {
-            const existingW = saludBtn.querySelector('.nav-alert-badge');
-            if (existingW) existingW.remove();
+        // Drawer "Lesiones" badge (injury / wellness trend)
+        const injBadge = document.getElementById('bnInjuryBadge');
+        if (injBadge) {
             const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
-            if (trendAlerts.length > 0) {
-                const badge = document.createElement('span');
-                badge.className = 'nav-alert-badge nav-alert-badge--trend';
-                badge.textContent = trendAlerts.length;
-                saludBtn.appendChild(badge);
-            }
+            const total = trendAlerts.length;
+            injBadge.textContent = total;
+            injBadge.style.display = total > 0 ? '' : 'none';
         }
     }
 }
