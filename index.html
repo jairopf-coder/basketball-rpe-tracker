@@ -60,17 +60,8 @@
             <input type="file" id="seasonFileInput" accept=".json" style="display:none">
         </header>
 
-        <!-- Navigation Tabs -->
-        <nav class="nav-groups" id="navGroups">
-            <div class="nav-group-bar">
-                <button class="nav-group-btn active" data-group="dashboard" onclick="NavMenu.selectGroup('dashboard')">📊 Inicio</button>
-                <button class="nav-group-btn" data-group="carga" onclick="NavMenu.selectGroup('carga')">🏋️ Carga</button>
-                <button class="nav-group-btn" data-group="salud" onclick="NavMenu.selectGroup('salud')">❤️ Salud</button>
-                <button class="nav-group-btn" data-group="rendimiento" onclick="NavMenu.selectGroup('rendimiento')">💪 Rendimiento</button>
-                <button class="nav-group-btn" data-group="equipo" onclick="NavMenu.selectGroup('equipo')">👥 Equipo</button>
-            </div>
-            <div class="nav-sub-bar" id="navSubBar" style="display:none"></div>
-        </nav>
+        <!-- Sub-nav bar (used programmatically by NavMenu for secondary items) -->
+        <div class="nav-sub-bar" id="navSubBar" style="display:none"></div>
 
         <!-- Sesiones View -->
         <div id="sessionsView" class="view">
@@ -142,8 +133,30 @@
         <div id="dashboardView" class="view active">
             <div class="dashboard-container">
                 <h2>📊 Dashboard del Equipo</h2>
+
+                <!-- Quick-action buttons -->
+                <div class="dashboard-quick-actions" id="dashboardQuickActions">
+                    <button class="dqa-btn" onclick="window.rpeTracker?.openNewSessionModal()" aria-label="Nueva sesión de entrenamiento">
+                        <span class="dqa-icon">🏀</span>
+                        <span class="dqa-label">Nueva sesión</span>
+                    </button>
+                    <button class="dqa-btn" onclick="window.rpeTracker?.switchView('wellness')" aria-label="Registrar wellness del equipo">
+                        <span class="dqa-icon">❤️</span>
+                        <span class="dqa-label">Wellness</span>
+                    </button>
+                    <button class="dqa-btn" onclick="window.rpeTracker?.switchView('weekplan')" aria-label="Ver planificación semanal">
+                        <span class="dqa-icon">📅</span>
+                        <span class="dqa-label">Planificación</span>
+                    </button>
+                </div>
+
                 <div id="dashboardContent"></div>
             </div>
+
+            <!-- FAB Nueva Sesión (visible solo en móvil dentro de la vista Hoy) -->
+            <button class="view-fab" id="dashboardFab" onclick="window.rpeTracker?.openNewSessionModal()" aria-label="Nueva sesión">
+                <span>＋</span>
+            </button>
         </div>
 
         <!-- Players View -->
@@ -588,113 +601,164 @@
         });
     </script>
 
-    <!-- ===== BOTTOM NAV BAR (visible solo en móvil) ===== -->
+    <!-- ===== BOTTOM NAV BAR — 4 destinos ===== -->
     <nav class="bottom-nav" id="bottomNav" aria-label="Navegación principal">
         <button class="bottom-nav-btn active" data-bn-group="dashboard" data-bn-view="dashboard"
-                onclick="BottomNav.select(this)" aria-label="Inicio">
-            <span class="bn-icon">📊</span>
-            <span class="bn-label">Inicio</span>
-        </button>
-        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="analytics"
-                onclick="BottomNav.select(this)" aria-label="Carga">
-            <span class="bn-icon">🏋️</span>
-            <span class="bn-label">Carga</span>
-        </button>
-        <button class="bottom-nav-btn bn-fab" aria-label="Nueva sesión"
-                onclick="window.rpeTracker?.openNewSessionModal()">
-            <span class="bn-icon">＋</span>
-        </button>
-        <button class="bottom-nav-btn" data-bn-group="salud" data-bn-view="wellness"
-                onclick="BottomNav.select(this)" aria-label="Salud">
-            <span class="bn-icon">❤️</span>
-            <span class="bn-label">Salud</span>
-            <span class="bn-badge" id="bnInjuryBadge" style="display:none">0</span>
+                onclick="BottomNav.select(this)" aria-label="Hoy — Dashboard principal">
+            <span class="bn-icon">🏠</span>
+            <span class="bn-label">Hoy</span>
         </button>
         <button class="bottom-nav-btn" data-bn-group="equipo" data-bn-view="players"
-                onclick="BottomNav.select(this)" aria-label="Equipo">
+                onclick="BottomNav.select(this)" aria-label="Equipo — Gestión de jugadoras">
             <span class="bn-icon">👥</span>
             <span class="bn-label">Equipo</span>
         </button>
-        <button class="bottom-nav-btn" id="bnMoreBtn" onclick="BottomNav.toggleMore()" aria-label="Más">
+        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="analytics"
+                onclick="BottomNav.select(this)" aria-label="Análisis — Cargas y estadísticas">
+            <span class="bn-icon">📈</span>
+            <span class="bn-label">Análisis</span>
+            <span class="bn-badge" id="bnAlertBadge" style="display:none">0</span>
+        </button>
+        <button class="bottom-nav-btn" id="bnMoreBtn" onclick="BottomNav.toggleMore()" aria-label="Más opciones">
             <span class="bn-icon">⋯</span>
             <span class="bn-label">Más</span>
         </button>
     </nav>
 
-    <!-- Menú "Más" flotante para acceso a Rendimiento en móvil -->
-    <div id="bnMoreMenu" class="bn-more-menu" style="display:none">
-        <button class="bn-more-item" onclick="BottomNav.selectMore('rendimiento','strength')">
-            <span>🏋️</span> Gym / Fuerza
-        </button>
-        <button class="bn-more-item" onclick="BottomNav.selectMore('rendimiento','performance')">
-            <span>📈</span> Tests físicos
-        </button>
-        <button class="bn-more-item" onclick="BottomNav.selectMore('rendimiento','acAnalysis')">
-            <span>📉</span> Análisis A:C
-        </button>
-        <button class="bn-more-item" onclick="BottomNav.selectMore('planificacion','weekPlan')">
-            <span>📅</span> Planificación
-        </button>
+    <!-- Drawer "Más" — vistas secundarias -->
+    <div id="bnMoreMenu" class="bn-more-menu" style="display:none" role="dialog" aria-label="Más opciones de navegación">
+        <div class="bn-more-header">
+            <span>Más secciones</span>
+            <button class="bn-more-close" onclick="BottomNav.closeMore()" aria-label="Cerrar menú">✕</button>
+        </div>
+        <div class="bn-more-grid">
+            <button class="bn-more-item" onclick="BottomNav.selectMore('salud','wellness')" aria-label="Wellness del equipo">
+                <span class="bn-more-icon">❤️</span>
+                <span class="bn-more-label">Wellness</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('salud','injury')" aria-label="Gestión de lesiones">
+                <span class="bn-more-icon">🏥</span>
+                <span class="bn-more-label">Lesiones</span>
+                <span class="bn-badge" id="bnInjuryBadge" style="display:none">0</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('salud','prediction')" aria-label="Predicción de lesiones">
+                <span class="bn-more-icon">🔮</span>
+                <span class="bn-more-label">Predicción</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('carga','weekplan')" aria-label="Planificación semanal">
+                <span class="bn-more-icon">📅</span>
+                <span class="bn-more-label">Planificación</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('carga','sessions')" aria-label="Historial de sesiones">
+                <span class="bn-more-icon">📋</span>
+                <span class="bn-more-label">Historial</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('equipo','teamstatus')" aria-label="Estado del equipo">
+                <span class="bn-more-icon">🚦</span>
+                <span class="bn-more-label">Estado</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('rendimiento','gym')" aria-label="Gym y fuerza">
+                <span class="bn-more-icon">🏋️</span>
+                <span class="bn-more-label">Gym</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('rendimiento','tests')" aria-label="Tests físicos">
+                <span class="bn-more-icon">📊</span>
+                <span class="bn-more-label">Tests</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('salud','rehab')" aria-label="Readaptación">
+                <span class="bn-more-icon">💪</span>
+                <span class="bn-more-label">Readap.</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('carga','calendar')" aria-label="Calendario">
+                <span class="bn-more-icon">🗓️</span>
+                <span class="bn-more-label">Calendario</span>
+            </button>
+        </div>
     </div>
+    <!-- Overlay para cerrar el drawer al pulsar fuera -->
+    <div id="bnMoreOverlay" class="bn-more-overlay" style="display:none" onclick="BottomNav.closeMore()"></div>
 
     <script>
+    // Primary views mapped to each bottom-nav tab
+    const BN_PRIMARY_VIEWS = {
+        dashboard: ['dashboard'],
+        equipo:    ['players', 'teamstatus'],
+        carga:     ['analytics', 'weekplan', 'sessions'],
+    };
+
     const BottomNav = {
         select(btn) {
             const group = btn.dataset.bnGroup;
             const view  = btn.dataset.bnView;
             BottomNav.closeMore();
-            // Update active state
             document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            // Sync with NavMenu + app router
             if (window.NavMenu) {
                 NavMenu.activeGroup = group;
                 NavMenu.activeView  = view;
-                document.querySelectorAll('.nav-group-btn').forEach(b =>
-                    b.classList.toggle('active', b.dataset.group === group));
             }
             if (window.rpeTracker) window.rpeTracker.switchView(view);
         },
         toggleMore() {
-            const menu = document.getElementById('bnMoreMenu');
-            const open = menu.style.display !== 'none';
+            const menu    = document.getElementById('bnMoreMenu');
+            const overlay = document.getElementById('bnMoreOverlay');
+            const open    = menu.style.display !== 'none';
             if (open) { BottomNav.closeMore(); return; }
-            menu.style.display = 'flex';
+            menu.style.display    = 'flex';
+            overlay.style.display = 'block';
             document.getElementById('bnMoreBtn').classList.add('active');
-            // Close on outside tap
-            setTimeout(() => document.addEventListener('click', BottomNav._outsideClose, { once: true }), 0);
+            // Animate in
+            requestAnimationFrame(() => menu.classList.add('bn-more-open'));
         },
         closeMore() {
-            document.getElementById('bnMoreMenu').style.display = 'none';
+            const menu    = document.getElementById('bnMoreMenu');
+            const overlay = document.getElementById('bnMoreOverlay');
+            menu.classList.remove('bn-more-open');
+            // Wait for transition then hide
+            const onEnd = () => {
+                menu.style.display    = 'none';
+                overlay.style.display = 'none';
+                menu.removeEventListener('transitionend', onEnd);
+            };
+            menu.addEventListener('transitionend', onEnd, { once: true });
             document.getElementById('bnMoreBtn').classList.remove('active');
         },
         selectMore(group, view) {
             BottomNav.closeMore();
+            // Keep "Más" highlighted for secondary views
             document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('bnMoreBtn').classList.add('active');
             if (window.NavMenu) {
                 NavMenu.activeGroup = group;
                 NavMenu.activeView  = view;
-                document.querySelectorAll('.nav-group-btn').forEach(b =>
-                    b.classList.toggle('active', b.dataset.group === group));
             }
             if (window.rpeTracker) window.rpeTracker.switchView(view);
         },
-        _outsideClose(e) {
-            const menu = document.getElementById('bnMoreMenu');
-            const btn  = document.getElementById('bnMoreBtn');
-            if (!menu.contains(e.target) && !btn.contains(e.target)) BottomNav.closeMore();
-        },
-        // Call from app when view changes programmatically
+        // Sync bottom-nav highlight when view changes programmatically
         syncToView(viewKey) {
-            document.querySelectorAll('.bottom-nav-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.bnView === viewKey);
-            });
+            let found = false;
+            for (const [group, views] of Object.entries(BN_PRIMARY_VIEWS)) {
+                if (views.includes(viewKey)) {
+                    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
+                        b.classList.toggle('active', b.dataset.bnGroup === group);
+                    });
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // Secondary view — highlight Más
+                document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.remove('active'));
+                const moreBtn = document.getElementById('bnMoreBtn');
+                if (moreBtn) moreBtn.classList.add('active');
+            }
+            // Show/hide the in-view FAB (only on dashboard/Hoy)
+            const fab = document.getElementById('dashboardFab');
+            if (fab) fab.style.display = (viewKey === 'dashboard') ? 'flex' : 'none';
         }
     };
 
     // Hook into NavMenu.selectView to keep bottom nav in sync
-    // Wrapped in DOMContentLoaded so NavMenu (defined in app.js) is available
     document.addEventListener('DOMContentLoaded', () => {
         if (window.NavMenu) {
             const _origSelectView = NavMenu.selectView.bind(NavMenu);
@@ -703,6 +767,8 @@
                 BottomNav.syncToView(viewKey);
             };
         }
+        // Initial FAB visibility
+        BottomNav.syncToView('dashboard');
     });
     </script>
 </body>

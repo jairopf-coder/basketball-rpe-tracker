@@ -194,12 +194,9 @@ header h1 {
 
 /* Tabs */
 /* ===== NAVEGACIÓN POR GRUPOS ===== */
+/* nav-groups barra superior eliminada — ocultamos residuos */
 .nav-groups {
-    position: sticky;
-    top: 53px;
-    z-index: 99;
-    background: var(--bg-surface);
-    transition: background 0.25s;
+    display: none !important;
 }
 
 .nav-group-bar {
@@ -5405,7 +5402,6 @@ details[open] .ewma-toggle-hint { display: none; }
 
 @media (max-width: 640px) {
     body { padding-bottom: 68px; }
-    .nav-groups { display: none; }
 
     .bottom-nav {
         display: flex;
@@ -8386,4 +8382,247 @@ details[open] .ewma-toggle-hint { display: none; }
     .inj-prepost-cols { grid-template-columns: 1fr; }
     .cn-form-row { flex-direction: column; }
     .pred-conf-badge { font-size: 0.65rem; }
+}
+
+/* ============================================================
+   v6 — NAVEGACIÓN UNIFICADA: drawer Más + quick-actions + FAB
+   ============================================================ */
+
+/* ── Desktop: sub-nav bar as thin secondary nav ── */
+@media (min-width: 641px) {
+    .nav-sub-bar {
+        position: sticky;
+        top: 53px;
+        z-index: 99;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border);
+        padding: 0 1rem;
+        gap: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .nav-sub-bar::-webkit-scrollbar { display: none; }
+    .nav-sub-btn {
+        padding: 0.5rem 0.9rem;
+        min-height: 44px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 0.82rem;
+        font-weight: 400;
+        color: var(--text-muted);
+        border-bottom: 2px solid transparent;
+        transition: color 0.15s, border-color 0.15s;
+        white-space: nowrap;
+        position: relative;
+        top: 1px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .nav-sub-btn:hover { color: var(--text-secondary); }
+    .nav-sub-btn.active {
+        color: var(--primary, #ff6600);
+        border-bottom-color: var(--primary, #ff6600);
+        font-weight: 500;
+    }
+
+    /* Desktop: hide bottom-nav FAB and drawer */
+    #bnMoreBtn, #bnMoreMenu, #bnMoreOverlay,
+    .view-fab, .dashboard-quick-actions { display: none !important; }
+}
+
+/* ── Quick-action buttons (dashboard, desktop) ── */
+.dashboard-quick-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.dqa-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.dqa-btn:hover {
+    background: var(--bg-subtle);
+    border-color: var(--primary, #ff6600);
+}
+
+.dqa-btn:active { transform: scale(0.97); }
+
+.dqa-icon { font-size: 1.1rem; line-height: 1; }
+.dqa-label { white-space: nowrap; }
+
+/* ── In-view FAB (solo dashboard móvil) ── */
+.view-fab {
+    display: none; /* controlled by BottomNav.syncToView */
+    position: fixed;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px) + 12px);
+    right: 1rem;
+    z-index: 190;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--primary, #ff6600);
+    color: #fff;
+    font-size: 1.6rem;
+    font-weight: 300;
+    border: none;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(255,102,0,0.45);
+    transition: transform 0.15s ease, box-shadow 0.15s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.view-fab:active {
+    transform: scale(0.93);
+    box-shadow: 0 2px 8px rgba(255,102,0,0.35);
+}
+
+/* Hide old bn-fab if it survives anywhere */
+.bottom-nav-btn.bn-fab { display: none !important; }
+
+/* ── Bottom nav: 4 tabs (mobile) ── */
+@media (max-width: 640px) {
+    .bottom-nav {
+        /* 4 equal tabs — no FAB slot needed */
+    }
+    .bottom-nav-btn { flex: 1; }
+}
+
+/* ── Drawer "Más" ── */
+.bn-more-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+.bn-more-menu {
+    position: fixed;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    right: 0;
+    z-index: 1100;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+    flex-direction: column;
+    overflow: hidden;
+    /* slide-up animation */
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.bn-more-menu.bn-more-open {
+    transform: translateY(0);
+}
+
+.bn-more-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem 0.5rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.bn-more-close {
+    border: none;
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+}
+
+.bn-more-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    padding: 0.25rem 0 calc(0.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.bn-more-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0.85rem 0.25rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--text-primary);
+    position: relative;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 72px;
+}
+
+.bn-more-item:active { background: var(--bg-subtle); }
+
+.bn-more-icon { font-size: 1.5rem; line-height: 1; }
+
+.bn-more-label {
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    white-space: nowrap;
+    line-height: 1.1;
+}
+
+/* Badge on drawer items */
+.bn-more-item .bn-badge {
+    position: absolute;
+    top: 10px;
+    right: calc(50% - 20px);
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 700;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+}
+
+[data-theme="dark"] .bn-more-menu {
+    box-shadow: 0 -4px 28px rgba(0,0,0,0.5);
+}
+
+/* Ocultar overlay y drawer en desktop */
+@media (min-width: 641px) {
+    .bn-more-overlay { display: none !important; }
 }
