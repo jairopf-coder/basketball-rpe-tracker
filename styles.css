@@ -74,6 +74,18 @@
     --radius-md: 10px;
     --radius-lg: 16px;
     --transition: 0.18s ease;
+
+    /* ── Team Load Heatmap — zone colors (light) ─────────── */
+    --tl-zone-rest-bg:    #e4e4e7;
+    --tl-zone-rest-text:  #71717a;
+    --tl-zone-low-bg:     #bfdbfe;
+    --tl-zone-low-text:   #1e40af;
+    --tl-zone-medium-bg:  #bbf7d0;
+    --tl-zone-medium-text:#14532d;
+    --tl-zone-high-bg:    #fed7aa;
+    --tl-zone-high-text:  #9a3412;
+    --tl-zone-vhigh-bg:   #fecaca;
+    --tl-zone-vhigh-text: #7f1d1d;
 }
 
 /* ===== DARK MODE ===== */
@@ -104,6 +116,18 @@
     --dark: #f0f0f4;
     --light: #0f0f11;
     --gray:  #88889a;
+
+    /* ── Team Load Heatmap — zone colors (dark) ──────────── */
+    --tl-zone-rest-bg:    #27272a;
+    --tl-zone-rest-text:  #71717a;
+    --tl-zone-low-bg:     #1e3a5f;
+    --tl-zone-low-text:   #93c5fd;
+    --tl-zone-medium-bg:  #14532d;
+    --tl-zone-medium-text:#86efac;
+    --tl-zone-high-bg:    #7c2d12;
+    --tl-zone-high-text:  #fdba74;
+    --tl-zone-vhigh-bg:   #7f1d1d;
+    --tl-zone-vhigh-text: #fca5a5;
 }
 
 /* Dark mode toggle button */
@@ -8631,3 +8655,216 @@ details[open] .ewma-toggle-hint { display: none; }
 @media (min-width: 641px) {
     .bn-more-overlay { display: none !important; }
 }
+
+/* ========== TEAM LOAD HEATMAP ========================================== */
+
+.tl-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem 1rem 0.5rem;
+}
+
+.tl-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tl-nav-btn {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    line-height: 1;
+    width: 2.25rem;
+    height: 2.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition);
+    flex-shrink: 0;
+}
+.tl-nav-btn:hover {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.tl-week-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+    text-align: center;
+}
+
+.tl-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.tl-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.tl-legend-dot {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 2px;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* ── Scroll wrapper ────────────────────────────────────────── */
+.tl-scroll-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.5rem 0.5rem 1.5rem;
+}
+
+/* ── Table ──────────────────────────────────────────────────── */
+.tl-table {
+    border-collapse: separate;
+    border-spacing: 3px;
+    min-width: 640px;
+    width: 100%;
+    font-size: 0.8rem;
+}
+
+.tl-th-player,
+.tl-th-day,
+.tl-th-total {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: center;
+    white-space: nowrap;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-sm);
+}
+.tl-th-player {
+    text-align: left;
+    min-width: 130px;
+}
+.tl-th-date {
+    font-weight: 400;
+    font-size: 0.65rem;
+    display: block;
+    color: var(--text-faint);
+}
+.tl-th-day.tl-today,
+.tl-td-cell.tl-today {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm);
+}
+
+/* ── Cells ───────────────────────────────────────────────── */
+.tl-td-player {
+    padding: 0.5rem 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-surface);
+    border-radius: var(--radius-sm);
+    min-height: 2.4rem;
+    white-space: nowrap;
+}
+.tl-player-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.tl-player-name {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 110px;
+}
+.tl-td-cell {
+    text-align: center;
+    padding: 0.45rem 0.3rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    font-weight: 600;
+    min-width: 52px;
+    transition: filter 0.1s;
+    cursor: default;
+}
+.tl-td-cell:hover {
+    filter: brightness(0.9);
+}
+.tl-zero {
+    opacity: 0.4;
+    font-weight: 400;
+}
+.tl-td-total {
+    text-align: center;
+    padding: 0.45rem 0.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: var(--bg-subtle);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+/* ── Team totals row ─────────────────────────────────────── */
+.tl-team-row {
+    border-top: 2px solid var(--border);
+}
+.tl-team-label {
+    font-weight: 700;
+    color: var(--text-primary);
+    background: var(--bg-subtle) !important;
+}
+.tl-team-cell {
+    font-size: 0.8rem;
+}
+.tl-team-grand {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+.tl-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+.tl-empty-icon {
+    font-size: 2.5rem;
+    opacity: 0.5;
+}
+
+/* ── Row hover ───────────────────────────────────────────── */
+.tl-row:hover .tl-td-player {
+    background: var(--primary-soft);
+}
+
+@media (max-width: 480px) {
+    .tl-week-label { font-size: 0.78rem; }
+    .tl-legend { gap: 0.35rem 0.75rem; font-size: 0.68rem; }
+    .tl-table { font-size: 0.72rem; }
+    .tl-td-cell { min-width: 40px; padding: 0.35rem 0.15rem; }
+    .tl-player-name { max-width: 80px; }
+}
+/* ======================================================================= */
