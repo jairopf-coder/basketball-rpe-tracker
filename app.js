@@ -7,6 +7,7 @@ const NavMenu = {
             label: '🏋️ Carga',
             items: [
                 { view: 'analytics', label: '📈 Análisis A:C' },
+                { view: 'teamload',  label: '🔥 Carga equipo' },
                 { view: 'weekplan',  label: '📅 Planificación' },
                 { view: 'sessions',  label: '📋 Historial' },
             ],
@@ -477,6 +478,9 @@ class RPETracker {
                 break;
             case 'wellness':
                 if (typeof this.renderWellnessDashboard === 'function') this.renderWellnessDashboard();
+                break;
+            case 'teamload':
+                if (typeof this.renderTeamLoad === 'function') this.renderTeamLoad();
                 break;
             case 'weekplan':
                 if (typeof this.renderWeeklyPlanning === 'function') this.renderWeeklyPlanning();
