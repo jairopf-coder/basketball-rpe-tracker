@@ -83,6 +83,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     const typeLabel = {training:'🏀 Entreno', shooting:'🎯 Tiro', gym:'🏋️ Gym', match:'🏟️ Partido', recovery:'💪 Recuperación'};
     const typeColors = {training:'#2196f3', match:'#f44336', recovery:'#4caf50', shooting:'#9c27b0', gym:'#795548'};
 
+    const intensityRPE_slot = {none:0,low:4,medium:6,high:7.5,max:9};
     const buildSlotHTML = (dayKey, slot, s) => {
         const active = !!s.enabled;
         const headerHTML =
@@ -125,6 +126,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
             <input type="text" class="wp-input-focus" placeholder="Foco..."
                 value="${(s.focus||'').replace(/"/g,'&quot;')}"
                 data-wp-day="${dayKey}" data-wp-slot="${slot}" data-wp-field="focus">
+            ${this._renderProjectedACRow((intensityRPE_slot[s.intensity||'none']||0) * (s.duration||0))}
         </div>`;
     };
 
@@ -175,6 +177,13 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     <h2 style="margin:0 0 .25rem">📅 Planificación Semanal</h2>
                     <p style="margin:0;color:var(--text-secondary);font-size:.85rem">
                         Semana del ${this._wpFmtDate(weekStart)}
+                        ${(() => {
+                            const ab = this.getActiveSeasonBlock ? this.getActiveSeasonBlock() : null;
+                            if (!ab) return '';
+                            const t = (this._seasonBlockTypes || []).find(t => t.key === ab.type);
+                            if (!t) return '';
+                            return `&nbsp;<span class="season-active-badge" style="background:${t.color}20;color:${t.color};border:1px solid ${t.color}50">${t.icon} ${t.label}</span>`;
+                        })()}
                     </p>
                 </div>
                 <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
@@ -292,6 +301,86 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     this._drawWpLoadChart(dayKeys, dayLabels, weekStart);
 };
 
+
+// ============================================================
+// PROYECCIÓN A:C — ratio proyectado si se registra carga hoy
+// ============================================================
+
+/**
+ * Calcula el ratio A:C EWMA proyectado si se añade extraLoad
+ * a la carga real de hoy (mismo algoritmo que calculateAcuteChronicRatio).
+ * Devuelve el ratio numérico o null si no hay crónico base.
+ */
+RPETracker.prototype._projectedACRatio = function(playerId, extraLoad) {
+    const MATCH_MULT = RPETracker.MATCH_LOAD_MULTIPLIER;
+    const playerSessions = this.sessions
+        .filter(s => s.playerId === playerId)
+        .map(s => ({
+            date: new Date(s.date.slice(0,10)),
+            load: (s.load || (s.rpe * (s.duration || 60))) * (s.type === 'match' ? MATCH_MULT : 1)
+        }))
+        .sort((a, b) => a.date - b.date);
+
+    if (playerSessions.length === 0) return null;
+
+    const lambdaAcute   = 2 / (7 + 1);
+    const lambdaChronic = 2 / (28 + 1);
+    const seedLoad = playerSessions.reduce((s, x) => s + x.load, 0) / playerSessions.length;
+
+    let ewmaAcute   = seedLoad;
+    let ewmaChronic = seedLoad;
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0,10);
+    const maxDaysBack = 56;
+
+    for (let i = maxDaysBack; i >= 0; i--) {
+        const cur = new Date(now);
+        cur.setDate(cur.getDate() - i);
+        cur.setHours(0,0,0,0);
+        const curStr = cur.toISOString().slice(0,10);
+
+        const sessLoad = playerSessions
+            .filter(s => s.date.toISOString().slice(0,10) === curStr)
+            .reduce((sum, s) => sum + s.load, 0);
+
+        // On today's day, add the projected extra load
+        const dailyLoad = sessLoad + (curStr === todayStr ? extraLoad : 0);
+
+        ewmaAcute   = lambdaAcute   * dailyLoad + (1 - lambdaAcute)   * ewmaAcute;
+        ewmaChronic = lambdaChronic * dailyLoad + (1 - lambdaChronic) * ewmaChronic;
+    }
+
+    return ewmaChronic > 0 ? ewmaAcute / ewmaChronic : null;
+};
+
+/**
+ * Renderiza una fila compacta de badges A:C proyectados por jugadora.
+ * sessionLoad = RPE × duración calculado desde intensidad y duración del slot.
+ */
+RPETracker.prototype._renderProjectedACRow = function(sessionLoad) {
+    if (!this.players.length || sessionLoad <= 0) return '';
+
+    const badges = this.players.map(p => {
+        const ratio = this._projectedACRatio(p.id, sessionLoad);
+        if (ratio === null) return '';
+        const t = this.getPlayerThresholds(p.id);
+        const cls = ratio < t.low   ? 'pac-badge--blue'
+                  : ratio <= t.opt  ? 'pac-badge--green'
+                  : ratio <= t.high ? 'pac-badge--orange'
+                  : 'pac-badge--red';
+        const avatar = typeof PlayerTokens !== 'undefined'
+            ? PlayerTokens.avatar(p, 13, '.42rem')
+            : p.name.charAt(0);
+        return `<span class="pac-badge ${cls}" title="${p.name}: A:C proyectado ${ratio.toFixed(2)}">${avatar} ${ratio.toFixed(2)}</span>`;
+    }).filter(Boolean).join('');
+
+    if (!badges) return '';
+    return `<div class="pac-row">
+        <span class="pac-label">A:C proyectado</span>
+        <div class="pac-badges">${badges}</div>
+    </div>`;
+};
 
 RPETracker.prototype._getWeekRealSessions = function(weekStart) {
     const byDay = {};
@@ -1451,3 +1540,287 @@ RPETracker.prototype._renderInjCorrelationCompact = function() {
 };
 
 RPETracker.prototype._injDrawZoneChart = function() { /* reserved for future canvas chart */ };
+
+// ============================================================
+// MICROCICLO DASHBOARD
+// Vista: microcicloView → #microcicloContent
+// ============================================================
+
+RPETracker.prototype.renderMicrociclo = function() {
+    const container = document.getElementById('microcicloContent');
+    if (!container) return;
+
+    if (!this.weekPlan) this.loadWeekPlan();
+    if (!this.weekPlan || !this.weekPlan.days) this.weekPlan = this._defaultWeekPlan();
+
+    // ── Semana actual (siempre offset=0 en esta vista) ────────
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Lunes
+    weekStart.setHours(0, 0, 0, 0);
+
+    const dayKeys   = ['lun','mar','mie','jue','vie','sab','dom'];
+    const dayLabels = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+    const dayDates  = dayKeys.map((_,i) => {
+        const d = new Date(weekStart);
+        d.setDate(d.getDate() + i);
+        return d;
+    });
+    const dayDateStrs = dayDates.map(d => d.toISOString().slice(0, 10));
+
+    // ── Planificado ───────────────────────────────────────────
+    const intensityRPE = { none: 0, low: 4, medium: 6, high: 7.5, max: 9 };
+    const plan = this.weekPlan.days;
+    const playerCount = Math.max(this.players.length, 1);
+
+    // Planned sessions per day (team level = slots enabled × players)
+    const plannedSessPerDay = dayKeys.map(dk => {
+        const d = plan[dk] || {};
+        let slots = 0;
+        ['morning','afternoon'].forEach(sl => { if (d[sl] && d[sl].enabled) slots++; });
+        return slots;
+    });
+    const plannedUAPerDay = dayKeys.map((dk, i) => {
+        const d = plan[dk] || {};
+        let load = 0;
+        ['morning','afternoon'].forEach(sl => {
+            const s = d[sl];
+            if (s && s.enabled) load += (intensityRPE[s.intensity || 'none'] || 0) * (s.duration || 0);
+        });
+        return Math.round(load * playerCount);
+    });
+
+    const totalPlannedSess = plannedSessPerDay.reduce((a,b) => a + b, 0) * playerCount;
+    const totalPlannedUA   = plannedUAPerDay.reduce((a,b) => a + b, 0);
+
+    // ── Real ─────────────────────────────────────────────────
+    const realSessByDay = dayDateStrs.map(ds =>
+        this.sessions.filter(s => s.date && s.date.slice(0,10) === ds)
+    );
+    const realUAPerDay = realSessByDay.map(sArr =>
+        Math.round(sArr.reduce((sum, s) => sum + (s.load || 0), 0))
+    );
+    const totalRealSess = realSessByDay.reduce((sum, arr) => sum + arr.length, 0);
+    const totalRealUA   = realUAPerDay.reduce((a, b) => a + b, 0);
+
+    const compliance = totalPlannedUA > 0
+        ? Math.round(totalRealUA / totalPlannedUA * 100)
+        : null;
+
+    // ── Semáforo helper ───────────────────────────────────────
+    const trafficLight = (real, planned) => {
+        if (planned === 0 && real === 0) return 'mc-cell-neutral';
+        if (planned === 0 && real > 0)   return 'mc-cell-extra';
+        const pct = real / planned;
+        if (pct >= 0.85 && pct <= 1.15) return 'mc-cell-ok';
+        if (pct >= 0.6  && pct <= 1.4)  return 'mc-cell-warn';
+        return 'mc-cell-bad';
+    };
+
+    // ── Tarjetas resumen ──────────────────────────────────────
+    const compColor = compliance === null ? '' :
+        compliance >= 85 && compliance <= 115 ? 'mc-kpi-ok' :
+        compliance >= 60 && compliance <= 140 ? 'mc-kpi-warn' : 'mc-kpi-bad';
+
+    const kpiCards = `
+    <div class="mc-kpi-row">
+        <div class="mc-kpi-card">
+            <div class="mc-kpi-label">Sesiones</div>
+            <div class="mc-kpi-value">${totalRealSess}<span class="mc-kpi-of">/${totalPlannedSess}</span></div>
+            <div class="mc-kpi-sub">completadas&nbsp;/&nbsp;planificadas</div>
+        </div>
+        <div class="mc-kpi-card">
+            <div class="mc-kpi-label">Carga UA</div>
+            <div class="mc-kpi-value">${totalRealUA}<span class="mc-kpi-of">/${totalPlannedUA}</span></div>
+            <div class="mc-kpi-sub">real&nbsp;/&nbsp;planificada</div>
+        </div>
+        <div class="mc-kpi-card ${compColor}">
+            <div class="mc-kpi-label">Cumplimiento</div>
+            <div class="mc-kpi-value">${compliance !== null ? compliance + '%' : '—'}</div>
+            <div class="mc-kpi-sub">carga real vs planificada</div>
+        </div>
+    </div>`;
+
+    // ── Barra de progreso equipo ──────────────────────────────
+    const barPct = totalPlannedUA > 0
+        ? Math.min(Math.round(totalRealUA / totalPlannedUA * 100), 130)
+        : 0;
+    const barClass = barPct >= 85 && barPct <= 115 ? 'mc-bar-ok' :
+                     barPct >= 60 && barPct <= 140 ? 'mc-bar-warn' : 'mc-bar-bad';
+
+    const progressBar = `
+    <div class="wellness-card mc-bar-card">
+        <div class="mc-bar-header">
+            <span class="wellness-section-title" style="margin:0">⚡ Progreso UA equipo</span>
+            <span class="mc-bar-pct">${barPct}%</span>
+        </div>
+        <div class="mc-bar-track">
+            <div class="mc-bar-fill ${barClass}" style="width:${Math.min(barPct, 100)}%"></div>
+            <div class="mc-bar-target-line" title="100% planificado"></div>
+        </div>
+        <div class="mc-bar-labels">
+            <span>0</span>
+            <span>${Math.round(totalPlannedUA / 2)} UA</span>
+            <span>${totalPlannedUA} UA planificadas</span>
+        </div>
+    </div>`;
+
+    // ── Tabla jugadora × día ──────────────────────────────────
+    // For each player, for each day: real UA vs planned (per-player share of daily plan)
+    const plannedUAPerDayPerPlayer = plannedUAPerDay.map(ua => Math.round(ua / playerCount));
+
+    const tableHead = `
+    <thead>
+        <tr>
+            <th class="mc-th-player">Jugadora</th>
+            ${dayLabels.map((lbl, i) => {
+                const d = dayDates[i];
+                const isToday = d.toISOString().slice(0,10) === new Date().toISOString().slice(0,10);
+                return `<th class="mc-th-day${isToday ? ' mc-th-today' : ''}">${lbl}<br><span class="mc-th-date">${d.getDate()}/${d.getMonth()+1}</span></th>`;
+            }).join('')}
+            <th class="mc-th-total">Total</th>
+        </tr>
+    </thead>`;
+
+    const tableRows = this.players.map(player => {
+        const cells = dayDateStrs.map((ds, i) => {
+            const daySessions = this.sessions.filter(s => s.playerId === player.id && s.date && s.date.slice(0,10) === ds);
+            const realUA  = Math.round(daySessions.reduce((sum, s) => sum + (s.load || 0), 0));
+            const planUA  = plannedUAPerDayPerPlayer[i];
+            const cls     = trafficLight(realUA, planUA);
+            const symbol  = planUA === 0 && realUA === 0 ? '–' :
+                            planUA === 0 ? `${realUA}` :
+                            `${realUA}<span class="mc-plan-of">/${planUA}</span>`;
+            return `<td class="mc-cell ${cls}">${symbol}</td>`;
+        }).join('');
+
+        const playerTotal = dayDateStrs.reduce((sum, ds) => {
+            return sum + Math.round(this.sessions
+                .filter(s => s.playerId === player.id && s.date && s.date.slice(0,10) === ds)
+                .reduce((a, s) => a + (s.load || 0), 0));
+        }, 0);
+        const playerPlannedTotal = plannedUAPerDayPerPlayer.reduce((a,b) => a + b, 0);
+        const totalCls = trafficLight(playerTotal, playerPlannedTotal);
+
+        return `
+        <tr>
+            <td class="mc-td-player">
+                <div style="display:flex;align-items:center;gap:.4rem">
+                    ${PlayerTokens.avatar(player, 20, '.45rem')}
+                    <span class="mc-player-name">${player.name}</span>
+                </div>
+            </td>
+            ${cells}
+            <td class="mc-cell mc-cell-total ${totalCls}">${playerTotal}<span class="mc-plan-of">/${playerPlannedTotal}</span></td>
+        </tr>`;
+    }).join('');
+
+    // Team totals row
+    const teamTotalCells = dayDateStrs.map((ds, i) => {
+        const ua  = realUAPerDay[i];
+        const pua = plannedUAPerDay[i];
+        const cls = trafficLight(ua, pua);
+        const sym = pua === 0 && ua === 0 ? '–' : `${ua}<span class="mc-plan-of">/${pua}</span>`;
+        return `<td class="mc-cell mc-cell-team ${cls}">${sym}</td>`;
+    }).join('');
+    const teamTotalCls = trafficLight(totalRealUA, totalPlannedUA);
+    const teamTotalRow = `
+    <tr class="mc-team-total-row">
+        <td class="mc-td-player"><strong>Equipo</strong></td>
+        ${teamTotalCells}
+        <td class="mc-cell mc-cell-total mc-cell-team ${teamTotalCls}"><strong>${totalRealUA}<span class="mc-plan-of">/${totalPlannedUA}</span></strong></td>
+    </tr>`;
+
+    const table = `
+    <div class="wellness-card" style="overflow-x:auto">
+        <h3 class="wellness-section-title">📋 Jugadora × Día — UA real / planificada</h3>
+        <div style="font-size:.72rem;color:var(--text-secondary);margin-bottom:.6rem;display:flex;gap:1rem;flex-wrap:wrap">
+            <span><span class="mc-legend mc-cell-ok"></span> ±15% del plan</span>
+            <span><span class="mc-legend mc-cell-warn"></span> ±15–40%</span>
+            <span><span class="mc-legend mc-cell-bad"></span> &gt;40% desviación</span>
+            <span><span class="mc-legend mc-cell-neutral"></span> Sin sesión</span>
+        </div>
+        <table class="mc-table">
+            ${tableHead}
+            <tbody>
+                ${tableRows}
+                ${teamTotalRow}
+            </tbody>
+        </table>
+    </div>`;
+
+    // ── Styles ────────────────────────────────────────────────
+    const styles = `
+    <style>
+    /* ── Microciclo Layout ─────────────────────────────── */
+    .mc-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:.75rem}
+    @media(max-width:480px){.mc-kpi-row{grid-template-columns:1fr 1fr;}}
+    @media(max-width:320px){.mc-kpi-row{grid-template-columns:1fr;}}
+
+    .mc-kpi-card{background:var(--card-bg,var(--bg-secondary));border:1px solid var(--border-color);border-radius:.75rem;padding:.85rem .9rem;text-align:center}
+    .mc-kpi-label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:.2rem}
+    .mc-kpi-value{font-size:1.6rem;font-weight:700;color:var(--text-primary);line-height:1.1}
+    .mc-kpi-of{font-size:1rem;font-weight:400;color:var(--text-secondary)}
+    .mc-kpi-sub{font-size:.65rem;color:var(--text-secondary);margin-top:.15rem}
+    .mc-kpi-ok  {border-color:var(--success-color,#4caf50);background:color-mix(in srgb,var(--success-color,#4caf50) 10%,transparent)}
+    .mc-kpi-warn{border-color:var(--warning-color,#ff9800);background:color-mix(in srgb,var(--warning-color,#ff9800) 10%,transparent)}
+    .mc-kpi-bad {border-color:var(--danger-color,#f44336);background:color-mix(in srgb,var(--danger-color,#f44336) 10%,transparent)}
+
+    /* ── Progress bar ──────────────────────────────────── */
+    .mc-bar-card{margin-bottom:.75rem}
+    .mc-bar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem}
+    .mc-bar-pct{font-size:1.1rem;font-weight:700;color:var(--text-primary)}
+    .mc-bar-track{position:relative;height:.75rem;background:var(--border-color);border-radius:.4rem;overflow:visible}
+    .mc-bar-fill{height:100%;border-radius:.4rem;transition:width .5s ease}
+    .mc-bar-ok  {background:var(--success-color,#4caf50)}
+    .mc-bar-warn{background:var(--warning-color,#ff9800)}
+    .mc-bar-bad {background:var(--danger-color,#f44336)}
+    .mc-bar-target-line{position:absolute;top:-4px;bottom:-4px;left:100%;transform:translateX(-1px);width:2px;background:var(--text-secondary);opacity:.4;border-radius:1px}
+    .mc-bar-labels{display:flex;justify-content:space-between;font-size:.65rem;color:var(--text-secondary);margin-top:.25rem}
+
+    /* ── Table ─────────────────────────────────────────── */
+    .mc-table{width:100%;border-collapse:collapse;font-size:.78rem;min-width:560px}
+    .mc-th-player,.mc-th-day,.mc-th-total{padding:.45rem .4rem;text-align:center;font-weight:600;color:var(--text-secondary);border-bottom:2px solid var(--border-color);font-size:.7rem;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+    .mc-th-player{text-align:left;min-width:110px}
+    .mc-th-today{color:var(--accent-color,#2196f3);border-bottom-color:var(--accent-color,#2196f3)}
+    .mc-th-date{font-weight:400;font-size:.65rem}
+    .mc-td-player{padding:.4rem .4rem;border-bottom:1px solid var(--border-color);white-space:nowrap}
+    .mc-player-name{font-size:.78rem;font-weight:500;color:var(--text-primary)}
+    .mc-cell{text-align:center;padding:.4rem .3rem;border-bottom:1px solid var(--border-color);font-size:.75rem;font-weight:600;border-radius:.25rem;color:var(--text-primary)}
+    .mc-plan-of{font-weight:400;font-size:.68rem;color:var(--text-secondary)}
+    .mc-cell-ok     {background:color-mix(in srgb,var(--success-color,#4caf50) 18%,transparent)}
+    .mc-cell-warn   {background:color-mix(in srgb,var(--warning-color,#ff9800) 18%,transparent)}
+    .mc-cell-bad    {background:color-mix(in srgb,var(--danger-color,#f44336) 18%,transparent)}
+    .mc-cell-neutral{color:var(--text-secondary)}
+    .mc-cell-extra  {background:color-mix(in srgb,var(--accent-color,#2196f3) 15%,transparent)}
+    .mc-cell-total  {font-weight:700}
+    .mc-cell-team   {opacity:.85}
+    .mc-team-total-row{background:color-mix(in srgb,var(--border-color) 30%,transparent)}
+    .mc-team-total-row td{border-top:2px solid var(--border-color)}
+
+    /* ── Legend swatches ───────────────────────────────── */
+    .mc-legend{display:inline-block;width:12px;height:12px;border-radius:.2rem;vertical-align:middle;margin-right:.2rem}
+    .mc-legend.mc-cell-ok     {background:color-mix(in srgb,var(--success-color,#4caf50) 40%,transparent);border:1px solid var(--success-color,#4caf50)}
+    .mc-legend.mc-cell-warn   {background:color-mix(in srgb,var(--warning-color,#ff9800) 40%,transparent);border:1px solid var(--warning-color,#ff9800)}
+    .mc-legend.mc-cell-bad    {background:color-mix(in srgb,var(--danger-color,#f44336) 40%,transparent);border:1px solid var(--danger-color,#f44336)}
+    .mc-legend.mc-cell-neutral{background:var(--border-color);border:1px solid var(--text-secondary)}
+    </style>`;
+
+    const weekLabel = (() => {
+        const end = new Date(weekStart); end.setDate(end.getDate() + 6);
+        const fmt = d => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        return `${fmt(weekStart)} – ${fmt(end)}`;
+    })();
+
+    container.innerHTML = `
+        ${styles}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.4rem">
+            <h2 style="margin:0;font-size:1.1rem;font-weight:700;color:var(--text-primary)">📆 Dashboard Microciclo</h2>
+            <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+                <span style="font-size:.78rem;color:var(--text-secondary)">${weekLabel}</span>
+                <button class="btn-secondary" style="font-size:.8rem;padding:.4rem .85rem" onclick="window.rpeTracker?.generateTeamWeeklyReport()">📊 Informe de equipo</button>
+            </div>
+        </div>
+        ${kpiCards}
+        ${progressBar}
+        ${table}`;
+};

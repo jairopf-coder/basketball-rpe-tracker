@@ -288,3 +288,32 @@ FirebaseSync.prototype.onClinicalNotesChange = function(callback) {
         callback(notes);
     });
 };
+
+FirebaseSync.prototype.saveSeasonBlocks = async function(blocks) {
+    try {
+        const obj = {};
+        (blocks || []).forEach(b => { obj[b.id] = b; });
+        await this.db.ref('seasonBlocks').set(obj);
+        localStorage.setItem('rpe_seasonBlocks', JSON.stringify(blocks || []));
+    } catch (e) {
+        console.error('Error saving seasonBlocks to Firebase:', e);
+        localStorage.setItem('rpe_seasonBlocks', JSON.stringify(blocks || []));
+    }
+};
+
+FirebaseSync.prototype.loadSeasonBlocks = function(callback) {
+    this.db.ref('seasonBlocks').once('value', snapshot => {
+        const data = snapshot.val();
+        const blocks = data ? Object.values(data) : [];
+        localStorage.setItem('rpe_seasonBlocks', JSON.stringify(blocks));
+        if (callback) callback(blocks);
+    });
+};
+
+FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
+    this.db.ref('seasonBlocks').on('value', snapshot => {
+        const data = snapshot.val();
+        const blocks = data ? Object.values(data) : [];
+        callback(blocks);
+    });
+};

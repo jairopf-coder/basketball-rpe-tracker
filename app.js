@@ -6,12 +6,13 @@ const NavMenu = {
         carga: {
             label: '🏋️ Carga',
             items: [
+                { view: 'microciclo', label: '📆 Microciclo' },
                 { view: 'analytics', label: '📈 Análisis A:C' },
                 { view: 'teamload',  label: '🔥 Carga equipo' },
                 { view: 'weekplan',  label: '📅 Planificación' },
                 { view: 'sessions',  label: '📋 Historial' },
             ],
-            default: 'analytics'
+            default: 'microciclo'
         },
         salud: {
             label: '❤️ Salud',
@@ -266,6 +267,11 @@ class RPETracker {
             this.loadWeekPlan();
         }
 
+        // Cargar bloques de temporada
+        if (typeof this.loadSeasonBlocks === 'function') {
+            this.loadSeasonBlocks();
+        }
+
         // Register service worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {
@@ -484,6 +490,12 @@ class RPETracker {
                 break;
             case 'weekplan':
                 if (typeof this.renderWeeklyPlanning === 'function') this.renderWeeklyPlanning();
+                break;
+            case 'seasonblocks':
+                if (typeof this.renderSeasonBlocksManager === 'function') this.renderSeasonBlocksManager();
+                break;
+            case 'microciclo':
+                if (typeof this.renderMicrociclo === 'function') this.renderMicrociclo();
                 break;
             case 'rehab':
                 if (typeof this.renderRehabLoad === 'function') this.renderRehabLoad();
@@ -3152,6 +3164,82 @@ class RPETracker {
 
     // ========== FEATURE 1: EVOLUTION CHARTS ==========
     
+    // ========== FOSTER MONOTONY & STRAIN ==========
+
+    /**
+     * Calcula monotonía y strain de Foster para los últimos 7 días.
+     * monotonía = media7d / SD7d  (SD poblacional)
+     * strain    = carga_total_7d × monotonía
+     * Requiere al menos 2 días con carga > 0 para SD significativa.
+     */
+    _calcFosterMetrics(playerId) {
+        const MATCH_MULT = RPETracker.MATCH_LOAD_MULTIPLIER;
+        const now = new Date();
+        const dailyLoads = [];
+        for (let i = 6; i >= 0; i--) {
+            const dayStart = new Date(now); dayStart.setDate(dayStart.getDate() - i); dayStart.setHours(0,0,0,0);
+            const dayEnd   = new Date(dayStart); dayEnd.setHours(23,59,59,999);
+            const load = this.sessions
+                .filter(s => s.playerId === playerId)
+                .filter(s => { const sd = new Date(s.date); return sd >= dayStart && sd <= dayEnd; })
+                .reduce((sum, s) => sum + (s.load || (s.rpe * (s.duration || 60))) * (s.type === 'match' ? MATCH_MULT : 1), 0);
+            dailyLoads.push(load);
+        }
+        const total7d = dailyLoads.reduce((a, b) => a + b, 0);
+        const mean7d  = total7d / 7;
+        const variance = dailyLoads.reduce((acc, v) => acc + Math.pow(v - mean7d, 2), 0) / 7;
+        const sd7d    = Math.sqrt(variance);
+        const monotony = sd7d > 0 ? mean7d / sd7d : null;
+        const strain   = monotony !== null ? total7d * monotony : null;
+        return { dailyLoads, total7d: Math.round(total7d), mean7d: Math.round(mean7d), sd7d: Math.round(sd7d), monotony, strain };
+    }
+
+    /**
+     * Renderiza el panel Foster (monotonía + strain) para una jugadora.
+     * Semáforo: monotonía > 2 → alerta; strain > 6000 → alerta.
+     */
+    _renderFosterBlock(player) {
+        const m = this._calcFosterMetrics(player.id);
+        if (m.total7d === 0) return `<div class="foster-block foster-block--empty">Sin carga en los últimos 7 días</div>`;
+
+        const monoVal  = m.monotony !== null ? m.monotony.toFixed(2) : '—';
+        const strainVal = m.strain !== null ? Math.round(m.strain).toLocaleString('es-ES') : '—';
+
+        // Semáforo monotonía
+        const monoCls = m.monotony === null ? 'foster-pill--neutral'
+            : m.monotony > 2   ? 'foster-pill--danger'
+            : m.monotony > 1.5 ? 'foster-pill--warning'
+            : 'foster-pill--ok';
+        const monoIcon = m.monotony === null ? '—' : m.monotony > 2 ? '🔴' : m.monotony > 1.5 ? '🟠' : '🟢';
+
+        // Semáforo strain
+        const strainCls = m.strain === null ? 'foster-pill--neutral'
+            : m.strain > 6000 ? 'foster-pill--danger'
+            : m.strain > 4500 ? 'foster-pill--warning'
+            : 'foster-pill--ok';
+        const strainIcon = m.strain === null ? '—' : m.strain > 6000 ? '🔴' : m.strain > 4500 ? '🟠' : '🟢';
+
+        return `<div class="foster-block">
+            <div class="foster-row">
+                <div class="foster-metric">
+                    <span class="foster-label">Monotonía</span>
+                    <span class="foster-pill ${monoCls}">${monoIcon} ${monoVal}</span>
+                    <span class="foster-hint">umbral &gt;2</span>
+                </div>
+                <div class="foster-metric">
+                    <span class="foster-label">Strain</span>
+                    <span class="foster-pill ${strainCls}">${strainIcon} ${strainVal} UA</span>
+                    <span class="foster-hint">umbral &gt;6000</span>
+                </div>
+                <div class="foster-metric foster-metric--load">
+                    <span class="foster-label">Carga 7d</span>
+                    <span class="foster-value">${m.total7d.toLocaleString('es-ES')} UA</span>
+                    <span class="foster-hint">media ${m.mean7d} · SD ${m.sd7d}</span>
+                </div>
+            </div>
+        </div>`;
+    }
+
     renderEvolutionCharts() {
         const container = document.getElementById('evolutionCharts');
         if (!container) return;
@@ -3193,6 +3281,19 @@ class RPETracker {
                         </div>
                     </div>
                     <canvas id="chart-${p.id}" class="chart-canvas"></canvas>
+                    ${this._renderFosterBlock(p)}
+                </div>
+            `).join('');
+
+        // Build season chart section for each selected player
+        const seasonChartsHTML = this.players
+            .filter(p => selected.includes(p.id))
+            .map(p => `
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4>${p.name}${p.number ? ` #${p.number}` : ''} — Temporada</h4>
+                    </div>
+                    <canvas id="season-chart-${p.id}" class="chart-canvas"></canvas>
                 </div>
             `).join('');
 
@@ -3202,11 +3303,20 @@ class RPETracker {
                 <div class="chart-chips-wrap">${chipsHTML}</div>
             </div>
             <div class="charts-grid">${chartsHTML}</div>
+            <div class="evolution-section-header" style="margin-top:1.5rem">
+                <h3>📅 Temporada — UA Semanal Acumulada</h3>
+                <p style="margin:0;font-size:.8rem;color:var(--text-secondary)">
+                    <span style="color:#e53935">●</span> Lesión &nbsp;
+                    <span style="color:#fb8c00">●</span> Partido
+                </p>
+            </div>
+            <div class="charts-grid" id="seasonChartsGrid">${seasonChartsHTML}</div>
         `;
 
         setTimeout(() => {
             this.players.filter(p => selected.includes(p.id)).forEach(p => {
                 this.renderPlayerEvolutionChart(p.id, this._chartPeriods?.[p.id] || 30);
+                this.renderPlayerSeasonChart(p.id);
             });
         }, 100);
     }
@@ -3444,6 +3554,145 @@ class RPETracker {
                         grid: { drawOnChartArea: false },
                         ticks: { color: textColor, font: { size: 10, family: 'system-ui, sans-serif' } },
                         title: { display: true, text: 'Carga', color: textColor, font: { size: 10 } }
+                    }
+                }
+            }
+        });
+
+        canvas._chartInstance = instance;
+    }
+
+    // ========== SEASON CHART — UA semanal acumulada + lesiones + partidos ==========
+
+    renderPlayerSeasonChart(playerId) {
+        const canvasId = `season-chart-${playerId}`;
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        if (canvas._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
+
+        const MATCH_MULT = RPETracker.MATCH_LOAD_MULTIPLIER;
+        const playerSessions = this.sessions
+            .filter(s => s.playerId === playerId)
+            .map(s => ({
+                ...s,
+                date: s.date.slice(0, 10),
+                load: (s.load || (s.rpe * (s.duration || 60))) * (s.type === 'match' ? MATCH_MULT : 1)
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        if (playerSessions.length === 0) return;
+
+        // Bucket by ISO week string YYYY-Www
+        const toISOWeek = (dateStr) => {
+            const d = new Date(dateStr + 'T00:00:00');
+            const day = d.getDay() || 7;
+            d.setDate(d.getDate() + 4 - day);
+            const yearStart = new Date(d.getFullYear(), 0, 1);
+            const wk = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return `${d.getFullYear()}-W${String(wk).padStart(2, '0')}`;
+        };
+
+        const weekMap = {};
+        const weekMatches = {};
+        playerSessions.forEach(s => {
+            const w = toISOWeek(s.date);
+            weekMap[w] = (weekMap[w] || 0) + s.load;
+            if (s.type === 'match') weekMatches[w] = true;
+        });
+
+        const weeks = Object.keys(weekMap).sort();
+        const loads = weeks.map(w => Math.round(weekMap[w]));
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const textColor = isDark ? '#ccc' : '#555';
+        const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+
+        // Injury markers as vertical lines
+        const playerInjuries = (this.injuries || []).filter(i => i.playerId === playerId && i.startDate);
+        const injuryWeeks = playerInjuries.map(i => toISOWeek(i.startDate.slice(0, 10)));
+
+        const injuryLinePlugin = {
+            id: 'injuryLines',
+            afterDraw(chart) {
+                const { ctx, chartArea: ca, scales: { x } } = chart;
+                if (!ca) return;
+                ctx.save();
+                weeks.forEach((w, i) => {
+                    if (injuryWeeks.includes(w)) {
+                        const xPos = x.getPixelForValue(i);
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(229,57,53,0.85)';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([4, 3]);
+                        ctx.moveTo(xPos, ca.top);
+                        ctx.lineTo(xPos, ca.bottom);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                });
+                ctx.restore();
+            }
+        };
+
+        // Match point colors
+        const pointColors = weeks.map(w => weekMatches[w] ? '#fb8c00' : (isDark ? 'rgba(100,160,255,0.8)' : 'rgba(33,150,243,0.8)'));
+        const pointRadius = weeks.map(w => weekMatches[w] ? 6 : 3);
+
+        const instance = new Chart(canvas, {
+            type: 'bar',
+            plugins: [injuryLinePlugin],
+            data: {
+                labels: weeks.map(w => w.replace('-W', ' S')),
+                datasets: [{
+                    label: 'UA semanal',
+                    data: loads,
+                    backgroundColor: isDark ? 'rgba(100,160,255,0.55)' : 'rgba(33,150,243,0.45)',
+                    borderColor:     isDark ? 'rgba(100,160,255,0.85)' : 'rgba(33,150,243,0.85)',
+                    borderWidth: 1,
+                    borderRadius: 3,
+                    pointBackgroundColor: pointColors,
+                    pointRadius: pointRadius
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 500 },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: isDark ? 'rgba(30,30,30,0.92)' : 'rgba(255,255,255,0.96)',
+                        titleColor: isDark ? '#fff' : '#111',
+                        bodyColor: isDark ? '#ccc' : '#444',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                        borderWidth: 1,
+                        callbacks: {
+                            afterLabel: (item) => {
+                                const w = weeks[item.dataIndex];
+                                const parts = [];
+                                if (weekMatches[w]) parts.push('🏟️ Partido esta semana');
+                                if (injuryWeeks.includes(w)) parts.push('🔴 Lesión registrada');
+                                return parts;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: textColor,
+                            font: { size: 10 },
+                            maxRotation: 45,
+                            autoSkip: true,
+                            maxTicksLimit: 20
+                        },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        min: 0,
+                        ticks: { color: textColor, font: { size: 10 } },
+                        grid: { color: gridColor },
+                        title: { display: true, text: 'UA', color: textColor, font: { size: 10 } }
                     }
                 }
             }

@@ -87,9 +87,14 @@ RPETracker.prototype.renderTeamStatus = function() {
                 <h2 class="ts-title">Estado del equipo</h2>
                 <div class="ts-subtitle">Disponibilidad para el próximo partido</div>
             </div>
-            <button class="btn-secondary" onclick="window.rpeTracker?.generateTeamStatusPDF()" style="font-size:0.85rem;padding:0.5rem 1rem;">
-                📄 Informe PDF
-            </button>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                <button class="btn-secondary" onclick="window.rpeTracker?.generateTeamWeeklyReport()" style="font-size:0.85rem;padding:0.5rem 1rem;">
+                    📊 Informe de equipo
+                </button>
+                <button class="btn-secondary" onclick="window.rpeTracker?.generateTeamStatusPDF()" style="font-size:0.85rem;padding:0.5rem 1rem;">
+                    📄 Informe PDF
+                </button>
+            </div>
         </div>
 
         <div class="ts-summary">
@@ -147,10 +152,10 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
             <span style="font-weight:700;color:${col};min-width:24px;text-align:right">${val.toFixed(1)}</span>
         </div>`;
     };
-    const ratioBar = (r, ratioStr) => {
+    const ratioBar = (r, ratioStr, playerId) => {
         if (isNaN(r) || ratioStr === 'N/A') return '<span style="color:var(--text-faint)">—</span>';
         const pct = Math.min(r / 2 * 100, 100).toFixed(0);
-        const _tBar = this.getPlayerThresholds(player.id); const col = r > _tBar.high ? '#f44336' : r > _tBar.opt ? '#ff9800' : r < _tBar.low ? '#2196f3' : '#4caf50';
+        const _tBar = this.getPlayerThresholds(playerId); const col = r > _tBar.high ? '#f44336' : r > _tBar.opt ? '#ff9800' : r < _tBar.low ? '#2196f3' : '#4caf50';
         return `<div style="display:flex;align-items:center;gap:6px">
             <div style="flex:1;height:6px;border-radius:3px;background:#eee;overflow:hidden;position:relative">
                 <div style="width:${pct}%;height:100%;background:${col};border-radius:3px"></div>
@@ -201,7 +206,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
                     </div>
                 </div>
             </td>
-            <td style="padding:10px 14px;${bd};min-width:120px">${ratioBar(r, ratio.ratio)}</td>
+            <td style="padding:10px 14px;${bd};min-width:120px">${ratioBar(r, ratio.ratio, player.id)}</td>
             <td style="padding:10px 14px;${bd};min-width:120px">${wBar(ws)}</td>
             <td style="padding:10px 14px;${bd};text-align:center;font-weight:600;color:var(--text-secondary)">${avgRPE}</td>
             <td style="padding:10px 14px;${bd};text-align:center;font-weight:600;color:var(--text-secondary)">${weekLoad ? weekLoad.toLocaleString('es-ES') : '—'}</td>
