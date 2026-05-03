@@ -100,6 +100,13 @@ function asymmetry(left, right) {
 /** Color según asimetría */
 function asymColor(pct) {
     const v = parseFloat(pct);
+    if (v < 10)  return 'var(--color-success, #4caf50)';
+    if (v < 15)  return 'var(--color-warning, #ff9800)';
+    return 'var(--color-danger, #f44336)';
+}
+// Hex equivalents for Chart.js (canvas API doesn't support CSS vars)
+function asymColorHex(pct) {
+    const v = parseFloat(pct);
     if (v < 10)  return '#4caf50';
     if (v < 15)  return '#ff9800';
     return '#f44336';
@@ -169,7 +176,7 @@ RPETracker.prototype.renderGymView = function() {
 
     const cats = { lower: 'Miembro Inferior', upper: 'Miembro Superior', core: 'Core', compound: 'Compuestos / Olímpicos' };
 
-    // Sub-router: gymSubView puede ser 'list' | 'player' | 'exercise'
+    // Sub-router: gymSubView puede ser 'list' | 'player' | 'exercise' | 'team'
     const sub = this._gymSub || 'list';
 
     if (sub === 'player' && this._gymPlayerId) {
@@ -180,6 +187,10 @@ RPETracker.prototype.renderGymView = function() {
         this._renderGymExercise(el);
         return;
     }
+    if (sub === 'team') {
+        this._renderGymTeamView(el);
+        return;
+    }
 
     // ── Vista principal: lista de jugadoras ──
     const playerCards = this.players.length === 0
@@ -188,12 +199,26 @@ RPETracker.prototype.renderGymView = function() {
             const sessions = (this.gymSessions || []).filter(s => s.playerId === p.id);
             const last = sessions.sort((a,b) => b.date.localeCompare(a.date))[0];
             const color = PlayerTokens.get(p);
+            // Volume summary: last 4 weeks
+            const fourWeeksAgo = new Date(); fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+            const recentExec = sessions.filter(s => s.status === 'executed' && new Date(s.date) >= fourWeeksAgo);
+            const sessCount = recentExec.length;
+            let tonnage = 0;
+            recentExec.forEach(gs => (gs.exercises||[]).forEach(e => (e.actual||e.sets||[]).forEach(s => {
+                if (s.weight && s.reps) tonnage += s.weight * s.reps;
+            })));
+            const volLine = sessCount > 0
+                ? `${sessCount} sesión${sessCount!==1?'es':''} (4 sem) · ${tonnage>0 ? Math.round(tonnage/1000)+'t tonelaje' : 'sin datos de carga'}`
+                : 'Sin sesiones ejecutadas';
+            const pendingCount = sessions.filter(s => s.status === 'planned' || !s.status).length;
+            const pendingBadge = pendingCount > 0 ? `<span class="gym-pending-badge">${pendingCount} pendiente${pendingCount!==1?'s':''}</span>` : '';
             return `
             <div class="str-player-card" onclick="window.rpeTracker._openGymPlayer('${p.id}')">
                 <div class="str-player-avatar" style="background:${color}">${p.name.charAt(0).toUpperCase()}</div>
                 <div class="str-player-info">
-                    <div class="str-player-name">${p.name}${p.number ? ` <span class="str-num">#${p.number}</span>` : ''}</div>
+                    <div class="str-player-name">${p.name}${p.number ? ` <span class="str-num">#${p.number}</span>` : ''} ${pendingBadge}</div>
                     <div class="str-player-meta">${last ? `Última sesión: ${last.date}` : 'Sin sesiones de gimnasio'}</div>
+                    <div class="str-player-vol">${volLine}</div>
                 </div>
                 <div class="str-player-arrow">›</div>
             </div>`;
@@ -204,6 +229,8 @@ RPETracker.prototype.renderGymView = function() {
             <div class="str-header">
                 <h2>🏋️ Gimnasio</h2>
                 <div class="str-header-actions">
+                    <button class="btn-secondary" onclick="window.rpeTracker._gymSub='team';window.rpeTracker.renderGymView()">📊 Comparativa</button>
+                    <button class="btn-secondary" onclick="window.rpeTracker._openGymTemplates()">📋 Plantillas</button>
                     <button class="btn-secondary" onclick="window.rpeTracker._openExerciseLibrary()">📚 Biblioteca</button>
                     <button class="btn-primary" onclick="window.rpeTracker._openNewGymSession()">+ Nueva Sesión</button>
                 </div>
@@ -225,11 +252,18 @@ RPETracker.prototype._renderGymPlayer = function(el) {
     const player = this.players.find(p => p.id === this._gymPlayerId);
     if (!player) { this._gymSub = 'list'; this.renderGymView(); return; }
 
-    const sessions = (this.gymSessions || [])
+    if (this._gymFilter === undefined) this._gymFilter = 'all';
+
+    const allSessions = (this.gymSessions || [])
         .filter(s => s.playerId === player.id)
         .sort((a, b) => b.date.localeCompare(a.date));
 
+    const sessions = this._gymFilter === 'pending'
+        ? allSessions.filter(s => s.status === 'planned' || !s.status)
+        : allSessions;
+
     const color = PlayerTokens.get(player);
+    const pendingCount = allSessions.filter(s => s.status === 'planned' || !s.status).length;
 
     // Sugerencias
     const suggestions = this._buildGymSuggestions(player.id);
@@ -248,11 +282,24 @@ RPETracker.prototype._renderGymPlayer = function(el) {
             </div>
         </div>`;
 
+    const progressHTML = this._buildGymProgressHTML(player.id, color);
+
+    const filterBar = `
+        <div class="gym-filter-bar">
+            <button class="gym-filter-btn ${this._gymFilter==='all'?'gym-filter-btn--active':''}"
+                onclick="window.rpeTracker._gymFilter='all';window.rpeTracker._renderGymPlayer(document.getElementById('gymView'))">
+                Todas (${allSessions.length})
+            </button>
+            <button class="gym-filter-btn ${this._gymFilter==='pending'?'gym-filter-btn--active':''}"
+                onclick="window.rpeTracker._gymFilter='pending';window.rpeTracker._renderGymPlayer(document.getElementById('gymView'))">
+                Pendientes${pendingCount>0?' ('+pendingCount+')':''}
+            </button>
+        </div>`;
+
     const sessHTML = sessions.length === 0
-        ? '<p class="str-empty">Sin sesiones registradas</p>'
+        ? `<p class="str-empty">${this._gymFilter==='pending'?'Sin sesiones pendientes':'Sin sesiones registradas'}</p>`
         : sessions.map(gs => {
             const isPlan     = gs.status === 'planned' || !gs.status;
-            const isExecuted = gs.status === 'executed';
             const exCount    = (gs.exercises || []).length;
             const statusBadge = isPlan
                 ? `<span class="gym-status-badge gym-status-badge--plan">📋 Plan</span>`
@@ -290,7 +337,7 @@ RPETracker.prototype._renderGymPlayer = function(el) {
         <div class="str-container">
             <div class="str-header">
                 <button class="str-back-btn"
-                    onclick="window.rpeTracker._gymSub='list';window.rpeTracker.renderGymView()">← Volver</button>
+                    onclick="window.rpeTracker._gymSub='list';window.rpeTracker._gymFilter='all';window.rpeTracker.renderGymView()">← Volver</button>
                 <div class="str-player-pill" style="background:${color}20;border-color:${color}40">
                     <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${player.name.charAt(0)}</div>
                     <span style="color:${color};font-weight:600">${player.name}</span>
@@ -298,11 +345,113 @@ RPETracker.prototype._renderGymPlayer = function(el) {
                 <button class="btn-primary" onclick="window.rpeTracker._openNewGymSession('${player.id}')">+ Nueva sesión</button>
             </div>
             ${suggHTML}
+            ${progressHTML}
             <div class="str-section">
                 <h3 class="str-section-title">📋 Historial de Gimnasio</h3>
+                ${filterBar}
                 <div class="str-session-list">${sessHTML}</div>
             </div>
         </div>`;
+
+    this._drawGymProgressChart(player.id, color);
+};
+
+// ─── Gráfico progresión 1RM por ejercicio ───
+RPETracker.prototype._buildGymProgressHTML = function(playerId, color) {
+    const executed = (this.gymSessions || [])
+        .filter(s => s.playerId === playerId && s.status === 'executed')
+        .sort((a, b) => a.date.localeCompare(b.date));
+    if (executed.length < 2) return '';
+
+    // Build per-exercise 1RM history
+    const byEx = {};
+    executed.forEach(gs => {
+        (gs.exercises || []).forEach(e => {
+            const sets = e.actual || e.sets || [];
+            const rm = Math.max(0, ...sets.map(s => s.weight && s.reps ? epley1RM(s.weight, s.reps) : 0));
+            if (rm <= 0) return;
+            if (!byEx[e.exerciseId]) byEx[e.exerciseId] = [];
+            byEx[e.exerciseId].push({ date: gs.date, rm });
+        });
+    });
+
+    const eligible = Object.entries(byEx).filter(([, records]) => records.length >= 2);
+    if (eligible.length === 0) return '';
+
+    if (!this._gymProgressTab || !byEx[this._gymProgressTab] || byEx[this._gymProgressTab].length < 2) {
+        this._gymProgressTab = eligible[0][0];
+    }
+
+    const tabsHTML = eligible.map(([exId]) => {
+        const ex = (this.exerciseLibrary || []).find(e => e.id === exId);
+        return `<button class="test-tab-btn ${exId === this._gymProgressTab ? 'active' : ''}"
+            onclick="window.rpeTracker._gymProgressTab='${exId}';window.rpeTracker._renderGymPlayer(document.getElementById('gymView'))">
+            ${ex ? ex.name : exId}
+        </button>`;
+    }).join('');
+
+    return `<div class="str-section">
+        <h3 class="str-section-title">📈 Progresión de fuerza — 1RM estimado</h3>
+        <div class="test-tabs">${tabsHTML}</div>
+        <div style="position:relative;margin-top:0.5rem"><canvas id="gymProgressChart" height="140" style="width:100%"></canvas></div>
+    </div>`;
+};
+
+RPETracker.prototype._drawGymProgressChart = function(playerId, color) {
+    const executed = (this.gymSessions || [])
+        .filter(s => s.playerId === playerId && s.status === 'executed')
+        .sort((a, b) => a.date.localeCompare(b.date));
+    if (!this._gymProgressTab || executed.length < 2) return;
+
+    const records = [];
+    executed.forEach(gs => {
+        (gs.exercises || []).forEach(e => {
+            if (e.exerciseId !== this._gymProgressTab) return;
+            const sets = e.actual || e.sets || [];
+            const rm = Math.max(0, ...sets.map(s => s.weight && s.reps ? epley1RM(s.weight, s.reps) : 0));
+            if (rm > 0) records.push({ date: gs.date, rm: parseFloat(rm.toFixed(1)) });
+        });
+    });
+    if (records.length < 2) return;
+
+    requestAnimationFrame(() => {
+        const canvas = document.getElementById('gymProgressChart');
+        if (!canvas) return;
+        if (canvas._chartInstance) canvas._chartInstance.destroy();
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const gridCol = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+        const textCol = isDark ? '#aaa' : '#666';
+        canvas._chartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: records.map(r => r.date),
+                datasets: [{
+                    label: '1RM estimado (kg)',
+                    data: records.map(r => r.rm),
+                    borderColor: color,
+                    backgroundColor: color + '22',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 5,
+                    pointBackgroundColor: color,
+                    spanGaps: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: { duration: 400 },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => `${ctx.raw} kg 1RM est.` } }
+                },
+                scales: {
+                    x: { ticks: { color: textCol, font: { size: 10 } }, grid: { color: gridCol } },
+                    y: { ticks: { color: textCol, font: { size: 10 } }, grid: { color: gridCol },
+                         title: { display: true, text: 'kg', color: textCol, font: { size: 10 } } }
+                }
+            }
+        });
+    });
 };
 
 // ─── Sugerencias ───
@@ -398,7 +547,7 @@ RPETracker.prototype._openGymSessionDetail = function(sessionId) {
                 const ps = planned[i] || {};
                 const deltaKg  = s.weight && ps.weight ? s.weight - ps.weight : null;
                 const deltaRpe = s.rpe    && ps.rpe    ? s.rpe    - ps.rpe    : null;
-                const deltaCol = d => d > 0 ? '#4caf50' : d < 0 ? '#f44336' : '#999';
+                const deltaCol = d => d > 0 ? 'var(--color-success,#4caf50)' : d < 0 ? 'var(--color-danger,#f44336)' : 'var(--text-faint,#999)';
                 return `<div class="pvr-set pvr-set--actual">
                     <span class="pvr-set-num">${i+1}</span>
                     <span>${s.reps||'—'}×${s.weight||'—'}kg</span>
@@ -430,6 +579,24 @@ RPETracker.prototype._openGymSessionDetail = function(sessionId) {
                Registrar ejecución
            </button>` : '';
 
+    // Tonnage summary for executed sessions
+    const tonnageHTML = !isPlan ? (() => {
+        let planned = 0, real = 0;
+        (gs.exercises||[]).forEach(e => {
+            (e.sets||[]).forEach(s => { if (s.weight && s.reps) planned += s.weight * s.reps; });
+            (e.actual||[]).forEach(s => { if (s.weight && s.reps) real += s.weight * s.reps; });
+        });
+        if (planned === 0) return '';
+        const pct = Math.round(real / planned * 100);
+        const col = pct >= 95 ? 'var(--success,#22a861)' : pct >= 80 ? 'var(--warning,#f5a623)' : 'var(--danger,#e53935)';
+        return `<div class="pvr-tonnage-bar">
+            <span class="pvr-ton-label">Tonelaje</span>
+            <span class="pvr-ton-val">Plan: <strong>${(planned/1000).toFixed(1)}t</strong></span>
+            <span class="pvr-ton-val">Real: <strong>${(real/1000).toFixed(1)}t</strong></span>
+            <span class="pvr-ton-pct" style="color:${col}">${pct}%</span>
+        </div>`;
+    })() : '';
+
     modal.innerHTML = `
         <div class="modal-content modal-content--wide">
             <div class="modal-header">
@@ -440,6 +607,7 @@ RPETracker.prototype._openGymSessionDetail = function(sessionId) {
                     onclick="document.getElementById('gymDetailModal').classList.remove('active')">✕</button>
             </div>
             <div class="modal-body" style="padding:1.25rem;max-height:70vh;overflow-y:auto">
+                ${tonnageHTML}
                 ${exRows}
             </div>
             ${execBtn ? `<div style="padding:1rem 1.25rem;border-top:1px solid var(--border);text-align:right">${execBtn}</div>` : ''}
@@ -560,6 +728,20 @@ RPETracker.prototype._renderExecModal = function(modal) {
 
     const isLast = idx === sessions.length - 1;
 
+    // Tonnage summary: planned vs draft
+    const tonSummary = (() => {
+        let planned = 0, real = 0;
+        (gs.exercises || []).forEach(e => {
+            (e.sets || []).forEach(s => { if (s.weight && s.reps) planned += s.weight * s.reps; });
+            const draft = ((this._execDraft||{})[gs.id]||{})[e.exerciseId] || [];
+            draft.forEach(s => { if (s.weight && s.reps) real += s.weight * s.reps; });
+        });
+        if (planned === 0) return '';
+        const pct = Math.round(real / planned * 100);
+        const col = pct >= 95 ? 'var(--success,#22a861)' : pct >= 80 ? 'var(--warning,#f5a623)' : 'var(--danger,#e53935)';
+        return `<span style="font-size:0.78rem;color:${col};font-weight:600">${Math.round(real/1000*10)/10}t / ${Math.round(planned/1000*10)/10}t (${pct}%)</span>`;
+    })();
+
     modal.innerHTML = `
         <div class="modal-content modal-content--wide">
             <div class="modal-header">
@@ -575,6 +757,7 @@ RPETracker.prototype._renderExecModal = function(modal) {
                     <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${player?.name?.charAt(0)||'?'}</div>
                     <strong style="color:${color}">${player?.name||'Jugadora'}</strong>
                     <span style="font-size:0.78rem;color:var(--text-muted)">${(gs.exercises||[]).length} ejercicios</span>
+                    <button class="exec-all-plan-btn" onclick="window.rpeTracker._execAllEqualPlan('${gs.id}')">= Todo igual al plan</button>
                 </div>
                 <div style="padding:1rem 1.25rem;overflow-y:auto;flex:1">
                     <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">
@@ -584,7 +767,10 @@ RPETracker.prototype._renderExecModal = function(modal) {
                 </div>
             </div>
             <div style="padding:0.85rem 1.25rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface)">
-                <span style="font-size:0.8rem;color:var(--text-muted)">${idx+1} / ${sessions.length}</span>
+                <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span style="font-size:0.8rem;color:var(--text-muted)">${idx+1} / ${sessions.length}</span>
+                    ${tonSummary}
+                </div>
                 <div style="display:flex;gap:0.5rem">
                     ${idx > 0 ? `<button class="btn-secondary" onclick="window.rpeTracker._execSaveCurrentAndGo(${idx-1})">← Anterior</button>` : ''}
                     ${!isLast
@@ -608,8 +794,19 @@ RPETracker.prototype._execEqualPlan = function(sessionId, exId) {
     if (!ex) return;
     if (!this._execDraft[sessionId]) this._execDraft[sessionId] = {};
     this._execDraft[sessionId][exId] = (ex.sets||[]).map(s => ({...s}));
-    // Re-render solo el bloque de este ejercicio
     this._renderExecModal();
+};
+
+// P2: Mark ALL exercises for current player as equal to plan in one tap
+RPETracker.prototype._execAllEqualPlan = function(sessionId) {
+    const gs = (this.gymSessions||[]).find(s => s.id === sessionId);
+    if (!gs) return;
+    if (!this._execDraft[sessionId]) this._execDraft[sessionId] = {};
+    (gs.exercises||[]).forEach(e => {
+        this._execDraft[sessionId][e.exerciseId] = (e.sets||[]).map(s => ({...s}));
+    });
+    this._renderExecModal();
+    this.showToast('✅ Todos los ejercicios marcados como plan', 'success');
 };
 
 RPETracker.prototype._execSaveCurrentAndGo = function(nextIdx) {
@@ -1097,6 +1294,210 @@ RPETracker.prototype._deleteGymSession = function(sessionId) {
     if (this.currentView==='gym') this._renderGymPlayer(document.getElementById('gymView'));
 };
 
+// ─────────────────────────────────────────
+//  VISTA COMPARATIVA DEL EQUIPO
+// ─────────────────────────────────────────
+RPETracker.prototype._renderGymTeamView = function(el) {
+    // Key exercises to show: top 6 by frequency across executed sessions
+    const freq = {};
+    (this.gymSessions || []).filter(s => s.status === 'executed').forEach(gs => {
+        (gs.exercises || []).forEach(e => { freq[e.exerciseId] = (freq[e.exerciseId] || 0) + 1; });
+    });
+    const topExIds = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0,6).map(([id]) => id);
+
+    if (topExIds.length === 0) {
+        el.innerHTML = `<div class="str-container">
+            <div class="str-header">
+                <button class="str-back-btn" onclick="window.rpeTracker._gymSub='list';window.rpeTracker.renderGymView()">← Volver</button>
+                <h2>📊 Comparativa del Equipo</h2>
+            </div>
+            <p class="str-empty">Sin sesiones ejecutadas para comparar.</p>
+        </div>`;
+        return;
+    }
+
+    const exNames = topExIds.map(id => {
+        const ex = (this.exerciseLibrary||[]).find(e => e.id === id);
+        return ex ? ex.name : id;
+    });
+
+    // Build best 1RM per player per exercise
+    const rows = this.players.map(p => {
+        const color = PlayerTokens.get(p);
+        const rms = topExIds.map(exId => {
+            let best = 0;
+            (this.gymSessions || []).filter(s => s.playerId === p.id && s.status === 'executed').forEach(gs => {
+                (gs.exercises || []).filter(e => e.exerciseId === exId).forEach(e => {
+                    (e.actual || e.sets || []).forEach(s => {
+                        if (s.weight && s.reps) best = Math.max(best, epley1RM(s.weight, s.reps));
+                    });
+                });
+            });
+            return best > 0 ? Math.round(best) : null;
+        });
+        return { player: p, color, rms };
+    });
+
+    // Color scale per column
+    const maxByCol = topExIds.map((_, ci) => Math.max(0, ...rows.map(r => r.rms[ci] || 0)));
+
+    const headerCells = exNames.map(n => `<th class="gym-cmp-th">${n}</th>`).join('');
+    const bodyRows = rows.map(({ player, color, rms }) => {
+        const cells = rms.map((rm, ci) => {
+            if (rm === null) return `<td class="gym-cmp-td gym-cmp-td--empty">—</td>`;
+            const pct = maxByCol[ci] > 0 ? rm / maxByCol[ci] : 0;
+            const bg = `${color}${Math.round(pct * 35 + 10).toString(16).padStart(2,'0')}`;
+            return `<td class="gym-cmp-td" style="background:${bg}">${rm}<span class="gym-cmp-unit">kg</span></td>`;
+        }).join('');
+        return `<tr>
+            <td class="gym-cmp-player">
+                <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${player.name.charAt(0)}</div>
+                <span>${player.name.split(' ')[0]}</span>
+            </td>
+            ${cells}
+        </tr>`;
+    }).join('');
+
+    el.innerHTML = `<div class="str-container">
+        <div class="str-header">
+            <button class="str-back-btn" onclick="window.rpeTracker._gymSub='list';window.rpeTracker.renderGymView()">← Volver</button>
+            <h2>📊 Comparativa del Equipo</h2>
+        </div>
+        <div class="str-section">
+            <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">1RM estimado más reciente por jugadora y ejercicio. Top 6 ejercicios más frecuentes.</p>
+            <div class="gym-cmp-wrap">
+                <table class="gym-cmp-table">
+                    <thead><tr><th class="gym-cmp-th gym-cmp-th--player">Jugadora</th>${headerCells}</tr></thead>
+                    <tbody>${bodyRows}</tbody>
+                </table>
+            </div>
+        </div>
+    </div>`;
+};
+
+// ─────────────────────────────────────────
+//  PLANTILLAS DE SESIÓN
+// ─────────────────────────────────────────
+RPETracker.prototype._loadGymTemplates = function() {
+    try {
+        const t = localStorage.getItem('bk_gym_templates');
+        this._gymTemplates = t ? JSON.parse(t) : [];
+    } catch(e) { this._gymTemplates = []; }
+};
+
+RPETracker.prototype._saveGymTemplates = function() {
+    localStorage.setItem('bk_gym_templates', JSON.stringify(this._gymTemplates || []));
+};
+
+RPETracker.prototype._openGymTemplates = function() {
+    if (!this._gymTemplates) this._loadGymTemplates();
+    let modal = document.getElementById('gymTemplatesModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'gymTemplatesModal';
+        modal.className = 'modal';
+        document.body.appendChild(modal);
+    }
+    this._renderTemplatesModal(modal);
+    modal.classList.add('active');
+};
+
+RPETracker.prototype._renderTemplatesModal = function(modal) {
+    if (!modal) modal = document.getElementById('gymTemplatesModal');
+    if (!modal) return;
+    const templates = this._gymTemplates || [];
+
+    const listHTML = templates.length === 0
+        ? '<p class="str-empty">Sin plantillas guardadas todavía.</p>'
+        : templates.map((t, i) => `
+            <div class="lib-row">
+                <div style="flex:1">
+                    <div class="lib-ex-name">${t.name}</div>
+                    <div style="font-size:0.75rem;color:var(--text-faint)">${t.exercises.length} ejercicios</div>
+                </div>
+                <div class="lib-row-actions">
+                    <button class="lib-btn" onclick="window.rpeTracker._applyTemplate(${i})" title="Usar plantilla">▶️</button>
+                    <button class="lib-btn lib-btn--del" onclick="window.rpeTracker._deleteTemplate(${i})">🗑</button>
+                </div>
+            </div>`).join('');
+
+    // Current session exercises for saving as template
+    const hasCurrentPlan = (this._gymSharedRows||[]).length > 0;
+
+    modal.innerHTML = `
+        <div class="modal-content modal-content--wide">
+            <div class="modal-header">
+                <div class="modal-header-inner"><h2>📋 Plantillas de Sesión</h2></div>
+                <button class="modal-close" onclick="document.getElementById('gymTemplatesModal').classList.remove('active')">✕</button>
+            </div>
+            <div class="modal-body" style="padding:1.25rem">
+                <div class="lib-section">${listHTML}</div>
+                <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+                    <h3 style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem">Guardar sesión actual como plantilla</h3>
+                    <div style="display:flex;gap:0.5rem;align-items:center">
+                        <input type="text" id="tplName" class="form-input" placeholder="Nombre de la plantilla" style="flex:1">
+                        <button class="btn-primary" onclick="window.rpeTracker._saveCurrentAsTemplate()">Guardar</button>
+                    </div>
+                    <p style="font-size:0.72rem;color:var(--text-faint);margin-top:0.35rem">
+                        Guarda los ejercicios compartidos del plan actual (series, reps, kg y RPE por defecto).
+                    </p>
+                </div>
+            </div>
+        </div>`;
+};
+
+RPETracker.prototype._saveCurrentAsTemplate = function() {
+    const name = document.getElementById('tplName')?.value.trim();
+    if (!name) { this.showToast('Escribe un nombre para la plantilla', 'error'); return; }
+    if (!this._gymTemplates) this._loadGymTemplates();
+    const exercises = (this._gymSharedRows||[]).map(r => ({
+        exId: r.exId,
+        defaultSets: r.defaultSets || 3,
+        defaultReps: r.defaultReps || 8,
+        defaultKg: r.defaultKg || '',
+        defaultRpe: r.defaultRpe || 7,
+        sets: r.sets ? r.sets.map(s => ({...s})) : null,
+    }));
+    if (exercises.length === 0) { this.showToast('No hay ejercicios compartidos en el plan actual', 'error'); return; }
+    this._gymTemplates.push({ name, exercises, createdAt: new Date().toISOString() });
+    this._saveGymTemplates();
+    this._renderTemplatesModal();
+    this.showToast('✅ Plantilla guardada', 'success');
+};
+
+RPETracker.prototype._applyTemplate = function(idx) {
+    if (!this._gymTemplates) this._loadGymTemplates();
+    const tpl = this._gymTemplates[idx];
+    if (!tpl) return;
+    document.getElementById('gymTemplatesModal')?.classList.remove('active');
+    // Pre-fill a new session with template exercises
+    this._openNewGymSession();
+    // Wait for modal to render then inject exercises
+    setTimeout(() => {
+        this._gymSharedRows = tpl.exercises.map(e => ({
+            exId: e.exId,
+            defaultSets: e.defaultSets,
+            defaultReps: e.defaultReps,
+            defaultKg: e.defaultKg,
+            defaultRpe: e.defaultRpe,
+            sets: e.sets ? e.sets.map(s => ({...s})) : null,
+            expanded: false,
+        }));
+        this._renderGymModal();
+        this.showToast(`✅ Plantilla "${tpl.name}" aplicada`, 'success');
+    }, 100);
+};
+
+RPETracker.prototype._deleteTemplate = function(idx) {
+    if (!this._gymTemplates) this._loadGymTemplates();
+    if (!confirm('¿Eliminar esta plantilla?')) return;
+    this._gymTemplates.splice(idx, 1);
+    this._saveGymTemplates();
+    this._renderTemplatesModal();
+    this.showToast('Plantilla eliminada', 'success');
+};
+
+
 RPETracker.prototype._openExerciseLibrary = function() {
     let modal = document.getElementById('exerciseLibraryModal');
     if (!modal) {
@@ -1304,16 +1705,16 @@ RPETracker.prototype._renderTestPlayer = function(el) {
         const canvases = selectedDef.bilateral
             ? `<div class="test-chart-pair">
                 <div class="test-chart-side">
-                    <div class="test-chart-side-label" style="color:#2196f3">Pierna Izquierda</div>
+                    <div class="test-chart-side-label" style="color:var(--color-left,#2196f3)">Pierna Izquierda</div>
                     <canvas id="testChartL" height="130"></canvas>
                 </div>
                 <div class="test-chart-side">
-                    <div class="test-chart-side-label" style="color:#ff6600">Pierna Derecha</div>
+                    <div class="test-chart-side-label" style="color:var(--color-right,#ff6600)">Pierna Derecha</div>
                     <canvas id="testChartR" height="130"></canvas>
                 </div>
                </div>
                <div class="test-chart-full">
-                    <div class="test-chart-side-label" style="color:#9c27b0">Índice de Asimetría (%)</div>
+                    <div class="test-chart-side-label" style="color:var(--color-asym,#9c27b0)">Índice de Asimetría (%)</div>
                     <canvas id="testChartA" height="100"></canvas>
                </div>`
             : `<canvas id="testChartV" height="150" style="width:100%"></canvas>`;
@@ -1335,8 +1736,8 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                 return `<div class="test-summary-card">
                     <div class="test-summary-name">${def.name}</div>
                     <div class="test-summary-values">
-                        <span style="color:#2196f3">I: <strong>${val.left != null ? val.left + def.unit : '—'}</strong></span>
-                        <span style="color:#ff6600">D: <strong>${val.right != null ? val.right + def.unit : '—'}</strong></span>
+                        <span class="test-val-left">I: <strong>${val.left != null ? val.left + def.unit : '—'}</strong></span>
+                        <span class="test-val-right">D: <strong>${val.right != null ? val.right + def.unit : '—'}</strong></span>
                         ${asym !== null ? `<span class="test-asym" style="color:${asymColor(asym)}">Δ ${asym}%</span>` : ''}
                     </div>
                 </div>`;
@@ -1363,8 +1764,8 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                     const asym = (val.left != null && val.right != null) ? asymmetry(val.left, val.right) : null;
                     return `<div class="test-result-row">
                         <span class="test-result-name">${def.name}</span>
-                        <span style="color:#2196f3">I: <strong>${val.left != null ? val.left + def.unit : '—'}</strong></span>
-                        <span style="color:#ff6600">D: <strong>${val.right != null ? val.right + def.unit : '—'}</strong></span>
+                        <span class="test-val-left">I: <strong>${val.left != null ? val.left + def.unit : '—'}</strong></span>
+                        <span class="test-val-right">D: <strong>${val.right != null ? val.right + def.unit : '—'}</strong></span>
                         ${asym !== null ? `<span class="test-asym" style="color:${asymColor(asym)}">Δ ${asym}%</span>` : ''}
                     </div>`;
                 }
