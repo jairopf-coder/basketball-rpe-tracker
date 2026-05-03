@@ -241,6 +241,11 @@
             <div class="analytics-container" id="weeklyPlanView"></div>
         </div>
 
+        <!-- Season Blocks View -->
+        <div id="seasonblocksView" class="view">
+            <div class="analytics-container" id="seasonBlocksView"></div>
+        </div>
+
         <!-- Team Load Heatmap View -->
         <div id="teamloadView" class="view">
             <div id="teamLoadView"></div>
@@ -271,6 +276,11 @@
 
         <!-- Tests View -->
         <div id="testsView" class="view"></div>
+
+        <!-- Microciclo View -->
+        <div id="microcicloView" class="view">
+            <div class="analytics-container" id="microcicloContent"></div>
+        </div>
 
         <!-- Modal Nueva Sesión -->
         <div id="newSessionModal" class="modal">
@@ -626,7 +636,7 @@
             <span class="bn-icon">👥</span>
             <span class="bn-label">Equipo</span>
         </button>
-        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="analytics"
+        <button class="bottom-nav-btn" data-bn-group="carga" data-bn-view="microciclo"
                 onclick="BottomNav.select(this)" aria-label="Análisis — Cargas y estadísticas">
             <span class="bn-icon">📈</span>
             <span class="bn-label">Análisis</span>
@@ -662,6 +672,10 @@
                 <span class="bn-more-icon">📅</span>
                 <span class="bn-more-label">Planificación</span>
             </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('carga','seasonblocks')" aria-label="Bloques de temporada">
+                <span class="bn-more-icon">📆</span>
+                <span class="bn-more-label">Temporada</span>
+            </button>
             <button class="bn-more-item" onclick="BottomNav.selectMore('carga','sessions')" aria-label="Historial de sesiones">
                 <span class="bn-more-icon">📋</span>
                 <span class="bn-more-label">Historial</span>
@@ -696,7 +710,7 @@
     const BN_PRIMARY_VIEWS = {
         dashboard: ['dashboard'],
         equipo:    ['players', 'teamstatus'],
-        carga:     ['analytics', 'weekplan', 'sessions'],
+        carga:     ['microciclo', 'analytics', 'weekplan', 'seasonblocks', 'sessions'],
     };
 
     const BottomNav = {

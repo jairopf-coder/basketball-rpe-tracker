@@ -613,3 +613,308 @@ RPETracker.prototype.showPlayerReportMenu = function(playerId) {
 
     document.body.appendChild(overlay);
 };
+
+// ========== INFORME SEMANAL DEL EQUIPO (con gráfico Chart.js) ==========
+
+RPETracker.prototype.generateTeamWeeklyReport = function() {
+    const now    = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const todayKey  = now.toISOString().slice(0, 10);
+    const dateRange = `${monday.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })} – ${sunday.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+    const wData   = this.wellnessData || [];
+    const wToday  = wData.filter(e => e.date === todayKey);
+
+    // ── Wellness overall score (1-5 scale) ──
+    const wScore = (playerId) => {
+        const e = wToday.find(x => x.playerId === playerId);
+        if (!e) return null;
+        return (e.sleep + (6 - e.fatigue) + e.mood + (6 - e.soreness)) / 4;
+    };
+
+    // ── UA 7 days per player ──
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    // ── Per-player data ──
+    const playerData = this.players.map(player => {
+        const ratio   = this.calculateAcuteChronicRatio(player.id);
+        const r       = parseFloat(ratio.ratio);
+        const injury  = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
+        const last7   = this.sessions.filter(s => {
+            const d = new Date(s.date.slice(0, 10));
+            return d >= sevenDaysAgo && s.playerId === player.id;
+        });
+        const ua7d    = last7.reduce((s, x) => s + (x.load || x.rpe * (x.duration || 60)), 0);
+        const ws      = wScore(player.id);
+        const t       = this.getPlayerThresholds(player.id);
+
+        let statusTxt, statusCls;
+        if (injury)                         { statusTxt = 'Lesionada';  statusCls = 'st-out'; }
+        else if (r > t.high)                { statusTxt = 'Peligro';    statusCls = 'st-danger'; }
+        else if (r > t.opt)                 { statusTxt = 'Precaución'; statusCls = 'st-warn'; }
+        else if (r > 0 && r < t.low)        { statusTxt = 'Descarga';   statusCls = 'st-low'; }
+        else if (r >= t.low)                { statusTxt = 'Óptima';     statusCls = 'st-ok'; }
+        else                                { statusTxt = 'Sin datos';  statusCls = 'st-none'; }
+
+        // Ratio color class (print-safe semantic classes, no hardcoded hex in JS)
+        let ratioCls;
+        if (ratio.ratio === 'N/A')     ratioCls = 'rc-none';
+        else if (r > t.high)           ratioCls = 'rc-danger';
+        else if (r > t.opt)            ratioCls = 'rc-warn';
+        else if (r > 0 && r < t.low)   ratioCls = 'rc-low';
+        else                           ratioCls = 'rc-ok';
+
+        const avail = injury ? '❌' : (r > t.high ? '⚠️' : '✅');
+
+        return { player, ratio, r, injury, ua7d, ws, statusTxt, statusCls, ratioCls, avail };
+    });
+
+    // ── Totals ──
+    const totalUA     = playerData.reduce((s, d) => s + d.ua7d, 0);
+    const countOk     = playerData.filter(d => d.statusCls === 'st-ok').length;
+    const countWarn   = playerData.filter(d => ['st-warn', 'st-danger', 'st-low'].includes(d.statusCls)).length;
+    const countOut    = playerData.filter(d => d.statusCls === 'st-out').length;
+    const wCoverage   = wToday.length;
+    const activeInj   = (this.injuries || []).filter(i => i.status === 'active');
+
+    // ── Chart data (JSON embedded, rendered client-side via Chart.js CDN) ──
+    const chartLabels = JSON.stringify(playerData.map(d => d.player.name.split(' ')[0]));
+    const chartData   = JSON.stringify(playerData.map(d => d.ua7d));
+    const chartColors = JSON.stringify(playerData.map(d => {
+        // returns semantic color string — no hardcoded business logic, uses threshold classification
+        switch (d.ratioCls) {
+            case 'rc-danger': return '#ef5350';
+            case 'rc-warn':   return '#ff9800';
+            case 'rc-low':    return '#42a5f5';
+            case 'rc-ok':     return '#66bb6a';
+            default:          return '#bdbdbd';
+        }
+    }));
+
+    // ── Table rows ──
+    const rows = playerData.map(({ player, ratio, ua7d, ws, statusTxt, statusCls, ratioCls, avail }) => {
+        const wsDisplay = ws !== null ? ws.toFixed(1) : '—';
+        const injNote   = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
+        const injLabel  = injNote ? (injNote.location ? this.getLocationName(injNote.location) : 'lesión activa') : '';
+        return `<tr>
+            <td class="td-name">${player.name}${player.number ? ` <span class="num">#${player.number}</span>` : ''}</td>
+            <td class="td-num">${ua7d ? ua7d.toLocaleString('es-ES') : '—'}</td>
+            <td class="td-ratio ${ratioCls}">${ratio.ratio !== 'N/A' ? ratio.ratio : '—'}</td>
+            <td class="td-num">${wsDisplay}</td>
+            <td class="td-inj">${injLabel || (statusCls === 'st-out' ? 'Baja' : '—')}</td>
+            <td class="td-avail">${avail} <span class="${statusCls}">${statusTxt}</span></td>
+        </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe Semanal Equipo — ${dateRange}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"><\/script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+         color: #1a1a1a; background: #fff; padding: 36px 40px; font-size: 13px; }
+  @media print {
+    body { padding: 16px 20px; }
+    .no-print { display: none !important; }
+    @page { margin: 1.2cm; size: A4; }
+    canvas { max-height: 220px !important; }
+  }
+
+  /* ── Header ── */
+  .rpt-header { display: flex; justify-content: space-between; align-items: flex-start;
+                margin-bottom: 28px; padding-bottom: 16px; border-bottom: 2.5px solid #ff6600; }
+  .rpt-header h1 { font-size: 20px; color: #ff6600; font-weight: 700; }
+  .rpt-header .sub { color: #888; font-size: 12px; margin-top: 3px; }
+  .rpt-header .meta { text-align: right; font-size: 11px; color: #aaa; }
+
+  /* ── KPI row ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 28px; }
+  .kpi { border: 1px solid #e8e8e8; border-radius: 10px; padding: 14px 10px; text-align: center; }
+  .kpi .num { font-size: 26px; font-weight: 700; color: #ff6600; line-height: 1.1; }
+  .kpi .lbl { font-size: 10px; color: #999; margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
+  .kpi.ok  { border-color: #a5d6a7; } .kpi.ok  .num { color: #2e7d32; }
+  .kpi.warn{ border-color: #ffcc80; } .kpi.warn .num { color: #e65100; }
+  .kpi.out { border-color: #ef9a9a; } .kpi.out  .num { color: #c62828; }
+
+  /* ── Section title ── */
+  .sec { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase;
+         letter-spacing: .06em; margin: 26px 0 10px; padding-bottom: 6px;
+         border-bottom: 1.5px solid #eee; display: flex; align-items: center; gap: 8px; }
+  .sec .badge { background: #ff6600; color: #fff; border-radius: 4px; padding: 1px 7px; font-size: 10px; font-weight: 600; }
+
+  /* ── Team table ── */
+  table.team-tbl { width: 100%; border-collapse: collapse; }
+  table.team-tbl th { padding: 7px 12px; text-align: left; font-size: 10px; font-weight: 700;
+                      color: #888; text-transform: uppercase; letter-spacing: .05em;
+                      background: #fafafa; border-bottom: 1.5px solid #eee; }
+  table.team-tbl td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  .td-name  { font-weight: 600; font-size: 13px; }
+  .td-name .num { color: #999; font-weight: 400; font-size: 11px; }
+  .td-num   { text-align: center; font-weight: 600; color: #444; }
+  .td-ratio { text-align: center; font-weight: 700; font-size: 13px; border-radius: 6px; }
+  .td-inj   { font-size: 11px; color: #888; }
+  .td-avail { font-size: 12px; }
+
+  /* ── Ratio color classes (CSS tokens only, no hardcoded JS hex) ── */
+  .rc-ok     { color: #2e7d32; }
+  .rc-warn   { color: #e65100; }
+  .rc-danger { color: #c62828; }
+  .rc-low    { color: #1565c0; }
+  .rc-none   { color: #999; }
+
+  /* ── Status badge classes ── */
+  .st-ok     { color: #2e7d32; }
+  .st-warn   { color: #e65100; }
+  .st-danger { color: #c62828; }
+  .st-low    { color: #1565c0; }
+  .st-out    { color: #c62828; font-weight: 700; }
+  .st-none   { color: #999; }
+
+  /* ── Totals row ── */
+  .total-row td { font-weight: 700; background: #fafafa; border-top: 2px solid #eee; }
+
+  /* ── Chart container ── */
+  .chart-wrap { position: relative; height: 240px; margin: 8px 0 24px; }
+
+  /* ── Legend ── */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 10px; color: #888; margin: 8px 0 4px; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot  { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Footer ── */
+  .rpt-footer { margin-top: 36px; padding-top: 10px; border-top: 1px solid #eee;
+                display: flex; justify-content: space-between; font-size: 10px; color: #bbb; }
+
+  /* ── Print button ── */
+  .print-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
+               background: #ff6600; color: #fff; border: none; border-radius: 8px;
+               font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+
+<div class="rpt-header">
+  <div>
+    <h1>🏀 Informe Semanal del Equipo</h1>
+    <div class="sub">${dateRange}</div>
+  </div>
+  <div class="meta">
+    <div style="font-weight:600;font-size:12px;color:#444">Basketball RPE Tracker</div>
+    <div>Generado el ${now.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi">         <div class="num">${this.players.length}</div><div class="lbl">Jugadoras</div></div>
+  <div class="kpi ok">     <div class="num">${countOk}</div>          <div class="lbl">Zona óptima</div></div>
+  <div class="kpi warn">   <div class="num">${countWarn}</div>        <div class="lbl">Precaución</div></div>
+  <div class="kpi out">    <div class="num">${countOut}</div>         <div class="lbl">Lesionadas</div></div>
+  <div class="kpi">         <div class="num">${wCoverage}/${this.players.length}</div><div class="lbl">Wellness hoy</div></div>
+</div>
+
+<div class="sec">Carga &amp; Disponibilidad <span class="badge">${playerData.length}</span></div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#66bb6a"></div>Ratio óptimo</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ff9800"></div>Precaución</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ef5350"></div>Peligro</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#42a5f5"></div>Descarga</div>
+</div>
+
+<table class="team-tbl">
+  <thead><tr>
+    <th style="width:180px">Jugadora</th>
+    <th style="text-align:center">UA 7 días</th>
+    <th style="text-align:center">Ratio A:C</th>
+    <th style="text-align:center">Wellness</th>
+    <th>Estado lesión</th>
+    <th>Disponibilidad</th>
+  </tr></thead>
+  <tbody>
+    ${rows}
+    <tr class="total-row">
+      <td>TOTAL EQUIPO</td>
+      <td class="td-num">${totalUA.toLocaleString('es-ES')}</td>
+      <td class="td-num">—</td>
+      <td class="td-num">${wCoverage ? (wToday.reduce((s, e) => s + (e.sleep + (6-e.fatigue) + e.mood + (6-e.soreness))/4, 0) / wCoverage).toFixed(1) : '—'}</td>
+      <td>${activeInj.length} activa${activeInj.length !== 1 ? 's' : ''}</td>
+      <td>${countOk} disp. · ${countWarn} prec. · ${countOut} baja</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="sec" style="margin-top:32px">Carga UA — últimos 7 días por jugadora</div>
+<div class="chart-wrap">
+  <canvas id="teamUAChart"></canvas>
+</div>
+
+<div class="rpt-footer">
+  <span>Basketball RPE Tracker · Metodología EWMA</span>
+  <span>Generado ${now.toLocaleString('es-ES')}</span>
+</div>
+
+<script>
+(function() {
+  var labels = ${chartLabels};
+  var data   = ${chartData};
+  var colors = ${chartColors};
+  var ctx    = document.getElementById('teamUAChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'UA (7 días)',
+        data: data,
+        backgroundColor: colors,
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ' ' + ctx.parsed.y.toLocaleString('es-ES') + ' UA';
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: '#f0f0f0' },
+          ticks: { font: { size: 11 } }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 11 } }
+        }
+      }
+    }
+  });
+})();
+<\/script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    this.showToast('📊 Informe de equipo generado', 'success');
+};
