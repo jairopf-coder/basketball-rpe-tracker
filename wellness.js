@@ -46,7 +46,10 @@ RPETracker.prototype.renderWellnessDashboard = function() {
                     <h2 style="margin:0 0 .25rem">❤️ Wellness del Equipo</h2>
                     <p style="margin:0;color:var(--text-secondary);font-size:.85rem">${this._wFmtDate(today)}</p>
                 </div>
-                <button class="btn-primary" onclick="window.rpeTracker?.openWellnessForm()">➕ Registrar bienestar</button>
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                    <button class="btn-secondary" onclick="window.rpeTracker?.openWellnessQuick()">⚡ Wellness rápido</button>
+                    <button class="btn-primary" onclick="window.rpeTracker?.openWellnessForm()">➕ Registrar bienestar</button>
+                </div>
             </div>
             ${this._renderWTodayStatus(filledIds, today)}
             ${this._renderWTeamSummary(sevenDaysAgo)}
@@ -786,3 +789,202 @@ RPETracker.prototype._closeBulk = function(completed) {
         if (this.currentView === 'dashboard') this.renderDashboard();
     }
 };
+
+// ========== WELLNESS QUICK MODAL (grid: todas las jugadoras, 4 sliders por fila) ==========
+
+RPETracker.prototype.openWellnessQuick = function() {
+    if (!this.players.length) { this.showToast('Sin jugadoras registradas', 'warning'); return; }
+    if (!this.wellnessData) this.wellnessData = this.loadWellnessData();
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Remove any existing instance
+    const existing = document.getElementById('wellnessQuickOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'wellnessQuickOverlay';
+    overlay.className = 'wq-overlay';
+
+    const metrics = ['sleep', 'fatigue', 'mood', 'soreness'];
+    const metaConfig = {
+        sleep:    { icon: '😴', label: 'Sueño'    },
+        fatigue:  { icon: '⚡', label: 'Energía'  },
+        mood:     { icon: '😊', label: 'Ánimo'    },
+        soreness: { icon: '💪', label: 'Muscular' }
+    };
+
+    // Build rows – one per player
+    const buildRows = () => this.players.map(player => {
+        const existing = (this.wellnessData||[]).find(w => w.playerId === player.id && w.date === today);
+        const initials = metrics.map(m => existing ? (existing[m] || 3) : 3);
+
+        const sliders = metrics.map((m, mi) => {
+            const val = initials[mi];
+            const cfg = metaConfig[m];
+            const pips = [1,2,3,4,5].map(i =>
+                `<span class="wq-pip${i <= val ? ' wq-pip-on' : ''}" data-pos="${i}"></span>`
+            ).join('');
+            return `<div class="wq-slider-cell">
+                <div class="wq-slider-header">
+                    <span class="wq-metric-icon">${cfg.icon}</span>
+                    <span class="wq-metric-lbl">${cfg.label}</span>
+                    <span class="wq-metric-val" id="wqVal_${player.id}_${m}" style="color:${this._wColor(val)}">${val}</span>
+                </div>
+                <input type="range" min="1" max="5" step="1" value="${val}"
+                    class="wq-slider"
+                    data-player="${player.id}" data-metric="${m}"
+                    id="wqSlider_${player.id}_${m}">
+                <div class="wq-pips" id="wqPips_${player.id}_${m}">${pips}</div>
+            </div>`;
+        }).join('');
+
+        const alreadyFilled = !!existing;
+        return `<div class="wq-row" id="wqRow_${player.id}">
+            <div class="wq-player-cell">
+                ${PlayerTokens.avatar(player, 28, '.7rem')}
+                <span class="wq-player-name">${player.name}${player.number ? `<span class="wq-num"> #${player.number}</span>` : ''}</span>
+                ${alreadyFilled ? '<span class="wq-done-badge">✓</span>' : ''}
+            </div>
+            <div class="wq-sliders-wrap">${sliders}</div>
+        </div>`;
+    }).join('');
+
+    overlay.innerHTML = `
+        <div class="wq-modal">
+            <div class="wq-modal-header">
+                <div>
+                    <span class="wq-modal-title">⚡ Wellness rápido del equipo</span>
+                    <span class="wq-modal-date">${this._wFmtDate(today)}</span>
+                </div>
+                <button class="wb-close" onclick="document.getElementById('wellnessQuickOverlay')?.remove()">✕</button>
+            </div>
+            <div class="wq-modal-body">
+                <div class="wq-table-header wq-row wq-row--header">
+                    <div class="wq-player-cell"><span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary)">Jugadora</span></div>
+                    <div class="wq-sliders-wrap">
+                        ${metrics.map(m => `<div class="wq-slider-cell wq-col-header">
+                            <span>${metaConfig[m].icon} ${metaConfig[m].label}</span>
+                        </div>`).join('')}
+                    </div>
+                </div>
+                <div id="wqRowsContainer">${buildRows()}</div>
+            </div>
+            <div class="wq-modal-footer">
+                <button class="btn-secondary" onclick="document.getElementById('wellnessQuickOverlay')?.remove()">Cancelar</button>
+                <button class="btn-primary" onclick="window.rpeTracker?.saveWellnessQuick()">💾 Guardar todo el equipo</button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+
+    // Attach events via delegation
+    overlay.addEventListener('input', e => {
+        if (!e.target.classList.contains('wq-slider')) return;
+        const { player: pid, metric: m } = e.target.dataset;
+        const val = parseInt(e.target.value);
+        // Update value display
+        const valEl = document.getElementById(`wqVal_${pid}_${m}`);
+        if (valEl) { valEl.textContent = val; valEl.style.color = this._wColor(val); }
+        // Update pips
+        const pipsEl = document.getElementById(`wqPips_${pid}_${m}`);
+        if (pipsEl) {
+            pipsEl.querySelectorAll('.wq-pip').forEach(pip => {
+                const pos = parseInt(pip.dataset.pos);
+                pip.classList.toggle('wq-pip-on', pos <= val);
+                if (pos <= val) pip.style.background = this._wColor(val);
+                else pip.style.background = '';
+            });
+        }
+    });
+
+    // Close on overlay click
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.remove();
+    });
+};
+
+RPETracker.prototype.saveWellnessQuick = function() {
+    if (!this.wellnessData) this.wellnessData = [];
+    const today = new Date().toISOString().slice(0, 10);
+    const overlay = document.getElementById('wellnessQuickOverlay');
+    if (!overlay) return;
+
+    let count = 0;
+    this.players.forEach(player => {
+        const get = m => {
+            const el = overlay.querySelector(`#wqSlider_${player.id}_${m}`);
+            return el ? parseInt(el.value) : 3;
+        };
+        const entry = {
+            id: `w_${player.id}_${today}`,
+            playerId: player.id, date: today,
+            sleep:    get('sleep'),
+            fatigue:  get('fatigue'),
+            mood:     get('mood'),
+            soreness: get('soreness'),
+            notes: '',
+            savedAt: new Date().toISOString()
+        };
+        const idx = this.wellnessData.findIndex(w => w.playerId === player.id && w.date === today);
+        if (idx >= 0) this.wellnessData[idx] = entry; else this.wellnessData.push(entry);
+        count++;
+    });
+
+    this.saveWellnessData();
+    overlay.remove();
+    this.showToast(`✅ Wellness guardado para ${count} jugadoras`, 'success');
+    this.renderWellnessDashboard();
+};
+
+// ── Quick Modal Styles ──────────────────────────────────────
+(function injectWellnessQuickStyles() {
+    if (document.getElementById('wellness-quick-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'wellness-quick-styles';
+    s.textContent = `
+.wq-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1100;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto}
+.wq-modal{background:var(--card-bg);border:1px solid var(--border-color);border-radius:14px;width:100%;max-width:860px;display:flex;flex-direction:column;max-height:90vh;margin:auto}
+.wq-modal-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border-color);flex-shrink:0}
+.wq-modal-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-right:.75rem}
+.wq-modal-date{font-size:.8rem;color:var(--text-secondary)}
+.wq-modal-body{overflow-y:auto;padding:.75rem 1rem;flex:1}
+.wq-modal-footer{display:flex;justify-content:flex-end;gap:.75rem;padding:.85rem 1.25rem;border-top:1px solid var(--border-color);flex-shrink:0}
+
+/* Row layout */
+.wq-row{display:grid;grid-template-columns:160px 1fr;align-items:center;gap:.75rem;padding:.55rem 0;border-bottom:1px solid var(--border-color)}
+.wq-row:last-child{border-bottom:none}
+.wq-row--header{padding:.3rem 0;border-bottom:2px solid var(--border-color)}
+.wq-player-cell{display:flex;align-items:center;gap:.45rem;min-width:0}
+.wq-player-name{font-weight:600;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wq-num{opacity:.55;font-weight:400}
+.wq-done-badge{background:var(--success-color,#4caf50);color:#fff;font-size:.65rem;padding:.05rem .35rem;border-radius:8px;flex-shrink:0}
+
+/* Sliders grid */
+.wq-sliders-wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem}
+.wq-slider-cell{display:flex;flex-direction:column;gap:.2rem}
+.wq-col-header{justify-content:center;align-items:center;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:.04em;text-align:center}
+.wq-slider-header{display:flex;align-items:center;gap:.3rem;font-size:.72rem}
+.wq-metric-icon{flex-shrink:0}
+.wq-metric-lbl{flex:1;color:var(--text-secondary);font-size:.7rem}
+.wq-metric-val{font-weight:700;font-size:.82rem;min-width:1rem;text-align:right;transition:color .2s}
+.wq-slider{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:var(--border-color);outline:none;cursor:pointer}
+.wq-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--primary-color);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.wq-pips{display:flex;gap:3px}
+.wq-pip{flex:1;height:3px;border-radius:2px;background:var(--border-color);transition:background .15s}
+.wq-pip-on{background:var(--primary-color)}
+
+/* Mobile: card scroll */
+@media(max-width:767px){
+    .wq-modal{max-height:95vh}
+    .wq-row{grid-template-columns:1fr;gap:.4rem}
+    .wq-row--header{display:none}
+    .wq-sliders-wrap{grid-template-columns:repeat(2,1fr)}
+    .wq-player-cell{padding-bottom:.15rem}
+}
+@media(max-width:420px){
+    .wq-sliders-wrap{grid-template-columns:1fr 1fr}
+}
+`;
+    document.head.appendChild(s);
+})();

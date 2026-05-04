@@ -1811,6 +1811,25 @@ RPETracker.prototype.renderMicrociclo = function() {
         return `${fmt(weekStart)} – ${fmt(end)}`;
     })();
 
+    // ── Carga semana anterior (offset -7 días) ─────────────
+    const prevWeekStart = new Date(weekStart);
+    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+    const prevDayDateStrs = dayKeys.map((_, i) => {
+        const d = new Date(prevWeekStart);
+        d.setDate(d.getDate() + i);
+        return d.toISOString().slice(0, 10);
+    });
+    const prevUAPerDay = prevDayDateStrs.map(ds =>
+        Math.round(this.sessions.filter(s => s.date && s.date.slice(0, 10) === ds)
+            .reduce((sum, s) => sum + (s.load || 0), 0))
+    );
+
+    const prevWeekLabel = (() => {
+        const end = new Date(prevWeekStart); end.setDate(end.getDate() + 6);
+        const fmt = d => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        return `${fmt(prevWeekStart)} – ${fmt(end)}`;
+    })();
+
     container.innerHTML = `
         ${styles}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.4rem">
@@ -1822,5 +1841,79 @@ RPETracker.prototype.renderMicrociclo = function() {
         </div>
         ${kpiCards}
         ${progressBar}
+        <div class="wellness-card" style="margin-bottom:.75rem">
+            <h3 class="wellness-section-title">📊 Carga diaria: semana actual vs anterior</h3>
+            <canvas id="mcWeekCompareChart" height="160" style="width:100%;display:block"></canvas>
+            <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:.65rem;font-size:.76rem;color:var(--text-secondary)">
+                <span style="display:flex;align-items:center;gap:.35rem"><span style="display:inline-block;width:14px;height:10px;border-radius:3px;background:var(--primary-color,#ff9800)"></span>${weekLabel}</span>
+                <span style="display:flex;align-items:center;gap:.35rem"><span style="display:inline-block;width:14px;height:10px;border-radius:3px;background:rgba(160,160,160,.5)"></span>${prevWeekLabel}</span>
+            </div>
+        </div>
         ${table}`;
+
+    // Draw bar chart after DOM is ready
+    requestAnimationFrame(() => {
+        const canvas = document.getElementById('mcWeekCompareChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+        if (canvas._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+            || document.body.classList.contains('dark-mode')
+            || window.matchMedia('(prefers-color-scheme:dark)').matches;
+        const gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
+        const textColor = isDark ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.45)';
+        const primaryColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--primary-color').trim() || '#ff9800';
+        const prevColor = isDark ? 'rgba(180,180,180,.35)' : 'rgba(140,140,140,.35)';
+        const prevBorder = isDark ? 'rgba(200,200,200,.5)' : 'rgba(100,100,100,.4)';
+
+        canvas._chartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: dayLabels,
+                datasets: [
+                    {
+                        label: weekLabel,
+                        data: realUAPerDay,
+                        backgroundColor: primaryColor,
+                        borderRadius: 4,
+                        borderSkipped: false
+                    },
+                    {
+                        label: prevWeekLabel,
+                        data: prevUAPerDay,
+                        backgroundColor: prevColor,
+                        borderColor: prevBorder,
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        borderSkipped: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} UA`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, font: { size: 11 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, font: { size: 11 },
+                            callback: v => v + ' UA' }
+                    }
+                }
+            }
+        });
+    });
 };
