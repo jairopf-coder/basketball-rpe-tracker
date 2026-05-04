@@ -1670,7 +1670,59 @@ class RPETracker {
             </div>`;
         // ---- End Team Readiness Widget ----
 
+        // ── "Hoy" panel ────────────────────────────────────────────
+        const todaySessions = this.sessions.filter(s => s.date && s.date.slice(0, 10) === _wToday);
+        const todayPlayerIds = [...new Set(todaySessions.map(s => s.playerId))];
+        const todaySessionCount = todayPlayerIds.length;
+
+        const acAlertCount  = players.filter(p => {
+            const t = this.getPlayerThresholds(p.player.id);
+            return parseFloat(p.ratio.ratio) > t.high;
+        }).length;
+        const activeInjCount = (this.injuries || []).filter(i => i.status === 'active').length;
+        const pendingCount   = _pendingW.length;
+
+        // Pending wellness names for WhatsApp message
+        const pendingNames = _pendingW.map(p => p.name.split(' ')[0]).join(', ');
+
+        const todayPanelHTML = `
+            <div class="db-today-panel">
+                <div class="db-today-header">
+                    <span class="db-today-title">Hoy — ${new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                </div>
+                <div class="db-today-kpis">
+                    <div class="db-today-kpi" onclick="window.rpeTracker?.switchView('sessions')" title="Ver sesiones de hoy">
+                        <span class="db-today-kpi-val">${todaySessionCount}</span>
+                        <span class="db-today-kpi-lbl">sesiones hoy</span>
+                    </div>
+                    <div class="db-today-kpi db-today-kpi--${pendingCount === 0 ? 'ok' : 'warn'}" onclick="window.rpeTracker?.switchView('wellness')" title="Wellness pendiente">
+                        <span class="db-today-kpi-val">${pendingCount}</span>
+                        <span class="db-today-kpi-lbl">sin wellness</span>
+                    </div>
+                    <div class="db-today-kpi db-today-kpi--${acAlertCount > 0 ? 'danger' : 'ok'}" onclick="window.rpeTracker?.switchView('analytics')" title="Alertas A:C">
+                        <span class="db-today-kpi-val">${acAlertCount}</span>
+                        <span class="db-today-kpi-lbl">alertas A:C</span>
+                    </div>
+                    <div class="db-today-kpi db-today-kpi--${activeInjCount > 0 ? 'danger' : 'ok'}" onclick="window.rpeTracker?.switchView('injury')" title="Lesiones activas">
+                        <span class="db-today-kpi-val">${activeInjCount}</span>
+                        <span class="db-today-kpi-lbl">lesionadas</span>
+                    </div>
+                </div>
+                ${pendingCount > 0 ? `
+                <div class="db-today-pending">
+                    <span class="db-today-pending-label">Sin wellness hoy:</span>
+                    <span class="db-today-pending-names">${pendingNames}</span>
+                    <button class="db-today-wa-btn" onclick="window.rpeTracker?.copyWellnessPendingWA()" title="Copiar mensaje para WhatsApp">
+                        📋 Copiar aviso
+                    </button>
+                </div>` : `
+                <div class="db-today-pending db-today-pending--ok">
+                    <span class="db-today-pending-label">✅ Todas han rellenado el wellness hoy</span>
+                </div>`}
+            </div>`;
+
         container.innerHTML = `
+            ${todayPanelHTML}
             ${bannerHTML}
             ${isMatchDay || this._matchDayMode ? `
             <div class="db-matchday-bar">
@@ -1894,6 +1946,35 @@ class RPETracker {
         const next = { risk: 'safe', safe: 'name', name: 'risk' };
         this._dashSort = next[this._dashSort] || 'risk';
         this.renderDashboard();
+    }
+
+    copyWellnessPendingWA() {
+        const today = new Date().toISOString().slice(0, 10);
+        const wData = this.wellnessData || [];
+        const pending = this.players.filter(p => !wData.some(e => e.playerId === p.id && e.date === today));
+        if (!pending.length) { this.showToast('✅ Todas han rellenado el wellness hoy', 'info'); return; }
+        const names = pending.map(p => p.name.split(' ')[0]).join(', ');
+        const dateLabel = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        const msg = `🏀 Recordatorio wellness — ${dateLabel}\n\nPor favor, rellenad el cuestionario de bienestar de hoy en la app.\n\nPendientes: ${names}\n\n¡Gracias! 💪`;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(msg).then(() => {
+                this.showToast('📋 Mensaje copiado — pégalo en WhatsApp', 'success');
+            }).catch(() => this._fallbackCopy(msg));
+        } else {
+            this._fallbackCopy(msg);
+        }
+    }
+
+    _fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); this.showToast('📋 Mensaje copiado — pégalo en WhatsApp', 'success'); }
+        catch (e) { this.showToast('No se pudo copiar. Copia manualmente.', 'error'); }
+        document.body.removeChild(ta);
     }
 
     // ── A) Pre-session Modal ───────────────────────────────────────────────
@@ -3757,65 +3838,159 @@ class RPETracker {
     }
 
     // ========== FEATURE 3: EXPORT TO CSV ==========
-    
+
     exportData() {
-        // Prepare CSV data
-        let csv = 'Jugadora,Dorsal,Fecha,Hora del Día,Tipo,RPE,Duración (min),Carga (sRPE),Incidencias\n';
-        
-        // Sort sessions by date
-        const sortedSessions = [...this.sessions].sort((a, b) => new Date(a.date) - new Date(b.date));
-        
-        sortedSessions.forEach(session => {
+        // Show date range picker modal before exporting
+        const existing = document.getElementById('csvExportModal');
+        if (existing) existing.remove();
+
+        const today = new Date().toISOString().slice(0, 10);
+        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const thirtyAgo = thirtyDaysAgo.toISOString().slice(0, 10);
+
+        const modal = document.createElement('div');
+        modal.id = 'csvExportModal';
+        modal.className = 'modal active';
+        modal.innerHTML = `
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>📥 Exportar CSV</h2>
+                    <button class="btn-close" onclick="document.getElementById('csvExportModal').remove()">&times;</button>
+                </div>
+                <div class="form-group">
+                    <label>Rango de fechas</label>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+                        <button class="btn-secondary csv-preset" data-days="7">Últimos 7d</button>
+                        <button class="btn-secondary csv-preset" data-days="28">Últimas 4 sem</button>
+                        <button class="btn-secondary csv-preset" data-days="90">3 meses</button>
+                        <button class="btn-secondary csv-preset" data-days="0">Todo</button>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                        <div class="filter-group">
+                            <label>Desde:</label>
+                            <input type="date" id="csvFrom" class="date-input" value="${thirtyAgo}">
+                        </div>
+                        <div class="filter-group">
+                            <label>Hasta:</label>
+                            <input type="date" id="csvTo" class="date-input" value="${today}">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                        <input type="checkbox" id="csvIncludeEWMA" checked> Incluir columnas EWMA (aguda, crónica, ratio A:C)
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="document.getElementById('csvExportModal').remove()">Cancelar</button>
+                    <button class="btn-primary" onclick="window.rpeTracker?._doExportCSV()">📥 Descargar CSV</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+
+        // Preset buttons
+        modal.querySelectorAll('.csv-preset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const days = parseInt(btn.dataset.days);
+                const toDate = new Date().toISOString().slice(0, 10);
+                if (days === 0) {
+                    document.getElementById('csvFrom').value = '';
+                    document.getElementById('csvTo').value = toDate;
+                } else {
+                    const from = new Date(); from.setDate(from.getDate() - days);
+                    document.getElementById('csvFrom').value = from.toISOString().slice(0, 10);
+                    document.getElementById('csvTo').value = toDate;
+                }
+            });
+        });
+
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    }
+
+    _doExportCSV() {
+        const fromVal = document.getElementById('csvFrom')?.value;
+        const toVal   = document.getElementById('csvTo')?.value;
+        const includeEWMA = document.getElementById('csvIncludeEWMA')?.checked !== false;
+        document.getElementById('csvExportModal')?.remove();
+
+        const fromDate = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+        const toDate   = toVal   ? new Date(toVal   + 'T23:59:59') : null;
+
+        // Filter sessions by range
+        let sessions = [...this.sessions].sort((a, b) => new Date(a.date) - new Date(b.date));
+        if (fromDate) sessions = sessions.filter(s => new Date(s.date) >= fromDate);
+        if (toDate)   sessions = sessions.filter(s => new Date(s.date) <= toDate);
+
+        // Pre-compute EWMA per player (full history, not range-filtered — ratio is cumulative)
+        const ewmaCache = {};
+        if (includeEWMA) {
+            this.players.forEach(p => {
+                ewmaCache[p.id] = this.calculateAcuteChronicRatio(p.id);
+            });
+        }
+
+        const ewmaHeader = includeEWMA ? ',EWMA Aguda,EWMA Crónica,Ratio A:C,Estado A:C' : '';
+        let csv = `Jugadora,Dorsal,Fecha,Hora del Día,Tipo,RPE,Duración (min),Carga (sRPE),Incidencias${ewmaHeader}\n`;
+
+        sessions.forEach(session => {
             const player = this.players.find(p => p.id === session.playerId);
-            const playerName = player ? player.name : 'Desconocida';
-            const playerNumber = player && player.number ? player.number : '';
-            
-            const date = new Date(session.date);
+            const playerName   = player ? player.name : 'Desconocida';
+            const playerNumber = player?.number || '';
+            const date    = new Date(session.date);
             const dateStr = date.toLocaleDateString('es-ES');
             const timeOfDay = session.timeOfDay === 'morning' ? 'Mañana' : 'Tarde';
-            const type = {training:'Entrenamiento',match:'Partido',shooting:'Tiro',gym:'Gym',recovery:'Recuperación'}[session.type] || 'Entrenamiento';
-            const load = session.load || (session.rpe * (session.duration || 60));
-            const notes = (session.notes || '').replace(/"/g, '""'); // Escape quotes
-            
-            csv += `"${playerName}","${playerNumber}","${dateStr}","${timeOfDay}","${type}",${session.rpe},${session.duration || 60},${load},"${notes}"\n`;
+            const type  = {training:'Entrenamiento',match:'Partido',shooting:'Tiro',gym:'Gym',recovery:'Recuperación'}[session.type] || 'Entrenamiento';
+            const load  = session.load || (session.rpe * (session.duration || 60));
+            const notes = (session.notes || '').replace(/"/g, '""');
+
+            let ewmaCols = '';
+            if (includeEWMA && player) {
+                const r = ewmaCache[player.id];
+                const acute   = r ? r.acute.toFixed(1)   : 'N/A';
+                const chronic = r ? r.chronic.toFixed(1) : 'N/A';
+                const ratio   = r ? r.ratio              : 'N/A';
+                const status  = r ? this.getRatioStatus(r.ratio) : 'Sin datos';
+                ewmaCols = `,"${acute}","${chronic}","${ratio}","${status}"`;
+            }
+
+            csv += `"${playerName}","${playerNumber}","${dateStr}","${timeOfDay}","${type}",${session.rpe},${session.duration || 60},${load},"${notes}"${ewmaCols}\n`;
         });
-        
-        // Add summary sheet
+
+        // Summary per player
         csv += '\n\nRESUMEN POR JUGADORA\n';
-        csv += 'Jugadora,Dorsal,Total Sesiones,RPE Medio,Carga Total,Ratio A:C,Estado\n';
-        
+        const summaryEWMAHeader = includeEWMA ? ',EWMA Aguda,EWMA Crónica,Ratio A:C,Estado' : '';
+        csv += `Jugadora,Dorsal,Total Sesiones,RPE Medio,Carga Total${summaryEWMAHeader}\n`;
+
         this.players.forEach(player => {
-            const playerSessions = this.sessions.filter(s => s.playerId === player.id);
+            const playerSessions = sessions.filter(s => s.playerId === player.id);
             const avgRPE = playerSessions.length > 0
-                ? (playerSessions.reduce((sum, s) => sum + s.rpe, 0) / playerSessions.length).toFixed(1)
-                : 0;
-            
-            const totalLoad = playerSessions.reduce((sum, s) => {
-                return sum + (s.load || (s.rpe * (s.duration || 60)));
-            }, 0);
-            
-            const ratio = this.calculateAcuteChronicRatio(player.id);
-            const status = this.getRatioStatus(ratio.ratio);
-            
-            csv += `"${player.name}","${player.number || ''}",${playerSessions.length},${avgRPE},${totalLoad},"${ratio.ratio}","${status}"\n`;
+                ? (playerSessions.reduce((sum, s) => sum + s.rpe, 0) / playerSessions.length).toFixed(1) : 0;
+            const totalLoad = playerSessions.reduce((sum, s) => sum + (s.load || (s.rpe * (s.duration || 60))), 0);
+
+            let ewmaSumCols = '';
+            if (includeEWMA) {
+                const r = ewmaCache[player.id];
+                ewmaSumCols = r
+                    ? `,"${r.acute.toFixed(1)}","${r.chronic.toFixed(1)}","${r.ratio}","${this.getRatioStatus(r.ratio)}"`
+                    : ',"N/A","N/A","N/A","Sin datos"';
+            }
+
+            csv += `"${player.name}","${player.number || ''}",${playerSessions.length},${avgRPE},${totalLoad}${ewmaSumCols}\n`;
         });
-        
-        // Download CSV
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url  = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        
-        const now = new Date();
-        const filename = `RPE_Basketball_${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}.csv`;
-        
+        const now  = new Date();
+        const rangeSuffix = fromVal ? `_${fromVal}_${toVal || 'hoy'}` : '_completo';
         link.setAttribute('href', url);
-        link.setAttribute('download', filename);
+        link.setAttribute('download', `RPE_Basketball${rangeSuffix}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
-        this.showToast('📥 Datos exportados a CSV', 'info');
+
+        this.showToast('📥 CSV exportado correctamente', 'info');
     }
 
     // ========== FEATURE 4: LOAD RECOMMENDATIONS ==========
