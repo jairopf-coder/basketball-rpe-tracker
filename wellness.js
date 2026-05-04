@@ -397,7 +397,7 @@ RPETracker.prototype._renderWModal = function(today) {
                         <div class="wellness-slider-row">
                             <span class="ws-label-lo">${config.lo}</span>
                             <input type="range" id="wForm${cap}" min="1" max="5" step="1" value="3"
-                                class="wellness-slider" oninput="rpeTracker._wUpdateSlider('${m}',this.value)">
+                                class="wellness-slider" data-metric="${m}">
                             <span class="ws-label-hi">${config.hi}</span>
                         </div>
                         <div class="ws-pips" id="wPips${cap}"></div>
@@ -427,6 +427,16 @@ RPETracker.prototype.openWellnessForm = function(presetPlayerId) {
     const modal = document.getElementById('wellnessModal');
     if (!modal) { this.renderWellnessDashboard(); return; }
     modal.style.display = 'flex';
+
+    // Event delegation for sliders (avoids inline rpeTracker ref timing issue)
+    if (!modal._sliderDelegated) {
+        modal._sliderDelegated = true;
+        modal.addEventListener('input', e => {
+            if (!e.target.classList.contains('wellness-slider')) return;
+            const metric = e.target.dataset.metric;
+            if (metric && window.rpeTracker) window.rpeTracker._wUpdateSlider(metric, e.target.value);
+        });
+    }
 
     if (presetPlayerId) {
         const sel = document.getElementById('wFormPlayer');
@@ -943,13 +953,13 @@ RPETracker.prototype.saveWellnessQuick = function() {
     const s = document.createElement('style');
     s.id = 'wellness-quick-styles';
     s.textContent = `
-.wq-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1100;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto}
-.wq-modal{background:var(--card-bg);border:1px solid var(--border-color);border-radius:14px;width:100%;max-width:860px;display:flex;flex-direction:column;max-height:90vh;margin:auto}
-.wq-modal-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border-color);flex-shrink:0}
+.wq-overlay{position:fixed;inset:0;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.wq-modal{background:var(--bg-primary,#fff);border:1px solid var(--border-color);border-radius:14px;width:100%;max-width:860px;display:flex;flex-direction:column;max-height:calc(100vh - 3rem);margin:0 auto;box-shadow:0 8px 40px rgba(0,0,0,.35)}
+.wq-modal-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border-color);flex-shrink:0;background:var(--bg-primary,#fff);border-radius:14px 14px 0 0}
 .wq-modal-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-right:.75rem}
 .wq-modal-date{font-size:.8rem;color:var(--text-secondary)}
-.wq-modal-body{overflow-y:auto;padding:.75rem 1rem;flex:1}
-.wq-modal-footer{display:flex;justify-content:flex-end;gap:.75rem;padding:.85rem 1.25rem;border-top:1px solid var(--border-color);flex-shrink:0}
+.wq-modal-body{overflow-y:auto;padding:.75rem 1rem;flex:1;background:var(--bg-primary,#fff)}
+.wq-modal-footer{display:flex;justify-content:flex-end;gap:.75rem;padding:.85rem 1.25rem;border-top:1px solid var(--border-color);flex-shrink:0;background:var(--bg-primary,#fff);border-radius:0 0 14px 14px}
 
 /* Row layout */
 .wq-row{display:grid;grid-template-columns:160px 1fr;align-items:center;gap:.75rem;padding:.55rem 0;border-bottom:1px solid var(--border-color)}
