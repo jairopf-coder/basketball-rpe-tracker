@@ -541,6 +541,12 @@ header h1 {
     display: flex;
 }
 
+.modal--top {
+    align-items: flex-start;
+    padding-top: 1.25rem;
+    overflow-y: auto;
+}
+
 .modal-content {
     background: var(--bg-surface);
     border-radius: 16px;

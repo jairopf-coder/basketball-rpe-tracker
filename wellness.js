@@ -365,7 +365,7 @@ RPETracker.prototype._renderWHistory = function() {
 
 RPETracker.prototype._renderWModal = function(today) {
     if(!this.players.length) return '';
-    return `<div id="wellnessModal" class="modal" style="display:none">
+    return `<div id="wellnessModal" class="modal modal--top" style="display:none">
         <div class="modal-content" style="max-width:480px">
             <div class="modal-header">
                 <div class="modal-header-inner">
@@ -386,22 +386,25 @@ RPETracker.prototype._renderWModal = function(today) {
                 </div>
                 ${['sleep','fatigue','mood','soreness'].map(m=>{
                     const config={
-                        sleep:{label:'😴 Calidad del sueño',lo:'Muy malo',hi:'Excelente'},
-                        fatigue:{label:'⚡ Nivel de energía',lo:'Muy cansada',hi:'Descansada'},
-                        mood:{label:'😊 Estado de ánimo',lo:'Muy bajo',hi:'Excelente'},
-                        soreness:{label:'💪 Dolor muscular',lo:'Mucho dolor',hi:'Sin dolor'}
+                        sleep:   {label:'😴 Calidad del sueño',   emojis:['😫','😞','😐','🙂','😄']},
+                        fatigue: {label:'⚡ Nivel de energía',    emojis:['😴','🥱','😐','💪','⚡']},
+                        mood:    {label:'😊 Estado de ánimo',     emojis:['😭','😟','😐','😊','😁']},
+                        soreness:{label:'💪 Dolor muscular',      emojis:['🤕','😣','😐','🙂','✅']}
                     }[m];
                     const cap=m.charAt(0).toUpperCase()+m.slice(1);
+                    const btns=[1,2,3,4,5].map(n=>`<button type="button"
+                        class="wem-btn" data-metric="${m}" data-val="${n}"
+                        title="${n}/5"
+                        onclick="window.rpeTracker?._wSelectEmoji('${m}',${n},this)">
+                        ${config.emojis[n-1]}
+                    </button>`).join('');
                     return `<div class="form-group">
                         <label class="form-label">${config.label}</label>
-                        <div class="wellness-slider-row">
-                            <span class="ws-label-lo">${config.lo}</span>
-                            <input type="range" id="wForm${cap}" min="1" max="5" step="1" value="3"
-                                class="wellness-slider" data-metric="${m}">
-                            <span class="ws-label-hi">${config.hi}</span>
+                        <div class="wem-row" id="wEmRow${cap}">
+                            <input type="hidden" id="wForm${cap}" data-metric="${m}" value="">
+                            ${btns}
+                            <span class="wem-hint" id="wVal${cap}"></span>
                         </div>
-                        <div class="ws-pips" id="wPips${cap}"></div>
-                        <div class="ws-val-display" id="wVal${cap}">3 — Aceptable</div>
                     </div>`;
                 }).join('')}
                 <div class="form-group">
@@ -449,8 +452,21 @@ RPETracker.prototype.openWellnessForm = function(presetPlayerId) {
 
     ['sleep','fatigue','mood','soreness'].forEach(m=>{
         const cap=m.charAt(0).toUpperCase()+m.slice(1);
-        const slider=document.getElementById(`wForm${cap}`);
-        if(slider){ slider.value=existing?(existing[m]||3):3; this._wUpdateSlider(m,slider.value); }
+        const hidden=document.getElementById(`wForm${cap}`);
+        if(hidden){
+            const val = existing ? (existing[m] || null) : null;
+            hidden.value = val || '';
+            // Activate matching emoji button, or none if no existing entry
+            const row=document.getElementById(`wEmRow${cap}`);
+            if(row){
+                row.querySelectorAll('.wem-btn').forEach(b=>{
+                    const active = val && parseInt(b.dataset.val)===val;
+                    b.classList.toggle('wem-btn--active', !!active);
+                });
+            }
+            const hint=document.getElementById(`wVal${cap}`);
+            if(hint){ hint.textContent=val?this._wEmojiLabel(val):''; hint.style.color=val?this._wColor(val):''; }
+        }
     });
     if (existing) { const n=document.getElementById('wFormNotes'); if(n) n.value=existing.notes||''; }
     this._wUpdateOverallPreview();
@@ -461,8 +477,13 @@ RPETracker.prototype.openWellnessForm = function(presetPlayerId) {
         const ex=(this.wellnessData||[]).find(w=>w.playerId===pid&&w.date===dt);
         ['sleep','fatigue','mood','soreness'].forEach(m=>{
             const cap=m.charAt(0).toUpperCase()+m.slice(1);
-            const s=document.getElementById(`wForm${cap}`);
-            if(s){s.value=ex?(ex[m]||3):3;this._wUpdateSlider(m,s.value);}
+            const hidden=document.getElementById(`wForm${cap}`);
+            const val = ex ? (ex[m] || null) : null;
+            if(hidden){ hidden.value = val || ''; }
+            const row=document.getElementById(`wEmRow${cap}`);
+            if(row){ row.querySelectorAll('.wem-btn').forEach(b=>{ b.classList.toggle('wem-btn--active', val&&parseInt(b.dataset.val)===val); }); }
+            const hint=document.getElementById(`wVal${cap}`);
+            if(hint){ hint.textContent=val?this._wEmojiLabel(val):''; hint.style.color=val?this._wColor(val):''; }
         });
         const notes=document.getElementById('wFormNotes');
         if(notes) notes.value=ex?.notes||'';
@@ -487,11 +508,38 @@ RPETracker.prototype._wUpdateSlider = function(metric, value) {
     this._wUpdateOverallPreview();
 };
 
+RPETracker.prototype._wSelectEmoji = function(metric, val, btn) {
+    const cap = metric.charAt(0).toUpperCase() + metric.slice(1);
+    // Update hidden input
+    const hidden = document.getElementById(`wForm${cap}`);
+    if (hidden) hidden.value = val;
+    // Toggle active class
+    const row = document.getElementById(`wEmRow${cap}`);
+    if (row) row.querySelectorAll('.wem-btn').forEach(b => {
+        b.classList.toggle('wem-btn--active', parseInt(b.dataset.val) === val);
+    });
+    // Update hint
+    const hint = document.getElementById(`wVal${cap}`);
+    if (hint) { hint.textContent = this._wEmojiLabel(val); hint.style.color = this._wColor(val); }
+    this._wUpdateOverallPreview();
+};
+
+RPETracker.prototype._wEmojiLabel = function(val) {
+    return {1:'Muy malo',2:'Malo',3:'Aceptable',4:'Bueno',5:'Excelente'}[val] || '';
+};
+
 RPETracker.prototype._wUpdateOverallPreview = function() {
-    const g=id=>parseInt(document.getElementById(id)?.value||3);
-    const overall=this._wOverall({sleep:g('wFormSleep'),fatigue:g('wFormFatigue'),mood:g('wFormMood'),soreness:g('wFormSoreness')});
+    const g=id=>{ const v=document.getElementById(id)?.value; return v?parseInt(v):null; };
+    const s=g('wFormSleep'),f=g('wFormFatigue'),m=g('wFormMood'),so=g('wFormSoreness');
     const el=document.getElementById('wOverallScore');
     const wrap=document.getElementById('wOverallPreview');
+    const filled=[s,f,m,so].filter(v=>v!==null);
+    if(!filled.length){
+        if(el){el.textContent='— / 5';el.style.color='var(--text-secondary)';}
+        if(wrap) wrap.style.borderColor='var(--border-color)';
+        return;
+    }
+    const overall=filled.reduce((a,b)=>a+b,0)/filled.length;
     if(el){el.textContent=`${overall.toFixed(1)} / 5`;el.style.color=this._wColor(overall);}
     if(wrap) wrap.style.borderColor=this._wColor(overall);
 };
@@ -501,12 +549,14 @@ RPETracker.prototype.saveWellnessEntry = function() {
     const playerId=document.getElementById('wFormPlayer')?.value;
     const date=document.getElementById('wFormDate')?.value;
     if(!playerId||!date){this.showToast('⚠️ Selecciona jugadora y fecha','warning');return;}
+    const getMetric = m => { const v=document.getElementById(`wForm${m.charAt(0).toUpperCase()+m.slice(1)}`)?.value; return v?parseInt(v):null; };
+    const sleepVal=getMetric('sleep'), fatigueVal=getMetric('fatigue'), moodVal=getMetric('mood'), sorenessVal=getMetric('soreness');
+    if([sleepVal,fatigueVal,moodVal,sorenessVal].some(v=>v===null)){
+        this.showToast('⚠️ Selecciona un valor para cada métrica','warning'); return;
+    }
     const entry={
         id:`w_${playerId}_${date}`,playerId,date,
-        sleep:parseInt(document.getElementById('wFormSleep')?.value||3),
-        fatigue:parseInt(document.getElementById('wFormFatigue')?.value||3),
-        mood:parseInt(document.getElementById('wFormMood')?.value||3),
-        soreness:parseInt(document.getElementById('wFormSoreness')?.value||3),
+        sleep:sleepVal, fatigue:fatigueVal, mood:moodVal, soreness:sorenessVal,
         notes:document.getElementById('wFormNotes')?.value||'',
         savedAt:new Date().toISOString()
     };
@@ -596,14 +646,18 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 .wellness-player-table td{padding:.45rem .6rem;border-bottom:1px solid var(--border-color)}
 .wellness-player-table tr:last-child td{border-bottom:none}
 .wt-badge{display:inline-block;padding:.1rem .5rem;border-radius:10px;color:white;font-size:.72rem;font-weight:600;letter-spacing:.5px}
+/* slider styles kept for legacy compat but hidden */
 .wellness-slider-row{display:flex;align-items:center;gap:.5rem}
 .ws-label-lo,.ws-label-hi{font-size:.72rem;color:var(--text-secondary);width:80px;flex-shrink:0}
 .ws-label-hi{text-align:right}
-.wellness-slider{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:var(--border-color);outline:none;cursor:pointer}
-.wellness-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--primary-color);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
-.ws-pips{display:flex;gap:4px;margin:.35rem 80px 0}
-.ws-pip{flex:1;height:4px;border-radius:2px;background:var(--border-color);transition:background .2s}
-.ws-val-display{text-align:center;font-weight:600;font-size:.85rem;margin-top:.35rem;transition:color .2s}
+.ws-pips{display:none}
+.ws-val-display{display:none}
+/* ── Emoji buttons ── */
+.wem-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.2rem}
+.wem-btn{font-size:1.6rem;background:none;border:2px solid var(--border-color);border-radius:10px;padding:.25rem .45rem;cursor:pointer;transition:transform .12s,border-color .15s,background .15s;line-height:1;flex-shrink:0}
+.wem-btn:hover{transform:scale(1.15);border-color:var(--text-secondary)}
+.wem-btn--active{border-color:var(--primary-color);background:rgba(255,152,0,.12);transform:scale(1.18)}
+.wem-hint{font-size:.8rem;font-weight:600;margin-left:.4rem;transition:color .2s;min-width:70px}
 .wellness-overall-preview{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-radius:10px;border:2px solid var(--border-color);background:var(--card-bg);margin-top:.5rem;transition:border-color .3s}
 .wellness-history-table{width:100%;border-collapse:collapse;font-size:.82rem}
 .wellness-history-table th{text-align:left;padding:.35rem .5rem;color:var(--text-secondary);font-size:.75rem;border-bottom:2px solid var(--border-color)}
@@ -954,12 +1008,12 @@ RPETracker.prototype.saveWellnessQuick = function() {
     s.id = 'wellness-quick-styles';
     s.textContent = `
 .wq-overlay{position:fixed;inset:0;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.wq-modal{background:var(--bg-primary,#fff);border:1px solid var(--border-color);border-radius:14px;width:100%;max-width:860px;display:flex;flex-direction:column;max-height:calc(100vh - 3rem);margin:0 auto;box-shadow:0 8px 40px rgba(0,0,0,.35)}
-.wq-modal-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border-color);flex-shrink:0;background:var(--bg-primary,#fff);border-radius:14px 14px 0 0}
+.wq-modal{background:var(--bg-card,#fff);border:1px solid var(--border-color);border-radius:14px;width:100%;max-width:860px;display:flex;flex-direction:column;max-height:calc(100vh - 3rem);margin:0 auto;box-shadow:0 8px 40px rgba(0,0,0,.35)}
+.wq-modal-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border-color);flex-shrink:0;background:var(--bg-card,#fff);border-radius:14px 14px 0 0}
 .wq-modal-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-right:.75rem}
 .wq-modal-date{font-size:.8rem;color:var(--text-secondary)}
-.wq-modal-body{overflow-y:auto;padding:.75rem 1rem;flex:1;background:var(--bg-primary,#fff)}
-.wq-modal-footer{display:flex;justify-content:flex-end;gap:.75rem;padding:.85rem 1.25rem;border-top:1px solid var(--border-color);flex-shrink:0;background:var(--bg-primary,#fff);border-radius:0 0 14px 14px}
+.wq-modal-body{overflow-y:auto;padding:.75rem 1rem;flex:1;background:var(--bg-card,#fff)}
+.wq-modal-footer{display:flex;justify-content:flex-end;gap:.75rem;padding:.85rem 1.25rem;border-top:1px solid var(--border-color);flex-shrink:0;background:var(--bg-card,#fff);border-radius:0 0 14px 14px}
 
 /* Row layout */
 .wq-row{display:grid;grid-template-columns:160px 1fr;align-items:center;gap:.75rem;padding:.55rem 0;border-bottom:1px solid var(--border-color)}
