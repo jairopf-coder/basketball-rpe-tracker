@@ -13,6 +13,8 @@
     --secondary-soft: #e8f0ff;
 
     /* ── Semánticos de estado ───────────────────────────── */
+    --color-pending-dot:   #ff6d00;
+    --color-pending-label: #bf360c;
     --success:        #22a861;
     --success-soft:   #e6f7ee;
     --warning:        #f5a623;
@@ -98,6 +100,8 @@
     --border:         #2e2e36;
     --border-input:   #3a3a44;
     --text-primary:   #f0f0f4;
+    --color-pending-dot:   #ff9100;
+    --color-pending-label: #ffab40;
     --text-secondary: #c4c4cc;
     --text-muted:     #88889a;
     --text-faint:     #44444e;
@@ -2545,6 +2549,15 @@ header h1 {
 
 .connection-indicator.connecting .connection-label { color: #ff9800; }
 
+/* Offline write queue — pending state */
+.connection-indicator.pending .connection-dot {
+    background: var(--color-pending-dot, #ff6d00);
+    animation: pulse-dot 1.4s ease-in-out infinite;
+}
+.connection-indicator.pending .connection-label {
+    color: var(--color-pending-label, #ff6d00);
+}
+
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.5; transform: scale(0.85); }
@@ -3147,6 +3160,72 @@ header h1 {
     gap: 1rem;
     margin-bottom: 1.25rem;
     flex-wrap: wrap;
+}
+
+/* ── Comparador date-range picker ── */
+.comp-daterange {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding: 0.65rem 0.9rem;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 1rem;
+}
+
+.comp-dr-presets {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.comp-dr-preset {
+    padding: 0.3rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    background: var(--bg-card, var(--bg-surface));
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+}
+
+.comp-dr-preset.active,
+.comp-dr-preset:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-soft);
+}
+
+.comp-dr-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+}
+
+.comp-dr-input {
+    padding: 0.3rem 0.5rem;
+    border: 1.5px solid var(--border-input);
+    border-radius: 7px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    font-size: max(0.78rem, 16px); /* prevent iOS zoom */
+    outline: none;
+}
+
+.comp-dr-input:focus {
+    border-color: var(--primary);
+}
+
+.comp-dr-sep {
+    color: var(--text-muted);
+    font-size: 0.8rem;
 }
 
 .comp-selector-group {

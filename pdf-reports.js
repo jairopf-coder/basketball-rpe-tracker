@@ -918,3 +918,224 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
     win.document.close();
     this.showToast('📊 Informe de equipo generado', 'success');
 };
+
+// ========== INFORME INDIVIDUAL POR JUGADORA (A4) ==========
+
+RPETracker.prototype.generatePlayerReport = function(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) { this.showToast('Jugadora no encontrada', 'error'); return; }
+
+    const color = (typeof PlayerTokens !== 'undefined') ? PlayerTokens.get(player) : (player.color || '#ff6600');
+
+    // ── Carga semanal últimas 8 semanas ──
+    const now = new Date();
+    const weekBuckets = [];
+    for (let w = 7; w >= 0; w--) {
+        const wStart = new Date(now); wStart.setDate(wStart.getDate() - w * 7 - (now.getDay() || 7) + 1); wStart.setHours(0,0,0,0);
+        const wEnd   = new Date(wStart); wEnd.setDate(wStart.getDate() + 6); wEnd.setHours(23,59,59,999);
+        const load   = this.sessions
+            .filter(s => s.playerId === playerId && new Date(s.date) >= wStart && new Date(s.date) <= wEnd)
+            .reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
+        const label  = `${wStart.getDate()}/${wStart.getMonth()+1}`;
+        weekBuckets.push({ label, load });
+    }
+
+    // ── Lesiones ──
+    this.injuries = this.injuries || [];
+    const playerInjuries = this.injuries
+        .filter(i => i.playerId === playerId)
+        .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+
+    const severityLabel = { minor: 'Leve', moderate: 'Moderada', severe: 'Grave' };
+    const injRows = playerInjuries.map(inj => {
+        const start    = new Date(inj.startDate).toLocaleDateString('es-ES');
+        const loc      = (typeof this.getLocationName === 'function') ? this.getLocationName(inj.location) : (inj.location || '—');
+        const days     = inj.getDaysInjured ? inj.getDaysInjured() : '—';
+        const statusBadge = inj.status === 'active' ? '<span style="color:#f44336;font-weight:700">●&nbsp;Activa</span>' : '<span style="color:#4caf50">✓&nbsp;Alta</span>';
+        return `<tr>
+            <td>${start}</td>
+            <td>${loc}</td>
+            <td>${severityLabel[inj.severity] || inj.severity || '—'}</td>
+            <td style="text-align:center">${days}</td>
+            <td>${statusBadge}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="5" style="color:#999;text-align:center">Sin lesiones registradas</td></tr>';
+
+    // ── Últimas 3 notas clínicas ──
+    this.initClinicalNotes && this.initClinicalNotes();
+    const notes = ((this.clinicalNotes || [])
+        .filter(n => n.playerId === playerId)
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 3));
+
+    const notesSection = notes.length === 0 ? '' : `
+        <div class="section">
+            <h2>📓 Últimas notas clínicas</h2>
+            ${notes.map(n => `
+                <div class="note-row">
+                    <div class="note-date">${new Date(n.date).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric' })}</div>
+                    <div class="note-text">${n.text || n.content || ''}</div>
+                </div>`).join('')}
+        </div>`;
+
+    const ratio = this.calculateAcuteChronicRatio(playerId);
+    const ratioColor = this.getRatioColor ? this.getRatioColor(ratio.ratio, playerId) : '#333';
+    const totalLoad = this.sessions.filter(s => s.playerId === playerId).reduce((s, x) => s + (x.load || x.rpe * (x.duration || 60)), 0);
+    const avgRPE    = (() => {
+        const ps = this.sessions.filter(s => s.playerId === playerId);
+        return ps.length ? (ps.reduce((s, x) => s + x.rpe, 0) / ps.length).toFixed(1) : '—';
+    })();
+
+    const chartLabels  = JSON.stringify(weekBuckets.map(b => b.label));
+    const chartData    = JSON.stringify(weekBuckets.map(b => b.load));
+    const barColor     = JSON.stringify(color);
+    const avatarLetter = player.name.charAt(0).toUpperCase();
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe — ${player.name}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"><\/script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+         color: #1a1a1a; background: #fff; padding: 32px 40px; font-size: 13px; }
+  @media print {
+    body { padding: 16px 20px; }
+    .no-print { display: none !important; }
+    @page { margin: 1.2cm; size: A4; }
+    canvas { max-height: 200px !important; }
+  }
+
+  /* ── Header ── */
+  .rpt-header { display: flex; align-items: center; gap: 18px;
+                border-bottom: 3px solid ${color}; padding-bottom: 18px; margin-bottom: 24px; }
+  .rpt-avatar { width: 56px; height: 56px; border-radius: 50%;
+                background: ${color}; color: #fff; display: flex; align-items: center;
+                justify-content: center; font-size: 1.4rem; font-weight: 700; flex-shrink: 0; }
+  .rpt-name   { font-size: 20px; font-weight: 700; color: ${color}; }
+  .rpt-sub    { font-size: 12px; color: #888; margin-top: 2px; }
+  .rpt-meta   { margin-left: auto; text-align: right; font-size: 11px; color: #aaa; }
+  .rpt-meta strong { color: #444; font-size: 12px; }
+
+  /* ── Print btn ── */
+  .print-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
+               background: ${color}; color: #fff; border: none; border-radius: 8px;
+               font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 20px; }
+
+  /* ── KPI row ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+  .kpi { border: 1px solid #e8e8e8; border-radius: 10px; padding: 12px 10px; text-align: center; }
+  .kpi .num { font-size: 24px; font-weight: 700; line-height: 1.1; }
+  .kpi .lbl { font-size: 10px; color: #999; margin-top: 3px; text-transform: uppercase; letter-spacing: .05em; }
+
+  /* ── Section title ── */
+  .section { margin-bottom: 24px; }
+  h2 { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase;
+       letter-spacing: .06em; margin-bottom: 10px; padding-bottom: 6px;
+       border-bottom: 1.5px solid #eee; }
+
+  /* ── Chart ── */
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* ── Injuries table ── */
+  table.inj-tbl { width: 100%; border-collapse: collapse; }
+  table.inj-tbl th { padding: 6px 10px; text-align: left; font-size: 10px; font-weight: 700;
+                     color: #888; text-transform: uppercase; background: #fafafa;
+                     border-bottom: 1.5px solid #eee; }
+  table.inj-tbl td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; font-size: 12px; vertical-align: middle; }
+
+  /* ── Clinical notes ── */
+  .note-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+  .note-date { flex-shrink: 0; font-size: 11px; color: #888; width: 90px; padding-top: 1px; }
+  .note-text { font-size: 12px; color: #333; line-height: 1.5; }
+
+  /* ── Footer ── */
+  .rpt-footer { margin-top: 32px; padding-top: 10px; border-top: 1px solid #eee;
+                display: flex; justify-content: space-between; font-size: 10px; color: #bbb; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+
+<div class="rpt-header">
+  <div class="rpt-avatar">${avatarLetter}</div>
+  <div>
+    <div class="rpt-name">${player.name}${player.number ? ` <span style="opacity:.6;font-size:.8em">#${player.number}</span>` : ''}</div>
+    <div class="rpt-sub">Informe individual · ${new Date().toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' })}</div>
+  </div>
+  <div class="rpt-meta">
+    <strong>Basketball RPE Tracker</strong><br>
+    Método EWMA · Generado ${new Date().toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="num" style="color:${color}">${ratio.ratio !== 'N/A' ? ratio.ratio : '—'}</div><div class="lbl">Ratio A:C</div></div>
+  <div class="kpi"><div class="num">${avgRPE}</div><div class="lbl">RPE medio</div></div>
+  <div class="kpi"><div class="num">${totalLoad.toLocaleString('es-ES')}</div><div class="lbl">Carga total</div></div>
+  <div class="kpi"><div class="num" style="color:#f44336">${playerInjuries.filter(i=>i.status==='active').length}</div><div class="lbl">Lesiones activas</div></div>
+</div>
+
+<div class="section">
+  <h2>📊 Carga semanal — últimas 8 semanas</h2>
+  <div class="chart-wrap">
+    <canvas id="indivLoadChart"></canvas>
+  </div>
+</div>
+
+<div class="section">
+  <h2>🏥 Lesiones</h2>
+  <table class="inj-tbl">
+    <thead><tr>
+      <th>Fecha inicio</th><th>Zona</th><th>Severidad</th>
+      <th style="text-align:center">Días de baja</th><th>Estado</th>
+    </tr></thead>
+    <tbody>${injRows}</tbody>
+  </table>
+</div>
+
+${notesSection}
+
+<div class="rpt-footer">
+  <span>Basketball RPE Tracker · Metodología EWMA</span>
+  <span>Generado ${new Date().toLocaleString('es-ES')}</span>
+</div>
+
+<script>
+(function() {
+  var labels = ${chartLabels};
+  var data   = ${chartData};
+  var color  = ${barColor};
+  var ctx    = document.getElementById('indivLoadChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{ label: 'Carga UA', data: data, backgroundColor: color + 'bb',
+                   borderColor: color, borderWidth: 1, borderRadius: 5, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y.toLocaleString('es-ES') + ' UA' } }
+      },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 } } },
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+})();
+<\/script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    this.showToast(`📄 Informe de ${player.name} generado`, 'success');
+};

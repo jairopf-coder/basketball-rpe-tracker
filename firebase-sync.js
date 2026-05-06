@@ -41,8 +41,8 @@ class FirebaseSync {
             localStorage.setItem('basketballSessions', JSON.stringify(sessions));
         } catch (error) {
             console.error('Error saving sessions:', error);
-            // Fallback a localStorage
             localStorage.setItem('basketballSessions', JSON.stringify(sessions));
+            await this._enqueueWrite('sessions', Object.fromEntries(sessions.map(s => [s.id, s])));
         }
     }
 
@@ -85,8 +85,8 @@ class FirebaseSync {
             localStorage.setItem('basketballPlayers', JSON.stringify(players));
         } catch (error) {
             console.error('Error saving players:', error);
-            // Fallback a localStorage
             localStorage.setItem('basketballPlayers', JSON.stringify(players));
+            await this._enqueueWrite('players', Object.fromEntries(players.map(p => [p.id, p])));
         }
     }
 
@@ -130,11 +130,19 @@ class FirebaseSync {
     // Verificar estado de conexión y actualizar indicador visual
     checkConnection() {
         const connectedRef = this.db.ref('.info/connected');
+        let wasOnline = null;
         connectedRef.on('value', (snapshot) => {
             const online = snapshot.val() === true;
             console.log(online ? '🟢 Conectado a Firebase' : '🔴 Desconectado de Firebase');
             this.updateConnectionIndicator(online);
+            if (online && wasOnline === false) {
+                // Reconnect event: drain pending writes
+                this._drainQueue();
+            }
+            wasOnline = online;
         });
+        // Show initial pending count badge if any writes are queued
+        this._updatePendingCount();
     }
 
     updateConnectionIndicator(online) {
@@ -165,6 +173,7 @@ FirebaseSync.prototype.saveGymSessions = async function(gymSessions) {
     } catch (e) {
         console.error('Error saving gymSessions to Firebase:', e);
         localStorage.setItem('bk_gym_sessions', JSON.stringify(gymSessions));
+        await this._enqueueWrite('gymSessions', Object.fromEntries(gymSessions.map(s => [s.id, s])));
     }
 };
 
@@ -187,6 +196,7 @@ FirebaseSync.prototype.saveTestSessions = async function(testSessions) {
     } catch (e) {
         console.error('Error saving testSessions to Firebase:', e);
         localStorage.setItem('bk_test_sessions', JSON.stringify(testSessions));
+        await this._enqueueWrite('testSessions', Object.fromEntries(testSessions.map(s => [s.id, s])));
     }
 };
 
@@ -209,6 +219,7 @@ FirebaseSync.prototype.saveWellnessData = async function(wellnessData) {
     } catch (e) {
         console.error('Error saving wellness to Firebase:', e);
         localStorage.setItem('basketballWellness', JSON.stringify(wellnessData));
+        await this._enqueueWrite('wellness', Object.fromEntries(wellnessData.map(w => [w.id, w])));
     }
 };
 
@@ -246,6 +257,7 @@ FirebaseSync.prototype.saveInjuries = async function(injuries) {
     } catch (e) {
         console.error('Error saving injuries to Firebase:', e);
         localStorage.setItem('basketballInjuries', JSON.stringify(injuries));
+        await this._enqueueWrite('injuries', Object.fromEntries(injuries.map(i => [i.id, i])));
     }
 };
 
@@ -266,6 +278,7 @@ FirebaseSync.prototype.saveWeekPlan = async function(weekPlan) {
     } catch (e) {
         console.error('Error saving weekPlan to Firebase:', e);
         localStorage.setItem('basketballWeekPlan', JSON.stringify(weekPlan));
+        await this._enqueueWrite('weekPlan', weekPlan);
     }
 };
 
@@ -278,6 +291,7 @@ FirebaseSync.prototype.saveClinicalNotes = async function(notes) {
     } catch (e) {
         console.error('Error saving clinicalNotes to Firebase:', e);
         localStorage.setItem('basketballClinicalNotes', JSON.stringify(notes));
+        await this._enqueueWrite('clinicalNotes', Object.fromEntries(notes.map(n => [n.id, n])));
     }
 };
 
@@ -298,6 +312,7 @@ FirebaseSync.prototype.saveSeasonBlocks = async function(blocks) {
     } catch (e) {
         console.error('Error saving seasonBlocks to Firebase:', e);
         localStorage.setItem('rpe_seasonBlocks', JSON.stringify(blocks || []));
+        await this._enqueueWrite('seasonBlocks', Object.fromEntries((blocks||[]).map(b => [b.id, b])));
     }
 };
 
@@ -316,4 +331,112 @@ FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
         const blocks = data ? Object.values(data) : [];
         callback(blocks);
     });
+};
+
+// ========== OFFLINE WRITE QUEUE (IndexedDB) ==========
+
+FirebaseSync.prototype._idbReady = null; // Promise<IDBDatabase>
+
+FirebaseSync.prototype._openIDB = function() {
+    if (this._idbReady) return this._idbReady;
+    this._idbReady = new Promise((resolve, reject) => {
+        const req = indexedDB.open('rpe_offline', 1);
+        req.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('rpe_pendingWrites')) {
+                const store = db.createObjectStore('rpe_pendingWrites', { keyPath: 'id', autoIncrement: true });
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+        };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+    });
+    return this._idbReady;
+};
+
+FirebaseSync.prototype._enqueueWrite = async function(ref, data) {
+    try {
+        const db = await this._openIDB();
+        return new Promise((resolve, reject) => {
+            const tx    = db.transaction('rpe_pendingWrites', 'readwrite');
+            const store = tx.objectStore('rpe_pendingWrites');
+            const req   = store.add({ ref, data, timestamp: Date.now() });
+            req.onsuccess = () => {
+                resolve();
+                this._updatePendingCount();
+            };
+            req.onerror = e => reject(e.target.error);
+        });
+    } catch (err) {
+        console.warn('[offline-queue] Error enqueueing write:', err);
+    }
+};
+
+FirebaseSync.prototype._drainQueue = async function() {
+    try {
+        const db = await this._openIDB();
+        const all = await new Promise((resolve, reject) => {
+            const tx    = db.transaction('rpe_pendingWrites', 'readonly');
+            const store = tx.objectStore('rpe_pendingWrites');
+            const req   = store.getAll();
+            req.onsuccess = e => resolve(e.target.result);
+            req.onerror   = e => reject(e.target.error);
+        });
+
+        if (!all.length) return;
+        console.log(`[offline-queue] Drenando ${all.length} escritura(s) pendiente(s)…`);
+
+        // FIFO: sort by timestamp just in case
+        all.sort((a, b) => a.timestamp - b.timestamp);
+
+        for (const entry of all) {
+            try {
+                await this.db.ref(entry.ref).set(entry.data);
+                // Remove from queue on success
+                await new Promise((resolve, reject) => {
+                    const tx    = db.transaction('rpe_pendingWrites', 'readwrite');
+                    const store = tx.objectStore('rpe_pendingWrites');
+                    const req   = store.delete(entry.id);
+                    req.onsuccess = resolve;
+                    req.onerror   = e => reject(e.target.error);
+                });
+            } catch (err) {
+                console.warn(`[offline-queue] Reintento fallido para ${entry.ref}:`, err);
+                // Leave in queue for next reconnect
+            }
+        }
+
+        this._updatePendingCount();
+        this.showToast && this.showToast('☁️ Datos sincronizados con Firebase', 'success');
+    } catch (err) {
+        console.warn('[offline-queue] Error drenando cola:', err);
+    }
+};
+
+FirebaseSync.prototype._updatePendingCount = async function() {
+    try {
+        const db    = await this._openIDB();
+        const count = await new Promise((resolve, reject) => {
+            const tx  = db.transaction('rpe_pendingWrites', 'readonly');
+            const req = tx.objectStore('rpe_pendingWrites').count();
+            req.onsuccess = e => resolve(e.target.result);
+            req.onerror   = e => reject(e.target.error);
+        });
+        this._setPendingIndicator(count);
+    } catch (_) { /* ignore */ }
+};
+
+FirebaseSync.prototype._setPendingIndicator = function(count) {
+    const indicator = document.getElementById('connectionIndicator');
+    if (!indicator) return;
+    if (count > 0) {
+        indicator.className = 'connection-indicator pending';
+        const label = indicator.querySelector('.connection-label');
+        if (label) label.textContent = `${count} pendiente${count !== 1 ? 's' : ''}`;
+        indicator.title = `${count} escritura${count !== 1 ? 's' : ''} en cola`;
+    } else {
+        // Revert to current online/offline state — read it from the dot class
+        const wasOnline = !indicator.classList.contains('offline');
+        this.updateConnectionIndicator(wasOnline);
+    }
 };

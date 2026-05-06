@@ -702,6 +702,7 @@ class RPETracker {
                     </div>
                     <div class="player-actions">
                         <button class="btn-icon" style="background: #2196f3; color: white;" onclick="window.rpeTracker?.showPlayerReportMenu('${player.id}')" title="Informe PDF">📄</button>
+                        <button class="btn-icon" style="background: #7b1fa2; color: white;" onclick="window.rpeTracker?.generatePlayerReport('${player.id}')" title="Informe individual">📋</button>
                         <button class="btn-icon" style="background: var(--primary); color: white;" onclick="window.rpeTracker?.editPlayer('${player.id}')" title="Editar">✏️</button>
                         <button class="btn-icon" style="background: #f44336; color: white;" onclick="window.rpeTracker?.deletePlayer('${player.id}')" title="Eliminar">🗑️</button>
                     </div>
@@ -4403,6 +4404,10 @@ class RPETracker {
         `;
 
         this._compMode = 'pvp';
+        // Initialise date range to last 4 weeks
+        this._compRangeStart = (() => { const d = new Date(); d.setDate(d.getDate() - 28); return d.toISOString().slice(0,10); })();
+        this._compRangeEnd   = new Date().toISOString().slice(0,10);
+        this._injectCompDatePicker();
         this.updateComparison();
     }
 
@@ -4556,8 +4561,88 @@ class RPETracker {
         }
     }
 
+    _injectCompDatePicker() {
+        const card = document.querySelector('#comparisonModule .comp-card');
+        if (!card) return;
+
+        const now = new Date();
+        // Season start: 1 Sep of current or prior year
+        const seasonYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+        const seasonStart = `${seasonYear}-09-01`;
+
+        // Month start
+        const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+
+        const pickerHTML = `
+            <div class="comp-daterange" id="compDateRange">
+                <div class="comp-dr-presets">
+                    <button class="comp-dr-preset active" id="drPreset4w" onclick="window.rpeTracker?.setCompDatePreset('4w')">Últimas 4 semanas</button>
+                    <button class="comp-dr-preset" id="drPresetMonth" onclick="window.rpeTracker?.setCompDatePreset('month')">Este mes</button>
+                    <button class="comp-dr-preset" id="drPresetSeason" onclick="window.rpeTracker?.setCompDatePreset('season')">Temporada completa</button>
+                </div>
+                <div class="comp-dr-inputs">
+                    <input type="date" id="compDateFrom" class="comp-dr-input" value="${this._compRangeStart}"
+                           onchange="window.rpeTracker?._onCompDateChange()">
+                    <span class="comp-dr-sep">→</span>
+                    <input type="date" id="compDateTo" class="comp-dr-input" value="${this._compRangeEnd}"
+                           onchange="window.rpeTracker?._onCompDateChange()">
+                </div>
+            </div>`;
+
+        // Insert before comp-body-grid
+        const bodyGrid = card.querySelector('.comp-body-grid');
+        if (bodyGrid) bodyGrid.insertAdjacentHTML('beforebegin', pickerHTML);
+    }
+
+    setCompDatePreset(preset) {
+        const now = new Date();
+        let start;
+        if (preset === '4w') {
+            start = new Date(now); start.setDate(start.getDate() - 28);
+        } else if (preset === 'month') {
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+        } else { // season
+            const y = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+            start = new Date(y, 8, 1); // 1 Sep
+        }
+        this._compRangeStart = start.toISOString().slice(0,10);
+        this._compRangeEnd   = now.toISOString().slice(0,10);
+
+        const fromEl = document.getElementById('compDateFrom');
+        const toEl   = document.getElementById('compDateTo');
+        if (fromEl) fromEl.value = this._compRangeStart;
+        if (toEl)   toEl.value   = this._compRangeEnd;
+
+        // Update active preset button
+        ['4w','month','season'].forEach(p => {
+            document.getElementById(`drPreset${p === '4w' ? '4w' : p === 'month' ? 'Month' : 'Season'}`)
+                ?.classList.toggle('active', p === preset);
+        });
+
+        this.updateComparison();
+    }
+
+    _onCompDateChange() {
+        const fromEl = document.getElementById('compDateFrom');
+        const toEl   = document.getElementById('compDateTo');
+        if (!fromEl || !toEl) return;
+        this._compRangeStart = fromEl.value;
+        this._compRangeEnd   = toEl.value;
+        // Deactivate all presets when manually changed
+        ['drPreset4w','drPresetMonth','drPresetSeason'].forEach(id => {
+            document.getElementById(id)?.classList.remove('active');
+        });
+        this.updateComparison();
+    }
+
     getCompStats(playerId) {
-        const sessions = this.sessions.filter(s => s.playerId === playerId);
+        const rangeStart = this._compRangeStart ? new Date(this._compRangeStart) : null;
+        const rangeEnd   = this._compRangeEnd   ? new Date(this._compRangeEnd + 'T23:59:59') : null;
+
+        const allSessions = this.sessions.filter(s => s.playerId === playerId);
+        const sessions = (rangeStart && rangeEnd)
+            ? allSessions.filter(s => { const d = new Date(s.date); return d >= rangeStart && d <= rangeEnd; })
+            : allSessions;
         const ratio = this.calculateAcuteChronicRatio(playerId);
         const totalLoad = sessions.reduce((s, x) => s + (x.load || x.rpe*(x.duration||60)), 0);
 
@@ -4612,7 +4697,12 @@ class RPETracker {
     }
 
     getWeeklyRPESeries(playerId) {
-        const sessions = this.sessions.filter(s => s.playerId === playerId);
+        const rangeStart = this._compRangeStart ? new Date(this._compRangeStart) : null;
+        const rangeEnd   = this._compRangeEnd   ? new Date(this._compRangeEnd + 'T23:59:59') : null;
+        let sessions = this.sessions.filter(s => s.playerId === playerId);
+        if (rangeStart && rangeEnd) {
+            sessions = sessions.filter(s => { const d = new Date(s.date); return d >= rangeStart && d <= rangeEnd; });
+        }
         const byWeek = {};
         sessions.forEach(s => {
             const d = new Date(s.date);
@@ -4622,21 +4712,25 @@ class RPETracker {
         });
         return Object.entries(byWeek)
             .map(([week, rpes]) => ({ week, rpe: rpes.reduce((a,b)=>a+b,0)/rpes.length }))
-            .sort((a,b) => a.week.localeCompare(b.week))
-            .slice(-10);
+            .sort((a,b) => a.week.localeCompare(b.week));
     }
 
     getTeamWeeklyRPESeries() {
+        const rangeStart = this._compRangeStart ? new Date(this._compRangeStart) : null;
+        const rangeEnd   = this._compRangeEnd   ? new Date(this._compRangeEnd + 'T23:59:59') : null;
+        let sessions = this.sessions;
+        if (rangeStart && rangeEnd) {
+            sessions = sessions.filter(s => { const d = new Date(s.date); return d >= rangeStart && d <= rangeEnd; });
+        }
         const byWeek = {};
-        this.sessions.forEach(s => {
+        sessions.forEach(s => {
             const week = this.getWeekKey(new Date(s.date));
             if (!byWeek[week]) byWeek[week] = [];
             byWeek[week].push(s.rpe);
         });
         return Object.entries(byWeek)
             .map(([week, rpes]) => ({ week, rpe: rpes.reduce((a,b)=>a+b,0)/rpes.length }))
-            .sort((a,b) => a.week.localeCompare(b.week))
-            .slice(-10);
+            .sort((a,b) => a.week.localeCompare(b.week));
     }
 
     getWeekKey(date) {
