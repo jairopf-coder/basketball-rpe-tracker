@@ -2992,7 +2992,10 @@ class RPETracker {
     }
 
     loadSessions() {
-        // Firebase es la fuente de verdad — escuchar cambios en tiempo real
+        // Seed inmediato desde localStorage para render inicial sin esperar Firebase
+        const localStored = localStorage.getItem('basketballSessions');
+        const localSessions = localStored ? JSON.parse(localStored) : [];
+
         if (window.firebaseSync) {
             window.firebaseSync.onSessionsChange((updatedSessions) => {
                 this.sessions = updatedSessions;
@@ -3002,10 +3005,8 @@ class RPETracker {
             });
         } else {
             console.warn('⚠️ Firebase no disponible, usando localStorage');
-            const stored = localStorage.getItem('basketballSessions');
-            return stored ? JSON.parse(stored) : [];
         }
-        return [];
+        return localSessions;
     }
 
     saveSessions() {
@@ -3019,23 +3020,24 @@ class RPETracker {
     }
 
     loadPlayers() {
-        // Firebase es la fuente de verdad — escuchar cambios en tiempo real
+        // Seed inmediato desde localStorage para render inicial sin esperar Firebase
+        const localStored = localStorage.getItem('basketballPlayers');
+        const localPlayers = localStored ? JSON.parse(localStored) : [];
+
         if (window.firebaseSync) {
             window.firebaseSync.onPlayersChange((updatedPlayers) => {
                 this.players = updatedPlayers;
-                this._ensurePlayerColors(); // migrate old players that lack color
+                this._ensurePlayerColors();
                 this.renderPlayers();
                 this.populatePlayerSelects();
-                this.renderSessions(); // re-renderizar para mostrar nombres correctos
+                this.renderSessions();
                 if (this.currentView === 'dashboard') this.renderDashboard();
                 console.log('🔄 Jugadores actualizados desde Firebase');
             });
         } else {
             console.warn('⚠️ Firebase no disponible, usando localStorage');
-            const stored = localStorage.getItem('basketballPlayers');
-            return stored ? JSON.parse(stored) : [];
         }
-        return [];
+        return localPlayers;
     }
 
     savePlayers() {
