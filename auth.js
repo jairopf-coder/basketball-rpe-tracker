@@ -1,21 +1,32 @@
 // ========== SISTEMA DE ACCESO CON PIN ==========
+// Roles: 'trainer' (preparador físico), 'physio' (fisio),
+//        'coach' (entrenador jefe), 'player' (jugadoras)
 
 const AppAuth = {
 
-    // PINs por defecto — el entrenador puede cambiarlos desde ajustes
-    defaultCoachPin: '1234',
-    defaultPlayerPin: '0000',
+    // ---- PINs por defecto ----
+    defaults: { trainer: '1111', physio: '2222', coach: '3333', player: '0000' },
 
-    getCoachPin() {
-        return localStorage.getItem('coachPin') || this.defaultCoachPin;
+    getPin(role) {
+        // Retrocompatibilidad: 'coachPin' antiguo → trainer
+        if (role === 'trainer') {
+            return localStorage.getItem('trainerPin')
+                || localStorage.getItem('coachPin')   // legacy mapping
+                || this.defaults.trainer;
+        }
+        return localStorage.getItem(role + 'Pin') || this.defaults[role] || '0000';
     },
 
-    getPlayerPin() {
-        return localStorage.getItem('playerPin') || this.defaultPlayerPin;
-    },
+    // Legacy helpers usados por código existente
+    getCoachPin()  { return this.getPin('trainer'); },
+    getPlayerPin() { return this.getPin('player'); },
 
     getRole() {
-        return sessionStorage.getItem('appRole'); // 'coach' | 'player' | null
+        return sessionStorage.getItem('appRole'); // 'trainer'|'physio'|'coach'|'player'|null
+    },
+
+    isStaff() {
+        return ['trainer','physio','coach'].includes(this.getRole());
     },
 
     setRole(role) {
@@ -27,7 +38,7 @@ const AppAuth = {
         location.reload();
     },
 
-    // Guardar respuesta de wellness en Firebase
+    // ---- Guardar wellness ----
     async saveWellness(playerId, answers) {
         const entry = {
             playerId,
@@ -37,13 +48,11 @@ const AppAuth = {
             fatigue: answers.fatigue,
             pain: answers.pain,
         };
-
         try {
             if (window.firebaseDB) {
                 const ref = window.firebaseDB.ref('wellness').push();
                 await ref.set(entry);
             }
-            // Always save locally as backup
             const stored = JSON.parse(localStorage.getItem('wellnessData') || '[]');
             stored.push(entry);
             localStorage.setItem('wellnessData', JSON.stringify(stored));
@@ -57,19 +66,16 @@ const AppAuth = {
         }
     },
 
-    // Load wellness data for coach view
     loadWellnessData() {
         return JSON.parse(localStorage.getItem('wellnessData') || '[]');
     },
 
-    // Check if player already answered today
     hasAnsweredToday(playerId) {
         const today = new Date().toISOString().slice(0, 10);
-        const stored = this.loadWellnessData();
-        return stored.some(w => w.playerId === playerId && w.date === today);
+        return this.loadWellnessData().some(w => w.playerId === playerId && w.date === today);
     },
 
-    // Render PIN screen
+    // ---- Pantalla PIN ----
     showPinScreen() {
         document.getElementById('app').style.display = 'none';
 
@@ -97,11 +103,10 @@ const AppAuth = {
                     `).join('')}
                 </div>
 
-                <p class="pin-hint">Jugadoras: PIN <strong>${this.getPlayerPin()}</strong> &nbsp;·&nbsp; Cuerpo técnico: PIN personalizado</p>
+                <p class="pin-hint">Jugadoras: <strong>${this.getPin('player')}</strong> &nbsp;·&nbsp; Staff: PIN de cada rol</p>
             </div>
         `;
         document.body.insertBefore(screen, document.getElementById('app'));
-
         this._pin = '';
     },
 
@@ -113,13 +118,10 @@ const AppAuth = {
         } else if (key !== '' && this._pin.length < 4) {
             this._pin += key;
         }
-
-        // Update dots
         for (let i = 0; i < 4; i++) {
             const dot = document.getElementById(`d${i}`);
             if (dot) dot.classList.toggle('filled', i < this._pin.length);
         }
-
         if (this._pin.length === 4) {
             setTimeout(() => this.checkPin(), 150);
         }
@@ -127,23 +129,26 @@ const AppAuth = {
 
     checkPin() {
         const errorEl = document.getElementById('pinError');
+        const pin = this._pin;
 
-        if (this._pin === this.getCoachPin()) {
-            this.setRole('coach');
+        const staffRoles = ['trainer','physio','coach'];
+        const matchedRole = staffRoles.find(r => pin === this.getPin(r));
+
+        if (matchedRole) {
+            this.setRole(matchedRole);
             document.getElementById('pin-screen').remove();
             document.getElementById('app').style.display = '';
-            this.addLogoutButton();
-            // Init app
+            this._applyRoleNav(matchedRole);
+            AppAuth.requestNotificationPermission();
             window.rpeTracker = new RPETracker();
 
-        } else if (this._pin === this.getPlayerPin()) {
+        } else if (pin === this.getPin('player')) {
             this.setRole('player');
             document.getElementById('pin-screen').remove();
             this.showWellnessScreen();
 
         } else {
-            if (errorEl) { errorEl.style.display = 'block'; }
-            // Shake and clear
+            if (errorEl) errorEl.style.display = 'block';
             const dots = document.getElementById('pinDots');
             if (dots) { dots.classList.add('shake'); setTimeout(() => dots.classList.remove('shake'), 400); }
             this._pin = '';
@@ -155,11 +160,82 @@ const AppAuth = {
         }
     },
 
-    addLogoutButton() {
-        // Logout and PIN management are now handled via the gear menu (⚙️)
-        // Nothing to inject — gear menu reads AppAuth.logout() and AppAuth.showPinSettings() directly
+    // ---- Aplicar nav reducida según rol ----
+    _roleNavConfig: {
+        trainer: [
+            { group:'carga',       view:'microciclo', icon:'🏋️', label:'Carga' },
+            { group:'carga',       view:'weekplan',   icon:'📅', label:'Microciclo' },
+            { group:'rendimiento', view:'gym',        icon:'💪', label:'Gym' },
+            { group:'rendimiento', view:'tests',      icon:'📊', label:'Tests' },
+            { group:'carga',       view:'analytics',  icon:'📈', label:'Analytics' },
+        ],
+        physio: [
+            { group:'salud', view:'injury',     icon:'🏥', label:'Lesiones' },
+            { group:'salud', view:'rehab',      icon:'💪', label:'Rehab' },
+            { group:'salud', view:'wellness',   icon:'❤️', label:'Wellness' },
+            { group:'salud', view:'medical',    icon:'📋', label:'Notas' },
+            { group:'salud', view:'prediction', icon:'🔮', label:'Predicción' },
+        ],
+        coach: [
+            { group:'dashboard', view:'dashboard',    icon:'🏠', label:'Dashboard' },
+            { group:'equipo',    view:'teamstatus',   icon:'🚦', label:'Estado' },
+            { group:'carga',     view:'weekplan',     icon:'📅', label:'Planif.' },
+            { group:'equipo',    view:'players',      icon:'👥', label:'Equipo' },
+        ],
     },
 
+    _applyRoleNav(role) {
+        const config = this._roleNavConfig[role];
+        if (!config) return; // fallback: no change
+
+        // Replace bottom nav with role-specific tabs (keep ⚙️ accessible via gear btn)
+        const bottomNav = document.getElementById('bottomNav');
+        if (!bottomNav) return;
+
+        // Build 3 primary tabs + ⚙️ gear (always last)
+        const primary = config.slice(0, 3);
+        const secondary = config.slice(3);
+
+        bottomNav.innerHTML = primary.map(item => `
+            <button class="bottom-nav-btn" data-bn-group="${item.group}" data-bn-view="${item.view}"
+                    onclick="BottomNav.select(this)" aria-label="${item.label}">
+                <span class="bn-icon">${item.icon}</span>
+                <span class="bn-label">${item.label}</span>
+            </button>
+        `).join('') + `
+            <button class="bottom-nav-btn" id="bnMoreBtn" onclick="BottomNav.toggleMore()" aria-label="Más opciones">
+                <span class="bn-icon">⋯</span>
+                <span class="bn-label">Más</span>
+            </button>
+        `;
+
+        // Rebuild the "Más" drawer with secondary items
+        const moreGrid = document.querySelector('#bnMoreMenu .bn-more-grid');
+        if (moreGrid && secondary.length) {
+            moreGrid.innerHTML = secondary.map(item => `
+                <button class="bn-more-item" onclick="BottomNav.selectMore('${item.group}','${item.view}')" aria-label="${item.label}">
+                    <span class="bn-more-icon">${item.icon}</span>
+                    <span class="bn-more-label">${item.label}</span>
+                </button>
+            `).join('');
+        }
+
+        // Activate first tab
+        const firstBtn = bottomNav.querySelector('.bottom-nav-btn');
+        if (firstBtn) {
+            firstBtn.classList.add('active');
+            // Navigate to first view after rpeTracker is ready
+            setTimeout(() => {
+                if (window.rpeTracker) window.rpeTracker.switchView(primary[0].view);
+            }, 200);
+        }
+    },
+
+    addLogoutButton() {
+        // Logout handled via gear menu — no-op kept for compatibility
+    },
+
+    // ---- Ajustes de PINs ----
     showPinSettings() {
         const modal = document.createElement('div');
         modal.className = 'modal active';
@@ -170,21 +246,32 @@ const AppAuth = {
                     <h2>⚙️ Gestión de PINs</h2>
                     <button class="btn-close" onclick="document.getElementById('pinSettingsModal').remove()">&times;</button>
                 </div>
-                <div class="form-group">
-                    <label>PIN del cuerpo técnico (admin)</label>
-                    <input type="number" id="newCoachPin" placeholder="4 dígitos"
-                        maxlength="4" style="width:100%;padding:0.75rem;border:2px solid #ddd;border-radius:8px;font-size:1.2rem;letter-spacing:0.3em;text-align:center;"
-                        value="${this.getCoachPin()}">
+
+                ${['trainer','physio','coach','player'].map(role => {
+                    const labels = { trainer:'Preparador físico', physio:'Fisioterapeuta', coach:'Entrenador jefe', player:'Jugadoras' };
+                    return `
+                    <div class="form-group">
+                        <label>${labels[role]}</label>
+                        <input type="number" id="newPin_${role}" placeholder="4 dígitos"
+                            maxlength="4" style="width:100%;padding:0.75rem;border:2px solid var(--border-color,#ddd);border-radius:8px;font-size:1.2rem;letter-spacing:0.3em;text-align:center;"
+                            value="${this.getPin(role)}">
+                    </div>`;
+                }).join('')}
+
+                <div class="form-group" style="margin-top:1rem;">
+                    <label>⏰ Recordatorio wellness</label>
+                    <input type="time" id="wellnessReminderTime"
+                        style="width:100%;padding:0.75rem;border:2px solid var(--border-color,#ddd);border-radius:8px;font-size:1rem;"
+                        value="${localStorage.getItem('rpe_wellness_reminder_time') || '08:30'}">
                 </div>
-                <div class="form-group">
-                    <label>PIN de las jugadoras</label>
-                    <input type="number" id="newPlayerPin" placeholder="4 dígitos"
-                        maxlength="4" style="width:100%;padding:0.75rem;border:2px solid #ddd;border-radius:8px;font-size:1.2rem;letter-spacing:0.3em;text-align:center;"
-                        value="${this.getPlayerPin()}">
+
+                <div style="margin-top:0.75rem;">
+                    <button class="btn-secondary" style="width:100%;" onclick="AppAuth.showIOSInstallModal()">📲 Instalar en iPhone</button>
                 </div>
-                <div class="modal-footer">
+
+                <div class="modal-footer" style="margin-top:1rem;">
                     <button class="btn-secondary" onclick="document.getElementById('pinSettingsModal').remove()">Cancelar</button>
-                    <button class="btn-primary" onclick="AppAuth.savePins()">💾 Guardar PINs</button>
+                    <button class="btn-primary" onclick="AppAuth.savePins()">💾 Guardar</button>
                 </div>
             </div>
         `;
@@ -192,32 +279,117 @@ const AppAuth = {
     },
 
     savePins() {
-        const coachPin = document.getElementById('newCoachPin')?.value?.trim();
-        const playerPin = document.getElementById('newPlayerPin')?.value?.trim();
+        const roles = ['trainer','physio','coach','player'];
+        const values = {};
 
-        if (!coachPin || coachPin.length !== 4 || !/^\d{4}$/.test(coachPin)) {
-            alert('El PIN del entrenador debe tener exactamente 4 dígitos');
-            return;
-        }
-        if (!playerPin || playerPin.length !== 4 || !/^\d{4}$/.test(playerPin)) {
-            alert('El PIN de las jugadoras debe tener exactamente 4 dígitos');
-            return;
-        }
-        if (coachPin === playerPin) {
-            alert('Los dos PINs no pueden ser iguales');
-            return;
+        for (const role of roles) {
+            const val = document.getElementById(`newPin_${role}`)?.value?.trim();
+            if (!val || val.length !== 4 || !/^\d{4}$/.test(val)) {
+                alert(`El PIN de ${role} debe tener exactamente 4 dígitos`);
+                return;
+            }
+            values[role] = val;
         }
 
-        localStorage.setItem('coachPin', coachPin);
-        localStorage.setItem('playerPin', playerPin);
+        // Check all PINs distinct
+        const unique = new Set(Object.values(values));
+        if (unique.size !== roles.length) {
+            alert('Todos los PINs deben ser distintos entre sí');
+            return;
+        }
+
+        for (const role of roles) {
+            localStorage.setItem(role + 'Pin', values[role]);
+        }
+        // Clear legacy key to avoid retrocompat confusion after explicit save
+        localStorage.removeItem('coachPin');
+
+        // Save wellness reminder time
+        const timeVal = document.getElementById('wellnessReminderTime')?.value;
+        if (timeVal) localStorage.setItem('rpe_wellness_reminder_time', timeVal);
+
         document.getElementById('pinSettingsModal')?.remove();
 
-        // Show confirmation
         const toast = document.createElement('div');
         toast.className = 'toast success';
-        toast.textContent = '✅ PINs actualizados correctamente';
+        toast.textContent = '✅ Ajustes guardados correctamente';
         document.body.appendChild(toast);
         setTimeout(() => { toast.classList.add('hiding'); setTimeout(() => toast.remove(), 280); }, 2500);
+    },
+
+    // ---- iOS Install modal ----
+    showIOSInstallModal() {
+        const existing = document.getElementById('iosInstallModal');
+        if (existing) { existing.remove(); return; }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.id = 'iosInstallModal';
+        modal.innerHTML = `
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>📲 Instalar en iPhone / iPad</h2>
+                    <button class="btn-close" onclick="document.getElementById('iosInstallModal').remove()">&times;</button>
+                </div>
+                <p style="margin:0.5rem 0 1rem;color:var(--text-secondary,#666);font-size:0.9rem;">
+                    Para añadir la app a tu pantalla de inicio sigue estos 3 pasos:
+                </p>
+                <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+                    <div style="display:flex;align-items:center;gap:1rem;">
+                        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="44" height="44" rx="10" fill="#007AFF"/>
+                            <text x="22" y="29" text-anchor="middle" font-size="20" fill="white">1</text>
+                        </svg>
+                        <div>
+                            <strong>Abre esta página en Safari</strong>
+                            <p style="margin:0.2rem 0 0;font-size:0.85rem;color:var(--text-secondary,#666);">Debe ser el navegador Safari de Apple, no Chrome ni Firefox.</p>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;align-items:center;gap:1rem;">
+                        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="44" height="44" rx="10" fill="#34C759"/>
+                            <!-- Share icon -->
+                            <rect x="19" y="16" width="6" height="14" rx="1" fill="white"/>
+                            <polygon points="22,10 17,17 27,17" fill="white"/>
+                            <rect x="14" y="26" width="16" height="9" rx="2" fill="none" stroke="white" stroke-width="1.5"/>
+                        </svg>
+                        <div>
+                            <strong>Pulsa el botón Compartir ⬆</strong>
+                            <p style="margin:0.2rem 0 0;font-size:0.85rem;color:var(--text-secondary,#666);">El icono de caja con flecha en la barra inferior de Safari.</p>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;align-items:center;gap:1rem;">
+                        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="44" height="44" rx="10" fill="#FF9500"/>
+                            <!-- Home screen icon -->
+                            <rect x="13" y="14" width="18" height="18" rx="4" fill="none" stroke="white" stroke-width="1.8"/>
+                            <line x1="22" y1="19" x2="22" y2="27" stroke="white" stroke-width="1.8"/>
+                            <line x1="18" y1="23" x2="26" y2="23" stroke="white" stroke-width="1.8"/>
+                        </svg>
+                        <div>
+                            <strong>Selecciona "Añadir a inicio"</strong>
+                            <p style="margin:0.2rem 0 0;font-size:0.85rem;color:var(--text-secondary,#666);">Desplázate en el menú y toca "Añadir a pantalla de inicio". Pulsa Añadir.</p>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer" style="margin-top:1.5rem;">
+                    <button class="btn-primary" style="width:100%;" onclick="document.getElementById('iosInstallModal').remove()">Entendido ✓</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    // ---- Notificaciones ----
+    async requestNotificationPermission() {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'default') {
+            await Notification.requestPermission();
+        }
     },
 
     // ========== PANTALLA DE WELLNESS PARA JUGADORAS ==========
@@ -300,8 +472,6 @@ const AppAuth = {
 
         this._wellness = { sleep: 0, fatigue: 0, pain: 0 };
         this._selectedPlayerId = null;
-
-        // Load players from Firebase or localStorage
         this.loadPlayersForWellness();
     },
 
@@ -320,19 +490,13 @@ const AppAuth = {
                 </button>`).join('');
         };
 
-        // Try Firebase first
         if (window.firebaseDB) {
             window.firebaseDB.ref('players').once('value').then(snap => {
                 const data = snap.val();
-                const players = data ? Object.values(data) : [];
-                render(players);
-            }).catch(() => {
-                const stored = JSON.parse(localStorage.getItem('basketballPlayers') || '[]');
-                render(stored);
-            });
+                render(data ? Object.values(data) : []);
+            }).catch(() => render(JSON.parse(localStorage.getItem('basketballPlayers') || '[]')));
         } else {
-            const stored = JSON.parse(localStorage.getItem('basketballPlayers') || '[]');
-            render(stored);
+            render(JSON.parse(localStorage.getItem('basketballPlayers') || '[]'));
         }
     },
 
@@ -340,7 +504,6 @@ const AppAuth = {
         this._selectedPlayerId = id;
         this._selectedPlayerName = name;
 
-        // Check if already answered today
         if (this.hasAnsweredToday(id)) {
             document.getElementById('wl-step-select').style.display = 'none';
             document.getElementById('wl-step-done').style.display = '';
@@ -356,13 +519,9 @@ const AppAuth = {
 
     selectScale(question, value) {
         this._wellness[question] = value;
-
-        // Update button styles for this question
         document.querySelectorAll(`[data-q="${question}"]`).forEach(btn => {
             btn.classList.toggle('selected', parseInt(btn.dataset.v) === value);
         });
-
-        // Enable submit if all answered
         const allAnswered = this._wellness.sleep > 0 && this._wellness.fatigue > 0 && this._wellness.pain > 0;
         const submitBtn = document.getElementById('wl-submit-btn');
         if (submitBtn) submitBtn.disabled = !allAnswered;
@@ -371,9 +530,7 @@ const AppAuth = {
     async submitWellness() {
         const btn = document.getElementById('wl-submit-btn');
         if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
-
-        const ok = await this.saveWellness(this._selectedPlayerId, this._wellness);
-
+        await this.saveWellness(this._selectedPlayerId, this._wellness);
         document.getElementById('wl-step-questions').style.display = 'none';
         document.getElementById('wl-step-done').style.display = '';
     },
@@ -391,16 +548,13 @@ const AppAuth = {
 window.addEventListener('load', () => {
     setTimeout(() => {
         const role = AppAuth.getRole();
-        if (role === 'coach') {
-            // Already logged in as coach this session
+        if (role === 'trainer' || role === 'physio' || role === 'coach') {
             document.getElementById('app').style.display = '';
-            AppAuth.addLogoutButton();
+            AppAuth._applyRoleNav(role);
             window.rpeTracker = new RPETracker();
         } else if (role === 'player') {
-            // Already logged in as player
             AppAuth.showWellnessScreen();
         } else {
-            // Show PIN screen
             AppAuth.showPinScreen();
         }
     }, 150);

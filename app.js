@@ -1035,6 +1035,10 @@ class RPETracker {
             this.showToast(`✅ ${n} sesiones guardadas`, 'success');
         }
 
+        // Fire A:C push notifications for any player above critical threshold
+        const _savedIds = [...this.selectedPlayerIds];
+        setTimeout(() => PushNotifications.checkACAlerts(this, _savedIds), 300);
+
         this.selectedPlayerIds = [];
     }
     
@@ -4866,8 +4870,122 @@ class RPETracker {
             injBadge.textContent = total;
             injBadge.style.display = total > 0 ? '' : 'none';
         }
+
+        // Update PWA app icon badge with count of critical A:C players
+        PushNotifications.updateBadge(this);
     }
 }
 
 // Initialize app — managed by auth.js
 let rpeTracker;
+
+// ========== PUSH NOTIFICATIONS HELPER ==========
+const PushNotifications = {
+
+    // Send notification via SW message channel (no server needed)
+    async send(title, body, tag) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        if (!navigator.serviceWorker?.controller) return;
+        navigator.serviceWorker.controller.postMessage({ type: 'SHOW_NOTIFICATION', title, body, tag });
+    },
+
+    // Check all players for critical A:C after session save
+    // Called with the tracker instance and array of playerIds that just got a session
+    async checkACAlerts(tracker, playerIds) {
+        if (!tracker || !playerIds?.length) return;
+        let alertCount = 0;
+        for (const pid of playerIds) {
+            const player = tracker.players.find(p => p.id === pid);
+            if (!player) continue;
+            const ratio = tracker.calculateAcuteChronicRatio(pid);
+            const r = parseFloat(ratio.ratio);
+            if (isNaN(r)) continue;
+            const thresh = tracker.getPlayerThresholds(pid);
+            if (r > thresh.high) {
+                alertCount++;
+                await this.send(
+                    `🔴 Alerta carga — ${player.name}`,
+                    `Ratio A:C: ${ratio.ratio} — revisar carga`,
+                    `ac-alert-${pid}`
+                );
+            }
+        }
+        return alertCount;
+    },
+
+    // Update PWA badge with count of players currently above critical threshold
+    updateBadge(tracker) {
+        if (!tracker) return;
+        let count = 0;
+        for (const player of tracker.players) {
+            const ratio = tracker.calculateAcuteChronicRatio(player.id);
+            const r = parseFloat(ratio.ratio);
+            if (!isNaN(r)) {
+                const thresh = tracker.getPlayerThresholds(player.id);
+                if (r > thresh.high) count++;
+            }
+        }
+        try {
+            if ('setAppBadge' in navigator) {
+                if (count > 0) navigator.setAppBadge(count);
+                else navigator.clearAppBadge();
+            }
+        } catch(e) { /* silently ignore — not all browsers support setAppBadge */ }
+
+        // Also update bottom-nav badge if present
+        const badge = document.getElementById('bnAlertBadge');
+        if (badge) { badge.textContent = count; badge.style.display = count > 0 ? '' : 'none'; }
+
+        return count;
+    }
+};
+
+// ========== WELLNESS DAILY REMINDER ==========
+const WellnessReminder = {
+    _intervalId: null,
+
+    start() {
+        if (this._intervalId) return; // already running
+        this._intervalId = setInterval(() => this._check(), 60_000);
+        this._check(); // immediate check on start
+    },
+
+    _check() {
+        if (!AppAuth.isStaff()) return;
+        if (Notification.permission !== 'granted') return;
+
+        const reminderTime = localStorage.getItem('rpe_wellness_reminder_time') || '08:30';
+        const now = new Date();
+        const [rHour, rMin] = reminderTime.split(':').map(Number);
+        if (now.getHours() !== rHour || now.getMinutes() !== rMin) return;
+
+        const today = now.toISOString().slice(0, 10);
+        const lastSent = localStorage.getItem('rpe_wellness_reminder_sent');
+        if (lastSent === today) return; // already sent today
+
+        // Find players without wellness today
+        const stored = JSON.parse(localStorage.getItem('wellnessData') || '[]');
+        const respondedToday = new Set(stored.filter(w => w.date === today).map(w => w.playerId));
+        const allPlayers = JSON.parse(localStorage.getItem('basketballPlayers') || '[]');
+        const pending = allPlayers.filter(p => !respondedToday.has(p.id));
+
+        if (!pending.length) return;
+
+        const names = pending.slice(0, 5).map(p => p.name).join(', ');
+        const extra = pending.length > 5 ? ` y ${pending.length - 5} más` : '';
+
+        PushNotifications.send(
+            '❤️ Recordatorio wellness',
+            `Sin respuesta hoy: ${names}${extra}`,
+            'wellness-reminder'
+        );
+        localStorage.setItem('rpe_wellness_reminder_sent', today);
+    }
+};
+
+// Start wellness reminder when staff is logged in
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        if (AppAuth.isStaff()) WellnessReminder.start();
+    }, 2000);
+});
