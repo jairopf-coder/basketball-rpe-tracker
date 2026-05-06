@@ -1,6 +1,6 @@
 // Service Worker — BasketballRPE-Web
 // Bump CACHE_VERSION whenever you deploy new code to invalidate stale caches.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v15';
 const CACHE_NAME = `rpe-basketball-${CACHE_VERSION}`;
 
 const urlsToCache = [
@@ -50,10 +50,29 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-  );
+    const url = new URL(event.request.url);
+    const isLocal = url.origin === self.location.origin;
+    const ext = url.pathname.split('.').pop();
+
+    // Network-first para HTML, JS y CSS — garantiza código fresco tras deploy
+    if (isLocal && ['html', 'js', 'css'].includes(ext) || url.pathname === '/') {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+
+    // Cache-first para el resto (imágenes, fuentes, etc.)
+    event.respondWith(
+        caches.match(event.request)
+            .then(response => response || fetch(event.request))
+    );
 });
 
 // ========== PUSH NOTIFICATIONS ==========
