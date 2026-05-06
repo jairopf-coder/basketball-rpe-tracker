@@ -282,11 +282,12 @@ class RPETracker {
             });
         }
 
-        // Show skeleton while Firebase loads
-        this.showSkeletonLoader();
-
-        // Activate dashboard on init
-        NavMenu.selectGroup('dashboard');
+        // Render dashboard con datos de localStorage inmediatamente.
+        // setTimeout(0) garantiza que window.rpeTracker ya existe cuando
+        // switchView se ejecuta (el constructor termina de asignarse primero).
+        setTimeout(() => {
+            this.switchView('dashboard');
+        }, 0);
     }
 
     setupEventListeners() {
