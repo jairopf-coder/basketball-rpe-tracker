@@ -155,13 +155,6 @@ class FirebaseSync {
     }
 }
 
-// Crear instancia global
-window.firebaseSync = new FirebaseSync();
-
-// Verificar conexión
-window.firebaseSync.checkConnection();
-
-
 // ========== GYM SESSIONS (Firebase sync) ==========
 
 FirebaseSync.prototype.saveGymSessions = async function(gymSessions) {
@@ -440,3 +433,24 @@ FirebaseSync.prototype._setPendingIndicator = function(count) {
         this.updateConnectionIndicator(wasOnline);
     }
 };
+
+// ========== SEASON BLOCKS — change listener (missing in prior versions) ==========
+
+FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
+    this.db.ref('seasonBlocks').on('value', snapshot => {
+        const data = snapshot.val();
+        const blocks = data ? Object.values(data) : [];
+        localStorage.setItem('rpe_seasonBlocks', JSON.stringify(blocks));
+        if (callback) callback(blocks);
+    });
+};
+
+// ========== INSTANTIATION (must come after all prototype methods) ==========
+
+// Crear instancia global
+window.firebaseSync = new FirebaseSync();
+
+// Verificar conexión — se llama aquí para garantizar que todos los
+// FirebaseSync.prototype.* estén definidos antes de que checkConnection
+// acceda a _drainQueue y _updatePendingCount.
+window.firebaseSync.checkConnection();
