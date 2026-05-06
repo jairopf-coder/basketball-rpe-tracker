@@ -9365,3 +9365,151 @@ details[open] .ewma-toggle-hint { display: none; }
     transition: opacity .15s, background .15s;
 }
 .btn-icon-sm:hover { opacity: 1; background: var(--danger-soft, rgba(244,67,54,.1)); }
+
+/* ========== INSTALL GATE ========== */
+#install-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--bg-primary, #f8f9fa);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+}
+
+.ig-container {
+    width: 100%;
+    max-width: 440px;
+    padding: 2rem 1.5rem 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+
+.ig-logo {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+.ig-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary, #1a1a1a);
+    text-align: center;
+    margin: 0 0 0.5rem;
+}
+
+.ig-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-secondary, #666);
+    text-align: center;
+    line-height: 1.5;
+    margin: 0 0 2rem;
+}
+
+.ig-steps {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.ig-step {
+    display: grid;
+    grid-template-columns: 2rem 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 12px;
+    padding: 1rem 1rem 1rem 0.75rem;
+}
+
+.ig-step-num {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--primary, #ff6600);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ig-step-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.ig-step-text strong {
+    font-size: 0.95rem;
+    color: var(--text-primary, #1a1a1a);
+}
+
+.ig-step-text span {
+    font-size: 0.82rem;
+    color: var(--text-secondary, #666);
+    line-height: 1.4;
+}
+
+.ig-icon {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+}
+
+.ig-confirm {
+    width: 100%;
+    background: var(--bg-card, #fff);
+    border: 2px solid var(--primary, #ff6600);
+    border-radius: 14px;
+    padding: 1.25rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.ig-confirm-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary, #666);
+    margin: 0 0 1rem;
+    line-height: 1.5;
+}
+
+.ig-btn-already {
+    width: 100%;
+    padding: 0.9rem;
+    background: var(--primary, #ff6600);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.ig-btn-already:active {
+    transform: scale(0.97);
+}
+
+[data-theme="dark"] #install-gate {
+    background: var(--bg-primary, #121212);
+}
+
+[data-theme="dark"] .ig-step {
+    background: var(--bg-card, #1e1e1e);
+    border-color: var(--border-color, #333);
+}
+
+[data-theme="dark"] .ig-confirm {
+    background: var(--bg-card, #1e1e1e);
+}

@@ -1,44 +1,37 @@
 // ========== SISTEMA DE ACCESO CON PIN ==========
-// Roles: 'trainer' (preparador físico), 'physio' (fisio),
-//        'coach' (entrenador jefe), 'player' (jugadoras)
+// Roles: 'staff' (cuerpo técnico — ve todo), 'player' (jugadoras — solo wellness)
 
 const AppAuth = {
 
-    // ---- PINs por defecto ----
-    defaults: { trainer: '1111', physio: '2222', coach: '3333', player: '0000' },
+    // ---- PINs ----
+    defaults: { staff: '1234', player: '0000' },
 
     getPin(role) {
-        // Retrocompatibilidad: 'coachPin' antiguo → trainer
-        if (role === 'trainer') {
-            return localStorage.getItem('trainerPin')
-                || localStorage.getItem('coachPin')   // legacy mapping
-                || this.defaults.trainer;
+        // Retrocompatibilidad: legados coachPin / trainerPin → staff
+        if (role === 'staff') {
+            return localStorage.getItem('staffPin')
+                || localStorage.getItem('trainerPin')
+                || localStorage.getItem('coachPin')
+                || this.defaults.staff;
         }
-        return localStorage.getItem(role + 'Pin') || this.defaults[role] || '0000';
+        return localStorage.getItem('playerPin') || this.defaults.player;
     },
 
     // Legacy helpers usados por código existente
-    getCoachPin()  { return this.getPin('trainer'); },
+    getCoachPin()  { return this.getPin('staff'); },
     getPlayerPin() { return this.getPin('player'); },
 
-    getRole() {
-        return sessionStorage.getItem('appRole'); // 'trainer'|'physio'|'coach'|'player'|null
-    },
+    getRole() { return sessionStorage.getItem('appRole'); }, // 'staff' | 'player' | null
+    isStaff()  { return this.getRole() === 'staff'; },
 
-    isStaff() {
-        return ['trainer','physio','coach'].includes(this.getRole());
-    },
-
-    setRole(role) {
-        sessionStorage.setItem('appRole', role);
-    },
+    setRole(role) { sessionStorage.setItem('appRole', role); },
 
     logout() {
         sessionStorage.removeItem('appRole');
         location.reload();
     },
 
-    // ---- Guardar wellness ----
+    // ---- Wellness persistence ----
     async saveWellness(playerId, answers) {
         const entry = {
             playerId,
@@ -58,7 +51,6 @@ const AppAuth = {
             localStorage.setItem('wellnessData', JSON.stringify(stored));
             return true;
         } catch (e) {
-            console.error('Error saving wellness:', e);
             const stored = JSON.parse(localStorage.getItem('wellnessData') || '[]');
             stored.push(entry);
             localStorage.setItem('wellnessData', JSON.stringify(stored));
@@ -75,10 +67,22 @@ const AppAuth = {
         return this.loadWellnessData().some(w => w.playerId === playerId && w.date === today);
     },
 
+    // ---- Detección de plataforma ----
+    _platform() {
+        const ua = navigator.userAgent;
+        if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
+        if (/android/i.test(ua)) return 'android';
+        return 'desktop';
+    },
+
+    _isInstalledPWA() {
+        return window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true; // iOS Safari
+    },
+
     // ---- Pantalla PIN ----
     showPinScreen() {
         document.getElementById('app').style.display = 'none';
-
         const screen = document.createElement('div');
         screen.id = 'pin-screen';
         screen.innerHTML = `
@@ -86,24 +90,19 @@ const AppAuth = {
                 <div class="pin-logo">🏀</div>
                 <h1 class="pin-title">RPE Baloncesto</h1>
                 <p class="pin-subtitle">Introduce tu PIN para acceder</p>
-
                 <div class="pin-dots" id="pinDots">
                     <span class="pin-dot" id="d0"></span>
                     <span class="pin-dot" id="d1"></span>
                     <span class="pin-dot" id="d2"></span>
                     <span class="pin-dot" id="d3"></span>
                 </div>
-
                 <div id="pinError" class="pin-error" style="display:none">PIN incorrecto</div>
-
                 <div class="pin-pad">
                     ${[1,2,3,4,5,6,7,8,9,'','0','⌫'].map(k => `
                         <button class="pin-key ${k===''?'pin-key-empty':''}"
                             onclick="AppAuth.handleKey('${k}')">${k}</button>
                     `).join('')}
                 </div>
-
-                <p class="pin-hint">Jugadoras: <strong>${this.getPin('player')}</strong> &nbsp;·&nbsp; Staff: PIN de cada rol</p>
             </div>
         `;
         document.body.insertBefore(screen, document.getElementById('app'));
@@ -122,30 +121,29 @@ const AppAuth = {
             const dot = document.getElementById(`d${i}`);
             if (dot) dot.classList.toggle('filled', i < this._pin.length);
         }
-        if (this._pin.length === 4) {
-            setTimeout(() => this.checkPin(), 150);
-        }
+        if (this._pin.length === 4) setTimeout(() => this.checkPin(), 150);
     },
 
     checkPin() {
         const errorEl = document.getElementById('pinError');
         const pin = this._pin;
 
-        const staffRoles = ['trainer','physio','coach'];
-        const matchedRole = staffRoles.find(r => pin === this.getPin(r));
-
-        if (matchedRole) {
-            this.setRole(matchedRole);
+        if (pin === this.getPin('staff')) {
+            this.setRole('staff');
             document.getElementById('pin-screen').remove();
             document.getElementById('app').style.display = '';
-            this._applyRoleNav(matchedRole);
             AppAuth.requestNotificationPermission();
             window.rpeTracker = new RPETracker();
 
         } else if (pin === this.getPin('player')) {
             this.setRole('player');
             document.getElementById('pin-screen').remove();
-            this.showWellnessScreen();
+            // Jugadoras deben tener la PWA instalada antes de continuar
+            if (this._isInstalledPWA()) {
+                this.showWellnessScreen();
+            } else {
+                this.showInstallGate();
+            }
 
         } else {
             if (errorEl) errorEl.style.display = 'block';
@@ -160,80 +158,7 @@ const AppAuth = {
         }
     },
 
-    // ---- Aplicar nav reducida según rol ----
-    _roleNavConfig: {
-        trainer: [
-            { group:'carga',       view:'microciclo', icon:'🏋️', label:'Carga' },
-            { group:'carga',       view:'weekplan',   icon:'📅', label:'Microciclo' },
-            { group:'rendimiento', view:'gym',        icon:'💪', label:'Gym' },
-            { group:'rendimiento', view:'tests',      icon:'📊', label:'Tests' },
-            { group:'carga',       view:'analytics',  icon:'📈', label:'Analytics' },
-        ],
-        physio: [
-            { group:'salud', view:'injury',     icon:'🏥', label:'Lesiones' },
-            { group:'salud', view:'rehab',      icon:'💪', label:'Rehab' },
-            { group:'salud', view:'wellness',   icon:'❤️', label:'Wellness' },
-            { group:'salud', view:'medical',    icon:'📋', label:'Notas' },
-            { group:'salud', view:'prediction', icon:'🔮', label:'Predicción' },
-        ],
-        coach: [
-            { group:'dashboard', view:'dashboard',    icon:'🏠', label:'Dashboard' },
-            { group:'equipo',    view:'teamstatus',   icon:'🚦', label:'Estado' },
-            { group:'carga',     view:'weekplan',     icon:'📅', label:'Planif.' },
-            { group:'equipo',    view:'players',      icon:'👥', label:'Equipo' },
-        ],
-    },
-
-    _applyRoleNav(role) {
-        const config = this._roleNavConfig[role];
-        if (!config) return; // fallback: no change
-
-        // Replace bottom nav with role-specific tabs (keep ⚙️ accessible via gear btn)
-        const bottomNav = document.getElementById('bottomNav');
-        if (!bottomNav) return;
-
-        // Build 3 primary tabs + ⚙️ gear (always last)
-        const primary = config.slice(0, 3);
-        const secondary = config.slice(3);
-
-        bottomNav.innerHTML = primary.map(item => `
-            <button class="bottom-nav-btn" data-bn-group="${item.group}" data-bn-view="${item.view}"
-                    onclick="BottomNav.select(this)" aria-label="${item.label}">
-                <span class="bn-icon">${item.icon}</span>
-                <span class="bn-label">${item.label}</span>
-            </button>
-        `).join('') + `
-            <button class="bottom-nav-btn" id="bnMoreBtn" onclick="BottomNav.toggleMore()" aria-label="Más opciones">
-                <span class="bn-icon">⋯</span>
-                <span class="bn-label">Más</span>
-            </button>
-        `;
-
-        // Rebuild the "Más" drawer with secondary items
-        const moreGrid = document.querySelector('#bnMoreMenu .bn-more-grid');
-        if (moreGrid && secondary.length) {
-            moreGrid.innerHTML = secondary.map(item => `
-                <button class="bn-more-item" onclick="BottomNav.selectMore('${item.group}','${item.view}')" aria-label="${item.label}">
-                    <span class="bn-more-icon">${item.icon}</span>
-                    <span class="bn-more-label">${item.label}</span>
-                </button>
-            `).join('');
-        }
-
-        // Activate first tab
-        const firstBtn = bottomNav.querySelector('.bottom-nav-btn');
-        if (firstBtn) {
-            firstBtn.classList.add('active');
-            // Navigate to first view after rpeTracker is ready
-            setTimeout(() => {
-                if (window.rpeTracker) window.rpeTracker.switchView(primary[0].view);
-            }, 200);
-        }
-    },
-
-    addLogoutButton() {
-        // Logout handled via gear menu — no-op kept for compatibility
-    },
+    addLogoutButton() { /* logout via gear menu — no-op */ },
 
     // ---- Ajustes de PINs ----
     showPinSettings() {
@@ -246,29 +171,24 @@ const AppAuth = {
                     <h2>⚙️ Gestión de PINs</h2>
                     <button class="btn-close" onclick="document.getElementById('pinSettingsModal').remove()">&times;</button>
                 </div>
-
-                ${['trainer','physio','coach','player'].map(role => {
-                    const labels = { trainer:'Preparador físico', physio:'Fisioterapeuta', coach:'Entrenador jefe', player:'Jugadoras' };
-                    return `
-                    <div class="form-group">
-                        <label>${labels[role]}</label>
-                        <input type="number" id="newPin_${role}" placeholder="4 dígitos"
-                            maxlength="4" style="width:100%;padding:0.75rem;border:2px solid var(--border-color,#ddd);border-radius:8px;font-size:1.2rem;letter-spacing:0.3em;text-align:center;"
-                            value="${this.getPin(role)}">
-                    </div>`;
-                }).join('')}
-
+                <div class="form-group">
+                    <label>🏋️ Cuerpo técnico (PIN de acceso completo)</label>
+                    <input type="number" id="newPin_staff" placeholder="4 dígitos"
+                        maxlength="4" style="width:100%;padding:0.75rem;border:2px solid var(--border-color,#ddd);border-radius:8px;font-size:1.2rem;letter-spacing:0.3em;text-align:center;"
+                        value="${this.getPin('staff')}">
+                </div>
+                <div class="form-group">
+                    <label>👤 Jugadoras (PIN de wellness)</label>
+                    <input type="number" id="newPin_player" placeholder="4 dígitos"
+                        maxlength="4" style="width:100%;padding:0.75rem;border:2px solid var(--border-color,#ddd);border-radius:8px;font-size:1.2rem;letter-spacing:0.3em;text-align:center;"
+                        value="${this.getPin('player')}">
+                </div>
                 <div class="form-group" style="margin-top:1rem;">
                     <label>⏰ Recordatorio wellness</label>
                     <input type="time" id="wellnessReminderTime"
                         style="width:100%;padding:0.75rem;border:2px solid var(--border-color,#ddd);border-radius:8px;font-size:1rem;"
                         value="${localStorage.getItem('rpe_wellness_reminder_time') || '08:30'}">
                 </div>
-
-                <div style="margin-top:0.75rem;">
-                    <button class="btn-secondary" style="width:100%;" onclick="AppAuth.showIOSInstallModal()">📲 Instalar en iPhone</button>
-                </div>
-
                 <div class="modal-footer" style="margin-top:1rem;">
                     <button class="btn-secondary" onclick="document.getElementById('pinSettingsModal').remove()">Cancelar</button>
                     <button class="btn-primary" onclick="AppAuth.savePins()">💾 Guardar</button>
@@ -279,37 +199,23 @@ const AppAuth = {
     },
 
     savePins() {
-        const roles = ['trainer','physio','coach','player'];
-        const values = {};
+        const staffVal  = document.getElementById('newPin_staff')?.value?.trim();
+        const playerVal = document.getElementById('newPin_player')?.value?.trim();
 
-        for (const role of roles) {
-            const val = document.getElementById(`newPin_${role}`)?.value?.trim();
-            if (!val || val.length !== 4 || !/^\d{4}$/.test(val)) {
-                alert(`El PIN de ${role} debe tener exactamente 4 dígitos`);
-                return;
-            }
-            values[role] = val;
-        }
+        if (!staffVal  || staffVal.length  !== 4 || !/^\d{4}$/.test(staffVal))  { alert('El PIN del cuerpo técnico debe tener 4 dígitos'); return; }
+        if (!playerVal || playerVal.length !== 4 || !/^\d{4}$/.test(playerVal)) { alert('El PIN de las jugadoras debe tener 4 dígitos'); return; }
+        if (staffVal === playerVal) { alert('Los dos PINs no pueden ser iguales'); return; }
 
-        // Check all PINs distinct
-        const unique = new Set(Object.values(values));
-        if (unique.size !== roles.length) {
-            alert('Todos los PINs deben ser distintos entre sí');
-            return;
-        }
-
-        for (const role of roles) {
-            localStorage.setItem(role + 'Pin', values[role]);
-        }
-        // Clear legacy key to avoid retrocompat confusion after explicit save
+        localStorage.setItem('staffPin',  staffVal);
+        localStorage.setItem('playerPin', playerVal);
+        // Limpiar keys legacy
         localStorage.removeItem('coachPin');
+        localStorage.removeItem('trainerPin');
 
-        // Save wellness reminder time
         const timeVal = document.getElementById('wellnessReminderTime')?.value;
         if (timeVal) localStorage.setItem('rpe_wellness_reminder_time', timeVal);
 
         document.getElementById('pinSettingsModal')?.remove();
-
         const toast = document.createElement('div');
         toast.className = 'toast success';
         toast.textContent = '✅ Ajustes guardados correctamente';
@@ -317,85 +223,172 @@ const AppAuth = {
         setTimeout(() => { toast.classList.add('hiding'); setTimeout(() => toast.remove(), 280); }, 2500);
     },
 
-    // ---- iOS Install modal ----
-    showIOSInstallModal() {
-        const existing = document.getElementById('iosInstallModal');
-        if (existing) { existing.remove(); return; }
-
-        const modal = document.createElement('div');
-        modal.className = 'modal active';
-        modal.id = 'iosInstallModal';
-        modal.innerHTML = `
-            <div class="modal-content modal-small">
-                <div class="modal-header">
-                    <h2>📲 Instalar en iPhone / iPad</h2>
-                    <button class="btn-close" onclick="document.getElementById('iosInstallModal').remove()">&times;</button>
-                </div>
-                <p style="margin:0.5rem 0 1rem;color:var(--text-secondary,#666);font-size:0.9rem;">
-                    Para añadir la app a tu pantalla de inicio sigue estos 3 pasos:
-                </p>
-                <div style="display:flex;flex-direction:column;gap:1.25rem;">
-
-                    <div style="display:flex;align-items:center;gap:1rem;">
-                        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="44" height="44" rx="10" fill="#007AFF"/>
-                            <text x="22" y="29" text-anchor="middle" font-size="20" fill="white">1</text>
-                        </svg>
-                        <div>
-                            <strong>Abre esta página en Safari</strong>
-                            <p style="margin:0.2rem 0 0;font-size:0.85rem;color:var(--text-secondary,#666);">Debe ser el navegador Safari de Apple, no Chrome ni Firefox.</p>
-                        </div>
-                    </div>
-
-                    <div style="display:flex;align-items:center;gap:1rem;">
-                        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="44" height="44" rx="10" fill="#34C759"/>
-                            <!-- Share icon -->
-                            <rect x="19" y="16" width="6" height="14" rx="1" fill="white"/>
-                            <polygon points="22,10 17,17 27,17" fill="white"/>
-                            <rect x="14" y="26" width="16" height="9" rx="2" fill="none" stroke="white" stroke-width="1.5"/>
-                        </svg>
-                        <div>
-                            <strong>Pulsa el botón Compartir ⬆</strong>
-                            <p style="margin:0.2rem 0 0;font-size:0.85rem;color:var(--text-secondary,#666);">El icono de caja con flecha en la barra inferior de Safari.</p>
-                        </div>
-                    </div>
-
-                    <div style="display:flex;align-items:center;gap:1rem;">
-                        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="44" height="44" rx="10" fill="#FF9500"/>
-                            <!-- Home screen icon -->
-                            <rect x="13" y="14" width="18" height="18" rx="4" fill="none" stroke="white" stroke-width="1.8"/>
-                            <line x1="22" y1="19" x2="22" y2="27" stroke="white" stroke-width="1.8"/>
-                            <line x1="18" y1="23" x2="26" y2="23" stroke="white" stroke-width="1.8"/>
-                        </svg>
-                        <div>
-                            <strong>Selecciona "Añadir a inicio"</strong>
-                            <p style="margin:0.2rem 0 0;font-size:0.85rem;color:var(--text-secondary,#666);">Desplázate en el menú y toca "Añadir a pantalla de inicio". Pulsa Añadir.</p>
-                        </div>
-                    </div>
-
-                </div>
-                <div class="modal-footer" style="margin-top:1.5rem;">
-                    <button class="btn-primary" style="width:100%;" onclick="document.getElementById('iosInstallModal').remove()">Entendido ✓</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    },
-
     // ---- Notificaciones ----
     async requestNotificationPermission() {
         if (!('Notification' in window)) return;
-        if (Notification.permission === 'default') {
-            await Notification.requestPermission();
+        if (Notification.permission === 'default') await Notification.requestPermission();
+    },
+
+    // ========== INSTALL GATE — jugadoras deben instalar PWA primero ==========
+    showInstallGate() {
+        const platform = this._platform();
+        const existing = document.getElementById('install-gate');
+        if (existing) existing.remove();
+
+        const isIOS     = platform === 'ios';
+        const isAndroid = platform === 'android';
+
+        // Instrucciones según plataforma
+        const steps = isIOS ? `
+            <div class="ig-step">
+                <div class="ig-step-num">1</div>
+                <div class="ig-step-text">
+                    <strong>Abre esta página en Safari</strong>
+                    <span>Debe ser Safari de Apple, no Chrome ni otro navegador.</span>
+                </div>
+                ${this._svgSafari()}
+            </div>
+            <div class="ig-step">
+                <div class="ig-step-num">2</div>
+                <div class="ig-step-text">
+                    <strong>Pulsa el botón Compartir</strong>
+                    <span>El icono ⬆ en la barra inferior de Safari.</span>
+                </div>
+                ${this._svgShare()}
+            </div>
+            <div class="ig-step">
+                <div class="ig-step-num">3</div>
+                <div class="ig-step-text">
+                    <strong>Toca "Añadir a pantalla de inicio"</strong>
+                    <span>Desplázate en el menú y pulsa ese botón. Luego toca <em>Añadir</em>.</span>
+                </div>
+                ${this._svgAddHome()}
+            </div>
+        ` : isAndroid ? `
+            <div class="ig-step">
+                <div class="ig-step-num">1</div>
+                <div class="ig-step-text">
+                    <strong>Abre esta página en Chrome</strong>
+                    <span>Usa Google Chrome para Android.</span>
+                </div>
+                ${this._svgChrome()}
+            </div>
+            <div class="ig-step">
+                <div class="ig-step-num">2</div>
+                <div class="ig-step-text">
+                    <strong>Pulsa el menú ⋮ (tres puntos)</strong>
+                    <span>En la esquina superior derecha de Chrome.</span>
+                </div>
+                ${this._svgMenuDots()}
+            </div>
+            <div class="ig-step">
+                <div class="ig-step-num">3</div>
+                <div class="ig-step-text">
+                    <strong>Selecciona "Añadir a pantalla de inicio"</strong>
+                    <span>O si aparece el banner de instalación, pulsa <em>Instalar</em>.</span>
+                </div>
+                ${this._svgAddHome()}
+            </div>
+        ` : `
+            <div class="ig-step">
+                <div class="ig-step-num">ℹ️</div>
+                <div class="ig-step-text">
+                    <strong>Abre esta página desde un móvil</strong>
+                    <span>La app de wellness está pensada para iPhone o Android. Pide al cuerpo técnico la URL y ábrela desde tu teléfono.</span>
+                </div>
+            </div>
+        `;
+
+        const screen = document.createElement('div');
+        screen.id = 'install-gate';
+        screen.innerHTML = `
+            <div class="ig-container">
+                <div class="ig-logo">🏀</div>
+                <h1 class="ig-title">Instala la app primero</h1>
+                <p class="ig-subtitle">Para registrar tu wellness necesitas tener la app guardada en tu pantalla de inicio. Solo tarda 30 segundos.</p>
+
+                <div class="ig-steps">
+                    ${steps}
+                </div>
+
+                <div class="ig-confirm">
+                    <p class="ig-confirm-label">Cuando la tengas instalada, ábrela desde tu pantalla de inicio y vuelve a entrar con tu PIN.</p>
+                    <button class="ig-btn-already" onclick="AppAuth._checkInstallAndProceed()">
+                        ✅ Ya la tengo instalada
+                    </button>
+                </div>
+
+                <button class="wl-logout" onclick="AppAuth.logout()">🔒 Volver al inicio</button>
+            </div>
+        `;
+        document.body.appendChild(screen);
+    },
+
+    _checkInstallAndProceed() {
+        if (this._isInstalledPWA()) {
+            document.getElementById('install-gate')?.remove();
+            this.showWellnessScreen();
+        } else {
+            // Breve feedback de que aún no está instalada
+            const btn = document.querySelector('.ig-btn-already');
+            if (btn) {
+                const orig = btn.textContent;
+                btn.textContent = '⚠️ No detectada como instalada — ábrela desde inicio';
+                btn.style.background = 'var(--danger, #c62828)';
+                setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 3000);
+            }
         }
     },
 
-    // ========== PANTALLA DE WELLNESS PARA JUGADORAS ==========
+    // ---- SVG helpers para el install gate ----
+    _svgSafari() {
+        return `<svg class="ig-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="20" stroke="#007AFF" stroke-width="2.5" fill="none"/>
+            <line x1="24" y1="8" x2="24" y2="11" stroke="#007AFF" stroke-width="2" stroke-linecap="round"/>
+            <line x1="24" y1="37" x2="24" y2="40" stroke="#007AFF" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8" y1="24" x2="11" y2="24" stroke="#007AFF" stroke-width="2" stroke-linecap="round"/>
+            <line x1="37" y1="24" x2="40" y2="24" stroke="#007AFF" stroke-width="2" stroke-linecap="round"/>
+            <polygon points="24,14 27,28 24,26 21,28" fill="#007AFF"/>
+        </svg>`;
+    },
+    _svgShare() {
+        return `<svg class="ig-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="20" width="28" height="22" rx="4" stroke="#34C759" stroke-width="2.5" fill="none"/>
+            <line x1="24" y1="6" x2="24" y2="28" stroke="#34C759" stroke-width="2.5" stroke-linecap="round"/>
+            <polyline points="17,13 24,6 31,13" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>`;
+    },
+    _svgAddHome() {
+        return `<svg class="ig-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="12" width="32" height="28" rx="5" stroke="#FF9500" stroke-width="2.5" fill="none"/>
+            <line x1="24" y1="21" x2="24" y2="32" stroke="#FF9500" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="18" y1="26.5" x2="30" y2="26.5" stroke="#FF9500" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M16 12 L16 9 Q16 7 18 7 L30 7 Q32 7 32 9 L32 12" stroke="#FF9500" stroke-width="2" fill="none"/>
+        </svg>`;
+    },
+    _svgChrome() {
+        return `<svg class="ig-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="18" stroke="#4285F4" stroke-width="2.5" fill="none"/>
+            <circle cx="24" cy="24" r="7" fill="#4285F4"/>
+            <line x1="24" y1="6" x2="24" y2="17" stroke="#EA4335" stroke-width="5" stroke-linecap="round"/>
+            <line x1="6" y1="33" x2="15.5" y2="17" stroke="#FBBC05" stroke-width="5" stroke-linecap="round"/>
+            <line x1="42" y1="33" x2="32.5" y2="17" stroke="#34A853" stroke-width="5" stroke-linecap="round"/>
+        </svg>`;
+    },
+    _svgMenuDots() {
+        return `<svg class="ig-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="6" width="28" height="36" rx="5" stroke="#666" stroke-width="2.5" fill="none"/>
+            <circle cx="24" cy="16" r="2.5" fill="#666"/>
+            <circle cx="24" cy="24" r="2.5" fill="#666"/>
+            <circle cx="24" cy="32" r="2.5" fill="#666"/>
+        </svg>`;
+    },
+
+    // ========== PANTALLA DE WELLNESS ==========
 
     showWellnessScreen() {
-        document.getElementById('app').style.display = 'none';
+        const existing = document.getElementById('wellness-screen');
+        if (existing) existing.remove();
 
         const screen = document.createElement('div');
         screen.id = 'wellness-screen';
@@ -416,7 +409,6 @@ const AppAuth = {
 
                 <div id="wl-step-questions" class="wl-step" style="display:none">
                     <div class="wl-player-selected" id="wl-selected-name"></div>
-
                     <div class="wl-question">
                         <div class="wl-q-label">😴 Calidad del sueño</div>
                         <div class="wl-q-sub">¿Cómo has dormido esta noche?</div>
@@ -428,7 +420,6 @@ const AppAuth = {
                                 </button>`).join('')}
                         </div>
                     </div>
-
                     <div class="wl-question">
                         <div class="wl-q-label">💪 Nivel de fatiga</div>
                         <div class="wl-q-sub">¿Cómo te sientes físicamente?</div>
@@ -440,7 +431,6 @@ const AppAuth = {
                                 </button>`).join('')}
                         </div>
                     </div>
-
                     <div class="wl-question">
                         <div class="wl-q-label">🦵 Dolor muscular</div>
                         <div class="wl-q-sub">¿Tienes molestias o dolor?</div>
@@ -452,7 +442,6 @@ const AppAuth = {
                                 </button>`).join('')}
                         </div>
                     </div>
-
                     <button class="wl-submit" id="wl-submit-btn" onclick="AppAuth.submitWellness()" disabled>
                         Enviar respuestas
                     </button>
@@ -469,7 +458,6 @@ const AppAuth = {
             </div>
         `;
         document.body.appendChild(screen);
-
         this._wellness = { sleep: 0, fatigue: 0, pain: 0 };
         this._selectedPlayerId = null;
         this.loadPlayersForWellness();
@@ -489,12 +477,10 @@ const AppAuth = {
                     <span class="wl-player-name">${p.name}${p.number ? ` #${p.number}` : ''}</span>
                 </button>`).join('');
         };
-
         if (window.firebaseDB) {
-            window.firebaseDB.ref('players').once('value').then(snap => {
-                const data = snap.val();
-                render(data ? Object.values(data) : []);
-            }).catch(() => render(JSON.parse(localStorage.getItem('basketballPlayers') || '[]')));
+            window.firebaseDB.ref('players').once('value')
+                .then(snap => render(snap.val() ? Object.values(snap.val()) : []))
+                .catch(() => render(JSON.parse(localStorage.getItem('basketballPlayers') || '[]')));
         } else {
             render(JSON.parse(localStorage.getItem('basketballPlayers') || '[]'));
         }
@@ -502,8 +488,6 @@ const AppAuth = {
 
     selectPlayer(id, name) {
         this._selectedPlayerId = id;
-        this._selectedPlayerName = name;
-
         if (this.hasAnsweredToday(id)) {
             document.getElementById('wl-step-select').style.display = 'none';
             document.getElementById('wl-step-done').style.display = '';
@@ -511,7 +495,6 @@ const AppAuth = {
             document.querySelector('.wl-done-sub').textContent = 'Ya has enviado tu cuestionario de hoy. ¡Hasta mañana!';
             return;
         }
-
         document.getElementById('wl-step-select').style.display = 'none';
         document.getElementById('wl-step-questions').style.display = '';
         document.getElementById('wl-selected-name').textContent = `👤 ${name}`;
@@ -548,12 +531,15 @@ const AppAuth = {
 window.addEventListener('load', () => {
     setTimeout(() => {
         const role = AppAuth.getRole();
-        if (role === 'trainer' || role === 'physio' || role === 'coach') {
+        if (role === 'staff') {
             document.getElementById('app').style.display = '';
-            AppAuth._applyRoleNav(role);
             window.rpeTracker = new RPETracker();
         } else if (role === 'player') {
-            AppAuth.showWellnessScreen();
+            if (AppAuth._isInstalledPWA()) {
+                AppAuth.showWellnessScreen();
+            } else {
+                AppAuth.showInstallGate();
+            }
         } else {
             AppAuth.showPinScreen();
         }
