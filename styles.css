@@ -9513,3 +9513,287 @@ details[open] .ewma-toggle-hint { display: none; }
 [data-theme="dark"] .ig-confirm {
     background: var(--bg-card, #1e1e1e);
 }
+
+/* ============================================================
+   ANAMNESIS MODULE STYLES
+   ============================================================ */
+
+/* Modal override — wider for body map */
+.anamnesis-modal-content {
+  max-width: 860px;
+}
+
+/* Sections */
+.ana-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.ana-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.ana-hint {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Form grids */
+.ana-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.ana-grid-1 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+.ana-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.ana-input, .ana-select, .ana-textarea {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.ana-input:focus, .ana-select:focus, .ana-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.ana-textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+/* iOS anti-zoom */
+@media (max-width: 768px) {
+  .ana-input, .ana-select, .ana-textarea { font-size: 16px; }
+}
+
+/* Body map layout */
+.ana-bodymap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.ana-legend-item { display: flex; align-items: center; gap: 0.3rem; }
+
+.ana-bodymap-wrap {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.ana-bodymap-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 160px;
+  max-width: 220px;
+}
+.ana-bodymap-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+.bm-container {
+  width: 100%;
+  aspect-ratio: 200 / 340;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+  position: relative;
+}
+.body-map-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Injury history table */
+.ana-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.ana-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.ana-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.ana-table tr:last-child td { border-bottom: none; }
+.ana-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+}
+.btn-icon--sm {
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 0.75rem !important;
+  padding: 0 !important;
+}
+
+/* Body map tooltip */
+.bm-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  min-width: 180px;
+  max-width: 240px;
+  pointer-events: none;
+  display: none;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.bmt-type {
+  font-weight: 700;
+  font-size: 0.86rem;
+  margin-bottom: 0.2rem;
+}
+.bmt-zone {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+.bmt-row {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.bmt-row span { font-weight: 600; }
+.bmt-desc {
+  margin-top: 0.3rem;
+  color: var(--text-primary);
+  font-size: 0.83rem;
+  font-style: italic;
+}
+
+/* Mark form popup */
+.bm-mark-form {
+  position: fixed;
+  z-index: 10000;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.84rem;
+}
+.bmf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.2rem;
+}
+.bmf-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  padding: 0;
+  line-height: 1;
+}
+.bmf-title {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.bmf-existing-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.bmf-existing-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+.bmf-del {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  margin-left: auto;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.bmf-del:hover { background: rgba(244,67,54,0.15); color: #f44336; }
+
+/* Mobile responsive */
+@media (max-width: 600px) {
+  .ana-grid-2 { grid-template-columns: 1fr; }
+  .ana-bodymap-wrap { flex-direction: row; flex-wrap: nowrap; gap: 0.75rem; }
+  .ana-bodymap-col { min-width: 130px; }
+  .anamnesis-modal-content { max-width: 100%; }
+  .bm-mark-form {
+    position: fixed;
+    left: 50% !important;
+    top: auto !important;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    width: calc(100vw - 2rem);
+  }
+}
+
+/* Dark mode — inputs */
+[data-theme="dark"] .ana-input,
+[data-theme="dark"] .ana-select,
+[data-theme="dark"] .ana-textarea {
+  background: var(--bg-tertiary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .bm-container { background: var(--bg-tertiary); }
+[data-theme="dark"] .bm-tooltip,
+[data-theme="dark"] .bm-mark-form { background: var(--bg-secondary); }

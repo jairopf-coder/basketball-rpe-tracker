@@ -450,6 +450,28 @@ FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
 // Crear instancia global
 window.firebaseSync = new FirebaseSync();
 
+// ── Anamnesis ──────────────────────────────────────────────
+FirebaseSync.prototype.saveAnamnesis = async function(playerId, data) {
+    try {
+        await this.db.ref(`anamnesis/${playerId}`).set(data);
+        localStorage.setItem(`anamnesis_${playerId}`, JSON.stringify(data));
+    } catch (e) {
+        console.error('Error saving anamnesis:', e);
+        localStorage.setItem(`anamnesis_${playerId}`, JSON.stringify(data));
+    }
+};
+
+FirebaseSync.prototype.loadAnamnesis = function(playerId, callback) {
+    this.db.ref(`anamnesis/${playerId}`).once('value', snapshot => {
+        const val = snapshot.val();
+        if (val) { callback(val); return; }
+        try {
+            const local = localStorage.getItem(`anamnesis_${playerId}`);
+            callback(local ? JSON.parse(local) : null);
+        } catch(e) { callback(null); }
+    });
+};
+
 // Verificar conexión — se llama aquí para garantizar que todos los
 // FirebaseSync.prototype.* estén definidos antes de que checkConnection
 // acceda a _drainQueue y _updatePendingCount.
