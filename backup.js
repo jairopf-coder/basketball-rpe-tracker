@@ -87,7 +87,7 @@ RPETracker.prototype.restoreBackup = function(event) {
         try {
             const backup = JSON.parse(e.target.result);
             if (!backup.players || !backup.sessions) { alert('❌ Archivo de backup inválido'); return; }
-            if (confirm(`¿Restaurar backup del ${new Date(backup.exportDate).toLocaleDateString('es-ES')}?\n\n⚠️ Esto REEMPLAZARÁ todos los datos actuales.`)) {
+            AppConfirm.show({title:'¿Restaurar backup?',message:`Backup del ${new Date(backup.exportDate).toLocaleDateString('es-ES')}. Esto REEMPLAZARÁ todos los datos actuales.`,confirmText:'Restaurar',cancelText:'Cancelar',danger:true}).then(ok=>{ if(ok) {
                 this.players      = backup.players;
                 this.sessions     = backup.sessions;
                 this.wellnessData = backup.wellnessData || [];
@@ -97,7 +97,7 @@ RPETracker.prototype.restoreBackup = function(event) {
                 this.savePlayers(); this.saveSessions(); this.saveWellnessData(); this.saveInjuries();
                 this.showToast('✅ Datos restaurados correctamente');
                 setTimeout(() => location.reload(), 1500);
-            }
+            }});
         } catch (err) { alert('❌ Error al leer el archivo: ' + err.message); }
     };
     reader.readAsText(file);

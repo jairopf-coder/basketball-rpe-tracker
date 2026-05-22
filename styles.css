@@ -1333,8 +1333,10 @@ header h1 {
     align-items: center;
     gap: 0.35rem;
     background: var(--bg-subtle, #f5f5f5);  /* fallback Safari < 15.4 */
+    background: var(--bg-subtle, #f0f0f0);
     background: color-mix(in srgb, var(--chip-color) 12%, var(--bg-subtle, #f5f5f5));
     border: 1px solid rgba(0,0,0,0.12);       /* fallback */
+    border: 1px solid rgba(0,0,0,0.15);
     border: 1px solid color-mix(in srgb, var(--chip-color) 30%, transparent);
     border-radius: 20px;
     padding: 0.28rem 0.7rem;
@@ -1372,6 +1374,7 @@ header h1 {
     border: 2px solid var(--chip-color);
     color: var(--chip-color);
     background: transparent;
+    background: rgba(0,0,0,0.06);
     background: color-mix(in srgb, var(--chip-color) 10%, transparent);
     cursor: pointer;
     white-space: nowrap;
@@ -1383,11 +1386,13 @@ header h1 {
 }
 
 .pred-mini-chip:hover {
+    background: rgba(0,0,0,0.14);
     background: color-mix(in srgb, var(--chip-color) 22%, transparent);
     transform: scale(1.05);
 }
 
 .pred-mini-chip--selected {
+    background: rgba(0,0,0,0.18);
     background: color-mix(in srgb, var(--chip-color) 30%, transparent);
     box-shadow: 0 0 0 1px var(--chip-color);
 }
@@ -1421,6 +1426,7 @@ header h1 {
     border-style: solid;
     border-color: var(--primary, #1976d2);
     color: var(--primary, #1976d2);
+    background: rgba(25,118,210,0.10);
     background: color-mix(in srgb, var(--primary, #1976d2) 10%, transparent);
 }
 
@@ -3031,7 +3037,7 @@ header h1 {
     .rpe-input {
         border-color: #e0e0e0;
         border-radius: 8px;
-        font-size: 0.9rem;
+        font-size: 1rem; /* min 16px evita auto-zoom iOS */
         padding: 0.6rem 0.85rem;
     }
 
@@ -3732,32 +3738,93 @@ header h1 {
 .corr-stat-val { font-weight:700; font-size:1rem; color:var(--primary); }
 .corr-stat-lbl { font-size:0.68rem; color:var(--text-muted); margin-top:2px; }
 
-/* ===== PANTALLA DE PIN ===== */
-#pin-screen {
+/* ===== PANTALLA DE LOGIN (Firebase Auth) ===== */
+#login-screen {
     position: fixed; inset: 0; background: var(--bg-surface);
     display: flex; align-items: center; justify-content: center;
     z-index: 9999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
-.pin-container { width: 100%; max-width: 320px; padding: 2rem 1.5rem; text-align: center; }
-.pin-logo { font-size: 3rem; margin-bottom: 0.5rem; }
-.pin-title { font-size: 1.5rem; font-weight: 700; margin: 0 0 0.25rem; color: var(--text-primary); }
-.pin-subtitle { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 2rem; }
-.pin-dots { display: flex; justify-content: center; gap: 16px; margin-bottom: 1rem; }
-.pin-dot { width: 14px; height: 14px; border-radius: 50%; background: #e0e0e0; transition: background 0.15s, transform 0.15s; }
-.pin-dot.filled { background: #ff6600; transform: scale(1.1); }
-@keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
-.pin-dots.shake { animation: shake 0.4s ease; }
-.pin-error { color: #f44336; font-size: 0.85rem; margin-bottom: 0.75rem; height: 1.2em; }
-.pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 1rem 0; }
-.pin-key { height: 64px; border: 0.5px solid var(--border); border-radius: 12px; background: var(--bg-subtle); font-size: 1.4rem; font-weight: 500; cursor: pointer; transition: background 0.1s, transform 0.1s; color: var(--text-primary); touch-action: manipulation; }
-.pin-key:active { background: #ff6600; color: white; transform: scale(0.95); }
-.pin-key-empty { background: transparent; border-color: transparent; cursor: default; }
-.pin-key-empty:active { background: transparent; transform: none; }
-.pin-hint { font-size: 0.75rem; color: var(--text-faint); margin-top: 1rem; }
+.login-container {
+    width: 100%; max-width: 360px; padding: 2.5rem 2rem;
+    background: var(--bg-card, #1e1e1e);
+    border: 1px solid var(--border, #333);
+    border-radius: 20px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    text-align: center;
+}
+.login-logo { font-size: 3rem; margin-bottom: 0.5rem; }
+.login-title { font-size: 1.6rem; font-weight: 700; margin: 0 0 0.25rem; color: var(--text-primary); }
+.login-subtitle { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 2rem; }
+.login-form { text-align: left; }
+.login-field { margin-bottom: 1rem; }
+.login-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.login-input-wrap { position: relative; }
+.login-input {
+    width: 100%; padding: 0.75rem 1rem; box-sizing: border-box;
+    background: var(--bg-subtle, #2a2a2a);
+    border: 1.5px solid var(--border, #444);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+}
+.login-input:focus { outline: none; border-color: var(--accent, #ff6600); }
+.login-input-wrap .login-input { padding-right: 3rem; }
+.login-eye {
+    position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; font-size: 1.1rem;
+    color: var(--text-muted); padding: 0.25rem;
+}
+.login-error {
+    background: rgba(244,67,54,0.12);
+    border: 1px solid rgba(244,67,54,0.3);
+    color: #f44336;
+    font-size: 0.85rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+.login-btn {
+    width: 100%; padding: 0.85rem;
+    background: var(--accent, #ff6600);
+    color: #fff;
+    border: none; border-radius: 10px;
+    font-size: 1rem; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    touch-action: manipulation;
+    margin-top: 0.5rem;
+}
+.login-btn:hover:not(:disabled) { opacity: 0.9; }
+.login-btn:active:not(:disabled) { transform: scale(0.98); }
+.login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.login-version { margin: 1.5rem 0 0; font-size: 0.75rem; color: var(--text-faint); }
+
+/* ===== GESTIÓN DE USUARIOS ===== */
+.um-section-title { font-size: 0.95rem; font-weight: 600; color: var(--text-secondary); margin: 0 0 1rem; }
+.um-user-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 260px; overflow-y: auto; }
+.um-user-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-subtle);
+    border-radius: 8px;
+}
+.um-user-info { flex: 1; min-width: 0; }
+.um-user-name { display: block; font-weight: 600; font-size: 0.9rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.um-user-email { display: block; font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.um-user-role { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 6px; white-space: nowrap; }
+.um-role-staff  { background: rgba(255,152,0,0.15); color: #ff9800; }
+.um-role-fisio  { background: rgba(33,150,243,0.15); color: #2196f3; }
+.um-role-player { background: rgba(76,175,80,0.15);  color: #4caf50; }
+.um-delete-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 0.2rem; border-radius: 4px; transition: color 0.15s; }
+.um-delete-btn:hover { color: var(--danger, #f44336); }
+
+/* ===== ESTILOS PIN LEGACY (mantenidos por si acaso) ===== */
+.pin-error { color: #f44336; font-size: 0.85rem; }
 
 /* ===== PANTALLA DE WELLNESS ===== */
 #wellness-screen {
-    min-height: 100vh; background: #f4f5f7;
+    min-height: 100vh; min-height: 100dvh; background: var(--bg-page, #f4f5f7);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 .wl-container { max-width: 480px; margin: 0 auto; padding: 2rem 1.25rem 5rem; }
@@ -3905,6 +3972,7 @@ header h1 {
     display: grid;
     grid-template-columns: 240px minmax(0,1fr) 310px;
     height: calc(100vh - 110px);         /* fallback para Safari < 15.4 */
+    height: calc(100dvh - 110px);
     height: calc(100dvh - 110px);        /* respeta chrome dinámico de iOS/iPadOS */
     overflow: hidden;
     max-width: 1200px;
@@ -7661,7 +7729,7 @@ details[open] .ewma-toggle-hint { display: none; }
     transition: color 0.2s;
 }
 @media (max-width: 640px) {
-    .wb-modal { max-height: 100vh; border-radius: 0; max-width: 100%; }
+    .wb-modal { max-height: 100vh; max-height: 100dvh; border-radius: 0; max-width: 100%; }
     .md-grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); }
 }
 
@@ -9797,3 +9865,29 @@ details[open] .ewma-toggle-hint { display: none; }
 [data-theme="dark"] .bm-container { background: var(--bg-tertiary); }
 [data-theme="dark"] .bm-tooltip,
 [data-theme="dark"] .bm-mark-form { background: var(--bg-secondary); }
+
+/* ── Accesibilidad: ocultar visualmente pero disponible para lectores ── */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ── Accesibilidad: indicador de foco para navegación con teclado ── */
+/* outline:none se mantiene en :focus para no afectar usuarios de ratón */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--primary, #ff6600);
+    outline-offset: 2px;
+    border-radius: 4px;
+}

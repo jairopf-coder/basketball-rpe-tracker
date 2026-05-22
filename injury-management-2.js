@@ -446,7 +446,7 @@ RPETracker.prototype.markAsRecovered = function(injuryId) {
     const injury = this.injuries.find(i => i.id === injuryId);
     if (!injury) return;
     
-    if (!confirm('¿Marcar como recuperada?\n\nEsto cerrará el proceso de RTP.')) return;
+    AppConfirm.show({title:'¿Marcar como recuperada?',message:'Esto cerrará el proceso de RTP.',confirmText:'Confirmar',danger:false}).then(ok=>{ if(!ok) return;
     
     injury.status = 'recovered';
     injury.endDate = new Date().toISOString().split('T')[0];
@@ -463,6 +463,7 @@ RPETracker.prototype.markAsRecovered = function(injuryId) {
     this.saveInjuries();
     this.renderInjuryManagement();
     this.showToast('✅ Jugadora marcada como recuperada');
+    });
 };
 
 // ========== HELPER FUNCTIONS ==========
@@ -629,11 +630,12 @@ RPETracker.prototype._saveClinicalNoteFromForm = function() {
 };
 
 RPETracker.prototype._deleteClinicalNote = function(noteId) {
-    if (!confirm('¿Eliminar esta nota clínica?')) return;
+    AppConfirm.show({title:'¿Eliminar nota clínica?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar',danger:true}).then(ok=>{ if(!ok) return;
     this.clinicalNotes = (this.clinicalNotes || []).filter(n => n.id !== noteId);
     this._saveClinicalNotes();
     const c = document.getElementById('clinicalNotesPanelContent');
     if (c) this._renderClinicalNotesPanel(c);
+    });
 };
 
 RPETracker.prototype._editClinicalNoteInline = function(noteId) {

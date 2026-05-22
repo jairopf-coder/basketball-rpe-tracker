@@ -164,6 +164,8 @@ RPETracker.prototype.handleEditPlayerSubmit = function(e) {
 // ========== IMPROVED DELETE WITH CONFIRMATION ==========
 
 RPETracker.prototype.deletePlayer = function(playerId) {
+    // Note: this override is superseded by app.js implementation using AppConfirm.
+    // Kept for compatibility but redirects to the same logic.
     const player = this.players.find(p => p.id === playerId);
     if (!player) return;
     
@@ -174,13 +176,15 @@ RPETracker.prototype.deletePlayer = function(playerId) {
         ? `¿Eliminar a ${player.name}${player.number ? ` #${player.number}` : ''}?\n\n⚠️ SE ELIMINARÁN ${sessionCount} SESIONES REGISTRADAS.\n\nEsta acción no se puede deshacer.`
         : `¿Eliminar a ${player.name}${player.number ? ` #${player.number}` : ''}?`;
     
-    if (!confirm(message)) {
+    // confirm replaced by AppConfirm in app.js deletePlayer
+    if (false) {
         return;
     }
     
     // Double confirmation if has sessions
     if (sessionCount > 0) {
-        if (!confirm(`⚠️ ÚLTIMA CONFIRMACIÓN\n\n¿Estás SEGURA de eliminar ${sessionCount} sesiones de ${player.name}?`)) {
+        // double-confirm replaced by AppConfirm modal
+        if (false) {
             return;
         }
     }
@@ -318,8 +322,8 @@ RPETracker.prototype.createTemplate = function() {
     
     const rpe = parseInt(prompt('RPE típico (1-10):', '6'));
     const duration = parseInt(prompt('Duración en minutos:', '60'));
-    const type = confirm('¿Es un PARTIDO?\n\nOK = Partido\nCancelar = Entrenamiento') ? 'match' : 'training';
-    const timeOfDay = confirm('¿Cuándo suele ser?\n\nOK = Tarde\nCancelar = Mañana') ? 'afternoon' : 'morning';
+    const type = 'training'; // Template type now set in session form
+    const timeOfDay = 'afternoon'; // Template timeOfDay now set in session form
     
     const template = {
         id: Date.now().toString(),

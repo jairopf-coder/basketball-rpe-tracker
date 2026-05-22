@@ -1287,11 +1287,12 @@ RPETracker.prototype._saveGymSession = function() {
 
 // ── Eliminar sesión ──
 RPETracker.prototype._deleteGymSession = function(sessionId) {
-    if (!confirm('¿Eliminar esta sesión?')) return;
+    AppConfirm.show({title:'¿Eliminar sesión de gym?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar',danger:true}).then(ok=>{ if(!ok) return;
     this.gymSessions=(this.gymSessions||[]).filter(s=>s.id!==sessionId);
     this._saveGymSessions();
     this.showToast('Sesión eliminada','success');
     if (this.currentView==='gym') this._renderGymPlayer(document.getElementById('gymView'));
+    });
 };
 
 // ─────────────────────────────────────────
@@ -1490,11 +1491,12 @@ RPETracker.prototype._applyTemplate = function(idx) {
 
 RPETracker.prototype._deleteTemplate = function(idx) {
     if (!this._gymTemplates) this._loadGymTemplates();
-    if (!confirm('¿Eliminar esta plantilla?')) return;
+    AppConfirm.show({title:'¿Eliminar plantilla?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar',danger:true}).then(ok=>{ if(!ok) return;
     this._gymTemplates.splice(idx, 1);
     this._saveGymTemplates();
     this._renderTemplatesModal();
     this.showToast('Plantilla eliminada', 'success');
+    });
 };
 
 
@@ -1585,12 +1587,13 @@ RPETracker.prototype._addExercise = function() {
 RPETracker.prototype._deleteExercise = function(exId) {
     const ex = (this.exerciseLibrary || []).find(e => e.id === exId);
     if (!ex) return;
-    if (!confirm(`¿Eliminar "${ex.name}" de la biblioteca?`)) return;
+    AppConfirm.show({title:`¿Eliminar ${ex.name}?`,message:'Se eliminará de la biblioteca de ejercicios.',confirmText:'Eliminar',danger:true}).then(ok=>{ if(!ok) return;
     this.exerciseLibrary = this.exerciseLibrary.filter(e => e.id !== exId);
     this._saveExercises();
     const modal = document.getElementById('exerciseLibraryModal');
     if (modal) this._renderLibraryModal(modal);
     this.showToast('Ejercicio eliminado', 'success');
+    });
 };
 
 RPETracker.prototype._editExercise = function(exId) {
@@ -2077,10 +2080,12 @@ RPETracker.prototype._saveTestSession = function() {
 };
 
 RPETracker.prototype._deleteTestSession = function(sessionId) {
-    if (!confirm('¿Eliminar este test?')) return;
-    this.testSessions = (this.testSessions || []).filter(s => s.id !== sessionId);
-    this._saveTestSessions();
-    this.showToast('Test eliminado', 'success');
-    const el = document.getElementById('testsView');
-    if (el) this._renderTestPlayer(el);
+    AppConfirm.show({title:'¿Eliminar test?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar',danger:true}).then(ok=>{
+        if (!ok) return;
+        this.testSessions = (this.testSessions || []).filter(s => s.id !== sessionId);
+        this._saveTestSessions();
+        this.showToast('Test eliminado', 'success');
+        const el = document.getElementById('testsView');
+        if (el) this._renderTestPlayer(el);
+    });
 };

@@ -1,0 +1,43 @@
+{
+  "rules": {
+    ".read":  false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read":  "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
+
+    "players": {
+      ".read":  "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "sessions": {
+      ".read":  "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "wellness": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null"
+    },
+
+    "injuries": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "strength": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "$other": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    }
+  }
+}

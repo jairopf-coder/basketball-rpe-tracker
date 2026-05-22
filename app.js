@@ -582,19 +582,26 @@ class RPETracker {
     }
 
     deletePlayer(playerId) {
-        if (!confirm('¿Eliminar esta jugadora? También se eliminarán todas sus sesiones.')) {
-            return;
-        }
-        
-        this.players = this.players.filter(p => p.id !== playerId);
-        this.sessions = this.sessions.filter(s => s.playerId !== playerId);
-        
-        this.savePlayers();
-        this.saveSessions();
-        this.renderPlayers();
-        this.renderSessions();
-        this.populatePlayerSelects();
-        this.showToast('🗑️ Jugadora eliminada', 'info');
+        const player = this.players.find(p => p.id === playerId);
+        const name = player ? player.name : 'esta jugadora';
+        const sessionCount = this.sessions.filter(s => s.playerId === playerId).length;
+        AppConfirm.show({
+            title: `¿Eliminar ${name}?`,
+            message: `Se eliminarán también ${sessionCount} sesión(es) registrada(s). Esta acción no se puede deshacer.`,
+            confirmText: 'Eliminar',
+            cancelText: 'Cancelar',
+            danger: true
+        }).then(ok => {
+            if (!ok) return;
+            this.players = this.players.filter(p => p.id !== playerId);
+            this.sessions = this.sessions.filter(s => s.playerId !== playerId);
+            this.savePlayers();
+            this.saveSessions();
+            this.renderPlayers();
+            this.renderSessions();
+            this.populatePlayerSelects();
+            this.showToast('🗑️ Jugadora eliminada', 'info');
+        });
     }
 
     renderPlayers() {
@@ -1322,14 +1329,20 @@ class RPETracker {
 
     deleteCurrentSession() {
         if (!this.currentSessionId) return;
-        
-        if (confirm('¿Seguro que quieres eliminar esta sesión?')) {
+        AppConfirm.show({
+            title: '¿Eliminar esta sesión?',
+            message: 'Esta acción no se puede deshacer.',
+            confirmText: 'Eliminar',
+            cancelText: 'Cancelar',
+            danger: true
+        }).then(ok => {
+            if (!ok) return;
             this.sessions = this.sessions.filter(s => s.id !== this.currentSessionId);
             this.saveSessions();
             this.renderSessions();
             this.closeModal('detailModal');
             this.showToast('🗑️ Sesión eliminada', 'info');
-        }
+        });
     }
 
     // ========== DASHBOARD ==========
@@ -2781,7 +2794,7 @@ class RPETracker {
         }
 
         this._renderSemaphoreBar();
-        const ewmaOpen = localStorage.getItem('rpe_ewma_open') === 'true';
+        const ewmaOpen = Store.getString('ewmaOpen') === 'true';
 
         container.innerHTML = `
             <!-- 1. Curvas A:C — protagonista -->
@@ -2836,6 +2849,11 @@ class RPETracker {
     static get MATCH_LOAD_MULTIPLIER() { return 1.5; }
 
     calculateAcuteChronicRatio(playerId) {
+        // Memoize result (invalidated via ACCache.invalidate() on save/delete)
+        if (typeof ACCache !== 'undefined') {
+            const cached = ACCache.get(playerId, this.sessions);
+            if (cached !== null) return cached;
+        }
         const MATCH_MULT = RPETracker.MATCH_LOAD_MULTIPLIER;
         const playerSessions = this.sessions
             .filter(s => s.playerId === playerId)
@@ -2918,7 +2936,7 @@ class RPETracker {
         const totalLoad7d = acuteSessions.reduce((sum, s) => sum + s.load, 0);
         const totalLoad28d = chronicSessions.reduce((sum, s) => sum + s.load, 0);
         
-        return {
+        const result = {
             acute: ewmaAcute,
             chronic: ewmaChronic,
             ratio: ratio > 0 ? ratio.toFixed(2) : 'N/A',
@@ -2927,6 +2945,9 @@ class RPETracker {
             totalLoad7d: Math.round(totalLoad7d),
             totalLoad21d: Math.round(totalLoad28d)
         };
+        // Store in cache for this render cycle
+        if (typeof ACCache !== 'undefined') ACCache.set(playerId, this.sessions, result);
+        return result;
     }
 
     // ========== INDIVIDUAL A:C THRESHOLDS ==========
@@ -2995,7 +3016,7 @@ class RPETracker {
 
     loadSessions() {
         // Seed inmediato desde localStorage para render inicial sin esperar Firebase
-        const localStored = localStorage.getItem('basketballSessions');
+        const localStored = Store.getString('sessions');
         const localSessions = localStored ? JSON.parse(localStored) : [];
 
         if (window.firebaseSync) {
@@ -3012,18 +3033,20 @@ class RPETracker {
     }
 
     saveSessions() {
+        // Invalidar caché de cálculos EWMA/AC al guardar sesiones
+        if (typeof ACCache !== 'undefined') ACCache.invalidate();
         // Guardar en Firebase (que también guardará en localStorage como backup)
         if (window.firebaseSync) {
             window.firebaseSync.saveSessions(this.sessions);
         } else {
             // Fallback si Firebase no está disponible
-            localStorage.setItem('basketballSessions', JSON.stringify(this.sessions));
+            Store.set('sessions', this.sessions);
         }
     }
 
     loadPlayers() {
         // Seed inmediato desde localStorage para render inicial sin esperar Firebase
-        const localStored = localStorage.getItem('basketballPlayers');
+        const localStored = Store.getString('players');
         const localPlayers = localStored ? JSON.parse(localStored) : [];
 
         if (window.firebaseSync) {
@@ -3048,7 +3071,7 @@ class RPETracker {
             window.firebaseSync.savePlayers(this.players);
         } else {
             // Fallback si Firebase no está disponible
-            localStorage.setItem('basketballPlayers', JSON.stringify(this.players));
+            Store.set('players', this.players);
         }
     }
 
@@ -3060,6 +3083,8 @@ class RPETracker {
         toast.className = `toast ${type}`;
         toast.textContent = message;
         document.body.appendChild(toast);
+        // Announce for screen readers
+        if (typeof announceA11y === 'function') announceA11y(message);
 
         setTimeout(() => {
             toast.classList.add('hiding');

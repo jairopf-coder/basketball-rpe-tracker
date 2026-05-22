@@ -439,10 +439,11 @@ RPETracker.prototype.openSeasonBlockModal = function(blockId) {
 };
 
 RPETracker.prototype.deleteSeasonBlock = function(id) {
-    if (!confirm('¿Eliminar este bloque?')) return;
+    AppConfirm.show({title:'¿Eliminar bloque?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar',danger:true}).then(ok=>{ if(!ok) return;
     this.seasonBlocks = (this.seasonBlocks || []).filter(b => b.id !== id);
     this.saveSeasonBlocks();
     this.renderSeasonBlocksManager();
     const wpView = document.getElementById('weeklyPlanView');
     if (wpView && wpView.style.display !== 'none') this.renderWeeklyPlanning();
+    });
 };

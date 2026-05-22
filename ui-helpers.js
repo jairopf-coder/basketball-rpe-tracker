@@ -60,11 +60,12 @@ RPETracker.prototype.showTemplateManager = function() {
 };
 
 RPETracker.prototype.deleteTemplate = function(templateId) {
-    if (!confirm('¿Eliminar esta plantilla?')) return;
+    AppConfirm.show({title:'¿Eliminar plantilla?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar',danger:true}).then(ok=>{ if(!ok) return;
     
     this.templates = this.templates.filter(t => t.id !== templateId);
     this.saveTemplates();
     this.showToast('🗑️ Plantilla eliminada');
+    });
 };
 
 // ========== ADVANCED STATS PANEL ==========

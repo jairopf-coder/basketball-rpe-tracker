@@ -23,7 +23,7 @@ class FirebaseSync {
         } catch (error) {
             console.error('Error loading sessions:', error);
             // Fallback a localStorage si Firebase falla
-            const stored = localStorage.getItem('basketballSessions');
+            const stored = Store.getString('sessions');
             return stored ? JSON.parse(stored) : [];
         }
     }
@@ -38,11 +38,12 @@ class FirebaseSync {
             });
             await this.sessionsRef.set(sessionsObj);
             // También guardar en localStorage como backup
-            localStorage.setItem('basketballSessions', JSON.stringify(sessions));
+            Store.set('sessions', sessions);
         } catch (error) {
             console.error('Error saving sessions:', error);
-            localStorage.setItem('basketballSessions', JSON.stringify(sessions));
+            Store.set('sessions', sessions);
             await this._enqueueWrite('sessions', Object.fromEntries(sessions.map(s => [s.id, s])));
+            this._notifyOffline('sesiones');
         }
     }
 
@@ -67,7 +68,7 @@ class FirebaseSync {
         } catch (error) {
             console.error('Error loading players:', error);
             // Fallback a localStorage
-            const stored = localStorage.getItem('basketballPlayers');
+            const stored = Store.getString('players');
             return stored ? JSON.parse(stored) : [];
         }
     }
@@ -82,11 +83,12 @@ class FirebaseSync {
             });
             await this.playersRef.set(playersObj);
             // También guardar en localStorage como backup
-            localStorage.setItem('basketballPlayers', JSON.stringify(players));
+            Store.set('players', players);
         } catch (error) {
             console.error('Error saving players:', error);
-            localStorage.setItem('basketballPlayers', JSON.stringify(players));
+            Store.set('players', players);
             await this._enqueueWrite('players', Object.fromEntries(players.map(p => [p.id, p])));
+            this._notifyOffline('jugadoras');
         }
     }
 
@@ -111,8 +113,8 @@ class FirebaseSync {
 
     // Migrar datos de localStorage a Firebase (usar una sola vez)
     async migrateFromLocalStorage() {
-        const localSessions = localStorage.getItem('basketballSessions');
-        const localPlayers = localStorage.getItem('basketballPlayers');
+        const localSessions = Store.getString('sessions');
+        const localPlayers = Store.getString('players');
         
         if (localSessions) {
             const sessions = JSON.parse(localSessions);
@@ -448,6 +450,19 @@ FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
 // ========== INSTANTIATION (must come after all prototype methods) ==========
 
 // Crear instancia global
+// Notify user when data is saved locally only (offline/error state)
+FirebaseSync.prototype._notifyOffline = function(tipo) {
+    if (typeof announceA11y === 'function') {
+        announceA11y(`Guardado localmente (sin conexión a Firebase): ${tipo}`);
+    }
+    // Show subtle warning toast if rpeTracker available
+    const tracker = window.rpeTracker;
+    if (tracker && typeof tracker.showToast === 'function') {
+        tracker.showToast(`⚠️ Guardado local (sin conexión). Los datos de ${tipo} se sincronizarán al reconectar.`, 'warning');
+    }
+};
+
+
 window.firebaseSync = new FirebaseSync();
 
 // ── Anamnesis ──────────────────────────────────────────────

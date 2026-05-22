@@ -569,18 +569,20 @@ RPETracker.prototype.saveWellnessEntry = function() {
 };
 
 RPETracker.prototype._deleteWellness = function(id) {
-    if(!confirm('¿Eliminar este registro?')) return;
+    AppConfirm.show({title:'¿Eliminar registro?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar',danger:true}).then(ok=>{ if(!ok) return;
     this.wellnessData=(this.wellnessData||[]).filter(w=>w.id!==id);
     this.saveWellnessData();
     this.showToast('🗑️ Registro eliminado','info');
     this.renderWellnessDashboard();
+    });
 };
 
 RPETracker.prototype._clearWellness = function() {
-    if(!confirm('¿Eliminar TODOS los registros de bienestar?\n\nEsta acción no se puede deshacer.')) return;
+    AppConfirm.show({title:'¿Eliminar TODOS los registros de bienestar?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar todo',danger:true}).then(ok=>{ if(!ok) return;
     this.wellnessData=[];this.saveWellnessData();
     this.showToast('🗑️ Historial eliminado','info');
     this.renderWellnessDashboard();
+    });
 };
 
 // ========== HELPERS ==========
