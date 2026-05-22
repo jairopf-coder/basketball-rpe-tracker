@@ -1,14 +1,29 @@
-# Node
-node_modules/
-npm-debug.log
+# ============================================================
+#  .gitignore — BasketballRPE Web
+# ============================================================
 
-# Sistema
+# ⚠️  CREDENCIALES — nunca subir a Git
+firebase-config.js
+
+# Sistemas operativos
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# NO ignorar firebase-config.js porque es necesario para GitHub Pages
-# firebase-config.js
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencias (si algún día usas npm)
+node_modules/
 
 # Backups locales
+*.bak
 *.backup
-backup/
