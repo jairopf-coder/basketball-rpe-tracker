@@ -194,7 +194,7 @@ const DarkMode = {
     KEY: 'rpe_dark_mode',
 
     init() {
-        const saved = localStorage.getItem(this.KEY);
+        const saved = Store.getString('darkMode');
         const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
         const enabled = saved !== null ? saved === 'true' : prefersDark;
         this.apply(enabled);
@@ -207,7 +207,7 @@ const DarkMode = {
 
     apply(dark) {
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-        localStorage.setItem(this.KEY, String(dark));
+        Store.setString('darkMode', String(dark));
         // Update button icon
         const btn = document.getElementById('darkModeBtn');
         if (btn) btn.textContent = dark ? '☀️' : '🌙';
@@ -426,7 +426,7 @@ class RPETracker {
             this.renderSessions();
         });
         
-        this.setupSearchAndFilters();
+        setTimeout(() => { if (typeof this.setupSearchAndFilters === "function") this.setupSearchAndFilters(); }, 0);
     }
 
     switchView(viewName) {
@@ -513,7 +513,9 @@ class RPETracker {
     // ========== PLAYERS MANAGEMENT ==========
     
     openAddPlayerModal() {
-        document.getElementById('addPlayerModal').classList.add('active');
+        const _modal2 = document.getElementById('addPlayerModal');
+        _modal2.classList.add('active');
+        this._ftRelease2 = trapFocus(_modal2);
         document.getElementById('playerForm').reset();
         // Pre-select next available color
         const usedColors = this.players.map(p => p.color).filter(Boolean);
@@ -818,8 +820,11 @@ class RPETracker {
             return;
         }
         this.selectedPlayerIds = [];
-        document.getElementById('newSessionModal').classList.add('active');
+        const _modal1 = document.getElementById('newSessionModal');
+        _modal1.classList.add('active');
+        this._ftRelease = trapFocus(_modal1);
         this.setDefaultDateTime();
+        this._populateSeasonSelector();
         this.renderPlayerButtonsMulti();
         document.getElementById('sessionDuration').value = 60;
         // Reset duration buttons
@@ -831,6 +836,39 @@ class RPETracker {
     
     renderPlayerButtons() {
         this.renderPlayerButtonsMulti();
+    }
+
+    _populateSeasonSelector() {
+        const sel = document.getElementById('sessionSeason');
+        if (!sel) return;
+        const seasons = Store.getSeasonsFromSessions(this.sessions);
+        sel.innerHTML = seasons.map(s =>
+            `<option value="${s}"${s === Store.getActiveSeason() ? ' selected' : ''}>${s}</option>`
+        ).join('') + `<option value="__new__">+ Nueva temporada…</option>`;
+
+        // Mostrar/ocultar input de temporada nueva
+        sel.onchange = () => {
+            const wrap = document.getElementById('newSeasonInputWrap');
+            if (wrap) wrap.style.display = sel.value === '__new__' ? 'flex' : 'none';
+        };
+
+        const wrap = document.getElementById('newSeasonInputWrap');
+        if (wrap) wrap.style.display = 'none';
+    }
+
+    _getSelectedSeason() {
+        const sel = document.getElementById('sessionSeason');
+        if (!sel) return Store.getActiveSeason();
+        if (sel.value === '__new__') {
+            const input = document.getElementById('newSeasonInput');
+            const val   = (input ? input.value : '').trim();
+            if (!val) {
+                this.showToast('⚠️ Escribe el nombre de la nueva temporada', 'warning');
+                return null; // señal de error
+            }
+            return val;
+        }
+        return sel.value || Store.getActiveSeason();
     }
 
     renderPlayerButtonsMulti() {
@@ -1005,6 +1043,8 @@ class RPETracker {
         const fullDateTime = dateValue + timeString;
         const duration = parseInt(document.getElementById('sessionDuration').value) || 60;
         const type = document.querySelector('input[name="sessionType"]:checked').value;
+        const season = this._getSelectedSeason();
+        if (season === null) return; // error ya mostrado
         const baseId = Date.now();
 
         this.selectedPlayerIds.forEach((playerId, i) => {
@@ -1021,7 +1061,8 @@ class RPETracker {
                 rpe,
                 duration,
                 load: rpe * duration,
-                notes
+                notes,
+                season
             };
             this.sessions.push(session);
         });
@@ -1071,7 +1112,10 @@ class RPETracker {
     closeModal(modalId) {
         if (modalId === 'newSessionModal') {
             this.selectedPlayerIds = [];
+            if (this._ftRelease) { this._ftRelease(); this._ftRelease = null; }
         }
+        if (modalId === 'addPlayerModal' && this._ftRelease2) { this._ftRelease2(); this._ftRelease2 = null; }
+        if (modalId === 'detailModal'    && this._ftRelease3) { this._ftRelease3(); this._ftRelease3 = null; }
         document.getElementById(modalId)?.classList.remove('active');
     }
     
@@ -1251,7 +1295,9 @@ class RPETracker {
             </div>` : ''}
         `;
         
-        document.getElementById('detailModal').classList.add('active');
+        const _dModal = document.getElementById('detailModal');
+        _dModal.classList.add('active');
+        this._ftRelease3 = trapFocus(_dModal);
 
         // Render RPE histogram after modal is in DOM
         if (playerSessions.length >= 2) {
@@ -1377,7 +1423,7 @@ class RPETracker {
 
         // Try localStorage first (wellness.js stores here before Firebase sync)
         let w = null;
-        try { w = JSON.parse(localStorage.getItem(wellnessKey)); } catch(_) {}
+        try { w = Store.get(wellnessKey); } catch(_) {}
 
         // Also check in-memory wellness array if present
         if (!w && this.wellnessData) {
@@ -1420,582 +1466,12 @@ class RPETracker {
         return Math.max(0, Math.min(100, score));
     }
 
-    readinessLabel(score) {
-        if (score === null) return { icon: '—', color: '#999', bg: 'transparent', cls: 'rdy-none' };
-        if (score >= 70)    return { icon: '🟢', color: '#2e7d32', bg: '#e8f5e9', cls: 'rdy-green' };
-        if (score >= 45)    return { icon: '🟡', color: '#f9a825', bg: '#fffde7', cls: 'rdy-yellow' };
-        return               { icon: '🔴', color: '#c62828', bg: '#ffebee', cls: 'rdy-red' };
-    }
 
-    renderDashboard() {
-        const container = document.getElementById('dashboardContent');
-        if (!container) return;
 
-        // Stats
-        const totalSessions = this.countUniqueSessions(this.sessions);
-        const trainingCount = this.countUniqueSessions(this.sessions.filter(s => s.type === 'training'));
-        const matchCount    = this.countUniqueSessions(this.sessions.filter(s => s.type === 'match'));
-        const avgRPE = this.sessions.length > 0
-            ? (this.sessions.reduce((sum, s) => sum + s.rpe, 0) / this.sessions.length).toFixed(1) : '—';
-        const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const recent7 = this.sessions.filter(s => new Date(s.date) >= sevenDaysAgo);
-        const recentUnique = this.countUniqueSessions(recent7);
-        const avgRPE7 = recent7.length > 0
-            ? (recent7.reduce((s, x) => s + x.rpe, 0) / recent7.length).toFixed(1) : '—';
 
-        // Active injuries
-        const activeInjuries = (this.injuries || []).filter(i => i.status === 'active').length;
 
-        // Wellness data — hoy
-        const _wToday = new Date().toISOString().slice(0, 10);
-        const _wData  = this.wellnessData || [];
-        const _pendingW = this.players.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
 
-        // Chips de wellness expandidas con color por estado
-        const wellnessChipsExpanded = this.players.length === 0 ? '' : (() => {
-            const chipColor = (p) => {
-                const todayEntry = _wData.find(e => e.playerId === p.id && e.date === _wToday);
-                if (!todayEntry) return { bg: 'var(--bg-subtle)', border: 'var(--border)', dot: '#bbb', label: '—' };
-                const overall = (todayEntry.sleep + (6 - todayEntry.fatigue) + todayEntry.mood + (6 - todayEntry.soreness)) / 4;
-                if (overall >= 4)   return { bg: '#e8f5e9', border: '#a5d6a7', dot: '#4caf50', label: overall.toFixed(1) };
-                if (overall >= 2.5) return { bg: '#fff8e1', border: '#ffe082', dot: '#ff9800', label: overall.toFixed(1) };
-                return { bg: '#ffebee', border: '#ef9a9a', dot: '#f44336', label: overall.toFixed(1) };
-            };
-            return this.players.map(p => {
-                const c = chipColor(p);
-                return `<div class="db-w-chip-full" style="background:${c.bg};border-color:${c.border}" onclick="window.rpeTracker?.switchView('wellness')" title="${p.name}">
-                    ${PlayerTokens.avatar(p, 18, '0.55rem')}
-                    <span class="db-w-chip-name">${p.name.split(' ')[0]}</span>
-                    <span class="db-w-chip-val" style="color:${c.dot}">${c.label}</span>
-                </div>`;
-            }).join('');
-        })();
 
-        // Mini resumen wellness equipo para columna Ratio
-        const wellnessMiniSummary = (() => {
-            if (!this.players.length) return '';
-            const todayEntries = _wData.filter(e => e.date === _wToday);
-            if (!todayEntries.length) return '';
-            const avg = (field) => {
-                const vals = todayEntries.map(e => e[field]).filter(v => v != null);
-                return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : '—';
-            };
-            const sleep = avg('sleep'), fatigue = avg('fatigue'), mood = avg('mood'), soreness = avg('soreness');
-            const dot = (val, invert = false) => {
-                const n = parseFloat(val);
-                if (isNaN(n)) return '#ccc';
-                const good = invert ? n <= 2.5 : n >= 3.5;
-                const bad  = invert ? n >= 3.5 : n <= 2.5;
-                return good ? '#4caf50' : bad ? '#f44336' : '#ff9800';
-            };
-            const covered = todayEntries.length;
-            const total   = this.players.length;
-            return `<div class="db-wsum">
-                <div class="db-wsum-header">
-                    <span class="db-wsum-label">Wellness hoy</span>
-                    <span class="db-wsum-coverage">${covered}/${total}</span>
-                </div>
-                <div class="db-wsum-row"><span class="db-wsum-metric">😴 Sueño</span><span class="db-wsum-val" style="color:${dot(sleep)}">${sleep}</span></div>
-                <div class="db-wsum-row"><span class="db-wsum-metric">⚡ Fatiga</span><span class="db-wsum-val" style="color:${dot(fatigue,true)}">${fatigue}</span></div>
-                <div class="db-wsum-row"><span class="db-wsum-metric">😊 Humor</span><span class="db-wsum-val" style="color:${dot(mood)}">${mood}</span></div>
-                <div class="db-wsum-row"><span class="db-wsum-metric">💪 Agujetas</span><span class="db-wsum-val" style="color:${dot(soreness,true)}">${soreness}</span></div>
-            </div>`;
-        })();
-
-        // Sort order — persisted on instance
-        if (!this._dashSort) this._dashSort = 'risk'; // 'risk' | 'safe' | 'name'
-
-        // Build player data
-        const getStatus = (r, playerId) => {
-            const n = parseFloat(r);
-            if (isNaN(n) || r === 'N/A') return { icon: '—', color: '#ccc', risk: -1 };
-            const _tS = this.getPlayerThresholds(playerId || null);
-            if (n > _tS.high) return { icon: '🔴', color: '#f44336', risk: 4 };
-            if (n > _tS.opt)  return { icon: '🟠', color: '#ff9800', risk: 3 };
-            if (n < _tS.low)  return { icon: '🔵', color: '#2196f3', risk: 1 };
-            return           { icon: '🟢', color: '#4caf50', risk: 2 };
-        };
-
-        let players = this.players.map(player => {
-            const ratio = this.calculateAcuteChronicRatio(player.id);
-            const st = getStatus(ratio.ratio, player.id);
-            return { player, ratio, st, r: parseFloat(ratio.ratio) || 0 };
-        });
-
-        if (this._dashSort === 'risk')  players.sort((a, b) => b.st.risk - a.st.risk || b.r - a.r);
-        if (this._dashSort === 'safe')  players.sort((a, b) => a.st.risk - b.st.risk || a.r - b.r);
-        if (this._dashSort === 'name')  players.sort((a, b) => a.player.name.localeCompare(b.player.name));
-
-        const sortLabel = { risk: '↓ Mayor riesgo', safe: '↑ Menor riesgo', name: 'A–Z' };
-        const nextSort  = { risk: 'safe', safe: 'name', name: 'risk' };
-
-        const playerRows = players.map(({ player, ratio, st, r }) => {
-            const barW = Math.min(r / 2 * 100, 100).toFixed(0);
-            // Wellness de hoy para esta jugadora
-            const wEntry = _wData.find(e => e.playerId === player.id && e.date === _wToday);
-            let wScore = '—', wColor = 'var(--text-faint)', wBg = 'var(--bg-subtle)';
-            if (wEntry) {
-                const overall = (wEntry.sleep + (6 - wEntry.fatigue) + wEntry.mood + (6 - wEntry.soreness)) / 4;
-                wScore = overall.toFixed(1);
-                if (overall >= 4)        { wColor = '#2e7d32'; wBg = '#e8f5e9'; }
-                else if (overall >= 2.5) { wColor = '#e65100'; wBg = '#fff3e0'; }
-                else                     { wColor = '#c62828'; wBg = '#ffebee'; }
-            }
-            // Readiness Score
-            const rdyScore = this.calculateReadiness(player.id);
-            const rdyLbl   = this.readinessLabel(rdyScore);
-            const rdyTxt   = rdyScore !== null ? rdyScore : '—';
-
-            return `
-                <div class="db-player-row">
-                    ${PlayerTokens.avatar(player, 20, '0.6rem')}
-                    <div class="db-player-name">${player.name}${player.number ? `<span class="db-num">#${player.number}</span>` : ''}</div>
-                    <div class="db-player-bar">
-                        <div class="db-bar-fill" style="width:${barW}%;background:${st.color}"></div>
-                        <div class="db-bar-lo"></div>
-                        <div class="db-bar-hi"></div>
-                    </div>
-                    <div class="db-player-ratio" style="color:${st.color}">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
-                    <div class="db-player-icon">${st.icon}</div>
-                    <div class="db-player-wellness" style="color:${wColor};background:${wBg}">${wScore}</div>
-                    <div class="db-player-readiness ${rdyLbl.cls}" title="Readiness: ${rdyTxt}/100" style="color:${rdyLbl.color};background:${rdyLbl.bg}">${rdyLbl.icon} ${rdyTxt}</div>
-                </div>`;
-        }).join('');
-
-        // Availability groups (same logic as renderTeamStatus)
-        const availGroups = { ok: [], caution: [], out: [] };
-        this.players.forEach(player => {
-            const ratio = this.calculateAcuteChronicRatio(player.id);
-            const r = parseFloat(ratio.ratio);
-            const activeInjury = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
-            const playerSessions = this.sessions.filter(s => s.playerId === player.id);
-            const last7 = playerSessions.filter(s => (new Date() - new Date(s.date)) / 86400000 <= 7);
-            const avgRPE7 = last7.length ? (last7.reduce((s, x) => s + x.rpe, 0) / last7.length).toFixed(1) : null;
-            const entry = { player, ratio, r, activeInjury, avgRPE7 };
-            const _tAv = this.getPlayerThresholds(player.id);
-            if (activeInjury)                                       availGroups.out.push(entry);
-            else if (r > _tAv.high || (r > 0 && r < _tAv.low))    availGroups.caution.push(entry);
-            else                                                     availGroups.ok.push(entry);
-        });
-
-        const availRow = ({ player, activeInjury, avgRPE7, r, ratio }) => {
-            let icon, color, detail;
-            const _tAR = this.getPlayerThresholds(player.id);
-            if (activeInjury) {
-                icon = '🔴'; color = '#f44336';
-                detail = activeInjury.location ? this.getLocationName(activeInjury.location) : 'lesión activa';
-            } else if (r > _tAR.high) {
-                icon = '🟠'; color = '#ff9800'; detail = `Ratio ${ratio.ratio}`;
-            } else if (r > 0 && r < _tAR.low) {
-                icon = '🔵'; color = '#2196f3'; detail = `Ratio ${ratio.ratio}`;
-            } else {
-                icon = '🟢'; color = '#4caf50'; detail = avgRPE7 ? `RPE 7d: ${avgRPE7}` : 'Sin datos';
-            }
-            return `
-                <div class="db-avail-row">
-                    <span class="db-avail-icon">${icon}</span>
-                    ${PlayerTokens.avatar(player, 22, '0.65rem')}
-                    <span class="db-avail-name">${player.name}${player.number ? `<span class="db-num">#${player.number}</span>` : ''}</span>
-                    <span class="db-avail-detail" style="color:${color}">${detail}</span>
-                </div>`;
-        };
-
-        const availSection = (title, entries, emptyMsg) =>
-            entries.length === 0 ? '' : `
-                <div class="db-avail-section">
-                    <div class="db-avail-section-title">${title} <span class="db-avail-count">${entries.length}</span></div>
-                    ${entries.map(availRow).join('')}
-                </div>`;
-
-        // ── Alert banner data ──────────────────────────────────────
-        const alertPlayers = players.filter(p => { const _t=this.getPlayerThresholds(p.player.id); return parseFloat(p.ratio.ratio) > _t.high; });
-        const warnPlayers  = players.filter(p => { const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
-        const pendingWellness = _pendingW.length;
-
-        // ── C) Team-level A:C alert (3+ players simultaneously over individual threshold) ──
-        const TEAM_ALERT_THRESHOLD = 3;
-        let bannerHTML = '';
-        if (alertPlayers.length >= TEAM_ALERT_THRESHOLD) {
-            const combinedAtRisk = alertPlayers.length + warnPlayers.length;
-            const teamMsg = alertPlayers.length >= TEAM_ALERT_THRESHOLD
-                ? `⚠️ <strong>${alertPlayers.length} jugadoras en zona de riesgo A:C simultáneamente</strong> — revisar carga de equipo hoy`
-                : '';
-            const teamSecondary = combinedAtRisk >= TEAM_ALERT_THRESHOLD + 1 && warnPlayers.length > 0
-                ? `<div class="db-alert-sep">·</div><div class="db-alert-item">🟠 <strong>${warnPlayers.length} más</strong> en precaución</div>`
-                : '';
-            bannerHTML = `<div class="db-alert-banner db-alert-banner--team">
-                <div class="db-alert-item">${teamMsg}</div>${teamSecondary}
-                <button class="db-alert-btn-team" onclick="window.rpeTracker?.openPreSessionModal()">Ver detalle →</button>
-            </div>`;
-        }
-
-        if (alertPlayers.length > 0 || warnPlayers.length > 0) {
-            const items = [];
-            if (alertPlayers.length) items.push(`🔴 <strong>${alertPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> ratio en zona de peligro`);
-            if (warnPlayers.length)  items.push(`🟠 <strong>${warnPlayers.map(p=>p.player.name.split(' ')[0]).join(', ')}</strong> en precaución`);
-            bannerHTML += `<div class="db-alert-banner">
-                ${items.map(i=>`<div class="db-alert-item">${i}</div>`).join('<div class="db-alert-sep">·</div>')}
-            </div>`;
-        }
-
-        // Wellness trend alerts in dashboard banner
-        const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
-        if (trendAlerts.length > 0) {
-            const trendItems = trendAlerts.map(a =>
-                `🔁 <strong>${a.name.split(' ')[0]}</strong> — ${a.message}`
-            );
-            bannerHTML += `<div class="db-alert-banner db-alert-banner--trend">
-                ${trendItems.map(i=>`<div class="db-alert-item">${i}</div>`).join('<div class="db-alert-sep">·</div>')}
-            </div>`;
-        }
-
-        // ── Match-day mode ─────────────────────────────────────────
-        const todayKey = ['dom','lun','mar','mie','jue','vie','sab'][new Date().getDay()];
-        const todayPlan = this.weekPlan?.days?.[todayKey] || {};
-        const isMatchDay = ['morning','afternoon'].some(s => todayPlan[s]?.type === 'match' && todayPlan[s]?.enabled);
-        const matchDayBtnLabel = this._matchDayMode ? '← Vista normal' : '🏟️ Modo partido';
-
-        // ---- Team Readiness Widget ----
-        const rdyPlayerData = this.players.map(player => ({
-            player,
-            score: this.calculateReadiness(player.id)
-        })).sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
-
-        const withData = rdyPlayerData.filter(d => d.score !== null);
-        const teamAvg  = withData.length
-            ? Math.round(withData.reduce((s, d) => s + d.score, 0) / withData.length)
-            : null;
-        const teamLbl  = this.readinessLabel(teamAvg);
-
-        const rdyRows = rdyPlayerData.map(({ player, score }) => {
-            const lbl = this.readinessLabel(score);
-            const txt = score !== null ? score : '—';
-            return `<div class="rdy-row">
-                ${PlayerTokens.avatar(player, 18, '0.55rem')}
-                <span class="rdy-name">${player.name}</span>
-                <div class="rdy-bar-wrap"><div class="rdy-bar-fill ${lbl.cls}" style="width:${score !== null ? score : 0}%"></div></div>
-                <span class="rdy-val" style="color:${lbl.color}">${lbl.icon} ${txt}</span>
-            </div>`;
-        }).join('');
-
-        const teamReadinessWidget = withData.length === 0 ? '' : `
-            <div class="db-readiness-widget">
-                <div class="db-readiness-header">
-                    <span class="db-readiness-title">⚡ Readiness del Equipo</span>
-                    <span class="db-readiness-avg ${teamLbl.cls}" style="color:${teamLbl.color};background:${teamLbl.bg}">
-                        ${teamLbl.icon} ${teamAvg !== null ? teamAvg + '/100' : '—'}
-                    </span>
-                </div>
-                <div class="rdy-rows">${rdyRows}</div>
-            </div>`;
-        // ---- End Team Readiness Widget ----
-
-        // ── "Hoy" panel ────────────────────────────────────────────
-        const todaySessions = this.sessions.filter(s => s.date && s.date.slice(0, 10) === _wToday);
-        const todayPlayerIds = [...new Set(todaySessions.map(s => s.playerId))];
-        const todaySessionCount = todayPlayerIds.length;
-
-        const acAlertCount  = players.filter(p => {
-            const t = this.getPlayerThresholds(p.player.id);
-            return parseFloat(p.ratio.ratio) > t.high;
-        }).length;
-        const activeInjCount = (this.injuries || []).filter(i => i.status === 'active').length;
-        const pendingCount   = _pendingW.length;
-
-        // Pending wellness names for WhatsApp message
-        const pendingNames = _pendingW.map(p => p.name.split(' ')[0]).join(', ');
-
-        const todayPanelHTML = `
-            <div class="db-today-panel">
-                <div class="db-today-header">
-                    <span class="db-today-title">Hoy — ${new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-                </div>
-                <div class="db-today-kpis">
-                    <div class="db-today-kpi" onclick="window.rpeTracker?.switchView('sessions')" title="Ver sesiones de hoy">
-                        <span class="db-today-kpi-val">${todaySessionCount}</span>
-                        <span class="db-today-kpi-lbl">sesiones hoy</span>
-                    </div>
-                    <div class="db-today-kpi db-today-kpi--${pendingCount === 0 ? 'ok' : 'warn'}" onclick="window.rpeTracker?.switchView('wellness')" title="Wellness pendiente">
-                        <span class="db-today-kpi-val">${pendingCount}</span>
-                        <span class="db-today-kpi-lbl">sin wellness</span>
-                    </div>
-                    <div class="db-today-kpi db-today-kpi--${acAlertCount > 0 ? 'danger' : 'ok'}" onclick="window.rpeTracker?.switchView('analytics')" title="Alertas A:C">
-                        <span class="db-today-kpi-val">${acAlertCount}</span>
-                        <span class="db-today-kpi-lbl">alertas A:C</span>
-                    </div>
-                    <div class="db-today-kpi db-today-kpi--${activeInjCount > 0 ? 'danger' : 'ok'}" onclick="window.rpeTracker?.switchView('injury')" title="Lesiones activas">
-                        <span class="db-today-kpi-val">${activeInjCount}</span>
-                        <span class="db-today-kpi-lbl">lesionadas</span>
-                    </div>
-                </div>
-                ${pendingCount > 0 ? `
-                <div class="db-today-pending">
-                    <span class="db-today-pending-label">Sin wellness hoy:</span>
-                    <span class="db-today-pending-names">${pendingNames}</span>
-                    <button class="db-today-wa-btn" onclick="window.rpeTracker?.copyWellnessPendingWA()" title="Copiar mensaje para WhatsApp">
-                        📋 Copiar aviso
-                    </button>
-                </div>` : `
-                <div class="db-today-pending db-today-pending--ok">
-                    <span class="db-today-pending-label">✅ Todas han rellenado el wellness hoy</span>
-                </div>`}
-            </div>`;
-
-        container.innerHTML = `
-            ${todayPanelHTML}
-            ${bannerHTML}
-            ${isMatchDay || this._matchDayMode ? `
-            <div class="db-matchday-bar">
-                <span class="db-matchday-badge">🏟️ DÍA DE PARTIDO</span>
-                <button class="db-matchday-toggle" onclick="window.rpeTracker?._toggleMatchDayMode()">${matchDayBtnLabel}</button>
-            </div>` : ''}
-            ${this._matchDayMode ? this._renderMatchDayView(availGroups, players) : `
-            <div class="db-split">
-
-                <!-- Columna izquierda: métricas + wellness -->
-                <div class="db-left">
-                    <div class="db-left-section">
-                        <div class="db-left-label">Carga equipo 7d</div>
-                        <canvas id="teamSparklineCanvas" class="db-team-sparkline" width="200" height="70"></canvas>
-                    </div>
-                    <div class="db-left-section">
-                        <div class="db-left-label">Esta semana</div>
-                        <div class="db-metric-row">
-                            <span class="db-metric-lbl">Sesiones</span>
-                            <span class="db-metric-val">${recentUnique}</span>
-                        </div>
-                        <div class="db-metric-row">
-                            <span class="db-metric-lbl">RPE medio</span>
-                            <span class="db-metric-val" style="color:#ff9800">${avgRPE7}</span>
-                        </div>
-                        <div class="db-metric-row">
-                            <span class="db-metric-lbl">Entrenos</span>
-                            <span class="db-metric-val">${trainingCount}</span>
-                        </div>
-                        <div class="db-metric-row">
-                            <span class="db-metric-lbl">Partidos</span>
-                            <span class="db-metric-val">${matchCount}</span>
-                        </div>
-                    </div>
-                    <div class="db-left-section">
-                        <div class="db-left-label">Temporada</div>
-                        <div class="db-metric-row">
-                            <span class="db-metric-lbl">Total sesiones</span>
-                            <span class="db-metric-val">${totalSessions}</span>
-                        </div>
-                        <div class="db-metric-row">
-                            <span class="db-metric-lbl">RPE medio global</span>
-                            <span class="db-metric-val">${avgRPE}</span>
-                        </div>
-                        <div class="db-metric-row">
-                            <span class="db-metric-lbl">Jugadoras</span>
-                            <span class="db-metric-val">${this.players.length}</span>
-                        </div>
-                        ${activeInjuries > 0 ? `
-                        <div class="db-metric-row">
-                            <span class="db-metric-lbl">Lesionadas</span>
-                            <span class="db-metric-val" style="color:#f44336">${activeInjuries}</span>
-                        </div>` : ''}
-                    </div>
-                </div>
-
-                <!-- Columna central: ratio A:C + disponibilidad -->
-                <div class="db-right">
-                    <div class="db-right-header">
-                        <span class="db-right-label">Ratio A:C</span>
-                        <div class="db-right-header-actions">
-                            <div class="db-avail-pills-inline">
-                                <span class="db-avail-pill db-avail-ok">${availGroups.ok.length} <span>aptas</span></span>
-                                <span class="db-avail-pill db-avail-caution">${availGroups.caution.length} <span>precaución</span></span>
-                                <span class="db-avail-pill db-avail-out">${availGroups.out.length} <span>no disp.</span></span>
-                            </div>
-                            <div class="db-right-header-btns">
-                                <button class="db-presession-btn" onclick="window.rpeTracker?.openPreSessionModal()" title="Resumen pre-entrenamiento">
-                                    ▶ Pre-sesión
-                                </button>
-                                <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
-                                    ${sortLabel[this._dashSort]}
-                                </button>
-                                <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Generar informe PDF">
-                                    📄
-                                </button>
-                                <button class="db-sort-btn db-sort-btn--pass" onclick="window.rpeTracker?.openWellnessBulk()" title="Pase rápido de wellness">
-                                    ✏️${_pendingW.length > 0 ? ` <span class="db-pass-badge">${_pendingW.length}</span>` : ''}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="db-right-legend">
-                        <span style="color:#4caf50">● óptimo</span>
-                        <span style="color:#ff9800">● precaución</span>
-                        <span style="color:#f44336">● peligro</span>
-                        <span style="color:#2196f3">● bajo</span>
-                    </div>
-                    <div class="db-players">
-                        ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
-                    </div>
-                    ${wellnessMiniSummary}
-                    ${teamReadinessWidget}
-                </div>
-
-                <!-- Columna calendario -->
-                <div class="db-cal" id="dbCalColumn">
-                    <!-- filled by renderDashboardCalendar() -->
-                </div>
-
-            </div>
-            `}
-        `;
-
-        // Draw team load 7d chart with day labels
-        requestAnimationFrame(() => {
-            const canvas = document.getElementById('teamSparklineCanvas');
-            if (canvas) {
-                if (canvas._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
-                const now = new Date();
-                const teamData = [];
-                const dayLabels = [];
-                const DAY_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-                for (let d = 6; d >= 0; d--) {
-                    const dayStart = new Date(now); dayStart.setDate(dayStart.getDate() - d); dayStart.setHours(0,0,0,0);
-                    const dayEnd   = new Date(dayStart); dayEnd.setHours(23,59,59,999);
-                    const dayLoad  = this.sessions
-                        .filter(s => { const sd = new Date(s.date); return sd >= dayStart && sd <= dayEnd; })
-                        .reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
-                    teamData.push(dayLoad);
-                    const isToday = d === 0;
-                    dayLabels.push(isToday ? 'Hoy' : DAY_SHORT[dayStart.getDay()]);
-                }
-                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-                const textCol = isDark ? '#888' : '#999';
-                const gridCol = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
-                canvas._chartInstance = new Chart(canvas.getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: dayLabels,
-                        datasets: [{
-                            data: teamData,
-                            backgroundColor: teamData.map((_, i) =>
-                                i === 6 ? '#ff6600' : 'rgba(255,102,0,0.35)'),
-                            borderRadius: 3,
-                            borderSkipped: false,
-                        }]
-                    },
-                    options: {
-                        responsive: false,
-                        animation: false,
-                        plugins: { legend: { display: false }, tooltip: {
-                            callbacks: { label: ctx => `Carga: ${ctx.raw}` }
-                        }},
-                        scales: {
-                            x: { ticks: { color: textCol, font: { size: 9 } }, grid: { display: false } },
-                            y: { display: false, beginAtZero: true }
-                        }
-                    }
-                });
-            }
-            // nav alert badge
-            this._updateNavAlertBadge();
-            // Render mini calendar column
-            this.renderDashboardCalendar();
-        });
-    }
-
-    _toggleMatchDayMode() {
-        this._matchDayMode = !this._matchDayMode;
-        this.renderDashboard();
-    }
-
-    _renderMatchDayView(availGroups, players) {
-        const today  = new Date().toISOString().slice(0, 10);
-        const wData  = this.wellnessData || [];
-
-        const playerCard = ({ player, ratio, icon, r }) => {
-            const w      = wData.find(e => e.playerId === player.id && e.date === today);
-            const wScore = w ? this._wOverall(w) : null;
-            const wColor = wScore ? this._wColor(wScore) : '#aaa';
-            const rColor = this.getRatioColor(ratio.ratio);
-            const inj    = (this.injuries||[]).find(i => i.playerId === player.id && i.status === 'active');
-            const _tMD = this.getPlayerThresholds(player?.id); return `<div class="md-card ${inj ? 'md-card--out' : r > _tMD.high ? 'md-card--danger' : r >= _tMD.opt ? 'md-card--warn' : ''}">
-                <div class="md-card-top">
-                    ${PlayerTokens.avatar(player, 30, '0.75rem')}
-                    <div class="md-card-name">${player.name}${player.number ? `<span class="db-num"> #${player.number}</span>` : ''}</div>
-                    <span class="md-card-icon">${icon}</span>
-                </div>
-                <div class="md-card-row">
-                    <span class="md-lbl">Ratio</span>
-                    <span class="md-val" style="color:${rColor}">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</span>
-                </div>
-                <div class="md-card-row">
-                    <span class="md-lbl">Wellness</span>
-                    <span class="md-val" style="color:${wColor}">${wScore !== null ? wScore.toFixed(1) : '—'}</span>
-                </div>
-                ${inj ? `<div class="md-card-inj">🚑 ${this.getLocationName?.(inj.location)||'Lesión activa'}</div>` : ''}
-            </div>`;
-        };
-
-        const okCards  = availGroups.ok.map(e =>
-            playerCard({ player: e.player, ratio: e.ratio, icon: '🟢', r: e.r })).join('');
-        const warnCards = availGroups.caution.map(e =>
-            playerCard({ player: e.player, ratio: e.ratio, icon: e.r > (this.getPlayerThresholds(e.player.id).high) ? '🔴' : '🔵', r: e.r })).join('');
-        const outCards = availGroups.out.map(e =>
-            playerCard({ player: e.player, ratio: e.ratio, icon: '🔴', r: e.r })).join('');
-
-        const todayW = wData.filter(e => e.date === today);
-        const avgW   = todayW.length
-            ? (todayW.reduce((s,e) => s + this._wOverall(e), 0) / todayW.length).toFixed(1) : '—';
-        const atRisk = players.filter(p => parseFloat(p.ratio.ratio) > this.getPlayerThresholds(p.player.id).high).length;
-
-        return `<div class="md-wrap">
-            <div class="md-summary">
-                <div class="md-pill"><span class="md-pill-val">${availGroups.ok.length}</span><span class="md-pill-lbl">Disponibles</span></div>
-                <div class="md-pill md-pill--warn"><span class="md-pill-val">${availGroups.caution.length}</span><span class="md-pill-lbl">Precaución</span></div>
-                <div class="md-pill md-pill--out"><span class="md-pill-val">${availGroups.out.length}</span><span class="md-pill-lbl">No disp.</span></div>
-                <div class="md-pill"><span class="md-pill-val">${avgW}</span><span class="md-pill-lbl">Wellness</span></div>
-                <div class="md-pill ${atRisk > 0 ? 'md-pill--danger' : ''}"><span class="md-pill-val">${atRisk}</span><span class="md-pill-lbl">Riesgo alto</span></div>
-            </div>
-            ${warnCards || outCards ? `
-                <div class="md-section">⚠️ Requieren atención</div>
-                <div class="md-grid">${warnCards}${outCards}</div>` : ''}
-            <div class="md-section">✅ Disponibles para el partido</div>
-            <div class="md-grid">${okCards || '<p class="db-empty">Sin jugadoras disponibles</p>'}</div>
-        </div>`;
-    }
-
-    cycleDashSort() {
-        const next = { risk: 'safe', safe: 'name', name: 'risk' };
-        this._dashSort = next[this._dashSort] || 'risk';
-        this.renderDashboard();
-    }
-
-    copyWellnessPendingWA() {
-        const today = new Date().toISOString().slice(0, 10);
-        const wData = this.wellnessData || [];
-        const pending = this.players.filter(p => !wData.some(e => e.playerId === p.id && e.date === today));
-        if (!pending.length) { this.showToast('✅ Todas han rellenado el wellness hoy', 'info'); return; }
-        const names = pending.map(p => p.name.split(' ')[0]).join(', ');
-        const dateLabel = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-        const msg = `🏀 Recordatorio wellness — ${dateLabel}\n\nPor favor, rellenad el cuestionario de bienestar de hoy en la app.\n\nPendientes: ${names}\n\n¡Gracias! 💪`;
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(msg).then(() => {
-                this.showToast('📋 Mensaje copiado — pégalo en WhatsApp', 'success');
-            }).catch(() => this._fallbackCopy(msg));
-        } else {
-            this._fallbackCopy(msg);
-        }
-    }
-
-    _fallbackCopy(text) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand('copy'); this.showToast('📋 Mensaje copiado — pégalo en WhatsApp', 'success'); }
-        catch (e) { this.showToast('No se pudo copiar. Copia manualmente.', 'error'); }
-        document.body.removeChild(ta);
-    }
 
     // ── A) Pre-session Modal ───────────────────────────────────────────────
     openPreSessionModal() {
@@ -2174,264 +1650,6 @@ class RPETracker {
     }
 
 
-    renderDashboardCalendar() {
-        const col = document.getElementById('dbCalColumn');
-        if (!col) return;
-
-        // Init state
-        if (!this._dbCal) {
-            const now = new Date();
-            this._dbCal = { mode: 'month', year: now.getFullYear(), month: now.getMonth(), weekOffset: 0 };
-        }
-
-        const { mode, year, month, weekOffset } = this._dbCal;
-
-        // Color map by session type
-        const typeColor = {
-            training: '#2196f3',
-            match:    '#f44336',
-            recovery: '#4caf50',
-            shooting: '#9c27b0',
-            gym:      '#795548',
-            rest:     '#bdbdbd'
-        };
-        const typeIcon = {
-            training: '🏀',
-            match:    '🏟️',
-            recovery: '💪',
-            shooting: '🎯',
-            gym:      '🏋️',
-            rest:     '—'
-        };
-        const typeLabel = {
-            training: 'Entreno',
-            match:    'Partido',
-            recovery: 'Recuperación',
-            shooting: 'Tiro',
-            gym:      'Gym',
-            rest:     'Descanso'
-        };
-
-        // Build a map: dateStr → [{type, source:'real'|'plan'}]
-        const eventMap = {};
-
-        const addEvent = (dateStr, type, source) => {
-            if (!eventMap[dateStr]) eventMap[dateStr] = [];
-            eventMap[dateStr].push({ type, source });
-        };
-
-        // Real sessions (unique dates with dominant type)
-        this.sessions.forEach(s => {
-            if (s.date) addEvent(s.date, s.type || 'training', 'real');
-        });
-
-        // WeekPlan events — expand the current plan across ±8 weeks from today
-        if (this.weekPlan && this.weekPlan.days) {
-            const dayKeys   = ['lun','mar','mie','jue','vie','sab','dom'];
-            // JS getDay(): 0=Sun,1=Mon... we want Mon=0
-            const now = new Date();
-            const todayDow = (now.getDay() + 6) % 7; // 0=Mon
-            // Find Monday of this week
-            const monday = new Date(now);
-            monday.setDate(now.getDate() - todayDow);
-            monday.setHours(0,0,0,0);
-
-            for (let wOff = -4; wOff <= 8; wOff++) {
-                dayKeys.forEach((key, idx) => {
-                    const dayData = this.weekPlan.days[key];
-                    if (!dayData) return;
-                    const d = new Date(monday);
-                    d.setDate(monday.getDate() + wOff * 7 + idx);
-                    const dateStr = d.toISOString().slice(0, 10);
-                    // Only add planned events if no real sessions exist for that date
-                    ['morning','afternoon'].forEach(slot => {
-                        const s = dayData[slot];
-                        if (s && s.enabled && s.type && s.type !== 'rest') {
-                            addEvent(dateStr, s.type, 'plan');
-                        }
-                    });
-                });
-            }
-        }
-
-        // Nav label
-        const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                            'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-        let navLabel = '';
-        if (mode === 'month') {
-            navLabel = `${monthNames[month]} ${year}`;
-        } else {
-            // Weekly: find Mon of offset week
-            const now2 = new Date();
-            const todayDow2 = (now2.getDay() + 6) % 7;
-            const mon = new Date(now2);
-            mon.setDate(now2.getDate() - todayDow2 + weekOffset * 7);
-            const sun = new Date(mon);
-            sun.setDate(mon.getDate() + 6);
-            navLabel = `${mon.getDate()} – ${sun.getDate()} ${monthNames[sun.getMonth()]}`;
-        }
-
-        // Build content
-        let bodyHTML = '';
-
-        if (mode === 'month') {
-            const firstDay = new Date(year, month, 1);
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            // start on Monday: JS getDay 0=Sun → convert to Mon-based
-            let startDow = (firstDay.getDay() + 6) % 7; // 0=Mon
-            const today = new Date().toISOString().slice(0, 10);
-
-            bodyHTML += `<div class="db-mini-cal">
-                <div class="db-mini-cal-grid">
-                    <div class="db-mini-cal-dow">L</div>
-                    <div class="db-mini-cal-dow">M</div>
-                    <div class="db-mini-cal-dow">X</div>
-                    <div class="db-mini-cal-dow">J</div>
-                    <div class="db-mini-cal-dow">V</div>
-                    <div class="db-mini-cal-dow">S</div>
-                    <div class="db-mini-cal-dow">D</div>`;
-
-            // Empty cells before first day
-            for (let i = 0; i < startDow; i++) {
-                bodyHTML += `<div class="db-mini-day empty"></div>`;
-            }
-
-            for (let d = 1; d <= daysInMonth; d++) {
-                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                const isToday = dateStr === today;
-                const events  = eventMap[dateStr] || [];
-
-                // Dominant event for this day (real > plan, match > training > rest)
-                const realEvents = events.filter(e => e.source === 'real');
-                const planEvents = events.filter(e => e.source === 'plan');
-                const dominant  = realEvents.length ? realEvents : planEvents;
-                const hasMatch  = dominant.some(e => e.type === 'match');
-                const topType   = hasMatch ? 'match' : (dominant[0]?.type || null);
-
-                let dotHTML = '';
-                if (topType) {
-                    const isReal = realEvents.length > 0;
-                    const color  = typeColor[topType] || '#ccc';
-                    dotHTML = `<div class="db-mini-day-dot" style="background:${color};opacity:${isReal ? 1 : 0.45};"></div>`;
-                    // Second dot if two different types on same day
-                    const types = [...new Set(dominant.map(e => e.type))];
-                    if (types.length > 1) {
-                        const second = types.find(t => t !== topType);
-                        if (second) dotHTML += `<div class="db-mini-day-dot" style="background:${typeColor[second]||'#ccc'};opacity:${isReal?1:0.45};"></div>`;
-                    }
-                }
-
-                const hasBg   = topType && topType !== 'rest';
-                const bgStyle = hasBg ? `background:${typeColor[topType]}12;` : '';
-                const hasEvt  = events.length > 0;
-
-                bodyHTML += `<div class="db-mini-day${isToday ? ' today' : ''}${hasEvt ? ' has-event' : ''}"
-                    style="${bgStyle}"
-                    title="${topType ? typeLabel[topType] : 'Sin actividad'}">
-                    <div class="db-mini-day-num">${d}</div>
-                    <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;margin-top:1px;">${dotHTML}</div>
-                </div>`;
-            }
-
-            bodyHTML += `</div></div>`; // close grid + mini-cal
-
-            // Legend
-            bodyHTML += `<div class="db-cal-legend">
-                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#2196f3"></div>Entreno</div>
-                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#f44336"></div>Partido</div>
-                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#4caf50"></div>Rec.</div>
-                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#795548"></div>Gym</div>
-                <div class="db-cal-legend-item" style="opacity:0.55">● plan &nbsp; <span style="opacity:1">●</span> real</div>
-            </div>`;
-
-        } else {
-            // Weekly view
-            const now3  = new Date();
-            const dow3  = (now3.getDay() + 6) % 7;
-            const mon   = new Date(now3);
-            mon.setDate(now3.getDate() - dow3 + weekOffset * 7);
-            mon.setHours(0,0,0,0);
-            const today3 = new Date().toISOString().slice(0,10);
-            const dayShort = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-
-            for (let i = 0; i < 7; i++) {
-                const d = new Date(mon);
-                d.setDate(mon.getDate() + i);
-                const dateStr = d.toISOString().slice(0,10);
-                const isToday = dateStr === today3;
-                const events  = eventMap[dateStr] || [];
-
-                // Deduplicate by type+source
-                const seen = new Set();
-                const uniq = events.filter(e => {
-                    const k = e.type + e.source;
-                    if (seen.has(k)) return false;
-                    seen.add(k); return true;
-                });
-
-                let sessHTML = '';
-                if (uniq.length === 0) {
-                    sessHTML = `<span class="db-week-rest">Descanso</span>`;
-                } else {
-                    sessHTML = `<div class="db-week-sessions">` +
-                        uniq.map(e => `
-                            <div class="db-week-session-chip">
-                                <div class="db-week-session-dot" style="background:${typeColor[e.type]||'#ccc'};opacity:${e.source==='plan'?0.45:1};"></div>
-                                <span>${typeIcon[e.type]} ${typeLabel[e.type]}${e.source==='plan'?' <span style="font-size:0.6rem;opacity:0.6">(plan)</span>':''}</span>
-                            </div>`).join('') +
-                        `</div>`;
-                }
-
-                bodyHTML += `<div class="db-week-day-row${isToday ? ' today-row' : ''}">
-                    <div class="db-week-day-label">
-                        <div class="db-week-day-name">${dayShort[i]}</div>
-                        <div class="db-week-day-num">${d.getDate()}</div>
-                    </div>
-                    ${uniq.length === 0
-                        ? `<span class="db-week-rest">Descanso</span>`
-                        : `<div class="db-week-sessions">${
-                            uniq.map(e => `
-                                <div class="db-week-session-chip">
-                                    <div class="db-week-session-dot" style="background:${typeColor[e.type]||'#ccc'};opacity:${e.source==='plan'?0.45:1};"></div>
-                                    <span>${typeIcon[e.type]} ${typeLabel[e.type]}${e.source==='plan'?' <span style="font-size:0.6rem;opacity:0.55">(plan)</span>':''}</span>
-                                </div>`).join('')
-                        }</div>`
-                    }
-                </div>`;
-            }
-
-            bodyHTML = `<div class="db-week-view">${bodyHTML}</div>`;
-
-            // Legend
-            bodyHTML += `<div class="db-cal-legend">
-                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#2196f3"></div>Entreno</div>
-                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#f44336"></div>Partido</div>
-                <div class="db-cal-legend-item"><div class="db-cal-legend-dot" style="background:#4caf50"></div>Rec.</div>
-                <div class="db-cal-legend-item" style="opacity:0.55">● plan &nbsp; <span style="opacity:1">●</span> real</div>
-            </div>`;
-        }
-
-        col.innerHTML = `
-            <div class="db-cal-header">
-                <span class="db-cal-title">Calendario</span>
-                <div class="db-cal-tabs">
-                    <button class="db-cal-tab${mode==='week'?' active':''}"
-                        onclick="window.rpeTracker?._dbCalSetMode('week')">Sem</button>
-                    <button class="db-cal-tab${mode==='month'?' active':''}"
-                        onclick="window.rpeTracker?._dbCalSetMode('month')">Mes</button>
-                </div>
-            </div>
-            <div class="db-cal-nav">
-                <button class="db-cal-nav-btn" onclick="window.rpeTracker?._dbCalNav(-1)">‹</button>
-                <span class="db-cal-nav-label">${navLabel}</span>
-                <button class="db-cal-nav-btn" onclick="window.rpeTracker?._dbCalNav(1)">›</button>
-            </div>
-            <div class="db-cal-body">
-                ${bodyHTML}
-            </div>
-        `;
-    }
 
     _dbCalSetMode(mode) {
         if (!this._dbCal) {
@@ -2455,57 +1673,6 @@ class RPETracker {
     }
     // ── End Dashboard Mini Calendar ────────────────────────────────────────
 
-    renderTeamRatios() {
-        if (this.players.length === 0) {
-            return '<p style="color: var(--gray); text-align: center;">No hay jugadoras registradas</p>';
-        }
-
-        const getStatus = (r, playerId) => {
-            const n = parseFloat(r);
-            if (isNaN(n) || r === 'N/A') return { label: 'Sin datos', cls: 'status-nodata', icon: '—' };
-            const _tL = this.getPlayerThresholds(playerId || null);
-            if (n > _tL.high) return { label: 'Peligro',   cls: 'status-danger',  icon: '🔴' };
-            if (n > _tL.opt)  return { label: 'Precaución', cls: 'status-caution', icon: '🟠' };
-            if (n < _tL.low)  return { label: 'Por debajo', cls: 'status-low',     icon: '🔵' };
-            return           { label: 'Óptimo',    cls: 'status-ok',      icon: '🟢' };
-        };
-
-        const cards = this.players.map(player => {
-            const ratio = this.calculateAcuteChronicRatio(player.id);
-            const st = getStatus(ratio.ratio, player.id);
-            const num = player.number ? `<span class="rcard-number">#${player.number}</span>` : '';
-            return `
-                <div class="rcard ${st.cls}">
-                    <div class="rcard-top">
-                        <div class="rcard-avatar">${player.name.charAt(0).toUpperCase()}</div>
-                        <div class="rcard-info">
-                            <div class="rcard-name">${player.name}${num}</div>
-                            <div class="rcard-status-label">${st.icon} ${st.label}</div>
-                        </div>
-                    </div>
-                    <div class="rcard-ratio">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
-                    <div class="rcard-bar-wrap">
-                        <div class="rcard-bar">
-                            <div class="rcard-bar-fill" style="width:${Math.min((parseFloat(ratio.ratio)||0)/2*100, 100)}%; background:${this.getRatioColor(ratio.ratio)};"></div>
-                            <div class="rcard-bar-marker safe-lo"></div>
-                            <div class="rcard-bar-marker safe-hi"></div>
-                        </div>
-                    </div>
-                </div>`;
-        }).join('');
-
-        return `
-            <h3 style="margin: 2rem 0 1rem; font-size: 1rem; color: #555; font-weight: 600;">
-                📊 Ratio Agudo:Crónico — Vista rápida del equipo
-            </h3>
-            <div class="rcard-legend">
-                <span class="rleg rleg-ok">🟢 Óptimo (0.8–1.3)</span>
-                <span class="rleg rleg-caution">🟠 Precaución (1.3–1.5)</span>
-                <span class="rleg rleg-danger">🔴 Peligro (&gt;1.5)</span>
-                <span class="rleg rleg-low">🔵 Por debajo (&lt;0.8)</span>
-            </div>
-            <div class="rcard-grid">${cards}</div>`;
-    }
 
     // ========== STICKY SEMAPHORE BAR ==========
 
@@ -2586,6 +1753,18 @@ class RPETracker {
         // Window selector
         const win = this._acWindow || 28;
 
+        // Season comparison selectors
+        const allSeasons = Store.getSeasonsFromSessions(this.sessions);
+        const activeSeason = Store.getActiveSeason();
+        const selA = this._acSeasonA || activeSeason;
+        const selB = this._acSeasonB || '';
+
+        const seasonOpts = (current, allowEmpty) =>
+            (allowEmpty ? `<option value="">— sin comparar —</option>` : '') +
+            allSeasons.map(s =>
+                `<option value="${s}" ${s === current ? 'selected' : ''}>${s}</option>`
+            ).join('');
+
         return `<div class="ac-curve-wrap">
             <div class="ac-curve-controls">
                 <div class="ac-curve-players">${checks}</div>
@@ -2598,6 +1777,19 @@ class RPETracker {
                     </select>
                 </div>
             </div>
+            <div class="ac-season-compare-row">
+                <span class="ac-season-label">🗓️ Temporada A</span>
+                <select class="ac-season-sel" id="acSeasonSelA"
+                    onchange="window.rpeTracker?._acSetSeasonA(this.value)">
+                    ${seasonOpts(selA, false)}
+                </select>
+                <span class="ac-season-sep">vs</span>
+                <span class="ac-season-label">Temporada B</span>
+                <select class="ac-season-sel" id="acSeasonSelB"
+                    onchange="window.rpeTracker?._acSetSeasonB(this.value)">
+                    ${seasonOpts(selB, true)}
+                </select>
+            </div>
             <div class="ac-curve-chart-wrap">
                 <canvas id="acCurveCanvas" style="width:100%;height:300px"></canvas>
             </div>
@@ -2606,6 +1798,7 @@ class RPETracker {
                 <span style="font-size:.72rem;color:var(--text-faint)">Zona peligro &gt;1.5</span>
                 <span class="ac-legend-line" style="background:#fb8c00;opacity:.25;height:2px;width:20px;display:inline-block;vertical-align:middle;margin-left:.75rem"></span>
                 <span style="font-size:.72rem;color:var(--text-faint)">Zona precaución 1.3–1.5</span>
+                <span style="font-size:.72rem;color:var(--text-faint);margin-left:.75rem">— línea sólida: Temporada A &nbsp;· · · discontinua: Temporada B</span>
             </div>
         </div>`;
     }
@@ -2615,9 +1808,9 @@ class RPETracker {
         if (!canvas || typeof Chart === 'undefined') return;
         if (canvas._ci) { canvas._ci.destroy(); canvas._ci = null; }
 
-        const days  = this._acWindow || 28;
-        const now   = new Date();
-        const labels = [];
+        const days    = this._acWindow || 28;
+        const now     = new Date();
+        const labels  = [];
         for (let d = days - 1; d >= 0; d--) {
             const dt = new Date(now);
             dt.setDate(now.getDate() - d);
@@ -2627,53 +1820,70 @@ class RPETracker {
         const excluded = this._acExcluded || new Set();
         const lambdaA  = 2 / (7 + 1);
         const lambdaC  = 2 / (28 + 1);
+        const seasonA  = this._acSeasonA || Store.getActiveSeason();
+        const seasonB  = this._acSeasonB || '';
 
-        const datasets = this.players
-            .filter(p => !excluded.has(p.id))
-            .map(p => {
-                const color  = PlayerTokens.get(p);
-                const psess  = this.sessions
-                    .filter(s => s.playerId === p.id)
-                    .map(s => ({ date: new Date(s.date), load: s.load || s.rpe * (s.duration || 60) }))
-                    .sort((a,b) => a.date - b.date);
-                const seed   = psess.length ? psess.reduce((s,x)=>s+x.load,0)/psess.length : 0;
-                let ewA = seed, ewC = seed;
-
-                // walk back far enough to stabilise
-                for (let i = 84; i >= 0; i--) {
-                    const d = new Date(now); d.setDate(now.getDate() - i); d.setHours(0,0,0,0);
-                    const load = psess.filter(s => { const sd=new Date(s.date); sd.setHours(0,0,0,0); return sd.getTime()===d.getTime(); }).reduce((s,x)=>s+x.load,0);
-                    ewA = lambdaA * load + (1-lambdaA) * ewA;
-                    ewC = lambdaC * load + (1-lambdaC) * ewC;
-                    if (i <= days) { /* we'll collect below */ }
+        // Helper: construye serie de ratio EWMA filtrada por temporada
+        const buildRatioSeries = (player, seasonFilter) => {
+            const psess = this.sessions
+                .filter(s => s.playerId === player.id &&
+                    (seasonFilter ? (s.season || Store.getActiveSeason()) === seasonFilter : true))
+                .map(s => ({ date: new Date(s.date), load: s.load || s.rpe * (s.duration || 60) }))
+                .sort((a,b) => a.date - b.date);
+            const seed = psess.length ? psess.reduce((acc,x) => acc + x.load, 0) / psess.length : 0;
+            let ewA = seed, ewC = seed;
+            const ratiosByDay = {};
+            for (let i = 84; i >= 0; i--) {
+                const d = new Date(now); d.setDate(now.getDate() - i); d.setHours(0,0,0,0);
+                const load = psess.filter(s => {
+                    const sd = new Date(s.date); sd.setHours(0,0,0,0);
+                    return sd.getTime() === d.getTime();
+                }).reduce((acc,x) => acc + x.load, 0);
+                ewA = lambdaA * load + (1 - lambdaA) * ewA;
+                ewC = lambdaC * load + (1 - lambdaC) * ewC;
+                if (i < days) {
+                    ratiosByDay[days - 1 - i] = ewC > 0 ? parseFloat((ewA / ewC).toFixed(3)) : null;
                 }
+            }
+            return Array.from({length: days}, (_, i) => ratiosByDay[i] ?? null);
+        };
 
-                // Now collect last `days` ratios
-                ewA = seed; ewC = seed;
-                const startFrom = 84;
-                const ratiosByDay = {};
-                for (let i = startFrom; i >= 0; i--) {
-                    const d = new Date(now); d.setDate(now.getDate() - i); d.setHours(0,0,0,0);
-                    const load = psess.filter(s => { const sd=new Date(s.date); sd.setHours(0,0,0,0); return sd.getTime()===d.getTime(); }).reduce((s,x)=>s+x.load,0);
-                    ewA = lambdaA * load + (1-lambdaA) * ewA;
-                    ewC = lambdaC * load + (1-lambdaC) * ewC;
-                    if (i < days) {
-                        ratiosByDay[days-1-i] = ewC > 0 ? parseFloat((ewA/ewC).toFixed(3)) : null;
-                    }
-                }
-                const data = Array.from({length: days}, (_, i) => ratiosByDay[i] ?? null);
+        const datasets = [];
+        const activePlayers = this.players.filter(p => !excluded.has(p.id));
 
-                return {
-                    label: p.name + (p.number ? ` #${p.number}` : ''),
-                    data,
+        activePlayers.forEach(p => {
+            const color = PlayerTokens.get(p);
+            const label = p.name + (p.number ? ` #${p.number}` : '');
+
+            // Serie A — línea sólida
+            datasets.push({
+                label: `${label} (${seasonA})`,
+                data: buildRatioSeries(p, seasonA),
+                borderColor: color,
+                backgroundColor: color + '18',
+                borderWidth: 2,
+                borderDash: [],
+                pointRadius: 2,
+                tension: 0.35,
+                spanGaps: true
+            });
+
+            // Serie B — línea discontinua, mismo color, sin relleno
+            if (seasonB) {
+                datasets.push({
+                    label: `${label} (${seasonB})`,
+                    data: buildRatioSeries(p, seasonB),
                     borderColor: color,
-                    backgroundColor: color + '18',
+                    backgroundColor: 'transparent',
                     borderWidth: 2,
+                    borderDash: [6, 4],
                     pointRadius: 2,
+                    pointStyle: 'triangle',
                     tension: 0.35,
                     spanGaps: true
-                };
-            });
+                });
+            }
+        });
 
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         const gridC  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
@@ -2687,14 +1897,28 @@ class RPETracker {
                 maintainAspectRatio: false,
                 animation: { duration: 300 },
                 plugins: {
-                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: textC } },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 12, font: { size: 11 }, color: textC,
+                            generateLabels: chart => chart.data.datasets.map((ds, i) => ({
+                                text: ds.label,
+                                fillStyle: ds.borderColor,
+                                strokeStyle: ds.borderColor,
+                                lineDash: ds.borderDash || [],
+                                lineWidth: 2,
+                                hidden: !chart.isDatasetVisible(i),
+                                datasetIndex: i
+                            }))
+                        }
+                    },
                     tooltip: { mode: 'index', intersect: false,
                         callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.raw?.toFixed(2) ?? '—'}` }
                     },
                     annotation: { annotations: {
-                        danger: { type:'line', yMin:1.5, yMax:1.5, borderColor:'rgba(229,57,53,.4)', borderWidth:1.5, borderDash:[4,4] },
-                        caution:{ type:'line', yMin:1.3, yMax:1.3, borderColor:'rgba(251,140,0,.35)', borderWidth:1.5, borderDash:[4,4] },
-                        low:    { type:'line', yMin:0.8, yMax:0.8, borderColor:'rgba(30,136,229,.35)', borderWidth:1.5, borderDash:[4,4] }
+                        danger:  { type:'line', yMin:1.5, yMax:1.5, borderColor:'rgba(229,57,53,.4)',  borderWidth:1.5, borderDash:[4,4] },
+                        caution: { type:'line', yMin:1.3, yMax:1.3, borderColor:'rgba(251,140,0,.35)', borderWidth:1.5, borderDash:[4,4] },
+                        low:     { type:'line', yMin:0.8, yMax:0.8, borderColor:'rgba(30,136,229,.35)',borderWidth:1.5, borderDash:[4,4] }
                     }}
                 },
                 scales: {
@@ -2714,6 +1938,16 @@ class RPETracker {
     _acSetWindow(days) {
         this._acWindow = days;
         this.renderAnalytics();
+    }
+
+    _acSetSeasonA(season) {
+        this._acSeasonA = season;
+        requestAnimationFrame(() => this._drawACCurveChart());
+    }
+
+    _acSetSeasonB(season) {
+        this._acSeasonB = season;
+        requestAnimationFrame(() => this._drawACCurveChart());
     }
 
     _renderInjuryTrendTab() {
@@ -2848,118 +2082,9 @@ class RPETracker {
     // literatura (Gabbett 2016, Hulin et al. 2016). Ajustar si es necesario.
     static get MATCH_LOAD_MULTIPLIER() { return 1.5; }
 
-    calculateAcuteChronicRatio(playerId) {
-        // Memoize result (invalidated via ACCache.invalidate() on save/delete)
-        if (typeof ACCache !== 'undefined') {
-            const cached = ACCache.get(playerId, this.sessions);
-            if (cached !== null) return cached;
-        }
-        const MATCH_MULT = RPETracker.MATCH_LOAD_MULTIPLIER;
-        const playerSessions = this.sessions
-            .filter(s => s.playerId === playerId)
-            .map(s => ({
-                ...s,
-                date: new Date(s.date),
-                load: (s.load || (s.rpe * (s.duration || 60))) * (s.type === 'match' ? MATCH_MULT : 1)
-            }))
-            .sort((a, b) => a.date - b.date); // Sort chronologically
-        
-        if (playerSessions.length === 0) {
-            return {
-                acute: 0,
-                chronic: 0,
-                ratio: 'N/A',
-                sessions7d: 0,
-                sessions21d: 0,
-                totalLoad7d: 0,
-                totalLoad21d: 0
-            };
-        }
-        
-        // EWMA parameters (based on scientific literature)
-        // Acute: lambda = 2/(7+1) = 0.25 (7-day window)
-        // Chronic: lambda = 2/(28+1) = 0.069 (28-day window)
-        const lambdaAcute = 2 / (7 + 1);
-        const lambdaChronic = 2 / (28 + 1);
-
-        // Seed EWMA with average daily load from all historical sessions,
-        // so it converges immediately instead of starting cold from 0.
-        const allLoads = playerSessions.map(s => s.load);
-        const seedLoad = allLoads.length > 0
-            ? allLoads.reduce((a, b) => a + b, 0) / allLoads.length
-            : 0;
-
-        let ewmaAcute = seedLoad;
-        let ewmaChronic = seedLoad;
-
-        // Calculate EWMA for each day
-        const now = new Date();
-        const maxDaysBack = 56; // Look back 56 days (8 weeks) for better chronic baseline
-        
-        for (let i = maxDaysBack; i >= 0; i--) {
-            const currentDate = new Date(now);
-            currentDate.setDate(currentDate.getDate() - i);
-            currentDate.setHours(0, 0, 0, 0);
-            
-            const nextDate = new Date(currentDate);
-            nextDate.setDate(nextDate.getDate() + 1);
-            
-            // Find sessions on this day
-            const dailySessions = playerSessions.filter(s => {
-                const sessionDate = new Date(s.date);
-                sessionDate.setHours(0, 0, 0, 0);
-                return sessionDate.getTime() === currentDate.getTime();
-            });
-            
-            // Sum load for this day
-            const dailyLoad = dailySessions.reduce((sum, s) => sum + s.load, 0);
-            
-            // Update EWMA
-            // EWMA formula: EWMA_today = lambda × load_today + (1 - lambda) × EWMA_yesterday
-            ewmaAcute = (lambdaAcute * dailyLoad) + ((1 - lambdaAcute) * ewmaAcute);
-            ewmaChronic = (lambdaChronic * dailyLoad) + ((1 - lambdaChronic) * ewmaChronic);
-        }
-        
-        // Calculate ACWR (Acute:Chronic Workload Ratio)
-        const ratio = ewmaChronic > 0 ? (ewmaAcute / ewmaChronic) : 0;
-        
-        // Get session counts for display
-        const sevenDaysAgo = new Date(now);
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        
-        const twentyEightDaysAgo = new Date(now);
-        twentyEightDaysAgo.setDate(twentyEightDaysAgo.getDate() - 28);
-        
-        const acuteSessions = playerSessions.filter(s => s.date >= sevenDaysAgo);
-        const chronicSessions = playerSessions.filter(s => s.date >= twentyEightDaysAgo);
-        
-        const totalLoad7d = acuteSessions.reduce((sum, s) => sum + s.load, 0);
-        const totalLoad28d = chronicSessions.reduce((sum, s) => sum + s.load, 0);
-        
-        const result = {
-            acute: ewmaAcute,
-            chronic: ewmaChronic,
-            ratio: ratio > 0 ? ratio.toFixed(2) : 'N/A',
-            sessions7d: acuteSessions.length,
-            sessions21d: chronicSessions.length,
-            totalLoad7d: Math.round(totalLoad7d),
-            totalLoad21d: Math.round(totalLoad28d)
-        };
-        // Store in cache for this render cycle
-        if (typeof ACCache !== 'undefined') ACCache.set(playerId, this.sessions, result);
-        return result;
-    }
 
     // ========== INDIVIDUAL A:C THRESHOLDS ==========
     // Returns thresholds for a player, falling back to global defaults if not set.
-    getPlayerThresholds(playerId) {
-        const player = playerId ? this.players.find(p => p.id === playerId) : null;
-        return {
-            low:  (player?.acThresholdLow  != null) ? Number(player.acThresholdLow)  : 0.8,
-            opt:  (player?.acThresholdOpt  != null) ? Number(player.acThresholdOpt)  : 1.3,
-            high: (player?.acThresholdHigh != null) ? Number(player.acThresholdHigh) : 1.5
-        };
-    }
 
     // getRatioColor accepts optional playerId for individual thresholds
     getRatioColor(ratio, playerId) {
@@ -3019,14 +2144,19 @@ class RPETracker {
         const localStored = Store.getString('sessions');
         const localSessions = localStored ? JSON.parse(localStored) : [];
 
-        if (window.firebaseSync) {
+        // Guard: registrar listener UNA sola vez para evitar acumulación y sobreescritura
+        if (window.firebaseSync && !this._sessionsListenerSet) {
+            this._sessionsListenerSet = true;
             window.firebaseSync.onSessionsChange((updatedSessions) => {
+                // Ignorar el snapshot reactivo inmediato cuando somos nosotros quienes
+                // acabamos de hacer el write (evita que el listener machaque el push local)
+                if (this._savingSessions) return;
                 this.sessions = updatedSessions;
                 this.renderSessions();
                 if (this.currentView === 'dashboard') this.renderDashboard();
-                console.log('🔄 Sesiones actualizadas desde Firebase');
+                if (window._devMode) console.log('🔄 Sesiones actualizadas desde Firebase');
             });
-        } else {
+        } else if (!window.firebaseSync) {
             console.warn('⚠️ Firebase no disponible, usando localStorage');
         }
         return localSessions;
@@ -3035,11 +2165,14 @@ class RPETracker {
     saveSessions() {
         // Invalidar caché de cálculos EWMA/AC al guardar sesiones
         if (typeof ACCache !== 'undefined') ACCache.invalidate();
-        // Guardar en Firebase (que también guardará en localStorage como backup)
         if (window.firebaseSync) {
-            window.firebaseSync.saveSessions(this.sessions);
+            // Activar flag para que el listener reactivo no sobreescriba el estado local
+            // mientras el write está en vuelo. Se desactiva al resolverse la promesa.
+            this._savingSessions = true;
+            window.firebaseSync.saveSessions(this.sessions).finally(() => {
+                this._savingSessions = false;
+            });
         } else {
-            // Fallback si Firebase no está disponible
             Store.set('sessions', this.sessions);
         }
     }
@@ -3049,28 +2182,31 @@ class RPETracker {
         const localStored = Store.getString('players');
         const localPlayers = localStored ? JSON.parse(localStored) : [];
 
-        if (window.firebaseSync) {
+        if (window.firebaseSync && !this._playersListenerSet) {
+            this._playersListenerSet = true;
             window.firebaseSync.onPlayersChange((updatedPlayers) => {
+                if (this._savingPlayers) return;
                 this.players = updatedPlayers;
                 this._ensurePlayerColors();
                 this.renderPlayers();
                 this.populatePlayerSelects();
                 this.renderSessions();
                 if (this.currentView === 'dashboard') this.renderDashboard();
-                console.log('🔄 Jugadores actualizados desde Firebase');
+                if (window._devMode) console.log('🔄 Jugadores actualizados desde Firebase');
             });
-        } else {
+        } else if (!window.firebaseSync) {
             console.warn('⚠️ Firebase no disponible, usando localStorage');
         }
         return localPlayers;
     }
 
     savePlayers() {
-        // Guardar en Firebase (que también guardará en localStorage como backup)
         if (window.firebaseSync) {
-            window.firebaseSync.savePlayers(this.players);
+            this._savingPlayers = true;
+            window.firebaseSync.savePlayers(this.players).finally(() => {
+                this._savingPlayers = false;
+            });
         } else {
-            // Fallback si Firebase no está disponible
             Store.set('players', this.players);
         }
     }
@@ -4983,19 +4119,19 @@ const WellnessReminder = {
         if (!AppAuth.isStaff()) return;
         if (Notification.permission !== 'granted') return;
 
-        const reminderTime = localStorage.getItem('rpe_wellness_reminder_time') || '08:30';
+        const reminderTime = Store.getString('reminderTime') || '08:30';
         const now = new Date();
         const [rHour, rMin] = reminderTime.split(':').map(Number);
         if (now.getHours() !== rHour || now.getMinutes() !== rMin) return;
 
         const today = now.toISOString().slice(0, 10);
-        const lastSent = localStorage.getItem('rpe_wellness_reminder_sent');
+        const lastSent = Store.getString('reminderSent');
         if (lastSent === today) return; // already sent today
 
         // Find players without wellness today
-        const stored = JSON.parse(localStorage.getItem('wellnessData') || '[]');
+        const stored = Store.get('wellnessData') || [];
         const respondedToday = new Set(stored.filter(w => w.date === today).map(w => w.playerId));
-        const allPlayers = JSON.parse(localStorage.getItem('basketballPlayers') || '[]');
+        const allPlayers = Store.get('players') || [];
         const pending = allPlayers.filter(p => !respondedToday.has(p.id));
 
         if (!pending.length) return;
@@ -5008,7 +4144,7 @@ const WellnessReminder = {
             `Sin respuesta hoy: ${names}${extra}`,
             'wellness-reminder'
         );
-        localStorage.setItem('rpe_wellness_reminder_sent', today);
+        Store.setString('reminderSent', today);
     }
 };
 
@@ -5018,3 +4154,440 @@ window.addEventListener('load', () => {
         if (AppAuth.isStaff()) WellnessReminder.start();
     }, 2000);
 });
+
+// ============================================================
+//  migrateSessionSeasons()
+//  Etiqueta con la temporada activa todas las sesiones sin
+//  campo "season". Ejecutar desde la consola del navegador:
+//
+//      migrateSessionSeasons()
+//      migrateSessionSeasons('2024-25')   // temporada específica
+//
+// ============================================================
+window.migrateSessionSeasons = function(targetSeason) {
+    const season = targetSeason || Store.getActiveSeason();
+    if (!window.rpeTracker) {
+        console.error('[migrate] rpeTracker no está inicializado.');
+        return;
+    }
+    const sessions = window.rpeTracker.sessions;
+    let count = 0;
+    sessions.forEach(s => {
+        if (!s.season) {
+            s.season = season;
+            count++;
+        }
+    });
+    if (count === 0) {
+        console.info('[migrate] Todas las sesiones ya tienen temporada asignada. Nada que hacer.');
+        return;
+    }
+    window.rpeTracker.saveSessions();
+    if (window.firebaseSync && typeof window.firebaseSync.saveSessions === 'function') {
+        window.firebaseSync.saveSessions(sessions);
+    }
+    console.info(`[migrate] ✅ ${count} sesión(es) etiquetadas como temporada "${season}".`);
+    // Actualizar la temporada activa en Store si no había ninguna guardada
+    if (!Store.getString('currentSeason', '')) {
+        Store.setString('currentSeason', season);
+    }
+};
+
+// ─── Merged from improvements.js (V21) ───────────────────────────────────
+// ========== EDIT SESSIONS ==========
+
+RPETracker.prototype.editSession = function(sessionId) {
+    const session = this.sessions.find(s => s.id === sessionId);
+    if (!session) return;
+    
+    // Populate edit form
+    document.getElementById('editSessionId').value = session.id;
+    document.getElementById('editSessionPlayer').value = session.playerId;
+    
+    const date = new Date(session.date);
+    const dateStr = date.toISOString().slice(0, 10);
+    document.getElementById('editSessionDate').value = dateStr;
+    
+    // Set time of day
+    if (session.timeOfDay === 'morning') {
+        document.getElementById('editTimeMorning').checked = true;
+    } else {
+        document.getElementById('editTimeAfternoon').checked = true;
+    }
+    
+    // Set duration
+    document.getElementById('editSessionDuration').value = session.duration || 60;
+    
+    // Set type
+    if (session.type === 'training') {
+        document.getElementById('editTypeTraining').checked = true;
+    } else {
+        document.getElementById('editTypeMatch').checked = true;
+    }
+    
+    // Set RPE
+    document.getElementById('editRpeSlider').value = session.rpe;
+    this.updateEditRPEDisplay(session.rpe);
+    
+    // Set notes
+    document.getElementById('editSessionNotes').value = session.notes || '';
+    
+    // Populate player select
+    const playerSelect = document.getElementById('editSessionPlayer');
+    playerSelect.innerHTML = this.players.map(p => 
+        `<option value="${p.id}" ${p.id === session.playerId ? 'selected' : ''}>${p.name}${p.number ? ` #${p.number}` : ''}</option>`
+    ).join('');
+    
+    // Open modal
+    document.getElementById('editSessionModal').classList.add('active');
+    this.closeModal('detailModal');
+};
+
+RPETracker.prototype.handleEditSessionSubmit = function(e) {
+    e.preventDefault();
+    
+    const sessionId = document.getElementById('editSessionId').value;
+    const session = this.sessions.find(s => s.id === sessionId);
+    
+    if (!session) {
+        alert('❌ Sesión no encontrada');
+        return;
+    }
+    
+    const dateValue = document.getElementById('editSessionDate').value;
+    const timeOfDay = document.querySelector('input[name="editSessionTime"]:checked').value;
+    const timeString = timeOfDay === 'morning' ? 'T10:00:00' : 'T18:00:00';
+    const fullDateTime = dateValue + timeString;
+    
+    const rpe = parseInt(document.getElementById('editRpeSlider').value);
+    const duration = parseInt(document.getElementById('editSessionDuration').value);
+    const load = rpe * duration;
+    
+    // Update session
+    session.date = fullDateTime;
+    session.timeOfDay = timeOfDay;
+    session.type = document.querySelector('input[name="editSessionType"]:checked').value;
+    session.rpe = rpe;
+    session.duration = duration;
+    session.load = load;
+    session.notes = document.getElementById('editSessionNotes').value;
+    
+    this.saveSessions();
+    this.renderSessions();
+    this.closeModal('editSessionModal');
+    this.showToast('✅ Sesión actualizada correctamente');
+};
+
+RPETracker.prototype.updateEditRPEDisplay = function(value) {
+    const rpeValue = parseInt(value);
+    const color = this.getRPEColor(rpeValue);
+    const label = this.getRPELabel(rpeValue);
+    
+    document.getElementById('editRpeValue').textContent = rpeValue;
+    document.getElementById('editRpeValue').style.color = color;
+    document.getElementById('editRpeLabel').textContent = label;
+    
+    const slider = document.getElementById('editRpeSlider');
+    slider.style.background = `linear-gradient(to right, ${color} 0%, ${color} ${rpeValue * 10}%, #ddd ${rpeValue * 10}%, #ddd 100%)`;
+    
+    // Update scale
+    const rpeBar = document.getElementById('editRpeBar');
+    let html = '';
+    for (let i = 1; i <= 10; i++) {
+        const barColor = i <= rpeValue ? this.getRPEColor(i) : '#e0e0e0';
+        html += `<div style="flex: 1; height: 30px; background: ${barColor}; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: ${i <= rpeValue ? 'white' : '#999'};">${i}</div>`;
+    }
+    rpeBar.innerHTML = html;
+};
+
+// ========== EDIT PLAYERS ==========
+
+RPETracker.prototype.editPlayer = function(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    document.getElementById('editPlayerId').value = player.id;
+    document.getElementById('editPlayerName').value = player.name;
+    document.getElementById('editPlayerNumber').value = player.number || '';
+
+    // Individual A:C thresholds (empty = use global defaults)
+    document.getElementById('editAcThresholdLow').value  = player.acThresholdLow  != null ? player.acThresholdLow  : '';
+    document.getElementById('editAcThresholdOpt').value  = player.acThresholdOpt  != null ? player.acThresholdOpt  : '';
+    document.getElementById('editAcThresholdHigh').value = player.acThresholdHigh != null ? player.acThresholdHigh : '';
+
+    // Render color picker with current color preselected
+    const currentColor = PlayerTokens.get(player);
+    this._renderColorPicker('editPlayerColorPicker', 'editPlayerColor', currentColor);
+
+    document.getElementById('editPlayerModal').classList.add('active');
+};
+
+RPETracker.prototype.handleEditPlayerSubmit = function(e) {
+    e.preventDefault();
+
+    const playerId = document.getElementById('editPlayerId').value;
+    const player = this.players.find(p => p.id === playerId);
+
+    if (!player) {
+        alert('❌ Jugadora no encontrada');
+        return;
+    }
+
+    player.name = document.getElementById('editPlayerName').value;
+    player.number = document.getElementById('editPlayerNumber').value || null;
+    const chosenColor = document.getElementById('editPlayerColor').value;
+    if (chosenColor) player.color = chosenColor;
+
+    // Individual A:C thresholds — null if empty (means "use global")
+    const _low  = document.getElementById('editAcThresholdLow').value.trim();
+    const _opt  = document.getElementById('editAcThresholdOpt').value.trim();
+    const _high = document.getElementById('editAcThresholdHigh').value.trim();
+    player.acThresholdLow  = _low  !== '' ? parseFloat(_low)  : null;
+    player.acThresholdOpt  = _opt  !== '' ? parseFloat(_opt)  : null;
+    player.acThresholdHigh = _high !== '' ? parseFloat(_high) : null;
+
+    this.savePlayers();
+    this.renderPlayers();
+    this.renderSessions();
+    this.populatePlayerSelects();
+    this.closeModal('editPlayerModal');
+    this.showToast('✅ Jugadora actualizada correctamente');
+};
+
+
+// ========== SEARCH AND FILTER ==========
+
+RPETracker.prototype.setupSearchAndFilters = function() {
+    const searchInput = document.getElementById('searchSessions');
+    const sortSelect = document.getElementById('sortSessions');
+    const dateFromInput = document.getElementById('dateFrom');
+    const dateToInput = document.getElementById('dateTo');
+    const rpeMinInput = document.getElementById('rpeMin');
+    const rpeMaxInput = document.getElementById('rpeMax');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', () => this.renderSessions());
+    }
+    
+    if (sortSelect) {
+        sortSelect.addEventListener('change', () => this.renderSessions());
+    }
+    
+    if (dateFromInput) dateFromInput.addEventListener('change', () => this.renderSessions());
+    if (dateToInput) dateToInput.addEventListener('change', () => this.renderSessions());
+    if (rpeMinInput) rpeMinInput.addEventListener('change', () => this.renderSessions());
+    if (rpeMaxInput) rpeMaxInput.addEventListener('change', () => this.renderSessions());
+};
+
+RPETracker.prototype.getFilteredAndSortedSessions = function() {
+    let filtered = [...this.sessions];
+    
+    // Player filter
+    if (this.currentPlayerFilter !== 'all') {
+        filtered = filtered.filter(s => s.playerId === this.currentPlayerFilter);
+    }
+    
+    // Type filter
+    if (this.currentTypeFilter !== 'all') {
+        filtered = filtered.filter(s => s.type === this.currentTypeFilter);
+    }
+    
+    // Search text
+    const searchText = document.getElementById('searchSessions')?.value.toLowerCase();
+    if (searchText) {
+        filtered = filtered.filter(s => {
+            const player = this.players.find(p => p.id === s.playerId);
+            const playerName = player ? player.name.toLowerCase() : '';
+            const notes = (s.notes || '').toLowerCase();
+            return playerName.includes(searchText) || notes.includes(searchText);
+        });
+    }
+    
+    // Date range
+    const dateFrom = document.getElementById('dateFrom')?.value;
+    const dateTo = document.getElementById('dateTo')?.value;
+    
+    if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        filtered = filtered.filter(s => new Date(s.date) >= fromDate);
+    }
+    
+    if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59);
+        filtered = filtered.filter(s => new Date(s.date) <= toDate);
+    }
+    
+    // RPE range
+    const rpeMin = document.getElementById('rpeMin')?.value;
+    const rpeMax = document.getElementById('rpeMax')?.value;
+    
+    if (rpeMin) {
+        filtered = filtered.filter(s => s.rpe >= parseInt(rpeMin));
+    }
+    
+    if (rpeMax) {
+        filtered = filtered.filter(s => s.rpe <= parseInt(rpeMax));
+    }
+    
+    // Sort
+    const sortBy = document.getElementById('sortSessions')?.value || 'date-desc';
+    
+    switch(sortBy) {
+        case 'date-asc':
+            filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+            break;
+        case 'date-desc':
+            filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+            break;
+        case 'rpe-asc':
+            filtered.sort((a, b) => a.rpe - b.rpe);
+            break;
+        case 'rpe-desc':
+            filtered.sort((a, b) => b.rpe - a.rpe);
+            break;
+        case 'player':
+            filtered.sort((a, b) => {
+                const playerA = this.players.find(p => p.id === a.playerId);
+                const playerB = this.players.find(p => p.id === b.playerId);
+                const nameA = playerA ? playerA.name : '';
+                const nameB = playerB ? playerB.name : '';
+                return nameA.localeCompare(nameB);
+            });
+            break;
+    }
+    
+    return filtered;
+};
+
+// ========== SESSION TEMPLATES ==========
+
+RPETracker.prototype.loadTemplates = function() {
+    const stored = localStorage.getItem('basketballTemplates');
+    return stored ? JSON.parse(stored) : [];
+};
+
+RPETracker.prototype.saveTemplates = function() {
+    localStorage.setItem('basketballTemplates', JSON.stringify(this.templates || []));
+};
+
+RPETracker.prototype.createTemplate = function() {
+    const name = prompt('Nombre de la plantilla:\n(ej: "Entrenamiento técnico estándar")');
+    if (!name) return;
+    
+    const rpe = parseInt(prompt('RPE típico (1-10):', '6'));
+    const duration = parseInt(prompt('Duración en minutos:', '60'));
+    const type = 'training'; // Template type now set in session form
+    const timeOfDay = 'afternoon'; // Template timeOfDay now set in session form
+    
+    const template = {
+        id: Date.now().toString(),
+        name,
+        rpe,
+        duration,
+        type,
+        timeOfDay
+    };
+    
+    if (!this.templates) this.templates = [];
+    this.templates.push(template);
+    this.saveTemplates();
+    this.showToast(`✅ Plantilla "${name}" creada`);
+};
+
+RPETracker.prototype.applyTemplate = function(templateId) {
+    const template = this.templates?.find(t => t.id === templateId);
+    if (!template) return;
+    
+    document.getElementById('rpeSlider').value = template.rpe;
+    this.updateRPEDisplay(template.rpe);
+    
+    document.getElementById('sessionDuration').value = template.duration;
+    
+    if (template.timeOfDay === 'morning') {
+        document.getElementById('timeMorning').checked = true;
+    } else {
+        document.getElementById('timeAfternoon').checked = true;
+    }
+    
+    if (template.type === 'training') {
+        document.getElementById('typeTraining').checked = true;
+    } else {
+        document.getElementById('typeMatch').checked = true;
+    }
+    
+    this.showToast(`📋 Plantilla "${template.name}" aplicada`);
+};
+
+// ========== ADVANCED STATISTICS ==========
+
+RPETracker.prototype.calculateAdvancedStats = function(playerId) {
+    const playerSessions = this.sessions
+        .filter(s => s.playerId === playerId)
+        .map(s => ({
+            ...s,
+            date: new Date(s.date),
+            load: s.load || (s.rpe * (s.duration || 60))
+        }))
+        .sort((a, b) => a.date - b.date);
+    
+    if (playerSessions.length < 2) {
+        return {
+            monotony: 0,
+            strain: 0,
+            trainingImpulse: 0,
+            variance: 0
+        };
+    }
+    
+    // Get last 7 days
+    const now = new Date();
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const lastWeekSessions = playerSessions.filter(s => s.date >= sevenDaysAgo);
+    
+    if (lastWeekSessions.length === 0) {
+        return {
+            monotony: 0,
+            strain: 0,
+            trainingImpulse: 0,
+            variance: 0
+        };
+    }
+    
+    // Calculate weekly load
+    const weeklyLoad = lastWeekSessions.reduce((sum, s) => sum + s.load, 0);
+    
+    // Calculate mean load
+    const meanLoad = weeklyLoad / lastWeekSessions.length;
+    
+    // Calculate standard deviation
+    const variance = lastWeekSessions.reduce((sum, s) => {
+        return sum + Math.pow(s.load - meanLoad, 2);
+    }, 0) / lastWeekSessions.length;
+    
+    const stdDev = Math.sqrt(variance);
+    
+    // Monotony = mean / stdDev (lower is better, means more variety)
+    const monotony = stdDev > 0 ? meanLoad / stdDev : 0;
+    
+    // Strain = weekly load × monotony
+    const strain = weeklyLoad * monotony;
+    
+    // Training Impulse (TRIMP approximation)
+    const trainingImpulse = lastWeekSessions.reduce((sum, s) => {
+        // Simplified TRIMP = duration × RPE
+        return sum + (s.duration * s.rpe);
+    }, 0);
+    
+    return {
+        monotony: monotony.toFixed(2),
+        strain: Math.round(strain),
+        trainingImpulse: Math.round(trainingImpulse),
+        variance: Math.round(variance),
+        weeklyLoad: Math.round(weeklyLoad),
+        meanLoad: Math.round(meanLoad),
+        stdDev: Math.round(stdDev)
+    };
+};
