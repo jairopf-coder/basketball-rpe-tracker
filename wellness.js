@@ -7,13 +7,15 @@ RPETracker.prototype.loadWellnessData = function() {
     try {
         const raw = localStorage.getItem('basketballWellness');
         const data = raw ? JSON.parse(raw) : [];
-        // Subscribe to Firebase realtime updates if available
-        if (window.firebaseSync) {
+        // fix P-04: registrar listener UNA sola vez para evitar acumulación
+        // fix P-15: console.log eliminado en producción
+        if (window.firebaseSync && !this._wellnessListenerSet) {
+            this._wellnessListenerSet = true;
             window.firebaseSync.onWellnessChange(updated => {
                 this.wellnessData = updated;
                 if (this.currentView === 'wellness') this.renderWellnessDashboard();
                 if (this.currentView === 'dashboard') this.renderDashboard();
-                console.log('🔄 Wellness actualizado desde Firebase');
+                if (window._devMode) console.log('🔄 Wellness actualizado desde Firebase');
             });
         }
         return data;
@@ -287,6 +289,12 @@ RPETracker.prototype._drawWellnessTrendChart = function() {
     const days=14, dates=[];
     for(let i=days-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);dates.push(d.toISOString().slice(0,10));}
 
+    // fix P-08: leer colores adaptativos según tema activo
+    const isDark = document.documentElement.classList.contains('dark') ||
+                   document.body.classList.contains('dark-mode') ||
+                   window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const gridColor  = isDark ? 'rgba(255,255,255,.1)'  : 'rgba(128,128,128,.12)';
+    const labelColor = isDark ? 'rgba(255,255,255,.5)'  : 'rgba(80,80,80,.8)';
     const colors=['#2196f3','#ff9800','#9c27b0','#f44336'];
     const metrics=['sleep','fatigue','mood','soreness'];
     const seriesData=metrics.map(m=>dates.map(date=>{
@@ -295,14 +303,14 @@ RPETracker.prototype._drawWellnessTrendChart = function() {
     }));
 
     // Grid
-    ctx.strokeStyle='rgba(128,128,128,.12)'; ctx.lineWidth=1;
+    ctx.strokeStyle=gridColor; ctx.lineWidth=1;
     for(let i=1;i<=5;i++){
         const y=pad.t+iH-(i/5)*iH;
         ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+iW,y);ctx.stroke();
-        ctx.fillStyle='rgba(128,128,128,.6)';ctx.font=`${10}px system-ui`;ctx.textAlign='right';
+        ctx.fillStyle=labelColor;ctx.font=`${10}px system-ui`;ctx.textAlign='right';
         ctx.fillText(i,pad.l-4,y+3);
     }
-    ctx.fillStyle='rgba(128,128,128,.6)';ctx.textAlign='center';
+    ctx.fillStyle=labelColor;ctx.textAlign='center';
     dates.forEach((date,i)=>{if(i%2===0){ctx.fillText(date.slice(5),pad.l+i*(iW/(days-1)),H-5);}});
 
     seriesData.forEach((series,si)=>{

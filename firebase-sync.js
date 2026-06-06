@@ -1,6 +1,10 @@
 // Firebase Sync Manager
 // Maneja la sincronización de datos entre Firebase y la app
 
+// Debug logger — only emits in dev mode (window._devMode = true)
+const _dbg = (...a) => { if (window._devMode) console.log(...a); };
+
+
 class FirebaseSync {
     constructor() {
         this.db = window.firebaseDB;
@@ -119,13 +123,13 @@ class FirebaseSync {
         if (localSessions) {
             const sessions = JSON.parse(localSessions);
             await this.saveSessions(sessions);
-            console.log('✅ Sesiones migradas a Firebase');
+            _dbg('✅ Sesiones migradas a Firebase');
         }
         
         if (localPlayers) {
             const players = JSON.parse(localPlayers);
             await this.savePlayers(players);
-            console.log('✅ Jugadores migrados a Firebase');
+            _dbg('✅ Jugadores migrados a Firebase');
         }
     }
 
@@ -135,7 +139,7 @@ class FirebaseSync {
         let wasOnline = null;
         connectedRef.on('value', (snapshot) => {
             const online = snapshot.val() === true;
-            console.log(online ? '🟢 Conectado a Firebase' : '🔴 Desconectado de Firebase');
+            _dbg(online ? '🟢 Conectado a Firebase' : '🔴 Desconectado de Firebase');
             this.updateConnectionIndicator(online);
             if (online && wasOnline === false) {
                 // Reconnect event: drain pending writes
@@ -164,10 +168,10 @@ FirebaseSync.prototype.saveGymSessions = async function(gymSessions) {
         const obj = {};
         gymSessions.forEach(s => { obj[s.id] = s; });
         await this.db.ref('gymSessions').set(obj);
-        localStorage.setItem('bk_gym_sessions', JSON.stringify(gymSessions));
+        Store.set('gymSessions', gymSessions);
     } catch (e) {
         console.error('Error saving gymSessions to Firebase:', e);
-        localStorage.setItem('bk_gym_sessions', JSON.stringify(gymSessions));
+        Store.set('gymSessions', gymSessions);
         await this._enqueueWrite('gymSessions', Object.fromEntries(gymSessions.map(s => [s.id, s])));
     }
 };
@@ -187,10 +191,10 @@ FirebaseSync.prototype.saveTestSessions = async function(testSessions) {
         const obj = {};
         testSessions.forEach(s => { obj[s.id] = s; });
         await this.db.ref('testSessions').set(obj);
-        localStorage.setItem('bk_test_sessions', JSON.stringify(testSessions));
+        Store.set('testSessions', testSessions);
     } catch (e) {
         console.error('Error saving testSessions to Firebase:', e);
-        localStorage.setItem('bk_test_sessions', JSON.stringify(testSessions));
+        Store.set('testSessions', testSessions);
         await this._enqueueWrite('testSessions', Object.fromEntries(testSessions.map(s => [s.id, s])));
     }
 };
@@ -210,10 +214,10 @@ FirebaseSync.prototype.saveWellnessData = async function(wellnessData) {
         const obj = {};
         wellnessData.forEach(w => { obj[w.id] = w; });
         await this.db.ref('wellness').set(obj);
-        localStorage.setItem('basketballWellness', JSON.stringify(wellnessData));
+        Store.set('wellness', wellnessData);
     } catch (e) {
         console.error('Error saving wellness to Firebase:', e);
-        localStorage.setItem('basketballWellness', JSON.stringify(wellnessData));
+        Store.set('wellness', wellnessData);
         await this._enqueueWrite('wellness', Object.fromEntries(wellnessData.map(w => [w.id, w])));
     }
 };
@@ -229,16 +233,16 @@ FirebaseSync.prototype.onWellnessChange = function(callback) {
 // ========== GYM/TEST/WELLNESS MIGRATION ==========
 
 FirebaseSync.prototype.migrateStrengthData = async function() {
-    const gymRaw  = localStorage.getItem('bk_gym_sessions');
-    const testRaw = localStorage.getItem('bk_test_sessions');
-    const wellRaw = localStorage.getItem('basketballWellness');
-    const injRaw  = localStorage.getItem('basketballInjuries');
-    const planRaw = localStorage.getItem('basketballWeekPlan');
-    if (gymRaw)  { await this.saveGymSessions(JSON.parse(gymRaw));   console.log('✅ GymSessions migradas a Firebase'); }
-    if (testRaw) { await this.saveTestSessions(JSON.parse(testRaw)); console.log('✅ TestSessions migradas a Firebase'); }
-    if (wellRaw) { await this.saveWellnessData(JSON.parse(wellRaw)); console.log('✅ Wellness migrado a Firebase'); }
-    if (injRaw)  { await this.saveInjuries(JSON.parse(injRaw));      console.log('✅ Lesiones migradas a Firebase'); }
-    if (planRaw) { await this.saveWeekPlan(JSON.parse(planRaw));     console.log('✅ Plan semanal migrado a Firebase'); }
+    const gymRaw  = Store.getString('gymSessions');
+    const testRaw = Store.getString('testSessions');
+    const wellRaw = Store.getString('wellness');
+    const injRaw  = Store.getString('injuries');
+    const planRaw = Store.getString('weekPlan');
+    if (gymRaw)  { await this.saveGymSessions(JSON.parse(gymRaw));   _dbg('✅ GymSessions migradas a Firebase'); }
+    if (testRaw) { await this.saveTestSessions(JSON.parse(testRaw)); _dbg('✅ TestSessions migradas a Firebase'); }
+    if (wellRaw) { await this.saveWellnessData(JSON.parse(wellRaw)); _dbg('✅ Wellness migrado a Firebase'); }
+    if (injRaw)  { await this.saveInjuries(JSON.parse(injRaw));      _dbg('✅ Lesiones migradas a Firebase'); }
+    if (planRaw) { await this.saveWeekPlan(JSON.parse(planRaw));     _dbg('✅ Plan semanal migrado a Firebase'); }
 };
 
 // ========== INJURIES (Firebase sync) ==========
@@ -248,10 +252,10 @@ FirebaseSync.prototype.saveInjuries = async function(injuries) {
         const obj = {};
         injuries.forEach(inj => { obj[inj.id] = inj; });
         await this.db.ref('injuries').set(obj);
-        localStorage.setItem('basketballInjuries', JSON.stringify(injuries));
+        Store.set('injuries', injuries);
     } catch (e) {
         console.error('Error saving injuries to Firebase:', e);
-        localStorage.setItem('basketballInjuries', JSON.stringify(injuries));
+        Store.set('injuries', injuries);
         await this._enqueueWrite('injuries', Object.fromEntries(injuries.map(i => [i.id, i])));
     }
 };
@@ -269,10 +273,10 @@ FirebaseSync.prototype.onInjuriesChange = function(callback) {
 FirebaseSync.prototype.saveWeekPlan = async function(weekPlan) {
     try {
         await this.db.ref('weekPlan').set(weekPlan);
-        localStorage.setItem('basketballWeekPlan', JSON.stringify(weekPlan));
+        Store.set('weekPlan', weekPlan);
     } catch (e) {
         console.error('Error saving weekPlan to Firebase:', e);
-        localStorage.setItem('basketballWeekPlan', JSON.stringify(weekPlan));
+        Store.set('weekPlan', weekPlan);
         await this._enqueueWrite('weekPlan', weekPlan);
     }
 };
@@ -282,10 +286,10 @@ FirebaseSync.prototype.saveClinicalNotes = async function(notes) {
         const obj = {};
         notes.forEach(n => { obj[n.id] = n; });
         await this.db.ref('clinicalNotes').set(obj);
-        localStorage.setItem('basketballClinicalNotes', JSON.stringify(notes));
+        Store.set('clinicalNotes', notes);
     } catch (e) {
         console.error('Error saving clinicalNotes to Firebase:', e);
-        localStorage.setItem('basketballClinicalNotes', JSON.stringify(notes));
+        Store.set('clinicalNotes', notes);
         await this._enqueueWrite('clinicalNotes', Object.fromEntries(notes.map(n => [n.id, n])));
     }
 };
@@ -303,10 +307,10 @@ FirebaseSync.prototype.saveSeasonBlocks = async function(blocks) {
         const obj = {};
         (blocks || []).forEach(b => { obj[b.id] = b; });
         await this.db.ref('seasonBlocks').set(obj);
-        localStorage.setItem('rpe_seasonBlocks', JSON.stringify(blocks || []));
+        Store.set('seasonBlocks', blocks || []);
     } catch (e) {
         console.error('Error saving seasonBlocks to Firebase:', e);
-        localStorage.setItem('rpe_seasonBlocks', JSON.stringify(blocks || []));
+        Store.set('seasonBlocks', blocks || []);
         await this._enqueueWrite('seasonBlocks', Object.fromEntries((blocks||[]).map(b => [b.id, b])));
     }
 };
@@ -315,16 +319,8 @@ FirebaseSync.prototype.loadSeasonBlocks = function(callback) {
     this.db.ref('seasonBlocks').once('value', snapshot => {
         const data = snapshot.val();
         const blocks = data ? Object.values(data) : [];
-        localStorage.setItem('rpe_seasonBlocks', JSON.stringify(blocks));
+        Store.set('seasonBlocks', blocks);
         if (callback) callback(blocks);
-    });
-};
-
-FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
-    this.db.ref('seasonBlocks').on('value', snapshot => {
-        const data = snapshot.val();
-        const blocks = data ? Object.values(data) : [];
-        callback(blocks);
     });
 };
 
@@ -379,7 +375,7 @@ FirebaseSync.prototype._drainQueue = async function() {
         });
 
         if (!all.length) return;
-        console.log(`[offline-queue] Drenando ${all.length} escritura(s) pendiente(s)…`);
+        _dbg(`[offline-queue] Drenando ${all.length} escritura(s) pendiente(s)…`);
 
         // FIFO: sort by timestamp just in case
         all.sort((a, b) => a.timestamp - b.timestamp);
@@ -442,7 +438,7 @@ FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
     this.db.ref('seasonBlocks').on('value', snapshot => {
         const data = snapshot.val();
         const blocks = data ? Object.values(data) : [];
-        localStorage.setItem('rpe_seasonBlocks', JSON.stringify(blocks));
+        Store.set('seasonBlocks', blocks);
         if (callback) callback(blocks);
     });
 };
@@ -469,10 +465,10 @@ window.firebaseSync = new FirebaseSync();
 FirebaseSync.prototype.saveAnamnesis = async function(playerId, data) {
     try {
         await this.db.ref(`anamnesis/${playerId}`).set(data);
-        localStorage.setItem(`anamnesis_${playerId}`, JSON.stringify(data));
+        Store.set(`anamnesis_${playerId}`, data);
     } catch (e) {
         console.error('Error saving anamnesis:', e);
-        localStorage.setItem(`anamnesis_${playerId}`, JSON.stringify(data));
+        Store.set(`anamnesis_${playerId}`, data);
     }
 };
 
@@ -481,8 +477,8 @@ FirebaseSync.prototype.loadAnamnesis = function(playerId, callback) {
         const val = snapshot.val();
         if (val) { callback(val); return; }
         try {
-            const local = localStorage.getItem(`anamnesis_${playerId}`);
-            callback(local ? JSON.parse(local) : null);
+            const local = Store.get(`anamnesis_${playerId}`);
+            callback(local !== null ? local : null);
         } catch(e) { callback(null); }
     });
 };

@@ -1,14 +1,16 @@
 // Service Worker — BasketballRPE-Web
 // Bump CACHE_VERSION whenever you deploy new code to invalidate stale caches.
-const CACHE_VERSION = 'v16';
+const CACHE_VERSION = 'v22';
 const CACHE_NAME = `rpe-basketball-${CACHE_VERSION}`;
 
 const urlsToCache = [
   '/',
   '/index.html',
+  '/improvements.js',
   '/styles.css',
   '/manifest.json',
   '/app.js',
+  '/anamnesis.js',
   '/auth.js',
   '/backup.js',
   '/calendar.js',
@@ -17,12 +19,15 @@ const urlsToCache = [
   '/security.js',
   '/firebase-config.js',
   '/firebase-sync.js',
-  '/improvements.js',
+  '/ewma-calculator.js',
+  '/dashboard-renderer.js',
   '/injury-management.js',
   '/injury-management-2.js',
   '/injury-prediction.js',
   '/pdf-reports.js',
+  '/player-view.js',
   '/strength.js',
+  '/team-load.js',
   '/team-status.js',
   '/ui-helpers.js',
   '/weekplan-medical.js',

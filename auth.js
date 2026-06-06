@@ -106,14 +106,14 @@ const AppAuth = {
                         </div>
                     </div>
 
-                    <div id="login-error" class="login-error" style="display:${errorMsg ? 'block' : 'none'}">${errorMsg || ''}</div>
+                    <div id="login-error" class="login-error" style="display:${errorMsg ? 'block' : 'none'}">${errorMsg ? esc(errorMsg) : ''}</div>
 
                     <button class="login-btn" id="login-btn" onclick="AppAuth.handleLogin()">
                         Entrar
                     </button>
                 </div>
 
-                <p class="login-version">BasketballRPE v14</p>
+                <p class="login-version">BasketballRPE v22</p>
             </div>
         `;
         document.body.insertBefore(screen, document.getElementById('app'));
@@ -221,7 +221,7 @@ const AppAuth = {
             } else if (role === 'player') {
                 document.getElementById('app').style.display = 'none';
                 if (this._isInstalledPWA()) {
-                    this.showWellnessScreen();
+                    PlayerView.show();
                 } else {
                     this.showInstallGate();
                 }
@@ -390,10 +390,11 @@ const AppAuth = {
                 <div class="um-user-row">
                     <div class="um-user-info">
                         <span class="um-user-name">${u.displayName || '—'}</span>
-                        <span class="um-user-email">${u.email}</span>
+                        <span class="um-user-email">${u.email || '—'}</span>
                     </div>
                     <span class="um-user-role um-role-${u.role}">${roleLabel[u.role] || u.role}</span>
-                    <button class="um-delete-btn" onclick="AppAuth.deleteUser('${uid}', '${(u.displayName || u.email).replace(/'/g, "\\'")}')" title="Eliminar usuario">🗑</button>
+                    <button class="um-edit-btn" onclick="AppAuth.editUser('${uid}', '${(u.displayName || '').replace(/'/g, "\\'")}')" title="Editar usuario">✏️</button>
+                    <button class="um-delete-btn" onclick="AppAuth.deleteUser('${uid}', '${(u.displayName || u.email || uid).replace(/'/g, "\\'")}')" title="Eliminar usuario">🗑</button>
                 </div>
             `).join('');
 
@@ -404,9 +405,18 @@ const AppAuth = {
     },
 
     async deleteUser(uid, name) {
-        const ok = await window.AppConfirm
-            ? AppConfirm.show(`¿Eliminar la cuenta de ${name}?`, 'Esta acción elimina solo el registro de rol. La cuenta de Auth debe borrarse manualmente en Firebase Console si es necesario.')
-            : confirm(`¿Eliminar la cuenta de ${name}?`);
+        // fix P-03: firma correcta de AppConfirm.show + precedencia de operador corregida
+        let ok;
+        if (window.AppConfirm) {
+            ok = await AppConfirm.show({
+                title: `¿Eliminar la cuenta de ${name}?`,
+                message: 'Esta acción elimina solo el registro de rol. La cuenta de Auth debe borrarse manualmente en Firebase Console si es necesario.',
+                confirmText: 'Eliminar',
+                danger: true,
+            });
+        } else {
+            ok = confirm(`¿Eliminar la cuenta de ${name}?`);
+        }
 
         if (!ok) return;
 
@@ -415,6 +425,71 @@ const AppAuth = {
             this._loadUserList();
         } catch (e) {
             alert(`Error al eliminar: ${e.message}`);
+        }
+    },
+
+    editUser(uid, currentName) {
+        const existing = document.getElementById('um-edit-modal');
+        if (existing) existing.remove();
+
+        // Lee el nodo actual para tener email y role frescos
+        window.firebaseDB.ref(`users/${uid}`).once('value').then(snap => {
+            const u = snap.val() || {};
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.id = 'um-edit-modal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width:420px">
+                    <div class="modal-header">
+                        <h2>✏️ Editar usuario</h2>
+                        <button class="btn-close" onclick="document.getElementById('um-edit-modal').remove()">&times;</button>
+                    </div>
+                    <div class="um-section">
+                        <div class="form-group">
+                            <label>Nombre completo</label>
+                            <input type="text" id="ue-displayName" class="form-input" value="${(u.displayName || '').replace(/"/g, '&quot;')}">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="text" id="ue-email" class="form-input" value="${(u.email || '').replace(/"/g, '&quot;')}">
+                        </div>
+                        <div class="form-group">
+                            <label>Rol</label>
+                            <select id="ue-role" class="form-input">
+                                <option value="player"  ${u.role === 'player'  ? 'selected' : ''}>👤 Jugadora</option>
+                                <option value="fisio"   ${u.role === 'fisio'   ? 'selected' : ''}>🩺 Fisioterapeuta</option>
+                                <option value="staff"   ${u.role === 'staff'   ? 'selected' : ''}>🏋️ Cuerpo técnico</option>
+                            </select>
+                        </div>
+                        <div id="ue-error" class="login-error" style="display:none"></div>
+                    </div>
+                    <div class="modal-footer" style="gap:0.75rem">
+                        <button class="btn-secondary" onclick="document.getElementById('um-edit-modal').remove()">Cancelar</button>
+                        <button class="btn-primary" onclick="AppAuth.saveEditUser('${uid}')">Guardar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        });
+    },
+
+    async saveEditUser(uid) {
+        const displayName = document.getElementById('ue-displayName')?.value?.trim();
+        const email       = document.getElementById('ue-email')?.value?.trim();
+        const role        = document.getElementById('ue-role')?.value;
+        const errEl       = document.getElementById('ue-error');
+
+        if (!displayName) {
+            if (errEl) { errEl.textContent = 'El nombre no puede estar vacío.'; errEl.style.display = 'block'; }
+            return;
+        }
+
+        try {
+            await window.firebaseDB.ref(`users/${uid}`).update({ displayName, email, role });
+            document.getElementById('um-edit-modal')?.remove();
+            this._loadUserList();
+        } catch (e) {
+            if (errEl) { errEl.textContent = `Error: ${e.message}`; errEl.style.display = 'block'; }
         }
     },
 
@@ -692,7 +767,7 @@ const AppAuth = {
     _checkInstallAndProceed() {
         if (this._isInstalledPWA()) {
             document.getElementById('install-gate')?.remove();
-            this.showWellnessScreen();
+            PlayerView.show();
         } else {
             const btn = document.querySelector('.ig-btn-already');
             if (btn) {

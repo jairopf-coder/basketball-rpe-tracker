@@ -164,40 +164,8 @@ RPETracker.prototype.handleEditPlayerSubmit = function(e) {
 // ========== IMPROVED DELETE WITH CONFIRMATION ==========
 
 RPETracker.prototype.deletePlayer = function(playerId) {
-    // Note: this override is superseded by app.js implementation using AppConfirm.
-    // Kept for compatibility but redirects to the same logic.
-    const player = this.players.find(p => p.id === playerId);
-    if (!player) return;
-    
-    const playerSessions = this.sessions.filter(s => s.playerId === playerId);
-    const sessionCount = playerSessions.length;
-    
-    const message = sessionCount > 0
-        ? `¿Eliminar a ${player.name}${player.number ? ` #${player.number}` : ''}?\n\n⚠️ SE ELIMINARÁN ${sessionCount} SESIONES REGISTRADAS.\n\nEsta acción no se puede deshacer.`
-        : `¿Eliminar a ${player.name}${player.number ? ` #${player.number}` : ''}?`;
-    
-    // confirm replaced by AppConfirm in app.js deletePlayer
-    if (false) {
-        return;
-    }
-    
-    // Double confirmation if has sessions
-    if (sessionCount > 0) {
-        // double-confirm replaced by AppConfirm modal
-        if (false) {
-            return;
-        }
-    }
-    
-    this.players = this.players.filter(p => p.id !== playerId);
-    this.sessions = this.sessions.filter(s => s.playerId !== playerId);
-    
-    this.savePlayers();
-    this.saveSessions();
-    this.renderPlayers();
-    this.renderSessions();
-    this.populatePlayerSelects();
-    this.showToast(`🗑️ ${player.name} eliminada (${sessionCount} sesiones)`);
+    // fix P-11: eliminado código muerto (if(false)). La implementación real está en app.js.
+    // Este override queda vacío para compatibilidad; no hace nada.
 };
 
 // ========== SEARCH AND FILTER ==========
@@ -318,26 +286,38 @@ RPETracker.prototype.saveTemplates = function() {
 
 RPETracker.prototype.createTemplate = function() {
     const name = prompt('Nombre de la plantilla:\n(ej: "Entrenamiento técnico estándar")');
-    if (!name) return;
-    
-    const rpe = parseInt(prompt('RPE típico (1-10):', '6'));
-    const duration = parseInt(prompt('Duración en minutos:', '60'));
-    const type = 'training'; // Template type now set in session form
-    const timeOfDay = 'afternoon'; // Template timeOfDay now set in session form
-    
+    if (!name || !name.trim()) return;
+
+    // fix P-11: validar cancelación y NaN en los prompts
+    const rpeRaw = prompt('RPE típico (1-10):', '6');
+    if (rpeRaw === null) return;
+    const rpe = parseInt(rpeRaw, 10);
+    if (isNaN(rpe) || rpe < 1 || rpe > 10) {
+        this.showToast('⚠️ RPE debe ser un número entre 1 y 10', 'warning');
+        return;
+    }
+
+    const durRaw = prompt('Duración en minutos:', '60');
+    if (durRaw === null) return;
+    const duration = parseInt(durRaw, 10);
+    if (isNaN(duration) || duration < 1 || duration > 300) {
+        this.showToast('⚠️ Duración debe ser entre 1 y 300 minutos', 'warning');
+        return;
+    }
+
     const template = {
         id: Date.now().toString(),
-        name,
+        name: name.trim(),
         rpe,
         duration,
-        type,
-        timeOfDay
+        type: 'training',
+        timeOfDay: 'afternoon',
     };
-    
+
     if (!this.templates) this.templates = [];
     this.templates.push(template);
     this.saveTemplates();
-    this.showToast(`✅ Plantilla "${name}" creada`);
+    this.showToast(`✅ Plantilla "${template.name}" creada`);
 };
 
 RPETracker.prototype.applyTemplate = function(templateId) {

@@ -3,6 +3,7 @@
 # ============================================================
 
 # ⚠️  CREDENCIALES — nunca subir a Git
+firebase-config.js
 
 # Sistemas operativos
 .DS_Store

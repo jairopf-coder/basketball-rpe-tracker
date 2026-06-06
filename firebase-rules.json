@@ -5,8 +5,27 @@
 
     "users": {
       "$uid": {
-        ".read":  "auth != null && auth.uid === $uid",
-        ".write": false
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'staff'",
+
+        "displayName": {
+          ".write": "auth != null && auth.uid === $uid"
+        },
+        "email": {
+          ".write": "auth != null && auth.uid === $uid"
+        },
+        "photoURL": {
+          ".write": "auth != null && auth.uid === $uid"
+        },
+
+        "role": {
+          ".read":  "auth != null && auth.uid === $uid",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'staff'"
+        },
+
+        "playerLink": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'staff'"
+        }
       }
     },
 
@@ -22,7 +41,9 @@
 
     "wellness": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null"
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
     },
 
     "injuries": {
@@ -33,6 +54,38 @@
     "strength": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "gymSessions": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "testSessions": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "weekPlan": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "clinicalNotes": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "seasonBlocks": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+
+    "anamnesis": {
+      "$pid": {
+        ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      }
     },
 
     "$other": {
