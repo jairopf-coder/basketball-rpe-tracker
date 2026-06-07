@@ -372,7 +372,7 @@ RPETracker.prototype._renderProjectedACRow = function(sessionLoad) {
         const avatar = typeof PlayerTokens !== 'undefined'
             ? PlayerTokens.avatar(p, 13, '.42rem')
             : p.name.charAt(0);
-        return `<span class="pac-badge ${cls}" title="${p.name}: A:C proyectado ${ratio.toFixed(2)}">${avatar} ${ratio.toFixed(2)}</span>`;
+        return `<span class="pac-badge ${cls}" title="${esc(p.name)}: A:C proyectado ${ratio.toFixed(2)}">${avatar} ${ratio.toFixed(2)}</span>`;
     }).filter(Boolean).join('');
 
     if (!badges) return '';
@@ -659,7 +659,7 @@ RPETracker.prototype._renderMedCard = function(inj) {
             <div style="display:flex;align-items:center;gap:.6rem">
                 ${PlayerTokens.avatar(player,28,'.7rem')}
                 <div>
-                    <div style="font-weight:700;font-size:1rem">${player.name}${player.number?` <span style="opacity:.5;font-size:.8rem">#${player.number}</span>`:''}</div>
+                    <div style="font-weight:700;font-size:1rem">${esc(player.name)}${player.number?` <span style="opacity:.5;font-size:.8rem">#${esc(player.number)}</span>`:''}</div>
                     <div style="font-size:.82rem;color:var(--text-secondary)">${typeLabel} — ${locLabel}</div>
                 </div>
             </div>
@@ -676,7 +676,7 @@ RPETracker.prototype._renderMedCard = function(inj) {
             <div class="med-info-cell"><span class="mic-label">🔄 Fase RTP</span><span class="mic-val">${inj.rtpPhase||1}/6</span></div>
             <div class="med-info-cell"><span class="mic-label">📈 Progreso</span><span class="mic-val">${inj.rtpProgress||0}%</span></div>
         </div>
-        ${inj.description ? `<p style="margin:.6rem 0 0;font-size:.83rem;color:var(--text-secondary)">${inj.description}</p>` : ''}
+        ${inj.description ? `<p style="margin:.6rem 0 0;font-size:.83rem;color:var(--text-secondary)">${esc(inj.description)}</p>` : ''}
     </div>`;
 };
 
@@ -747,7 +747,7 @@ RPETracker.prototype.renderRehabLoad = function() {
                 <div style="display:flex;align-items:center;gap:.6rem">
                     ${PlayerTokens.avatar(player,32,'.75rem')}
                     <div>
-                        <div style="font-weight:700;font-size:1rem">${player.name}</div>
+                        <div style="font-weight:700;font-size:1rem">${esc(player.name)}</div>
                         <div style="font-size:.8rem;color:var(--text-secondary)">${inj.type||'Lesión'} — Día ${playerLoad.daysInjured} de baja</div>
                     </div>
                 </div>
@@ -805,7 +805,7 @@ RPETracker.prototype.renderRehabLoad = function() {
                 </div>
             </div>
 
-            ${inj.notes ? `<p style="margin:.6rem 0 0;font-size:.82rem;color:var(--text-secondary);border-top:1px solid var(--border-color);padding-top:.6rem">${inj.notes}</p>` : ''}
+            ${inj.notes ? `<p style="margin:.6rem 0 0;font-size:.82rem;color:var(--text-secondary);border-top:1px solid var(--border-color);padding-top:.6rem">${esc(inj.notes)}</p>` : ''}
         </div>`;
     }).join('');
 
@@ -910,7 +910,7 @@ RPETracker.prototype.renderLoadInjuryCorrelation = function() {
                         <tbody>
                             ${correlationData.rows.map(row=>`<tr>
                                 <td><div style="display:flex;align-items:center;gap:.35rem">
-                                    ${PlayerTokens.avatar(row.player,18,'.5rem')}<span>${row.player.name}</span>
+                                    ${PlayerTokens.avatar(row.player,18,'.5rem')}<span>${esc(row.player.name)}</span>
                                 </div></td>
                                 <td style="font-size:.82rem">${row.type}</td>
                                 <td style="font-size:.82rem;white-space:nowrap">${row.date}</td>
@@ -1288,7 +1288,7 @@ RPETracker.prototype._renderInjIndividual = function() {
         <div class="ijh-player-summary" style="border-left:4px solid ${color}" onclick="window.rpeTracker._injSelPlayer='${p.id}';window.rpeTracker.renderInjuryHub()">
             <div class="ijh-ps-header">
                 ${PlayerTokens.avatar(p, 28, '.65rem')}
-                <div class="ijh-ps-name">${p.name}${p.number?` <span class="sv-number">#${p.number}</span>`:''}</div>
+                <div class="ijh-ps-name">${esc(p.name)}${p.number?` <span class="sv-number">#${esc(p.number)}</span>`:''}</div>
                 ${activeNow ? `<span class="ijh-badge-active">● Activa</span>` : ''}
             </div>
             <div class="ijh-ps-stats">
@@ -1526,7 +1526,7 @@ RPETracker.prototype._renderInjCorrelationCompact = function() {
                 <tbody>
                     ${rows.sort((a,b)=>b.ratioPrev-a.ratioPrev).map(r=>`<tr>
                         <td><div style="display:flex;align-items:center;gap:.35rem">
-                            ${PlayerTokens.avatar(r.player,16,'.4rem')} ${r.player.name}
+                            ${PlayerTokens.avatar(r.player,16,'.4rem')} ${esc(r.player.name)}
                         </div></td>
                         <td>${r.type}</td>
                         <td>${r.date}</td>
@@ -1706,7 +1706,7 @@ RPETracker.prototype.renderMicrociclo = function() {
             <td class="mc-td-player">
                 <div style="display:flex;align-items:center;gap:.4rem">
                     ${PlayerTokens.avatar(player, 20, '.45rem')}
-                    <span class="mc-player-name">${player.name}</span>
+                    <span class="mc-player-name">${esc(player.name)}</span>
                 </div>
             </td>
             ${cells}

@@ -476,7 +476,7 @@ RPETracker.prototype.getTypeName = function(type) {
         'tendon': 'Tendón/Ligamento',
         'other': 'Otra'
     };
-    return types[type] || type;
+    return esc(types[type] || type || '—');
 };
 
 RPETracker.prototype.getLocationName = function(location) {
@@ -493,7 +493,7 @@ RPETracker.prototype.getLocationName = function(location) {
         'finger': 'Dedos',
         'other': 'Otra'
     };
-    return locations[location] || location;
+    return esc(locations[location] || location || '—');
 };
 
 // ========== CLINICAL NOTES DIARY ==========

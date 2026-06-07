@@ -671,7 +671,7 @@ RPETracker.prototype.renderInjuryCard = function(injury) {
                 ${injury.painLevel != null ? `<div><span class="inj-meta-lbl">Dolor EVA</span><span class="inj-meta-val" style="color:${painColor}">${injury.painLevel}/10</span></div>` : ''}
             </div>
 
-            ${injury.description ? `<div class="inj-desc">📝 ${injury.description}</div>` : ''}
+            ${injury.description ? `<div class="inj-desc">📝 ${esc(injury.description)}</div>` : ''}
             ${injury.initialTreatment ? `<div class="inj-desc" style="background:var(--bg-subtle)">🩹 ${injury.initialTreatment}</div>` : ''}
 
             ${(() => {

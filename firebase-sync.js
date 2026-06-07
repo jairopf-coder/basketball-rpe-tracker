@@ -7,9 +7,16 @@ const _dbg = (...a) => { if (window._devMode) console.log(...a); };
 
 class FirebaseSync {
     constructor() {
-        this.db = window.firebaseDB;
-        this.sessionsRef = this.db.ref('sessions');
-        this.playersRef = this.db.ref('players');
+        // Defensive init: firebase-config.js may not have finished or may have failed
+        this.db = window.firebaseDB || null;
+        if (!this.db) {
+            console.warn('[FirebaseSync] firebaseDB no disponible en construcción — modo offline');
+            this.sessionsRef = null;
+            this.playersRef  = null;
+        } else {
+            this.sessionsRef = this.db.ref('sessions');
+            this.playersRef  = this.db.ref('players');
+        }
         this.listeners = {
             sessions: [],
             players: []
@@ -135,6 +142,7 @@ class FirebaseSync {
 
     // Verificar estado de conexión y actualizar indicador visual
     checkConnection() {
+        if (!this.db) return;
         const connectedRef = this.db.ref('.info/connected');
         let wasOnline = null;
         connectedRef.on('value', (snapshot) => {
@@ -166,6 +174,7 @@ class FirebaseSync {
 FirebaseSync.prototype.saveGymSessions = async function(gymSessions) {
     try {
         const obj = {};
+        if (!this.db) { Store.set('gymSessions', gymSessions); return; }
         gymSessions.forEach(s => { obj[s.id] = s; });
         await this.db.ref('gymSessions').set(obj);
         Store.set('gymSessions', gymSessions);
@@ -177,6 +186,7 @@ FirebaseSync.prototype.saveGymSessions = async function(gymSessions) {
 };
 
 FirebaseSync.prototype.onGymSessionsChange = function(callback) {
+    if (!this.db) return;
     this.db.ref('gymSessions').on('value', snapshot => {
         const data = snapshot.val();
         const sessions = data ? Object.values(data) : [];
@@ -189,6 +199,7 @@ FirebaseSync.prototype.onGymSessionsChange = function(callback) {
 FirebaseSync.prototype.saveTestSessions = async function(testSessions) {
     try {
         const obj = {};
+        if (!this.db) { Store.set('testSessions', testSessions); return; }
         testSessions.forEach(s => { obj[s.id] = s; });
         await this.db.ref('testSessions').set(obj);
         Store.set('testSessions', testSessions);
@@ -200,6 +211,7 @@ FirebaseSync.prototype.saveTestSessions = async function(testSessions) {
 };
 
 FirebaseSync.prototype.onTestSessionsChange = function(callback) {
+    if (!this.db) return;
     this.db.ref('testSessions').on('value', snapshot => {
         const data = snapshot.val();
         const sessions = data ? Object.values(data) : [];
@@ -212,6 +224,7 @@ FirebaseSync.prototype.onTestSessionsChange = function(callback) {
 FirebaseSync.prototype.saveWellnessData = async function(wellnessData) {
     try {
         const obj = {};
+        if (!this.db) { Store.set('wellnessData', wellnessData); return; }
         wellnessData.forEach(w => { obj[w.id] = w; });
         await this.db.ref('wellness').set(obj);
         Store.set('wellness', wellnessData);
@@ -223,6 +236,7 @@ FirebaseSync.prototype.saveWellnessData = async function(wellnessData) {
 };
 
 FirebaseSync.prototype.onWellnessChange = function(callback) {
+    if (!this.db) return;
     this.db.ref('wellness').on('value', snapshot => {
         const data = snapshot.val();
         const entries = data ? Object.values(data) : [];
@@ -250,6 +264,7 @@ FirebaseSync.prototype.migrateStrengthData = async function() {
 FirebaseSync.prototype.saveInjuries = async function(injuries) {
     try {
         const obj = {};
+        if (!this.db) { Store.set('injuries', injuries); return; }
         injuries.forEach(inj => { obj[inj.id] = inj; });
         await this.db.ref('injuries').set(obj);
         Store.set('injuries', injuries);
@@ -261,6 +276,7 @@ FirebaseSync.prototype.saveInjuries = async function(injuries) {
 };
 
 FirebaseSync.prototype.onInjuriesChange = function(callback) {
+    if (!this.db) return;
     this.db.ref('injuries').on('value', snapshot => {
         const data = snapshot.val();
         const injuries = data ? Object.values(data) : [];
@@ -272,6 +288,7 @@ FirebaseSync.prototype.onInjuriesChange = function(callback) {
 
 FirebaseSync.prototype.saveWeekPlan = async function(weekPlan) {
     try {
+        if (!this.db) { Store.set('weekPlan', weekPlan); return; }
         await this.db.ref('weekPlan').set(weekPlan);
         Store.set('weekPlan', weekPlan);
     } catch (e) {
@@ -284,6 +301,7 @@ FirebaseSync.prototype.saveWeekPlan = async function(weekPlan) {
 FirebaseSync.prototype.saveClinicalNotes = async function(notes) {
     try {
         const obj = {};
+        if (!this.db) { Store.set('clinicalNotes', notes); return; }
         notes.forEach(n => { obj[n.id] = n; });
         await this.db.ref('clinicalNotes').set(obj);
         Store.set('clinicalNotes', notes);
@@ -295,6 +313,7 @@ FirebaseSync.prototype.saveClinicalNotes = async function(notes) {
 };
 
 FirebaseSync.prototype.onClinicalNotesChange = function(callback) {
+    if (!this.db) return;
     this.db.ref('clinicalNotes').on('value', snapshot => {
         const data = snapshot.val();
         const notes = data ? Object.values(data) : [];
@@ -305,6 +324,7 @@ FirebaseSync.prototype.onClinicalNotesChange = function(callback) {
 FirebaseSync.prototype.saveSeasonBlocks = async function(blocks) {
     try {
         const obj = {};
+        if (!this.db) { Store.set('seasonBlocks', blocks || []); return; }
         (blocks || []).forEach(b => { obj[b.id] = b; });
         await this.db.ref('seasonBlocks').set(obj);
         Store.set('seasonBlocks', blocks || []);
@@ -316,6 +336,7 @@ FirebaseSync.prototype.saveSeasonBlocks = async function(blocks) {
 };
 
 FirebaseSync.prototype.loadSeasonBlocks = function(callback) {
+    if (!this.db) { if (callback) callback([]); return; }
     this.db.ref('seasonBlocks').once('value', snapshot => {
         const data = snapshot.val();
         const blocks = data ? Object.values(data) : [];
@@ -435,6 +456,7 @@ FirebaseSync.prototype._setPendingIndicator = function(count) {
 // ========== SEASON BLOCKS — change listener (missing in prior versions) ==========
 
 FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
+    if (!this.db) return;
     this.db.ref('seasonBlocks').on('value', snapshot => {
         const data = snapshot.val();
         const blocks = data ? Object.values(data) : [];
@@ -464,7 +486,8 @@ window.firebaseSync = new FirebaseSync();
 // ── Anamnesis ──────────────────────────────────────────────
 FirebaseSync.prototype.saveAnamnesis = async function(playerId, data) {
     try {
-        await this.db.ref(`anamnesis/${playerId}`).set(data);
+        if (!this.db) { return; }
+    await this.db.ref(`anamnesis/${playerId}`).set(data);
         Store.set(`anamnesis_${playerId}`, data);
     } catch (e) {
         console.error('Error saving anamnesis:', e);
@@ -473,6 +496,7 @@ FirebaseSync.prototype.saveAnamnesis = async function(playerId, data) {
 };
 
 FirebaseSync.prototype.loadAnamnesis = function(playerId, callback) {
+    if (!this.db) { callback(null); return; }
     this.db.ref(`anamnesis/${playerId}`).once('value', snapshot => {
         const val = snapshot.val();
         if (val) { callback(val); return; }

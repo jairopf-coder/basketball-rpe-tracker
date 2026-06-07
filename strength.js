@@ -216,7 +216,7 @@ RPETracker.prototype.renderGymView = function() {
             <div class="str-player-card" onclick="window.rpeTracker._openGymPlayer('${p.id}')">
                 <div class="str-player-avatar" style="background:${color}">${p.name.charAt(0).toUpperCase()}</div>
                 <div class="str-player-info">
-                    <div class="str-player-name">${p.name}${p.number ? ` <span class="str-num">#${p.number}</span>` : ''} ${pendingBadge}</div>
+                    <div class="str-player-name">${esc(p.name)}${p.number ? ` <span class="str-num">#${esc(p.number)}</span>` : ''} ${pendingBadge}</div>
                     <div class="str-player-meta">${last ? `Última sesión: ${last.date}` : 'Sin sesiones de gimnasio'}</div>
                     <div class="str-player-vol">${volLine}</div>
                 </div>
@@ -386,7 +386,7 @@ RPETracker.prototype._buildGymProgressHTML = function(playerId, color) {
         const ex = (this.exerciseLibrary || []).find(e => e.id === exId);
         return `<button class="test-tab-btn ${exId === this._gymProgressTab ? 'active' : ''}"
             onclick="window.rpeTracker._gymProgressTab='${exId}';window.rpeTracker._renderGymPlayer(document.getElementById('gymView'))">
-            ${ex ? ex.name : exId}
+            ${ex ? esc(ex.name) : esc(exId)}
         </button>`;
     }).join('');
 
@@ -488,7 +488,7 @@ RPETracker.prototype._buildGymSuggestions = function(playerId) {
 
         if (stagnant) suggestions.push({
             type: 'warning', icon: '⚠️',
-            title: `Estancamiento en ${ex.name}`,
+            title: `Estancamiento en ${esc(ex.name)}`,
             body: 'Sin progresión en las últimas 3 sesiones ejecutadas. Considera cambiar el estímulo.'
         });
 
@@ -496,7 +496,7 @@ RPETracker.prototype._buildGymSuggestions = function(playerId) {
         const progress  = rm1Last > rm1Prev ? `↑ +${(rm1Last-rm1Prev).toFixed(0)} 1RM estimado` : '';
         suggestions.push({
             type: 'info', icon: '🎯',
-            title: `${ex.name} — peso sugerido`,
+            title: `${esc(ex.name)} — peso sugerido`,
             body: `~${sugWeight} kg para RPE 7 (1RM est. ${rm1Last.toFixed(0)} kg). ${progress}`
         });
     });
@@ -974,7 +974,7 @@ RPETracker.prototype._renderStep1 = function() {
         const on = activeSet.includes(ex.id);
         return `<button class="gym-ex-chip ${on?'gym-ex-chip--active':''}"
             onclick="window.rpeTracker._toggleExercise('${ex.id}')">
-            ${on?'✓ ':''}${ex.name}
+            ${on?'✓ ':''}${esc(ex.name)}
         </button>`;
     }).join('');
 
@@ -1523,7 +1523,7 @@ RPETracker.prototype._renderLibraryModal = function(modal) {
     const sectionsHTML = Object.entries(cats).map(([cat, label]) => {
         const items = (byCategory[cat] || []).map(ex => `
             <div class="lib-row" id="librow_${ex.id}">
-                <span class="lib-ex-name">${ex.name}</span>
+                <span class="lib-ex-name">${esc(ex.name)}</span>
                 <span class="lib-ex-meta">${ex.bilateral ? 'Bilateral' : 'Unilateral'}</span>
                 <div class="lib-row-actions">
                     <button class="lib-btn lib-btn--edit" onclick="window.rpeTracker._editExercise('${ex.id}')">✏️</button>
@@ -1596,10 +1596,10 @@ RPETracker.prototype._deleteExercise = function(exId) {
     });
 };
 
-RPETracker.prototype._editExercise = function(exId) {
+RPETracker.prototype._editExercise = async function(exId) {
     const ex = (this.exerciseLibrary || []).find(e => e.id === exId);
     if (!ex) return;
-    const newName = prompt('Nuevo nombre para el ejercicio:', ex.name);
+    const newName = await AppPrompt.show('Nuevo nombre para el ejercicio:', ex.name, 'Renombrar ejercicio');
     if (!newName || !newName.trim()) return;
     ex.name = newName.trim();
     this._saveExercises();
@@ -1639,7 +1639,7 @@ RPETracker.prototype.renderTestsView = function() {
             <div class="str-player-card" onclick="window.rpeTracker._openTestPlayer('${p.id}')">
                 <div class="str-player-avatar" style="background:${color}">${p.name.charAt(0).toUpperCase()}</div>
                 <div class="str-player-info">
-                    <div class="str-player-name">${p.name}${p.number ? ` <span class="str-num">#${p.number}</span>` : ''}</div>
+                    <div class="str-player-name">${esc(p.name)}${p.number ? ` <span class="str-num">#${esc(p.number)}</span>` : ''}</div>
                     <div class="str-player-meta">${last ? `Último test: ${last.date}` : 'Sin tests registrados'}</div>
                 </div>
                 ${badge}
@@ -1745,9 +1745,21 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                     </div>
                 </div>`;
             }
+            // Team percentile badge
+            const _teamVals = (this.testSessions || [])
+                .filter(s => s.results?.[testId]?.value != null && s.playerId !== player.id)
+                .map(s => s.results[testId].value);
+            let _percBadge = '';
+            if (_teamVals.length >= 2 && val.value != null) {
+                const _below = _teamVals.filter(v => v < val.value).length;
+                const _perc  = Math.round((_below / _teamVals.length) * 100);
+                const _percColor = _perc >= 60 ? 'var(--color-success,#639922)' : _perc >= 35 ? 'var(--color-warning,#EF9F27)' : 'var(--color-danger,#E24B4A)';
+                _percBadge = `<span style="font-size:10px;font-weight:500;padding:1px 6px;border-radius:10px;background:${_percColor}18;color:${_percColor};border:1px solid ${_percColor}44">P${_perc} equipo</span>`;
+            }
             return `<div class="test-summary-card">
                 <div class="test-summary-name">${def.name}</div>
                 <div class="test-summary-value">${val.value != null ? val.value + def.unit : '—'}</div>
+                ${_percBadge}
             </div>`;
         }).join('');
         return `<div class="str-section">

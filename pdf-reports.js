@@ -248,7 +248,7 @@ RPETracker.prototype.buildReportHTML = function(player, report, reportType) {
 <body>
     <div class="header">
         <h1>🏀 Informe ${reportTitle}</h1>
-        <div class="subtitle">${player.name}${player.number ? ` #${player.number}` : ''}</div>
+        <div class="subtitle">${esc(player.name)}${player.number ? ` #${esc(player.number)}` : ''}</div>
         <div class="date-range">
             ${report.startDate.toLocaleDateString('es-ES')} - ${report.endDate.toLocaleDateString('es-ES')}
         </div>
@@ -405,7 +405,7 @@ RPETracker.prototype.buildSessionsTable = function(sessions) {
             <td style="text-align: center; font-weight: bold; color: ${this.getRPEColor(s.rpe)}">${s.rpe}</td>
             <td style="text-align: center;">${s.duration || 60}</td>
             <td style="text-align: center; font-weight: bold;">${s.load || (s.rpe * (s.duration || 60))}</td>
-            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${s.notes || '-'}</td>
+            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${esc(s.notes || '-')}</td>
         </tr>
     `).join('');
     
@@ -495,7 +495,7 @@ RPETracker.prototype.exportSessionsHistoryPDF = function() {
         const ratio = this.calculateAcuteChronicRatio(p.id);
         const ratioCol = this.getRatioColor(ratio.ratio);
         return `<tr>
-            <td><strong>${p.name}</strong>${p.number?` #${p.number}`:''}</td>
+            <td><strong>${esc(p.name)}</strong>${p.number?` #${esc(p.number)}`:''}</td>
             <td style="text-align:center">${ps.length}</td>
             <td style="text-align:center">${avgRPE}</td>
             <td style="text-align:center">${totalLoad.toLocaleString('es-ES')}</td>
@@ -517,7 +517,7 @@ RPETracker.prototype.exportSessionsHistoryPDF = function() {
             <td style="text-align:center;font-weight:700;color:${rpeColor(s.rpe)}">${s.rpe}</td>
             <td style="text-align:center">${s.duration||60}</td>
             <td style="text-align:center;font-weight:600">${load.toLocaleString('es-ES')}</td>
-            <td style="font-size:0.85em;color:#555">${s.notes||''}</td>
+            <td style="font-size:0.85em;color:#555">${esc(s.notes||'')}</td>
         </tr>`;
     }).join('');
 
@@ -703,7 +703,7 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
         const injNote   = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
         const injLabel  = injNote ? (injNote.location ? this.getLocationName(injNote.location) : 'lesión activa') : '';
         return `<tr>
-            <td class="td-name">${player.name}${player.number ? ` <span class="num">#${player.number}</span>` : ''}</td>
+            <td class="td-name">${esc(player.name)}${player.number ? ` <span class="num">#${esc(player.number)}</span>` : ''}</td>
             <td class="td-num">${ua7d ? ua7d.toLocaleString('es-ES') : '—'}</td>
             <td class="td-ratio ${ratioCls}">${ratio.ratio !== 'N/A' ? ratio.ratio : '—'}</td>
             <td class="td-num">${wsDisplay}</td>
@@ -1063,7 +1063,7 @@ RPETracker.prototype.generatePlayerReport = function(playerId) {
 <div class="rpt-header">
   <div class="rpt-avatar">${avatarLetter}</div>
   <div>
-    <div class="rpt-name">${player.name}${player.number ? ` <span style="opacity:.6;font-size:.8em">#${player.number}</span>` : ''}</div>
+    <div class="rpt-name">${esc(player.name)}${player.number ? ` <span style="opacity:.6;font-size:.8em">#${esc(player.number)}</span>` : ''}</div>
     <div class="rpt-sub">Informe individual · ${new Date().toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' })}</div>
   </div>
   <div class="rpt-meta">

@@ -320,6 +320,19 @@
                     </div>
 
                     <div class="form-group">
+                        <label>🗓️ Temporada</label>
+                        <div class="season-selector-row">
+                            <select id="sessionSeason" class="season-select">
+                                <!-- Se llenará dinámicamente -->
+                            </select>
+                            <span id="newSeasonInputWrap" style="display:none;gap:6px;align-items:center;flex:1">
+                                <input type="text" id="newSeasonInput" class="season-new-input"
+                                       placeholder="ej. 2025-26" maxlength="10">
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
                         <label>🕐 Momento del día</label>
                         <div class="session-type-toggle">
                             <input type="radio" id="timeMorning" name="sessionTime" value="morning" checked>
@@ -581,7 +594,8 @@
     <script src="chart.js"></script>
     <script src="app.js"></script>
     <script src="backup.js"></script>
-    <script src="improvements.js"></script>
+    <script src="ewma-calculator.js"></script>
+    <script src="dashboard-renderer.js"></script>
     <script src="calendar.js"></script>
     <script src="pdf-reports.js"></script>
     <script src="injury-prediction.js"></script>
@@ -594,6 +608,7 @@
     <script src="strength.js"></script>
     <script src="anamnesis.js"></script>
     <script src="team-load.js"></script>
+    <script src="player-view.js"></script>
     <script src="auth.js"></script>
     <script>
         function toggleAdvancedFilters() {

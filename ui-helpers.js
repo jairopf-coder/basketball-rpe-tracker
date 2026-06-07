@@ -14,7 +14,7 @@ RPETracker.prototype.showTemplateManager = function() {
         ? this.templates.map(t => `
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; margin-bottom: 0.5rem;">
                 <div>
-                    <strong>${t.name}</strong><br>
+                    <strong>${esc(t.name)}</strong><br>
                     <small style="color: var(--gray);">
                         RPE ${t.rpe} | ${t.duration}min | ${t.type === 'training' ? '🏀 Entrenamiento' : '🏟️ Partido'} | 
                         ${t.timeOfDay === 'morning' ? '☀️ Mañana' : '🌙 Tarde'}

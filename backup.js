@@ -86,7 +86,7 @@ RPETracker.prototype.restoreBackup = function(event) {
     reader.onload = (e) => {
         try {
             const backup = JSON.parse(e.target.result);
-            if (!backup.players || !backup.sessions) { alert('❌ Archivo de backup inválido'); return; }
+            if (!Array.isArray(backup.players) || !Array.isArray(backup.sessions)) { AppAlert.show('❌ Archivo de backup inválido: formato incorrecto'); return; }
             AppConfirm.show({title:'¿Restaurar backup?',message:`Backup del ${new Date(backup.exportDate).toLocaleDateString('es-ES')}. Esto REEMPLAZARÁ todos los datos actuales.`,confirmText:'Restaurar',cancelText:'Cancelar',danger:true}).then(ok=>{ if(ok) {
                 this.players      = backup.players;
                 this.sessions     = backup.sessions;
@@ -98,7 +98,7 @@ RPETracker.prototype.restoreBackup = function(event) {
                 this.showToast('✅ Datos restaurados correctamente');
                 setTimeout(() => location.reload(), 1500);
             }});
-        } catch (err) { alert('❌ Error al leer el archivo: ' + err.message); }
+        } catch (err) { AppAlert.show('❌ Error al leer el archivo: ' + err.message); }
     };
     reader.readAsText(file);
     event.target.value = '';
@@ -196,9 +196,9 @@ RPETracker.prototype.loadSeasonArchive = function(event) {
     reader.onload = (e) => {
         try {
             const data = JSON.parse(e.target.result);
-            if (!data.players || !data.sessions) { alert('❌ Archivo no reconocido'); return; }
+            if (!data.players || !data.sessions) { AppAlert.show('❌ Archivo no reconocido'); return; }
             this._showSeasonViewer(data, file.name);
-        } catch (err) { alert('❌ Error al leer: ' + err.message); }
+        } catch (err) { AppAlert.show('❌ Error al leer: ' + err.message); }
     };
     reader.readAsText(file);
     event.target.value = '';
@@ -228,7 +228,7 @@ RPETracker.prototype._showSeasonViewer = function(data, filename) {
         const inj = (data.injuries||[]).filter(i=>i.playerId===p.id).length;
         const wCount = (data.wellnessData||[]).filter(w=>w.playerId===p.id).length;
         return `<tr class="sv-player-row">
-            <td class="sv-td sv-td--name">${p.name}${p.number?` <span class="sv-number">#${p.number}</span>`:''}</td>
+            <td class="sv-td sv-td--name">${esc(p.name)}${p.number?` <span class="sv-number">#${esc(p.number)}</span>`:''}</td>
             <td class="sv-td sv-td--center">${ps.length}</td>
             <td class="sv-td sv-td--center sv-td--rpe">${rpe7}</td>
             <td class="sv-td sv-td--center">${load.toLocaleString('es-ES')}</td>

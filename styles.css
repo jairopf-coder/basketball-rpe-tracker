@@ -3816,11 +3816,104 @@ header h1 {
 .um-role-staff  { background: rgba(255,152,0,0.15); color: #ff9800; }
 .um-role-fisio  { background: rgba(33,150,243,0.15); color: #2196f3; }
 .um-role-player { background: rgba(76,175,80,0.15);  color: #4caf50; }
+.um-edit-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 0.2rem; border-radius: 4px; transition: color 0.15s; }
+.um-edit-btn:hover { color: var(--accent, #2196f3); }
 .um-delete-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 0.2rem; border-radius: 4px; transition: color 0.15s; }
 .um-delete-btn:hover { color: var(--danger, #f44336); }
 
 /* ===== ESTILOS PIN LEGACY (mantenidos por si acaso) ===== */
 .pin-error { color: #f44336; font-size: 0.85rem; }
+
+/* ===== PLAYER VIEW (jugadora autenticada) ===== */
+#player-view-screen {
+    min-height: 100vh; min-height: 100dvh;
+    background: var(--bg-app);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.pv-container  { max-width: 480px; margin: 0 auto; padding: 2rem 1.25rem 5rem; }
+.pv-header     { text-align: center; margin-bottom: 2rem; }
+.pv-logo       { font-size: 2.5rem; }
+.pv-title      { font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0 0.25rem; color: var(--text-primary); }
+.pv-subtitle   { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
+
+/* Preguntas */
+.pv-question   { background: var(--bg-surface); border-radius: 14px; border: 1px solid var(--border); padding: 1.25rem; margin-bottom: 1rem; }
+.pv-q-label    { font-weight: 700; font-size: 1rem; margin-bottom: 2px; color: var(--text-primary); }
+.pv-q-sub      { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem; }
+
+/* RPE slider */
+.pv-rpe-wrap   { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.pv-rpe-slider {
+    -webkit-appearance: none; appearance: none;
+    flex: 1; height: 6px; border-radius: 4px;
+    background: linear-gradient(to right, var(--rpe-color, var(--primary)) 0%, var(--rpe-color, var(--primary)) var(--val, 50%), var(--border) var(--val, 50%));
+    outline: none; cursor: pointer;
+}
+.pv-rpe-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--rpe-color, var(--primary));
+    border: 3px solid var(--bg-surface);
+    box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    cursor: grab;
+}
+.pv-rpe-slider::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--rpe-color, var(--primary));
+    border: 3px solid var(--bg-surface);
+    box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    cursor: grab;
+}
+.pv-rpe-badge  {
+    min-width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; font-weight: 800;
+    background: var(--border); color: var(--text-faint);
+    flex-shrink: 0; transition: background 0.2s, color 0.2s;
+}
+.pv-rpe-desc   { font-size: 0.88rem; font-weight: 600; text-align: center; margin-bottom: 0.5rem; transition: color 0.2s; }
+.pv-rpe-ticks  { display: flex; justify-content: space-between; padding: 0 2px; }
+.pv-rpe-ticks span { font-size: 0.7rem; font-weight: 700; }
+
+/* Escala de botones wellness */
+.pv-scale      { display: flex; gap: 0.4rem; }
+.pv-scale-btn  {
+    flex: 1; padding: 0.55rem 0.2rem; border: 2px solid var(--border);
+    border-radius: 10px; background: var(--bg-surface); cursor: pointer;
+    text-align: center; transition: border-color 0.15s, background 0.15s;
+    touch-action: manipulation; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 16px; /* evitar autozoom iOS */
+}
+.pv-scale-btn:hover  { border-color: var(--primary); }
+.pv-scale-btn.selected { background: var(--primary); border-color: var(--primary); color: #fff; }
+.pv-scale-num  { font-size: 1.05rem; font-weight: 700; line-height: 1; }
+.pv-scale-lbl  { font-size: 0.6rem; line-height: 1.2; }
+
+/* Campo fecha */
+.pv-date-row   { display: flex; align-items: center; gap: 0.75rem; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border); padding: 0.85rem 1rem; margin-bottom: 1rem; }
+.pv-date-label { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); white-space: nowrap; }
+.pv-date-input { flex: 1; border: none; background: transparent; color: var(--text-primary); font-size: 16px; text-align: right; outline: none; cursor: pointer; }
+
+/* Botón Registrar */
+.pv-submit     { width: 100%; padding: 1rem; background: var(--primary); color: #fff; border: none; border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 0.25rem; transition: opacity 0.2s; }
+.pv-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+.pv-submit:not(:disabled):active { opacity: 0.85; }
+
+/* Confirmación */
+.pv-done-icon  { font-size: 4rem; text-align: center; margin-bottom: 1rem; }
+.pv-done-title { font-size: 1.5rem; font-weight: 700; text-align: center; margin: 0 0 0.5rem; color: var(--text-primary); }
+.pv-done-sub   { color: var(--text-muted); text-align: center; font-size: 0.9rem; margin-bottom: 2rem; }
+
+/* Error / logout */
+.pv-error      { color: var(--danger, #c62828); font-size: 0.85rem; text-align: center; margin-bottom: 0.5rem; }
+.pv-logout     { display: block; margin: 2rem auto 0; background: none; border: none; color: var(--text-faint); font-size: 0.82rem; cursor: pointer; padding: 0.5rem; }
+
+/* Dark mode overrides */
+[data-theme="dark"] .pv-question   { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .pv-scale-btn  { background: var(--bg-surface); border-color: var(--border-input); color: var(--text-primary); }
+[data-theme="dark"] .pv-scale-btn.selected { background: var(--primary); border-color: var(--primary); color: #fff; }
+[data-theme="dark"] .pv-date-row   { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .pv-rpe-slider { background: var(--bg-elevated, var(--bg-surface)); }
 
 /* ===== PANTALLA DE WELLNESS ===== */
 #wellness-screen {
@@ -7555,7 +7648,71 @@ details[open] .ewma-toggle-hint { display: none; }
     cursor: pointer;
 }
 .ac-curve-chart-wrap { position: relative; height: 300px; }
-.ac-curve-legend { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.5rem; }
+.ac-curve-legend { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Season comparison row */
+.ac-season-compare-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0 0.25rem;
+    border-top: 1px solid var(--border);
+    margin-top: 0.5rem;
+}
+.ac-season-label {
+    font-size: 0.75rem;
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+.ac-season-sep {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 0 0.15rem;
+}
+.ac-season-sel {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    cursor: pointer;
+    min-width: 90px;
+}
+
+/* Session modal — season selector */
+.season-selector-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.season-select {
+    flex: 1;
+    padding: 0.55rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.season-select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+.season-new-input {
+    flex: 1;
+    padding: 0.55rem 0.75rem;
+    border: 1.5px solid var(--primary);
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-size: max(16px, 0.9rem); /* evita auto-zoom iOS */
+}
+.season-new-input:focus { outline: none; border-color: var(--primary); }
 
 /* Injury trend tab */
 .inj-trend-wrap { padding: 1rem 1.25rem; }

@@ -116,7 +116,7 @@ RPETracker.prototype.showDaySessions = function(year, month, day) {
     const date    = new Date(year, month, day);
     const entries = this.sessions.filter(s => new Date(s.date).toDateString() === date.toDateString());
 
-    if (entries.length === 0) { alert('No hay sesiones en este día'); return; }
+    if (entries.length === 0) { AppAlert.show('No hay sesiones en este día'); return; }
 
     const slots     = this.groupSessionsBySlot(entries);
     const slotLabel = { morning: 'Mañana', afternoon: 'Tarde', evening: 'Noche' };
@@ -162,7 +162,7 @@ RPETracker.prototype.showDaySessions = function(year, month, day) {
             .forEach(entry => {
                 const player = this.players.find(p => p.id === entry.playerId);
                 const name   = player
-                    ? `${player.name}${player.number ? ' <span class="db-num">#' + player.number + '</span>' : ''}`
+                    ? `${esc(player.name)}${player.number ? ' <span class="db-num">#' + esc(player.number) + '</span>' : ''}`
                     : 'Desconocida';
                 const ratio  = this.calculateAcuteChronicRatio(entry.playerId);
                 const rColor = this.getRatioColor(ratio.ratio);
@@ -174,7 +174,7 @@ RPETracker.prototype.showDaySessions = function(year, month, day) {
                         <td><span style="color:${this.getRPEColor(entry.rpe)};font-weight:700;">${entry.rpe}</span></td>
                         <td>${load}</td>
                         <td><span style="color:${rColor};font-weight:600;">${ratio.ratio}</span></td>
-                        ${hasNotes ? `<td class="cal-modal-notes">${entry.notes || '—'}</td>` : ''}
+                        ${hasNotes ? `<td class="cal-modal-notes">${esc(entry.notes || '—')}</td>` : ''}
                     </tr>
                 `;
             });
@@ -349,7 +349,7 @@ RPETracker.prototype.renderSeasonBlocksManager = function() {
                     <span class="season-block-icon">${t.icon}</span>
                     <span class="season-block-label" style="color:${t.color}">${t.label}</span>
                     <span class="season-block-dates">${b.start} → ${b.end}</span>
-                    ${b.note ? `<span class="season-block-note">${b.note}</span>` : ''}
+                    ${b.note ? `<span class="season-block-note">${esc(b.note)}</span>` : ''}
                     ${isActive ? `<span class="season-active-badge">● Activo</span>` : ''}
                     <button class="btn-icon-sm" onclick="window.rpeTracker?.deleteSeasonBlock('${b.id}')" title="Eliminar">🗑️</button>
                 </div>
@@ -418,8 +418,8 @@ RPETracker.prototype.openSeasonBlockModal = function(blockId) {
         const end   = modal.querySelector('#sbEnd').value;
         const note  = modal.querySelector('#sbNote').value.trim();
 
-        if (!start || !end) { alert('Introduce fechas de inicio y fin'); return; }
-        if (end < start)    { alert('La fecha fin debe ser posterior al inicio'); return; }
+        if (!start || !end) { AppAlert.show('Introduce fechas de inicio y fin'); return; }
+        if (end < start)    { AppAlert.show('La fecha fin debe ser posterior al inicio'); return; }
 
         if (!this.seasonBlocks) this.seasonBlocks = [];
 

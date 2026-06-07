@@ -1,93 +1,75 @@
 {
   "rules": {
-    ".read":  false,
+    ".read": false,
     ".write": false,
-
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'staff'",
-
-        "displayName": {
-          ".write": "auth != null && auth.uid === $uid"
-        },
-        "email": {
-          ".write": "auth != null && auth.uid === $uid"
-        },
-        "photoURL": {
-          ".write": "auth != null && auth.uid === $uid"
-        },
-
+        "displayName": { ".write": "auth != null && auth.uid === $uid" },
+        "email":       { ".write": "auth != null && auth.uid === $uid" },
+        "photoURL":    { ".write": "auth != null && auth.uid === $uid" },
         "role": {
           ".read":  "auth != null && auth.uid === $uid",
           ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'staff'"
         },
-
         "playerLink": {
           ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'staff'"
         }
       }
     },
-
     "players": {
-      ".read":  "auth != null",
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
-
     "sessions": {
-      ".read":  "auth != null",
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
-
     "wellness": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+    "wellnessPlayer": {
       "$uid": {
-        ".write": "auth != null && auth.uid === $uid"
+        ".read":  "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')"
       }
     },
-
     "injuries": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
-
     "strength": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
-
     "gymSessions": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
-
     "testSessions": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
-
     "weekPlan": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
-
     "clinicalNotes": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
-
     "seasonBlocks": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
-
     "anamnesis": {
       "$pid": {
         ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
         ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
       }
     },
-
     "$other": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"

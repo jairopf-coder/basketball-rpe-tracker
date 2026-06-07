@@ -172,7 +172,7 @@ const PlayerTokens = {
     avatar(player, sizePx = 40, fontSize = '1rem', extraClass = '') {
         const color = this.get(player);
         const initials = this._initials(player.name);
-        return `<div class="player-token-avatar ${extraClass}" style="width:${sizePx}px;height:${sizePx}px;font-size:${fontSize};background:${color}" title="${player.name}">${initials}</div>`;
+        return `<div class="player-token-avatar ${extraClass}" style="width:${sizePx}px;height:${sizePx}px;font-size:${fontSize};background:${color}" title="${esc(player.name)}">${esc(initials)}</div>`;
     },
 
     /** CSS inline style string to set --player-token on a parent element */
@@ -816,7 +816,7 @@ class RPETracker {
 
     openNewSessionModal() {
         if (this.players.length === 0) {
-            alert('⚠️ Primero debes añadir jugadoras en la sección "Jugadoras"');
+            AppAlert.show('⚠️ Primero debes añadir jugadoras en la sección "Jugadoras"');
             return;
         }
         this.selectedPlayerIds = [];
@@ -1286,7 +1286,7 @@ class RPETracker {
                 <div class="detail-row">
                     <span class="detail-label">Incidencias</span>
                 </div>
-                <div class="detail-notes">${session.notes}</div>
+                <div class="detail-notes">${esc(session.notes)}</div>
             ` : '<div class="detail-notes" style="font-style: italic; color: var(--text-faint);">Sin incidencias registradas</div>'}
             ${playerSessions.length >= 2 ? `
             <div class="detail-rpe-hist-section">
@@ -1703,10 +1703,10 @@ class RPETracker {
             const st = getStatus(ratio.ratio, player.id);
             const ratioDisplay = ratio.ratio === 'N/A' ? '—' : ratio.ratio;
             const avatar = PlayerTokens.avatar(player, 22, '0.6rem');
-            return `<div class="sema-pill" style="--sema-color:${st.color}" title="${player.name} · Ratio A:C ${ratioDisplay} · ${st.label}"
+            return `<div class="sema-pill" style="--sema-color:${st.color}" title="${esc(player.name)} · Ratio A:C ${ratioDisplay} · ${st.label}"
                 onclick="window.rpeTracker?.scrollToPlayerChart('${player.id}')">
                 ${avatar}
-                <span class="sema-name">${player.name}${player.number ? ' <span class="sema-num">#'+player.number+'</span>' : ''}</span>
+                <span class="sema-name">${esc(player.name)}${player.number ? ' <span class="sema-num">#'+esc(player.number)+'</span>' : ''}</span>
                 <span class="sema-ratio">${ratioDisplay}</span>
                 <span class="sema-dot" style="background:${st.color}"></span>
             </div>`;
@@ -2971,21 +2971,21 @@ class RPETracker {
                 alerts.push({
                     type: 'danger',
                     icon: '🚨',
-                    title: `ALERTA: ${player.name}`,
+                    title: `ALERTA: ${esc(player.name)}`,
                     message: `Ratio A:C de ${ratio.ratio} - Alto riesgo de lesión. Reducir carga inmediatamente.`
                 });
             } else if (r > _tAl.opt) {
                 alerts.push({
                     type: 'warning',
                     icon: '⚠️',
-                    title: `Precaución: ${player.name}`,
+                    title: `Precaución: ${esc(player.name)}`,
                     message: `Ratio A:C de ${ratio.ratio} - Riesgo moderado. Monitorizar carga de cerca.`
                 });
             } else if (r < _tAl.low && ratio.sessions7d > 0) {
                 alerts.push({
                     type: 'info',
                     icon: 'ℹ️',
-                    title: `Descarga: ${player.name}`,
+                    title: `Descarga: ${esc(player.name)}`,
                     message: `Ratio A:C de ${ratio.ratio} - Puede estar perdiendo condición.`
                 });
             }
@@ -4069,7 +4069,7 @@ const PushNotifications = {
             if (r > thresh.high) {
                 alertCount++;
                 await this.send(
-                    `🔴 Alerta carga — ${player.name}`,
+                    `🔴 Alerta carga — ${esc(player.name)}`,
                     `Ratio A:C: ${ratio.ratio} — revisar carga`,
                     `ac-alert-${pid}`
                 );
@@ -4108,6 +4108,10 @@ const PushNotifications = {
 // ========== WELLNESS DAILY REMINDER ==========
 const WellnessReminder = {
     _intervalId: null,
+
+    stop() {
+        if (this._intervalId) { clearInterval(this._intervalId); this._intervalId = null; }
+    },
 
     start() {
         if (this._intervalId) return; // already running
@@ -4250,7 +4254,7 @@ RPETracker.prototype.handleEditSessionSubmit = function(e) {
     const session = this.sessions.find(s => s.id === sessionId);
     
     if (!session) {
-        alert('❌ Sesión no encontrada');
+        AppAlert.show('❌ Sesión no encontrada');
         return;
     }
     
@@ -4329,7 +4333,7 @@ RPETracker.prototype.handleEditPlayerSubmit = function(e) {
     const player = this.players.find(p => p.id === playerId);
 
     if (!player) {
-        alert('❌ Jugadora no encontrada');
+        AppAlert.show('❌ Jugadora no encontrada');
         return;
     }
 
@@ -4471,12 +4475,16 @@ RPETracker.prototype.saveTemplates = function() {
     localStorage.setItem('basketballTemplates', JSON.stringify(this.templates || []));
 };
 
-RPETracker.prototype.createTemplate = function() {
-    const name = prompt('Nombre de la plantilla:\n(ej: "Entrenamiento técnico estándar")');
+RPETracker.prototype.createTemplate = async function() {
+    const name = await AppPrompt.show('Nombre de la plantilla:', 'Entrenamiento técnico estándar', 'Nueva plantilla');
     if (!name) return;
     
-    const rpe = parseInt(prompt('RPE típico (1-10):', '6'));
-    const duration = parseInt(prompt('Duración en minutos:', '60'));
+    const rpeRaw = await AppPrompt.show('RPE típico (1-10):', '6', 'Nueva plantilla');
+    const rpe = parseInt(rpeRaw);
+    if (isNaN(rpe) || rpe < 1 || rpe > 10) { this.showToast('RPE debe ser entre 1 y 10'); return; }
+    const durRaw = await AppPrompt.show('Duración en minutos:', '60', 'Nueva plantilla');
+    const duration = parseInt(durRaw);
+    if (isNaN(duration) || duration < 1 || duration > 300) { this.showToast('Duración inválida (1-300 min)'); return; }
     const type = 'training'; // Template type now set in session form
     const timeOfDay = 'afternoon'; // Template timeOfDay now set in session form
     

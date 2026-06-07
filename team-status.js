@@ -57,7 +57,7 @@ RPETracker.prototype.renderTeamStatus = function() {
             <div class="ts-card ${borderClass}">
                 <div class="ts-card-avatar">${player.name.charAt(0).toUpperCase()}</div>
                 <div class="ts-card-info">
-                    <div class="ts-card-name">${player.name}${player.number ? ` <span class="ts-num">#${player.number}</span>` : ''}</div>
+                    <div class="ts-card-name">${esc(player.name)}${player.number ? ` <span class="ts-num">#${esc(player.number)}</span>` : ''}</div>
                     <div class="ts-card-status">${statusText}</div>
                 </div>
                 <div class="ts-card-meta">
@@ -352,10 +352,24 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
 
     </body></html>`;
 
-    const w = window.open('', '_blank');
-    w.document.write(html);
-    w.document.close();
-    setTimeout(() => w.print(), 500);
+    // ── Web Share API (móvil) → fallback a print ──
+    const blob = new Blob([html], { type: 'text/html' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], 'informe.html', { type: 'text/html' })] })) {
+        const file = new File([blob], `informe-semanal-${todayKey}.html`, { type: 'text/html' });
+        navigator.share({ title: `Informe semanal ${dateRange}`, files: [file] })
+            .then(() => this.showToast('✅ Informe compartido', 'success'))
+            .catch(() => { /* user cancelled or error — fallback to print */ _printFallback(); });
+    } else {
+        _printFallback();
+    }
+
+    function _printFallback() {
+        const w = window.open('', '_blank');
+        if (!w) { AppAlert.show('Permite pop-ups para abrir el informe.'); return; }
+        w.document.write(html);
+        w.document.close();
+        setTimeout(() => w.print(), 500);
+    }
     this.showToast('📄 Informe semanal generado', 'success');
 };
 

@@ -17,6 +17,8 @@ const AppAuth = {
     isStaffOrFisio() { return this.isStaff() || this.isFisio(); },
 
     logout() {
+        // Detener reminder antes de limpiar sesión
+        if (window.WellnessReminder) WellnessReminder.stop();
         const auth = window.firebaseAuth;
         if (auth) {
             auth.signOut().catch(() => {});
@@ -312,7 +314,7 @@ const AppAuth = {
 
         if (!displayName) { this._umError('Escribe el nombre completo.'); return; }
         if (!emailRaw)    { this._umError('Escribe el email o nombre de usuario.'); return; }
-        if (!password || password.length < 6) { this._umError('La contraseña debe tener al menos 6 caracteres.'); return; }
+        if (!password || password.length < 8) { this._umError('La contraseña debe tener al menos 8 caracteres.'); return; }
 
         btn.disabled    = true;
         btn.textContent = 'Creando…';
@@ -400,7 +402,7 @@ const AppAuth = {
 
             container.innerHTML = rows;
         } catch (e) {
-            container.innerHTML = `<div style="color:var(--danger)">Error cargando usuarios: ${e.message}</div>`;
+            container.innerHTML = `<div style="color:var(--danger)">Error cargando usuarios: ${esc(e.message)}</div>`;
         }
     },
 
@@ -424,7 +426,7 @@ const AppAuth = {
             await window.firebaseDB.ref(`users/${uid}`).remove();
             this._loadUserList();
         } catch (e) {
-            alert(`Error al eliminar: ${e.message}`);
+            AppAlert.show(`Error al eliminar: ${esc(e.message)}`);
         }
     },
 

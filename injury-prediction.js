@@ -309,9 +309,9 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                     return `
                     <div class="pred-mini-chip ${isSel ? 'pred-mini-chip--selected' : ''}"
                         style="--chip-color:${p.colorHex}"
-                        title="${player.name}${player.number ? ' #' + player.number : ''} · ${p.riskLevel === 'unknown' ? 'Sin datos' : p.probability + '% riesgo'}"
+                        title="${esc(player.name)}${player.number ? ' #' + esc(player.number) : ''} · ${p.riskLevel === 'unknown' ? 'Sin datos' : p.probability + '% riesgo'}"
                         onclick="window._rpeTracker._predToggleSelect('${player.id}')">
-                        ${player.name.split(' ')[0]}
+                        ${esc(player.name.split(' ')[0])}
                         ${isSel ? '<span class="pred-mini-check">✓</span>' : ''}
                     </div>`;
                 }).join('')}
@@ -421,7 +421,7 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                              onclick="window._rpeTracker._predToggleExpand('${player.id}')">
                             <div class="pred-collapsed-left">
                                 <div class="pred-player-name">
-                                    ${player.name}
+                                    ${esc(player.name)}
                                     ${player.number ? `<span class="pred-player-num">#${player.number}</span>` : ''}
                                 </div>
                                 <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
@@ -441,7 +441,7 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                             <div class="pred-card-header">
                                 <div class="pred-player-info">
                                     <div class="pred-player-name">
-                                        ${player.name}
+                                        ${esc(player.name)}
                                         ${player.number ? `<span class="pred-player-num">#${player.number}</span>` : ''}
                                     </div>
                                     <div class="pred-level-badge pred-level-badge--${pred.riskLevel}">${levelLabel}</div>

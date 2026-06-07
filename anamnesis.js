@@ -297,10 +297,10 @@ window.AnamnesisModule = {
     }
     tbody.innerHTML = list.map((inj, i) => `
       <tr>
-        <td>${inj.zone || '—'}</td>
+        <td>${esc(inj.zone || '—')}</td>
         <td><span class="ana-badge" style="background:${markColor(inj.type)}">${MARK_TYPES.find(t=>t.id===inj.type)?.label||inj.type}</span></td>
-        <td>${inj.date || '—'}</td>
-        <td>${inj.description || '—'}</td>
+        <td>${esc(inj.date || '—')}</td>
+        <td>${esc(inj.description || '—')}</td>
         <td>${inj.downtime ? inj.downtime + ' sem.' : '—'}</td>
         <td>
           <button class="btn-icon btn-icon--sm" style="background:#f44336;color:white" 
@@ -359,11 +359,11 @@ window.AnamnesisModule = {
     }
 
     tip.innerHTML = `
-      <div class="bmt-type" style="color:${col}">● ${typeLabel}</div>
-      <div class="bmt-zone">${zone?.label || mark.zoneId}</div>
-      ${mark.date ? `<div class="bmt-row"><span>Fecha:</span> ${mark.date}</div>` : ''}
-      ${mark.downtime ? `<div class="bmt-row"><span>Baja:</span> ${mark.downtime} semanas</div>` : ''}
-      ${mark.description ? `<div class="bmt-desc">${mark.description}</div>` : ''}
+      <div class="bmt-type" style="color:${esc(col)}">● ${esc(typeLabel)}</div>
+      <div class="bmt-zone">${esc(zone?.label || mark.zoneId)}</div>
+      ${mark.date ? `<div class="bmt-row"><span>Fecha:</span> ${esc(mark.date)}</div>` : ''}
+      ${mark.downtime ? `<div class="bmt-row"><span>Baja:</span> ${esc(String(mark.downtime))} semanas</div>` : ''}
+      ${mark.description ? `<div class="bmt-desc">${esc(mark.description)}</div>` : ''}
     `;
     tip.style.display = 'block';
     this._positionTooltip(tip, e);
@@ -402,7 +402,7 @@ window.AnamnesisModule = {
         <div class="bmf-existing-item">
           <span style="color:${markColor(m.type)}">●</span>
           ${MARK_TYPES.find(t=>t.id===m.type)?.label||m.type}
-          ${m.date ? `· ${m.date}` : ''}
+          ${m.date ? `· ${esc(m.date)}` : ''}
           <button class="bmf-del" data-mid="${m.id}">✕</button>
         </div>`).join('')}
       <hr style="margin:0.5rem 0;border-color:var(--border)">

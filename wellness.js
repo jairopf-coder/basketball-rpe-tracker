@@ -359,7 +359,7 @@ RPETracker.prototype._renderWHistory = function() {
                             <td style="font-size:.82rem">${dot(w.mood)}</td>
                             <td style="font-size:.82rem">${dot(w.soreness)}</td>
                             <td><strong style="color:${this._wColor(o)}">${o.toFixed(1)}</strong></td>
-                            <td style="font-size:.78rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.notes||'—'}</td>
+                            <td style="font-size:.78rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.notes||'—')}</td>
                             <td><button class="btn-icon-sm" onclick="window.rpeTracker?._deleteWellness('${w.id}')">🗑️</button></td>
                         </tr>`;
                     }).join('')}
