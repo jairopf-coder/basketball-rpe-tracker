@@ -182,7 +182,15 @@ const AppAuth = {
     // ==========================================
     init() {
         if (!window.firebaseAuth) {
-            console.error('firebaseAuth no disponible. Revisa firebase-config.js');
+            // Firebase Auth puede no estar listo todavía (carga de SDK externa lenta).
+            // Reintentamos hasta 10 veces con incremento de 200 ms antes de rendirnos.
+            if (!this._authRetries) this._authRetries = 0;
+            this._authRetries++;
+            if (this._authRetries <= 10) {
+                setTimeout(() => this.init(), this._authRetries * 200);
+                return;
+            }
+            console.error('firebaseAuth no disponible tras varios intentos. Revisa firebase-config.js');
             this.showLoginScreen('Error de configuración. Recarga la página.');
             return;
         }
