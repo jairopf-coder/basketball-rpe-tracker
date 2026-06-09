@@ -141,7 +141,7 @@ RPETracker.prototype.renderDashboard = function() {
                     <div class="db-bar-lo"></div>
                     <div class="db-bar-hi"></div>
                 </div>
-                <div class="db-player-ratio" style="color:${st.color}">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
+                <div class="db-player-ratio" style="color:${st.color}">${ratio.confidence === 'low' ? '<span class="badge-insuf" title="' + (ratio.message||'Datos insuficientes') + '">⚠️ Insuf.</span>' : ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
                 <div class="db-player-icon">${st.icon}</div>
                 <div class="db-player-wellness" style="color:${wColor};background:${wBg}">${wScore}</div>
                 <div class="db-player-readiness ${rdyLbl.cls}" title="Readiness: ${rdyTxt}/100" style="color:${rdyLbl.color};background:${rdyLbl.bg}">${rdyLbl.icon} ${rdyTxt}</div>
@@ -194,8 +194,8 @@ RPETracker.prototype.renderDashboard = function() {
             </div>`;
 
     // ── Alert banner data ──────────────────────────────────────
-    const alertPlayers = players.filter(p => { const _t=this.getPlayerThresholds(p.player.id); return parseFloat(p.ratio.ratio) > _t.high; });
-    const warnPlayers  = players.filter(p => { const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
+    const alertPlayers = players.filter(p => { if (p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); return parseFloat(p.ratio.ratio) > _t.high; });
+    const warnPlayers  = players.filter(p => { if (p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
     const pendingWellness = _pendingW.length;
 
     // ── C) Team-level A:C alert (3+ players simultaneously over individual threshold) ──
@@ -532,7 +532,7 @@ RPETracker.prototype._renderMatchDayView = function(availGroups, players) {
             </div>
             <div class="md-card-row">
                 <span class="md-lbl">Ratio</span>
-                <span class="md-val" style="color:${rColor}">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</span>
+                <span class="md-val" style="color:${rColor}">${ratio.confidence === 'low' ? '<span class="badge-insuf" title="' + (ratio.message||'Datos insuficientes') + '">⚠️ Insuf.</span>' : ratio.ratio === 'N/A' ? '—' : ratio.ratio}</span>
             </div>
             <div class="md-card-row">
                 <span class="md-lbl">Wellness</span>
@@ -552,7 +552,7 @@ RPETracker.prototype._renderMatchDayView = function(availGroups, players) {
     const todayW = wData.filter(e => e.date === today);
     const avgW   = todayW.length
         ? (todayW.reduce((s,e) => s + this._wOverall(e), 0) / todayW.length).toFixed(1) : '—';
-    const atRisk = players.filter(p => parseFloat(p.ratio.ratio) > this.getPlayerThresholds(p.player.id).high).length;
+    const atRisk = players.filter(p => p.ratio.confidence !== 'low' && parseFloat(p.ratio.ratio) > this.getPlayerThresholds(p.player.id).high).length;
 
     return `<div class="md-wrap">
         <div class="md-summary">
@@ -897,7 +897,7 @@ RPETracker.prototype.renderTeamRatios = function() {
                         <div class="rcard-status-label">${st.icon} ${st.label}</div>
                     </div>
                 </div>
-                <div class="rcard-ratio">${ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
+                <div class="rcard-ratio">${ratio.confidence === 'low' ? '<span class="badge-insuf" title="' + (ratio.message||'Datos insuficientes') + '">⚠️ Datos insuficientes</span>' : ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
                 <div class="rcard-bar-wrap">
                     <div class="rcard-bar">
                         <div class="rcard-bar-fill" style="width:${Math.min((parseFloat(ratio.ratio)||0)/2*100, 100)}%; background:${this.getRatioColor(ratio.ratio)};"></div>
@@ -921,3 +921,25 @@ RPETracker.prototype.renderTeamRatios = function() {
         <div class="rcard-grid">${cards}</div>`;
 };
 
+
+// ── badge-insuf styles (inyectado una vez al cargar el módulo) ─────────────
+(function() {
+    if (document.getElementById('badge-insuf-style')) return;
+    var s = document.createElement('style');
+    s.id = 'badge-insuf-style';
+    s.textContent = [
+        '.badge-insuf {',
+        '  display: inline-flex; align-items: center; gap: 3px;',
+        '  font-size: 11px; font-weight: 600;',
+        '  color: var(--color-warning, #f9a825);',
+        '  background: var(--color-warning-bg, #fffde7);',
+        '  border: 1px solid var(--color-warning, #f9a825);',
+        '  border-radius: 10px; padding: 1px 6px;',
+        '  cursor: default; white-space: nowrap;',
+        '}',
+        '[data-theme="dark"] .badge-insuf {',
+        '  color: #ffd54f; background: #3e3000; border-color: #ffd54f;',
+        '}'
+    ].join(' ');
+    document.head.appendChild(s);
+}());

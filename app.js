@@ -2985,7 +2985,7 @@ class RPETracker {
             const ratio = this.calculateAcuteChronicRatio(player.id);
             const r = parseFloat(ratio.ratio);
             
-            if (ratio.ratio === 'N/A') return;
+            if (ratio.ratio === 'N/A' || ratio.confidence === 'low') return;
             
             const _tAl = this.getPlayerThresholds(player.id);
             if (r > _tAl.high) {

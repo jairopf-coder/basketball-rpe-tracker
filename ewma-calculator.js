@@ -108,6 +108,8 @@ RPETracker.prototype.calculateAcuteChronicRatio = function(playerId) {
             acute: ewmaAcute,
             chronic: ewmaChronic,
             ratio: ratio > 0 ? ratio.toFixed(2) : 'N/A',
+            confidence: 'high',
+            message: '',
             sessions7d: acuteSessions.length,
             sessions21d: chronicSessions.length,
             totalLoad7d: Math.round(totalLoad7d),
