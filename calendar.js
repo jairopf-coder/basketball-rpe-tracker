@@ -193,19 +193,36 @@ RPETracker.prototype.showDaySessions = function(year, month, day) {
         `;
     }
 
+    const MODAL_ID = 'daySessionsModal';
+    const existingDay = document.getElementById(MODAL_ID);
+    if (existingDay) existingDay.remove();
+
+    const labelId = 'daySessionsTitle';
     const modal = document.createElement('div');
     modal.className = 'modal active';
+    modal.id = MODAL_ID;
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', labelId);
     modal.innerHTML = `
         <div class="modal-content cal-modal-content">
             <div class="modal-header">
-                <h2>Sesiones del ${day}/${month + 1}/${year}</h2>
-                <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
+                <h2 id="${labelId}">Sesiones del ${day}/${month + 1}/${year}</h2>
+                <button onclick="document.getElementById('${MODAL_ID}')?.remove()" class="btn-close" aria-label="Cerrar">&times;</button>
             </div>
             <div class="cal-modal-body">${html}</div>
         </div>
     `;
     document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+    const ftRelease = trapFocus(modal);
+
+    modal.addEventListener('click', e => {
+        if (e.target === modal) { ftRelease(); modal.remove(); }
+    });
+    modal.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { ftRelease(); modal.remove(); }
+    });
 };
 
 // ========== NAV ==========
@@ -372,37 +389,46 @@ RPETracker.prototype.openSeasonBlockModal = function(blockId) {
     const existing = blockId ? (this.seasonBlocks || []).find(b => b.id === blockId) : null;
     const types = this._seasonBlockTypes;
 
+    const MODAL_ID = 'seasonBlockModal';
+    const prevModal = document.getElementById(MODAL_ID);
+    if (prevModal) prevModal.remove();
+
+    const labelId = 'seasonBlockModalTitle';
     const modal = document.createElement('div');
     modal.className = 'modal active';
+    modal.id = MODAL_ID;
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', labelId);
     modal.innerHTML = `
         <div class="modal-content" style="max-width:420px">
             <div class="modal-header">
-                <h2>${existing ? 'Editar bloque' : 'Nuevo bloque de temporada'}</h2>
-                <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
+                <h2 id="${labelId}">${existing ? 'Editar bloque' : 'Nuevo bloque de temporada'}</h2>
+                <button onclick="document.getElementById('${MODAL_ID}')?.remove()" class="btn-close" aria-label="Cerrar">&times;</button>
             </div>
             <div class="modal-body" style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem">
                 <div>
                     <label class="form-label">Tipo de bloque</label>
                     <select id="sbType" class="form-control">
-                        ${types.map(t => `<option value="${t.key}" ${existing?.type === t.key ? 'selected' : ''}>${t.icon} ${t.label}</option>`).join('')}
+                        ${types.map(t => `<option value="${t.key}" ${existing && existing.type === t.key ? 'selected' : ''}>${t.icon} ${t.label}</option>`).join('')}
                     </select>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
                     <div>
                         <label class="form-label">Fecha inicio</label>
-                        <input type="date" id="sbStart" class="form-control" value="${existing?.start || ''}">
+                        <input type="date" id="sbStart" class="form-control" value="${existing ? existing.start : ''}">
                     </div>
                     <div>
                         <label class="form-label">Fecha fin</label>
-                        <input type="date" id="sbEnd" class="form-control" value="${existing?.end || ''}">
+                        <input type="date" id="sbEnd" class="form-control" value="${existing ? existing.end : ''}">
                     </div>
                 </div>
                 <div>
                     <label class="form-label">Nota (opcional)</label>
-                    <input type="text" id="sbNote" class="form-control" placeholder="Ej: Liga ACB" value="${existing?.note || ''}">
+                    <input type="text" id="sbNote" class="form-control" placeholder="Ej: Liga ACB" value="${existing ? esc(existing.note || '') : ''}">
                 </div>
                 <div style="display:flex;gap:.5rem;justify-content:flex-end">
-                    <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancelar</button>
+                    <button class="btn-secondary" onclick="document.getElementById('${MODAL_ID}')?.remove()">Cancelar</button>
                     <button class="btn-primary" id="sbSaveBtn">Guardar</button>
                 </div>
             </div>
@@ -410,7 +436,15 @@ RPETracker.prototype.openSeasonBlockModal = function(blockId) {
     `;
 
     document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+    const ftRelease = trapFocus(modal);
+
+    modal.addEventListener('click', e => {
+        if (e.target === modal) { ftRelease(); modal.remove(); }
+    });
+    modal.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { ftRelease(); modal.remove(); }
+    });
 
     modal.querySelector('#sbSaveBtn').addEventListener('click', () => {
         const type  = modal.querySelector('#sbType').value;
@@ -430,6 +464,7 @@ RPETracker.prototype.openSeasonBlockModal = function(blockId) {
         }
 
         this.saveSeasonBlocks();
+        ftRelease();
         modal.remove();
         this.renderSeasonBlocksManager();
         // Refresh weekplan header badge if visible

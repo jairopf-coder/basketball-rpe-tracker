@@ -256,11 +256,14 @@ const AppAuth = {
         const modal = document.createElement('div');
         modal.className = 'modal active';
         modal.id = 'userMgmtModal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'userMgmtModalTitle');
         modal.innerHTML = `
             <div class="modal-content" style="max-width:520px">
                 <div class="modal-header">
-                    <h2>👥 Gestión de usuarios</h2>
-                    <button class="btn-close" onclick="document.getElementById('userMgmtModal').remove()">&times;</button>
+                    <h2 id="userMgmtModalTitle">👥 Gestión de usuarios</h2>
+                    <button class="btn-close" aria-label="Cerrar" onclick="document.getElementById('userMgmtModal').remove()">&times;</button>
                 </div>
 
                 <div class="um-section">
@@ -306,6 +309,16 @@ const AppAuth = {
             </div>
         `;
         document.body.appendChild(modal);
+
+        this._umFtRelease = trapFocus(modal);
+
+        modal.addEventListener('click', e => {
+            if (e.target === modal) { this._umFtRelease && this._umFtRelease(); modal.remove(); }
+        });
+        modal.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { this._umFtRelease && this._umFtRelease(); modal.remove(); }
+        });
+
         this._loadUserList();
     },
 
@@ -448,11 +461,14 @@ const AppAuth = {
             const modal = document.createElement('div');
             modal.className = 'modal active';
             modal.id = 'um-edit-modal';
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.setAttribute('aria-labelledby', 'umEditModalTitle');
             modal.innerHTML = `
                 <div class="modal-content" style="max-width:420px">
                     <div class="modal-header">
-                        <h2>✏️ Editar usuario</h2>
-                        <button class="btn-close" onclick="document.getElementById('um-edit-modal').remove()">&times;</button>
+                        <h2 id="umEditModalTitle">✏️ Editar usuario</h2>
+                        <button class="btn-close" aria-label="Cerrar" onclick="document.getElementById('um-edit-modal').remove()">&times;</button>
                     </div>
                     <div class="um-section">
                         <div class="form-group">
@@ -480,6 +496,15 @@ const AppAuth = {
                 </div>
             `;
             document.body.appendChild(modal);
+
+            const ftRelease = trapFocus(modal);
+
+            modal.addEventListener('click', e => {
+                if (e.target === modal) { ftRelease(); modal.remove(); }
+            });
+            modal.addEventListener('keydown', e => {
+                if (e.key === 'Escape') { ftRelease(); modal.remove(); }
+            });
         });
     },
 

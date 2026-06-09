@@ -395,6 +395,25 @@ class RPETracker {
                 }
             });
         });
+
+        // Cerrar modal activo con tecla Escape (WCAG 2.1 AA – criterio 2.1.2)
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const staticIds = [
+                'newSessionModal', 'detailModal', 'editSessionModal',
+                'addPlayerModal', 'editPlayerModal'
+            ];
+            for (const id of staticIds) {
+                const el = document.getElementById(id);
+                if (el && el.classList.contains('active')) {
+                    this.closeModal(id);
+                    return;
+                }
+            }
+            // Modales dinámicos (creados con createElement y class="modal active")
+            const dynModal = document.querySelector('.modal.active:not([id])');
+            if (dynModal) { dynModal.remove(); }
+        });
         
         // Edit session modal
         document.getElementById('editSessionBtn')?.addEventListener('click', () => {
@@ -1114,8 +1133,10 @@ class RPETracker {
             this.selectedPlayerIds = [];
             if (this._ftRelease) { this._ftRelease(); this._ftRelease = null; }
         }
-        if (modalId === 'addPlayerModal' && this._ftRelease2) { this._ftRelease2(); this._ftRelease2 = null; }
-        if (modalId === 'detailModal'    && this._ftRelease3) { this._ftRelease3(); this._ftRelease3 = null; }
+        if (modalId === 'addPlayerModal'    && this._ftRelease2) { this._ftRelease2(); this._ftRelease2 = null; }
+        if (modalId === 'detailModal'       && this._ftRelease3) { this._ftRelease3(); this._ftRelease3 = null; }
+        if (modalId === 'editSessionModal'  && this._ftRelease4) { this._ftRelease4(); this._ftRelease4 = null; }
+        if (modalId === 'editPlayerModal'   && this._ftRelease5) { this._ftRelease5(); this._ftRelease5 = null; }
         document.getElementById(modalId)?.classList.remove('active');
     }
     
@@ -4243,7 +4264,10 @@ RPETracker.prototype.editSession = function(sessionId) {
     ).join('');
     
     // Open modal
-    document.getElementById('editSessionModal').classList.add('active');
+    const _esModal = document.getElementById('editSessionModal');
+    _esModal.classList.add('active');
+    if (this._ftRelease4) { this._ftRelease4(); }
+    this._ftRelease4 = trapFocus(_esModal);
     this.closeModal('detailModal');
 };
 
@@ -4323,7 +4347,10 @@ RPETracker.prototype.editPlayer = function(playerId) {
     const currentColor = PlayerTokens.get(player);
     this._renderColorPicker('editPlayerColorPicker', 'editPlayerColor', currentColor);
 
-    document.getElementById('editPlayerModal').classList.add('active');
+    const _epModal = document.getElementById('editPlayerModal');
+    _epModal.classList.add('active');
+    if (this._ftRelease5) { this._ftRelease5(); }
+    this._ftRelease5 = trapFocus(_epModal);
 };
 
 RPETracker.prototype.handleEditPlayerSubmit = function(e) {
