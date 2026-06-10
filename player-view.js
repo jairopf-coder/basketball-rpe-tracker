@@ -1,6 +1,6 @@
 // ======================================================================
 // PLAYER VIEW — Vista exclusiva para rol 'player' en modo PWA instalada
-// Guarda en Firebase: /wellness/{uid}/{date}
+// Guarda en Firebase: /wellnessPlayer/{uid}/{date}
 // ======================================================================
 // Requiere: AppAuth, window.firebaseDB (opcional — funciona offline)
 // ======================================================================
@@ -79,6 +79,15 @@ const PlayerView = (() => {
         const uid  = AppAuth._currentUser?.uid;
         if (!uid) throw new Error('Usuario no autenticado');
 
+        // Intentar leer el playerId vinculado al usuario desde /users/{uid}/playerId
+        let playerId = null;
+        if (window.firebaseDB) {
+            try {
+                const snap = await window.firebaseDB.ref('users/' + uid + '/playerId').once('value');
+                playerId = snap.val() || null;
+            } catch (_) { /* offline — continuar sin playerId */ }
+        }
+
         const entry = {
             uid,
             date:    _state.date,
@@ -89,9 +98,10 @@ const PlayerView = (() => {
             pain:    _state.pain,
             ts:      new Date().toISOString(),
         };
+        if (playerId) entry.playerId = playerId;
 
-        // Nodo principal: /wellness/{uid}/{date}
-        const fbPath = `wellness/${uid}/${_state.date}`;
+        // Nodo principal: /wellnessPlayer/{uid}/{date}
+        const fbPath = `wellnessPlayer/${uid}/${_state.date}`;
 
         if (window.firebaseDB) {
             try {

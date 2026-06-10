@@ -244,6 +244,45 @@ FirebaseSync.prototype.onWellnessChange = function(callback) {
     });
 };
 
+// ========== WELLNESS PLAYER (nodo dedicado para rol jugadora) ==========
+
+/**
+ * Lee /wellnessPlayer/{uid} completo y llama callback(array).
+ * Cada entry tiene la forma {uid, date, rpe, sleep, fatigue, mood, pain, ts[, playerId]}.
+ */
+FirebaseSync.prototype.loadWellnessPlayer = function(uid, callback) {
+    if (!this.db) { callback([]); return; }
+    this.db.ref('wellnessPlayer/' + uid).once('value', function(snapshot) {
+        var val = snapshot.val();
+        var entries = val ? Object.values(val) : [];
+        callback(entries);
+    }, function(err) {
+        console.error('loadWellnessPlayer error:', err);
+        callback([]);
+    });
+};
+
+/**
+ * Escribe en /wellnessPlayer/{uid}/{date}.
+ * Retorna Promise.
+ */
+FirebaseSync.prototype.saveWellnessPlayer = function(uid, date, entry) {
+    if (!this.db) { return Promise.reject(new Error('DB no disponible')); }
+    return this.db.ref('wellnessPlayer/' + uid + '/' + date).set(entry);
+};
+
+/**
+ * Registra un listener en tiempo real para todos los entries de una jugadora.
+ * callback recibe el array de entries cada vez que cambia el nodo.
+ */
+FirebaseSync.prototype.onWellnessPlayerChange = function(uid, callback) {
+    if (!this.db) return;
+    this.db.ref('wellnessPlayer/' + uid).on('value', function(snapshot) {
+        var val = snapshot.val();
+        callback(val ? Object.values(val) : []);
+    });
+};
+
 // ========== GYM/TEST/WELLNESS MIGRATION ==========
 
 FirebaseSync.prototype.migrateStrengthData = async function() {

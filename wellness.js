@@ -12,14 +12,113 @@ RPETracker.prototype.loadWellnessData = function() {
         if (window.firebaseSync && !this._wellnessListenerSet) {
             this._wellnessListenerSet = true;
             window.firebaseSync.onWellnessChange(updated => {
-                this.wellnessData = updated;
+                this.wellnessData = this._mergeWellnessPlayer(updated, this._wellnessPlayerCache || []);
                 if (this.currentView === 'wellness') this.renderWellnessDashboard();
                 if (this.currentView === 'dashboard') this.renderDashboard();
                 if (window._devMode) console.log('🔄 Wellness actualizado desde Firebase');
             });
         }
+        // Registrar listener para wellnessPlayer de todas las jugadoras vinculadas
+        this._registerWellnessPlayerListeners();
         return data;
     } catch(e) { return []; }
+};
+
+/**
+ * Registra listeners en /wellnessPlayer/{uid} para cada jugadora que tenga
+ * authUid definido en su registro de player. Se llama una sola vez gracias
+ * al flag _wellnessPlayerListenersSet.
+ */
+RPETracker.prototype._registerWellnessPlayerListeners = function() {
+    if (this._wellnessPlayerListenersSet) return;
+    if (!window.firebaseSync || !window.firebaseDB) return;
+    this._wellnessPlayerListenersSet = true;
+    this._wellnessPlayerCache = this._wellnessPlayerCache || [];
+
+    // Escuchar el nodo completo /wellnessPlayer una sola vez.
+    // Cada clave de primer nivel es un uid; dentro, {date: entry}.
+    window.firebaseDB.ref('wellnessPlayer').on('value', snapshot => {
+        const val = snapshot.val() || {};
+        // Construir array plano con todos los entries, añadiendo uid si no está
+        const allEntries = [];
+        Object.keys(val).forEach(uid => {
+            const dateMap = val[uid] || {};
+            Object.values(dateMap).forEach(entry => {
+                if (entry && typeof entry === 'object') {
+                    allEntries.push(Object.assign({}, entry, { uid: entry.uid || uid }));
+                }
+            });
+        });
+        this._wellnessPlayerCache = allEntries;
+        // Mezclar con wellness staff sin duplicados
+        this.wellnessData = this._mergeWellnessPlayer(
+            this.wellnessData || [],
+            allEntries
+        );
+        if (this.currentView === 'wellness') this.renderWellnessDashboard();
+        if (this.currentView === 'dashboard') this.renderDashboard();
+        if (window._devMode) console.log('🔄 WellnessPlayer actualizado desde Firebase', allEntries.length, 'entries');
+    });
+};
+
+/**
+ * Mezcla entries del nodo staff (wellnessData) con entries del nodo jugadoras
+ * (wellnessPlayer), resolviendo duplicados por (playerId, date).
+ *
+ * Estrategia:
+ *  1. Los entries de staff (guardados manualmente) tienen prioridad.
+ *  2. Un entry de wellnessPlayer se convierte a formato staff:
+ *     - playerId: entry.playerId si existe, o se resuelve buscando en
+ *       this.players el jugador cuyo authUid === entry.uid.
+ *     - id generado: "wp_{uid}_{date}" para evitar colisiones con IDs staff.
+ *  3. Solo se añade si no existe ya un entry staff con mismo playerId+date.
+ *
+ * @param {Array} staffEntries  Entries del nodo /wellness (fuente staff).
+ * @param {Array} playerEntries Entries del nodo /wellnessPlayer (fuente jugadoras).
+ * @returns {Array} Array fusionado sin duplicados.
+ */
+RPETracker.prototype._mergeWellnessPlayer = function(staffEntries, playerEntries) {
+    if (!playerEntries || !playerEntries.length) return staffEntries;
+
+    // Construir un Set de claves "playerId|date" ya presentes en staffEntries
+    const staffKeys = new Set(
+        (staffEntries || [])
+            .filter(w => w.playerId && w.date)
+            .map(w => w.playerId + '|' + w.date)
+    );
+
+    const extras = [];
+    playerEntries.forEach(entry => {
+        if (!entry || !entry.date) return;
+
+        // Resolver playerId: campo explícito o búsqueda por authUid en this.players
+        let playerId = entry.playerId || null;
+        if (!playerId && entry.uid) {
+            const linked = (this.players || []).find(p => p.authUid === entry.uid);
+            if (linked) playerId = linked.id;
+        }
+        if (!playerId) return; // No se puede vincular — descartar silenciosamente
+
+        const key = playerId + '|' + entry.date;
+        if (staffKeys.has(key)) return; // Ya existe entrada staff — prioridad staff
+
+        // Convertir a formato wellness staff
+        extras.push({
+            id:       'wp_' + entry.uid + '_' + entry.date,
+            playerId: playerId,
+            date:     entry.date,
+            rpe:      entry.rpe  != null ? entry.rpe  : null,
+            sleep:    entry.sleep   != null ? entry.sleep   : null,
+            fatigue:  entry.fatigue != null ? entry.fatigue : null,
+            mood:     entry.mood    != null ? entry.mood    : null,
+            pain:     entry.pain    != null ? entry.pain    : null,
+            ts:       entry.ts || null,
+            source:   'player', // marca de origen para depuración
+        });
+        staffKeys.add(key); // evitar duplicados dentro de playerEntries
+    });
+
+    return (staffEntries || []).concat(extras);
 };
 
 RPETracker.prototype.saveWellnessData = function() {
