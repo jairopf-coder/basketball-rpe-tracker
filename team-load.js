@@ -91,6 +91,11 @@
         const monday = _currentMonday;
         const { matrix, weekDates } = computeWeekMatrix(sessions, players, monday);
 
+        const minMonday = getMondayOf(addDays(new Date(), -730));
+        const maxMonday = getMondayOf(addDays(new Date(), 183));
+        const atMin = toYMD(monday) <= toYMD(minMonday);
+        const atMax = toYMD(monday) >= toYMD(maxMonday);
+
         // ── Totales por día (suma de todos los jugadores) ────────────────────
         const teamTotals = weekDates.map((_, di) =>
             players.reduce((sum, p) => sum + (matrix[p.id]?.[di] || 0), 0)
@@ -109,9 +114,9 @@
         container.innerHTML = `
         <div class="tl-header">
             <div class="tl-nav">
-                <button class="tl-nav-btn" id="tlPrevWeek" aria-label="Semana anterior">‹</button>
+                <button class="tl-nav-btn" id="tlPrevWeek" aria-label="Semana anterior" ${atMin ? 'disabled' : ''}>‹</button>
                 <span class="tl-week-label">${weekLabel}</span>
-                <button class="tl-nav-btn" id="tlNextWeek" aria-label="Semana siguiente">›</button>
+                <button class="tl-nav-btn" id="tlNextWeek" aria-label="Semana siguiente" ${atMax ? 'disabled' : ''}>›</button>
             </div>
             <div class="tl-legend">
                 ${Object.values(ZONE).map(z => `
@@ -187,12 +192,18 @@
 
         // ── Eventos de navegación ────────────────────────────────────────────
         document.getElementById('tlPrevWeek')?.addEventListener('click', () => {
-            _currentMonday = addDays(_currentMonday, -7);
-            renderTeamLoad();
+            const prev = addDays(_currentMonday, -7);
+            if (toYMD(prev) >= toYMD(minMonday)) {
+                _currentMonday = prev;
+                renderTeamLoad();
+            }
         });
         document.getElementById('tlNextWeek')?.addEventListener('click', () => {
-            _currentMonday = addDays(_currentMonday, 7);
-            renderTeamLoad();
+            const next = addDays(_currentMonday, 7);
+            if (toYMD(next) <= toYMD(maxMonday)) {
+                _currentMonday = next;
+                renderTeamLoad();
+            }
         });
     }
 

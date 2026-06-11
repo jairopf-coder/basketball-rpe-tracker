@@ -282,7 +282,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
 
     // Navigation buttons
     document.getElementById('wpPrev')?.addEventListener('click', () => {
-        this.weekPlan.weekOffset = (this.weekPlan.weekOffset||0) - 1;
+        this.weekPlan.weekOffset = Math.max(-104, Math.min(52, (this.weekPlan.weekOffset||0) - 1));
         this.renderWeeklyPlanning();
     });
     document.getElementById('wpToday')?.addEventListener('click', () => {
@@ -290,7 +290,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
         this.renderWeeklyPlanning();
     });
     document.getElementById('wpNext')?.addEventListener('click', () => {
-        this.weekPlan.weekOffset = (this.weekPlan.weekOffset||0) + 1;
+        this.weekPlan.weekOffset = Math.max(-104, Math.min(52, (this.weekPlan.weekOffset||0) + 1));
         this.renderWeeklyPlanning();
     });
     document.getElementById('wpSave')?.addEventListener('click', () => {
@@ -451,7 +451,7 @@ RPETracker.prototype._wpSaveCurrentPlan = function() {
 
 RPETracker.prototype._wpChangeWeek = function(delta) {
     if (!this.weekPlan) this.loadWeekPlan();
-    this.weekPlan.weekOffset = (this.weekPlan.weekOffset||0) + delta;
+    this.weekPlan.weekOffset = Math.max(-104, Math.min(52, (this.weekPlan.weekOffset||0) + delta));
     this.renderWeeklyPlanning();
 };
 
@@ -958,7 +958,7 @@ RPETracker.prototype._buildCorrelationData = function(injuries) {
 
         // Check injuries this week
         injuries.forEach(inj => {
-            const injDate = new Date(inj.startDate);
+            const injDate = new Date(inj.startDate + 'T12:00:00');
             if (injDate>=wStart && injDate<wEnd) injuryWeeks.add(weeks-1-i);
         });
     }
@@ -971,7 +971,7 @@ RPETracker.prototype._buildCorrelationData = function(injuries) {
         const player = this.players.find(p=>p.id===inj.playerId);
         if (!player) return;
 
-        const injDate = new Date(inj.startDate);
+        const injDate = new Date(inj.startDate + 'T12:00:00');
         const week1Start = new Date(injDate); week1Start.setDate(week1Start.getDate()-7);
         const week2Start = new Date(injDate); week2Start.setDate(week2Start.getDate()-14);
 
@@ -1565,7 +1565,7 @@ RPETracker.prototype.renderMicrociclo = function() {
         d.setDate(d.getDate() + i);
         return d;
     });
-    const dayDateStrs = dayDates.map(d => d.toISOString().slice(0, 10));
+    const dayDateStrs = dayDates.map(d => toLocalISODate(d));
 
     // ── Planificado ───────────────────────────────────────────
     const intensityRPE = { none: 0, low: 4, medium: 6, high: 7.5, max: 9 };

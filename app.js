@@ -449,6 +449,15 @@ class RPETracker {
     }
 
     switchView(viewName) {
+        // Limpiar estado de vista 'gym' al navegar fuera
+        if (this.currentView === 'gym' && viewName !== 'gym') {
+            if (this._gymSub || this._gymPlayerId) {
+                this._gymSub = null; this._gymFilter = 'all';
+                const p = this.players.find(p => p.id === this._gymPlayerId);
+                if (!p) this._gymPlayerId = null;
+            }
+        }
+
         this.currentView = viewName;
 
         // Sync grouped nav
@@ -545,14 +554,53 @@ class RPETracker {
     handlePlayerSubmit(e) {
         e.preventDefault();
 
+        // Validar nombre
+        const rawName = document.getElementById('playerName').value;
+        const trimmedName = rawName.trim().slice(0, 60);
+        if (!trimmedName) {
+            this.showToast('❌ El nombre no puede estar vacío', 'error');
+            return;
+        }
+
+        // Validar dorsal (0–99 si se introduce)
+        const rawNumber = document.getElementById('playerNumber').value;
+        let playerNumber = null;
+        if (rawNumber !== '' && rawNumber !== null && rawNumber !== undefined) {
+            const num = parseInt(rawNumber, 10);
+            if (isNaN(num) || num < 0 || num > 99) {
+                this.showToast('❌ El dorsal debe estar entre 0 y 99', 'error');
+                return;
+            }
+            playerNumber = String(num);
+        }
+
+        // Detectar nombre duplicado (case-insensitive)
+        const duplicate = this.players.find(p => p.name.trim().toLowerCase() === trimmedName.toLowerCase());
+        if (duplicate) {
+            AppConfirm.show({
+                title: 'Nombre duplicado',
+                message: `Ya existe una jugadora llamada "${duplicate.name}". ¿Deseas añadir igualmente?`,
+                confirmText: 'Añadir',
+                cancelText: 'Cancelar'
+            }).then(ok => {
+                if (!ok) return;
+                this._doAddPlayer(trimmedName, playerNumber);
+            });
+            return;
+        }
+
+        this._doAddPlayer(trimmedName, playerNumber);
+    }
+
+    _doAddPlayer(name, number) {
         const chosenColor = document.getElementById('playerColor').value;
         const usedColors = this.players.map(p => p.color).filter(Boolean);
         const fallback = PlayerTokens.PALETTE.find(c => !usedColors.includes(c)) || PlayerTokens.PALETTE[this.players.length % PlayerTokens.PALETTE.length];
 
         const player = {
             id: Date.now().toString(),
-            name: document.getElementById('playerName').value,
-            number: document.getElementById('playerNumber').value || null,
+            name: name,
+            number: number,
             color: chosenColor || fallback,
             createdAt: new Date().toISOString()
         };
@@ -1056,6 +1104,11 @@ class RPETracker {
     }
 
     saveTeamSession() {
+        if (this._savingTeamSession) return;
+        this._savingTeamSession = true;
+        const saveBtn = document.querySelector('#newSessionModal .btn-primary');
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Guardando…'; }
+        try {
         const dateValue = document.getElementById('sessionDate').value;
         const timeOfDay = document.querySelector('input[name="sessionTime"]:checked').value;
         const timeString = timeOfDay === 'morning' ? 'T10:00:00' : 'T18:00:00';
@@ -1109,6 +1162,11 @@ class RPETracker {
         setTimeout(() => PushNotifications.checkACAlerts(this, _savedIds), 300);
 
         this.selectedPlayerIds = [];
+        } finally {
+            this._savingTeamSession = false;
+            const saveBtn = document.querySelector('#newSessionModal .btn-primary');
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Guardar sesión'; }
+        }
     }
     
     selectDuration(duration) {
@@ -1417,8 +1475,7 @@ class RPETracker {
     // Cuenta sesiones únicas de equipo (fecha + momento + tipo = 1 evento)
     countUniqueSessions(sessions) {
         const keys = new Set(sessions.map(s => {
-            const d = new Date(s.date);
-            const dateKey = d.toISOString().slice(0, 10);
+            const dateKey = s.date.slice(0, 10);
             return `${dateKey}_${s.timeOfDay || 'unknown'}_${s.type || 'training'}`;
         }));
         return keys.size;
@@ -1427,8 +1484,7 @@ class RPETracker {
     getUniqueSessions(sessions) {
         const seen = new Set();
         return sessions.filter(s => {
-            const d = new Date(s.date);
-            const key = `${d.toISOString().slice(0,10)}_${s.timeOfDay||'unknown'}_${s.type||'training'}`;
+            const key = `${s.date.slice(0,10)}_${s.timeOfDay||'unknown'}_${s.type||'training'}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
