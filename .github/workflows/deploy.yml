@@ -11,15 +11,21 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Inject Firebase config (from GitHub Secret)
+        env:
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
         run: |
-          cat > firebase-config.js << 'FBEOF'
-          const firebaseConfig = ${{ secrets.FIREBASE_CONFIG }};
-          if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
-          firebase.database().goOnline();
-          firebase.database().ref('.info/connected').on('value', () => {});
-          window.firebaseDB = firebase.database();
-          console.log("🟢 Firebase inicializado correctamente");
-          FBEOF
+          {
+            echo "const firebaseConfig = ${FIREBASE_CONFIG};"
+            echo "if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }"
+            echo "firebase.database().goOnline();"
+            echo "firebase.database().ref('.info/connected').on('value', function(){});"
+            echo "window.firebaseDB   = firebase.database();"
+            echo "window.firebaseAuth = firebase.auth();"
+            echo "if (window._devMode) console.log('🟢 Firebase inicializado correctamente (Auth + Database)');"
+          } > firebase-config.js
+          echo "=== firebase-config.js generado ==="
+          ls -la firebase-config.js
+          head -2 firebase-config.js
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
