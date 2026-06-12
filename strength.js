@@ -1945,7 +1945,7 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
     if (!this.testSessions) this._loadStrengthData();
 
     const playerOpts = this.players.map(p =>
-        `<option value="${p.id}" ${p.id === preselectedPlayerId ? 'selected' : ''}>${p.name}${p.number ? ' #'+p.number : ''}</option>`
+        `<option value="${p.id}" ${p.id === preselectedPlayerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ' #'+p.number : ''}</option>`
     ).join('');
     const today = new Date().toISOString().slice(0, 10);
 

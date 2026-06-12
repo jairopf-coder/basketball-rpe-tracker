@@ -484,7 +484,7 @@ RPETracker.prototype._renderWModal = function(today) {
                 <div class="form-group">
                     <label class="form-label">Jugadora</label>
                     <select id="wFormPlayer" class="form-select">
-                        ${this.players.map(p=>`<option value="${p.id}">${p.name}${p.number?` #${p.number}`:''}</option>`).join('')}
+                        ${this.players.map(p=>`<option value="${p.id}">${esc(p.name)}${p.number?` #${p.number}`:''}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">

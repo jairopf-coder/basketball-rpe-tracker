@@ -815,7 +815,7 @@ class RPETracker {
         
         if (filterSelect) {
             filterSelect.innerHTML = '<option value="all">Todas las jugadoras</option>' +
-                this.players.map(p => `<option value="${p.id}">${p.name}${p.number ? ` #${p.number}` : ''}</option>`).join('');
+                this.players.map(p => `<option value="${p.id}">${esc(p.name)}${p.number ? ` #${p.number}` : ''}</option>`).join('');
         }
     }
 
@@ -2414,7 +2414,7 @@ class RPETracker {
 
         const playerOptions = this.players
             .filter(p => rows.some(r => r.player.id === p.id))
-            .map(p => `<option value="${p.id}"${filterPlayer === p.id ? ' selected' : ''}>${p.name}</option>`)
+            .map(p => `<option value="${p.id}"${filterPlayer === p.id ? ' selected' : ''}>${esc(p.name)}</option>`)
             .join('');
 
         const tableRows = filteredRows.length === 0
@@ -3601,7 +3601,7 @@ class RPETracker {
         }
 
         const playerOptions = this.players.map(p =>
-            `<option value="${p.id}">${p.name}${p.number ? ' #'+p.number : ''}</option>`
+            `<option value="${p.id}">${esc(p.name)}${p.number ? ' #'+p.number : ''}</option>`
         ).join('');
 
         container.innerHTML = `
@@ -3630,7 +3630,7 @@ class RPETracker {
                         <label class="comp-label" id="labelB">Jugadora B</label>
                         <select class="comp-select" id="compPlayerB" onchange="window.rpeTracker?.updateComparison()">
                             ${this.players.map((p, i) =>
-                                `<option value="${p.id}" ${i===1?'selected':''}>${p.name}${p.number ? ' #'+p.number : ''}</option>`
+                                `<option value="${p.id}" ${i===1?'selected':''}>${esc(p.name)}${p.number ? ' #'+p.number : ''}</option>`
                             ).join('')}
                         </select>
                     </div>
@@ -4316,7 +4316,7 @@ RPETracker.prototype.editSession = function(sessionId) {
     // Populate player select
     const playerSelect = document.getElementById('editSessionPlayer');
     playerSelect.innerHTML = this.players.map(p => 
-        `<option value="${p.id}" ${p.id === session.playerId ? 'selected' : ''}>${p.name}${p.number ? ` #${p.number}` : ''}</option>`
+        `<option value="${p.id}" ${p.id === session.playerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ` #${p.number}` : ''}</option>`
     ).join('');
     
     // Open modal
