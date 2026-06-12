@@ -749,7 +749,7 @@ RPETracker.prototype._renderExecModal = function(modal) {
                     <h2>✅ Registrar ejecución — ${gs.date}</h2>
                 </div>
                 <button class="modal-close"
-                    onclick="document.getElementById('execModal').classList.remove('active')">✕</button>
+                    onclick="window.rpeTracker._execDraft={};window.rpeTracker._execSessions=[];document.getElementById('execModal').classList.remove('active')">✕</button>
             </div>
             <div class="modal-body" style="padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:75vh">
                 ${navHTML}
@@ -1244,12 +1244,21 @@ RPETracker.prototype._removeSet2 = function(exId,si) {
 
 // ── Guardar plan ──
 RPETracker.prototype._saveGymSession = function() {
+    if (this._savingGymSession) return;
+    this._savingGymSession = true;
+    const gymSaveBtn = document.querySelector('#gymSessionModal .btn-primary');
+    if (gymSaveBtn) { gymSaveBtn.disabled = true; gymSaveBtn.textContent = '⏳ Guardando…'; }
+    const _resetGymBtn = () => {
+        this._savingGymSession = false;
+        if (gymSaveBtn) { gymSaveBtn.disabled = false; gymSaveBtn.textContent = '💾 Guardar plan'; }
+    };
+
     const dateEl=document.getElementById('gymDate');
     const date=dateEl?dateEl.value:this._gymDate;
-    if (!date) { this.showToast('Selecciona la fecha','error'); return; }
+    if (!date) { this.showToast('Selecciona la fecha','error'); _resetGymBtn(); return; }
 
     const sel=this._gymModalPlayers.filter(p=>p.selected);
-    if (sel.length===0) { this.showToast('Selecciona al menos una jugadora','error'); return; }
+    if (sel.length===0) { this.showToast('Selecciona al menos una jugadora','error'); _resetGymBtn(); return; }
 
     const toEx = rows => rows.filter(r=>r.exId).map(r=>({
         exerciseId: r.exId,
@@ -1278,11 +1287,12 @@ RPETracker.prototype._saveGymSession = function() {
         saved++;
     });
 
-    if (saved===0) { this.showToast('Añade ejercicios con datos','error'); return; }
+    if (saved===0) { this.showToast('Añade ejercicios con datos','error'); _resetGymBtn(); return; }
     this._saveGymSessions();
     document.getElementById('gymSessionModal')?.classList.remove('active');
     this.showToast(`✅ Plan guardado para ${saved} jugadora${saved>1?'s':''}  — recuerda registrar la ejecución tras el entreno`,'success');
     if (this.currentView==='gym') this.renderGymView();
+    _resetGymBtn();
 };
 
 // ── Eliminar sesión ──
@@ -1629,7 +1639,7 @@ RPETracker.prototype.renderTestsView = function() {
             const tests = (this.testSessions || []).filter(s => s.playerId === p.id);
             const last = tests.sort((a,b) => b.date.localeCompare(a.date))[0];
             const color = PlayerTokens.get(p);
-            const weeksSince = last ? Math.floor((new Date() - new Date(last.date)) / (7*86400000)) : null;
+            const weeksSince = last ? Math.floor((new Date() - new Date(last.date + 'T12:00:00')) / (7*86400000)) : null;
             const badge = weeksSince === null
                 ? '<span class="str-badge str-badge--grey">Sin tests</span>'
                 : weeksSince > 8

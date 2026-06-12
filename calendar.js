@@ -114,7 +114,7 @@ RPETracker.prototype.renderCalendar = function(year, month) {
 
 RPETracker.prototype.showDaySessions = function(year, month, day) {
     const date    = new Date(year, month, day);
-    const entries = this.sessions.filter(s => new Date(s.date).toDateString() === date.toDateString());
+    const entries = this.sessions.filter(s => s.date.slice(0, 10) === toLocalISODate(date));
 
     if (entries.length === 0) { AppAlert.show('No hay sesiones en este día'); return; }
 

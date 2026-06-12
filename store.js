@@ -102,3 +102,16 @@ const Store = {
 };
 
 window.Store = Store;
+
+// ── Timezone-safe date utility ────────────────────────────────────────────────
+// new Date('YYYY-MM-DD') parses as UTC midnight, which shifts to the previous
+// day in negative-offset zones (UTC-1 … UTC-12).  Always use this function
+// instead of .toISOString().slice(0,10) when working with local calendar dates.
+function toLocalISODate(d) {
+    if (typeof d === 'string') return d.slice(0, 10);
+    var y   = d.getFullYear();
+    var m   = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+}
+window.toLocalISODate = toLocalISODate;

@@ -82,11 +82,46 @@ RPETracker.prototype.downloadBackup = function() {
 RPETracker.prototype.restoreBackup = function(event) {
     const file = event.target.files[0];
     if (!file) return;
+
+    // Validar extensión
+    if (!file.name.endsWith('.json')) {
+        AppAlert.show('❌ El archivo debe tener extensión .json');
+        event.target.value = '';
+        return;
+    }
+
+    // Validar tamaño máximo 10 MB
+    if (file.size > 10 * 1024 * 1024) {
+        AppAlert.show('❌ El archivo supera el tamaño máximo permitido (10 MB)');
+        event.target.value = '';
+        return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
             const backup = JSON.parse(e.target.result);
             if (!Array.isArray(backup.players) || !Array.isArray(backup.sessions)) { AppAlert.show('❌ Archivo de backup inválido: formato incorrecto'); return; }
+
+            // Validar estructura interna: players
+            for (let i = 0; i < backup.players.length; i++) {
+                const p = backup.players[i];
+                if (!p || typeof p.id !== 'string' || typeof p.name !== 'string') {
+                    AppAlert.show(`❌ Backup inválido: jugadora en posición ${i} no tiene id y name válidos`);
+                    return;
+                }
+            }
+
+            // Validar estructura interna: sessions
+            for (let i = 0; i < backup.sessions.length; i++) {
+                const s = backup.sessions[i];
+                if (!s || typeof s.id !== 'string' || typeof s.date !== 'string' ||
+                    typeof s.rpe !== 'number' || typeof s.duration !== 'number') {
+                    AppAlert.show(`❌ Backup inválido: sesión en posición ${i} no tiene los campos requeridos (id, date, rpe, duration)`);
+                    return;
+                }
+            }
+
             AppConfirm.show({title:'¿Restaurar backup?',message:`Backup del ${new Date(backup.exportDate).toLocaleDateString('es-ES')}. Esto REEMPLAZARÁ todos los datos actuales.`,confirmText:'Restaurar',cancelText:'Cancelar',danger:true}).then(ok=>{ if(ok) {
                 this.players      = backup.players;
                 this.sessions     = backup.sessions;

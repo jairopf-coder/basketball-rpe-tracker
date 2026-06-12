@@ -1,0 +1,35 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inject Firebase config (from GitHub Secret)
+        env:
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
+        run: |
+          {
+            echo "const firebaseConfig = ${FIREBASE_CONFIG};"
+            echo "if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }"
+            echo "firebase.database().goOnline();"
+            echo "firebase.database().ref('.info/connected').on('value', function(){});"
+            echo "window.firebaseDB   = firebase.database();"
+            echo "window.firebaseAuth = firebase.auth();"
+            echo "if (window._devMode) console.log('\xF0\x9F\x9F\xA2 Firebase inicializado correctamente (Auth + Database)');"
+          } > firebase-config.js
+          echo "=== firebase-config.js generado ==="
+          ls -la firebase-config.js
+          head -2 firebase-config.js
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          exclude_assets: '.github,*.md,*.TEMPLATE.js,server.js,deploy.md'

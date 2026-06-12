@@ -83,4 +83,4 @@ Creado con ❤️ para equipos de baloncesto que quieren optimizar sus cargas de
 
 ---
 
-**¿Te gusta este proyecto?** Dale una ⭐ en GitHub!
+**¿Te gusta este proyecto?*** Dale una ⭐ en GitHub!
