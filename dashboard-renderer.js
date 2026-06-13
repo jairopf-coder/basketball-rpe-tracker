@@ -446,6 +446,7 @@ RPETracker.prototype.renderDashboard = function() {
                 ${wellnessMiniSummary}
                 ${teamReadinessWidget}
                 ${teamFatigueWidget}
+                ${this._renderPlayerComparisonSection()}
             </div>
 
             <!-- Columna calendario -->
@@ -508,6 +509,9 @@ RPETracker.prototype.renderDashboard = function() {
         this._updateNavAlertBadge();
         // Render mini calendar column
         this.renderDashboardCalendar();
+        // Render comparativa de jugadoras (radar wellness)
+        this._renderComparisonRadar();
+        this._bindComparisonEvents();
     });
 };
 
