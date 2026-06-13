@@ -16,7 +16,7 @@ RPETracker.prototype.readinessLabel = function(score) {
 };
 
 // ── calculateAcuteChronicRatio ─────────────────────────────────────────────
-RPETracker.prototype.calculateAcuteChronicRatio = function(playerId) {
+RPETracker.prototype.calculateAcuteChronicRatio = function(playerId, minSessions = 7) {
         // Memoize result (invalidated via ACCache.invalidate() on save/delete)
         if (typeof ACCache !== 'undefined') {
             const cached = ACCache.get(playerId, this.sessions);
@@ -30,6 +30,8 @@ RPETracker.prototype.calculateAcuteChronicRatio = function(playerId) {
                 date: new Date(s.date),
                 load: (s.load || (s.rpe * (s.duration || 60))) * (s.type === 'match' ? MATCH_MULT : 1)
             }))
+            // Descartar sesiones con load no numérico o no positivo (datos corruptos/NaN)
+            .filter(s => Number.isFinite(s.load) && s.load > 0)
             .sort((a, b) => a.date - b.date); // Sort chronologically
         
         if (playerSessions.length === 0) {
@@ -37,8 +39,33 @@ RPETracker.prototype.calculateAcuteChronicRatio = function(playerId) {
                 acute: 0,
                 chronic: 0,
                 ratio: 'N/A',
+                confidence: 'low',
+                message: 'Datos insuficientes',
                 sessions7d: 0,
                 sessions21d: 0,
+                totalLoad7d: 0,
+                totalLoad21d: 0
+            };
+        }
+
+        // Sesiones en los últimos 28 días, usadas para el chequeo de confianza
+        const now = new Date();
+        const twentyEightDaysAgoCheck = new Date(now);
+        twentyEightDaysAgoCheck.setDate(twentyEightDaysAgoCheck.getDate() - 28);
+        const recentSessionsCount = playerSessions.filter(s => s.date >= twentyEightDaysAgoCheck).length;
+
+        if (recentSessionsCount < minSessions) {
+            return {
+                acute: 0,
+                chronic: 0,
+                ratio: 'N/A',
+                confidence: 'low',
+                message: 'Datos insuficientes',
+                sessions7d: playerSessions.filter(s => {
+                    const d = new Date(now); d.setDate(d.getDate() - 7);
+                    return s.date >= d;
+                }).length,
+                sessions21d: recentSessionsCount,
                 totalLoad7d: 0,
                 totalLoad21d: 0
             };
@@ -61,7 +88,6 @@ RPETracker.prototype.calculateAcuteChronicRatio = function(playerId) {
         let ewmaChronic = seedLoad;
 
         // Calculate EWMA for each day
-        const now = new Date();
         const maxDaysBack = 56; // Look back 56 days (8 weeks) for better chronic baseline
         
         for (let i = maxDaysBack; i >= 0; i--) {

@@ -68,74 +68,122 @@
 
 ---
 
-## 📁 Estructura de Archivos
+## 📁 Estructura de Archivos (actualizada V25)
 
-### Archivos Principales
+> Nota: las secciones siguientes describen la estructura tal como era en
+> versiones anteriores. Esta sección refleja el estado real a fecha
+> 12/06/2026 (25 archivos `.js`, ~19.400 líneas).
+
+### Núcleo
 ```
 BasketballRPE-Web/
-├── 📄 index.html           → Estructura HTML de la app
-├── 🎨 styles.css           → Estilos visuales
-├── ⚙️ app.js               → Lógica principal de la aplicación
-├── 🔥 firebase-config.js   → Configuración de Firebase (EDITAR AQUÍ)
-├── 🔄 firebase-sync.js     → Sincronización con Firebase
-├── 🌐 server.js            → Servidor local para desarrollo
-└── 📱 manifest.json        → Configuración PWA
+├── 📄 index.html           → Estructura HTML, modales, carga de scripts
+├── 🎨 styles.css           → Estilos, variables CSS (incluye dark mode)
+├── ⚙️ app.js               → Núcleo: constructor RPETracker, sesiones,
+│                              dashboard, navegación, modales, comparativas
+├── 🔥 firebase-config.js   → Generado en deploy desde el secreto
+│                              FIREBASE_CONFIG (no se commitea)
+├── 🔥 firebase-config.TEMPLATE.js → Plantilla de referencia
+├── 🔄 firebase-sync.js     → Acceso centralizado a Firebase
+│                              (incluye loadWellnessPlayer,
+│                              saveWellnessPlayer, onWellnessPlayerChange)
+├── 🔐 security.js          → esc(), AppAlert, AppPrompt, AppConfirm,
+│                              trapFocus()
+├── 💾 store.js             → Utilidades de almacenamiento y fechas
+│                              (toLocalISODate)
+└── 📱 manifest.json + sw.js → PWA y Service Worker (caché v23+)
 ```
 
-### Archivos de Ayuda
+### Autenticación y roles
 ```
-├── 🎯 EMPIEZA-AQUI.md           → Primera lectura
-├── ✅ CHECKLIST.md              → Pasos rápidos
-├── 📖 INSTRUCCIONES-FIREBASE.md → Guía completa
-├── 📚 README.md                 → Documentación
-└── 🏗️ ARQUITECTURA.md          → Este archivo
+├── 🔑 auth.js              → Firebase Authentication, login, gestión
+│                              de usuarios, roles staff/player
+└── 👤 player-view.js       → Vista restringida para jugadoras
+                               (wellness en /wellnessPlayer/{uid}/{date})
 ```
 
-### Módulos Adicionales
+### Módulos funcionales
 ```
-├── 📅 calendar.js          → Calendario de sesiones
-├── 🏥 injury-management.js → Gestión de lesiones
-├── 🔮 injury-prediction.js → Predicción de riesgos
-├── 💾 backup.js            → Backup y restauración
-├── 📊 chart.js             → Gráficos y visualizaciones
-└── 🛠️ improvements.js      → Mejoras continuas
+├── 📅 calendar.js              → Calendario de sesiones
+├── 🏥 injury-management.js      → Gestión de lesiones
+├── 🏥 injury-management-2.js    → Gestión de lesiones (parte 2)
+├── 🔮 injury-prediction.js      → Predicción de riesgos
+├── 📈 ewma-calculator.js        → Cálculo EWMA y ratio A:C
+│                                   (con minSessions y confidence)
+├── 📊 dashboard-renderer.js     → Renderizado del dashboard
+├── 🩺 wellness.js               → Wellness staff + merge con
+│                                   wellnessPlayer
+├── 🗓️ weekplan-medical.js       → Planificación semanal (microciclo)
+├── 🏋️ strength.js               → Gimnasio: plantillas, sesiones,
+│                                   ejecución
+├── 📋 anamnesis.js              → Anamnesis / historial médico
+├── 📊 team-load.js              → Carga de equipo, comparativas
+├── 🚦 team-status.js            → Estado general del equipo
+├── 🎨 ui-helpers.js             → Modales dinámicos reutilizables
+├── 📄 pdf-reports.js            → Generación de informes PDF (jsPDF)
+├── 💾 backup.js                 → Backup y restauración (con
+│                                   validación de estructura y tamaño)
+└── 📊 chart.js                  → Wrapper de gráficos (Chart.js)
 ```
+
+### Configuración y CI/CD
+```
+├── 🔥 firebase-rules.json   → Reglas de Firebase (incluye
+│                               wellnessPlayer/$uid)
+└── .github/workflows/
+    └── deploy.yml           → Build + deploy a gh-pages, inyecta
+                                firebase-config.js desde el secreto
+                                FIREBASE_CONFIG (incluye firebaseAuth)
+```
+
+> `improvements.js` fue eliminado en V23 (módulo obsoleto).
+> `sync-main.yml` fue eliminado (causaba bucle de sobrescritura de
+> `firebase-config.js`).
 
 ---
 
-## 🔐 Seguridad y Datos
+## 🔐 Seguridad y Datos (actualizado V25)
 
 ### ¿Dónde se guardan los datos?
 
-**Antes (localStorage):**
-- En el navegador de cada usuario
-- No se comparten
-- Se pierden si borras el navegador
-
-**Ahora (Firebase):**
-- En la nube de Google
-- Compartidos entre todos
-- Persistentes y con backup automático
+Todo en **Firebase Realtime Database**, en tiempo real y compartido
+entre todos los usuarios conectados.
 
 ### ¿Quién puede acceder?
 
-**Configuración actual (modo desarrollo):**
-```json
-{
-  "rules": {
-    ".read": true,   // Cualquiera con el enlace puede leer
-    ".write": true   // Cualquiera con el enlace puede escribir
-  }
-}
-```
+El proyecto usa **Firebase Authentication** (email/password) con dos
+roles:
 
-✅ **Perfecto para:** Equipos pequeños de confianza
-⚠️ **No usar para:** Datos sensibles médicos
+- **`staff`**: acceso completo (lectura/escritura de `sessions`,
+  `players`, `wellness`, lesiones, planificación, gimnasio, etc.)
+- **`player`**: acceso restringido vía la PWA. Solo puede leer/escribir
+  su propio wellness en `/wellnessPlayer/{uid}/{date}`. No tiene acceso
+  a `/sessions` ni `/players` en escritura.
 
-### Mejorar seguridad (opcional, futuro):
-- Añadir autenticación con Google
-- Limitar escritura a usuarios autorizados
-- Auditoría de cambios
+Las reglas (`firebase-rules.json`) reflejan esta separación: `sessions`
+y `players` restringidos a usuarios `staff`; `wellnessPlayer/$uid`
+permite lectura/escritura solo al propio `$uid` (más lectura para
+staff).
+
+⚠️ **Importante**: la API key de Firebase es pública por diseño (no es
+un secreto), pero `firebase-config.js` no se commitea — se genera en
+cada deploy desde el secreto `FIREBASE_CONFIG` de GitHub Actions, lo
+que facilita rotar la key si fuera necesario (ya se hizo una vez tras
+detectarla en el historial de Git).
+
+### Notas sobre el flujo de deploy
+
+- La rama `main` contiene el código fuente y los workflows.
+- El workflow `deploy.yml` (disparado por `push` a `main`) genera
+  `firebase-config.js` con el secreto y publica el contenido en la
+  rama `gh-pages` usando `peaceiris/actions-gh-pages`.
+- **GitHub Pages debe estar configurado como "Deploy from a branch:
+  gh-pages"** (no "GitHub Actions"), ya que el método de publicación
+  usado es un push directo a esa rama, no el flujo nativo
+  `actions/deploy-pages`.
+- No debe existir ningún workflow que sincronice `gh-pages → main`:
+  causaría que el `firebase-config.js` generado (un artefacto) se
+  cuele en el código fuente y provoque deploys inconsistentes.
 
 ---
 
