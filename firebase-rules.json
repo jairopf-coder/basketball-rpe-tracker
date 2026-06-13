@@ -24,7 +24,8 @@
     },
     "sessions": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".indexOn": ["date"]
     },
     "wellness": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
