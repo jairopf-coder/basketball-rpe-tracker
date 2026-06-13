@@ -735,25 +735,85 @@ class RPETracker {
         // Guard: registrar listener UNA sola vez para evitar acumulación y sobreescritura
         if (window.firebaseSync && !this._sessionsListenerSet) {
             this._sessionsListenerSet = true;
+            // Ventana inicial: bloque de ~4 meses de la temporada actual
+            // (ver getCurrentSeasonWindowStart en store.js). Reduce la carga
+            // inicial de /sessions cuando hay varios años de histórico.
+            this._sessionsWindowStart = getCurrentSeasonWindowStart();
             window.firebaseSync.onSessionsChange((updatedSessions) => {
                 // Ignorar el snapshot reactivo inmediato cuando somos nosotros quienes
                 // acabamos de hacer el write (evita que el listener machaque el push local)
                 if (this._savingSessions) return;
-                this.sessions = updatedSessions;
+                // Si ya se cargó el histórico completo, fusionar para no perder
+                // sesiones antiguas que el listener filtrado no incluye.
+                if (this._fullHistoryLoaded) {
+                    this.sessions = this._mergeSessionsById(updatedSessions, this.sessions);
+                } else {
+                    this.sessions = updatedSessions;
+                }
                 this.renderSessions();
                 if (this.currentView === 'dashboard') this.renderDashboard();
                 if (window._devMode) console.log('🔄 Sesiones actualizadas desde Firebase');
-            });
+            }, this._sessionsWindowStart);
         } else if (!window.firebaseSync) {
             console.warn('⚠️ Firebase no disponible, usando localStorage');
         }
         return localSessions;
     }
 
-    saveSessions() {
+    // Fusiona dos arrays de sesiones por "id", sin duplicados.
+    // `primary` tiene prioridad (sus versiones ganan en caso de colisión).
+    _mergeSessionsById(primary, secondary) {
+        const map = new Map();
+        (secondary || []).forEach(s => map.set(s.id, s));
+        (primary || []).forEach(s => map.set(s.id, s));
+        return Array.from(map.values());
+    }
+
+    // Asegura que this.sessions contiene el histórico completo (todas las
+    // temporadas), no solo la ventana de ~4 meses cargada al iniciar.
+    // Usado por pdf-reports.js, app-comparisons.js e injury-prediction.js
+    // antes de calcular sobre rangos largos. Idempotente: si ya se cargó,
+    // resuelve inmediatamente.
+    async ensureFullSessionHistory() {
+        if (this._fullHistoryLoaded) return this.sessions;
+        if (!window.firebaseSync) {
+            this._fullHistoryLoaded = true; // sin Firebase, localStorage ya es "todo"
+            return this.sessions;
+        }
+        const all = await window.firebaseSync.loadAllSessions();
+        this.sessions = this._mergeSessionsById(all, this.sessions);
+        this._fullHistoryLoaded = true;
+        return this.sessions;
+    }
+
+    // Handler del botón "Cargar histórico" del dashboard.
+    async loadFullHistoryFromButton() {
+        const btn = document.getElementById('loadFullHistoryBtn');
+        if (this._fullHistoryLoaded) {
+            this.showToast('✅ El histórico completo ya está cargado');
+            if (btn) btn.style.display = 'none';
+            return;
+        }
+        if (btn) {
+            btn.disabled = true;
+            btn.querySelector('.dqa-label').textContent = 'Cargando…';
+        }
+        await this.ensureFullSessionHistory();
+        this.renderSessions();
+        if (this.currentView === 'dashboard') this.renderDashboard();
+        this.showToast(`📜 Histórico completo cargado (${this.sessions.length} sesiones)`);
+        if (btn) btn.style.display = 'none';
+    }
+
+    async saveSessions() {
         // Invalidar caché de cálculos EWMA/AC al guardar sesiones
         if (typeof ACCache !== 'undefined') ACCache.invalidate();
         if (window.firebaseSync) {
+            // IMPORTANTE: saveSessions hace set() sobre /sessions completo.
+            // Si solo tenemos cargada la ventana de ~4 meses, debemos traer
+            // el histórico completo ANTES de guardar, o se borrarían las
+            // sesiones de meses anteriores fuera de la ventana actual.
+            await this.ensureFullSessionHistory();
             // Activar flag para que el listener reactivo no sobreescriba el estado local
             // mientras el write está en vuelo. Se desactiva al resolverse la promesa.
             this._savingSessions = true;

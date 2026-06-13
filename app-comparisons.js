@@ -321,12 +321,16 @@ RPETracker.prototype.setCompMode = function(mode) {
     this.updateComparison();
 };
 
-RPETracker.prototype.updateComparison = function() {
+RPETracker.prototype.updateComparison = async function() {
     const idA = document.getElementById('compPlayerA')?.value;
     if (!idA) return;
 
     const playerA = this.players.find(p => p.id === idA);
     if (!playerA) return;
+
+    // Las comparaciones pueden cubrir rangos largos (toda la temporada o más),
+    // más allá de la ventana de ~4 meses cargada al iniciar.
+    await this.ensureFullSessionHistory();
 
     const mode = this._compMode || 'pvp';
     const metricsEl = document.getElementById('compMetrics');

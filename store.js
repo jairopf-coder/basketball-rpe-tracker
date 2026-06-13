@@ -115,3 +115,22 @@ function toLocalISODate(d) {
     return y + '-' + m + '-' + day;
 }
 window.toLocalISODate = toLocalISODate;
+
+// ── Ventanas de carga inicial de sesiones (paginación por temporada) ──────────
+// La temporada va de finales de agosto a mediados de mayo. Se divide en dos
+// bloques de ~4 meses para limitar la carga inicial de /sessions:
+//   Bloque A: pretemporada + 1ª vuelta  → 1 ago  .. 31 dic
+//   Bloque B: 2ª vuelta + playoffs      → 1 ene  .. 31 jul
+// Devuelve la fecha de inicio (YYYY-MM-DD) del bloque al que pertenece "hoy".
+function getCurrentSeasonWindowStart(now) {
+    now = now || new Date();
+    const year  = now.getFullYear();
+    const month = now.getMonth(); // 0 = enero ... 11 = diciembre
+    // Agosto (7) a diciembre (11) → bloque A, empieza el 1 de agosto de este año
+    if (month >= 7) {
+        return year + '-08-01';
+    }
+    // Enero (0) a julio (6) → bloque B, empieza el 1 de enero de este año
+    return year + '-01-01';
+}
+window.getCurrentSeasonWindowStart = getCurrentSeasonWindowStart;

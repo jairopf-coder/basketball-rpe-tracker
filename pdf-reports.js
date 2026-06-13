@@ -37,13 +37,17 @@ RPETracker.prototype.exportAllCharts = function() {
 
 // ========== PDF REPORT GENERATION ==========
 
-RPETracker.prototype.generatePDFReport = function(playerId, reportType = 'weekly') {
+RPETracker.prototype.generatePDFReport = async function(playerId, reportType = 'weekly') {
     const player = this.players.find(p => p.id === playerId);
     if (!player) {
         alert('❌ Jugadora no encontrada');
         return;
     }
-    
+
+    // Informes pueden requerir histórico anterior a la ventana de ~4 meses
+    // cargada al iniciar (paginación de /sessions). Cargar todo si falta.
+    await this.ensureFullSessionHistory();
+
     const report = this.buildReportData(playerId, reportType);
     const html = this.buildReportHTML(player, report, reportType);
     
@@ -434,7 +438,10 @@ RPETracker.prototype.buildSessionsTable = function(sessions) {
 
 // ========== TEAM PDF REPORT ==========
 
-RPETracker.prototype.generateTeamPDFReport = function(reportType = 'weekly') {
+RPETracker.prototype.generateTeamPDFReport = async function(reportType = 'weekly') {
+    // Informes pueden requerir histórico anterior a la ventana cargada al iniciar.
+    await this.ensureFullSessionHistory();
+
     const summary = this.getWeeklySummary ? this.getWeeklySummary() : {};
     const html = this.buildTeamReportHTML(summary, reportType);
     

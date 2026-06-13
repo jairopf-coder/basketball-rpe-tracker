@@ -59,13 +59,34 @@ class FirebaseSync {
     }
 
     // Escuchar cambios en sesiones en tiempo real
-    onSessionsChange(callback) {
-        this.sessionsRef.on('value', (snapshot) => {
+    // startDate (opcional, 'YYYY-MM-DD'): si se indica, solo se escuchan
+    // sesiones con date >= startDate (requiere índice .indexOn "date" en
+    // las reglas de Firebase para rendimiento óptimo con mucho histórico).
+    onSessionsChange(callback, startDate) {
+        let ref = this.sessionsRef;
+        if (startDate) {
+            ref = ref.orderByChild('date').startAt(startDate);
+        }
+        ref.on('value', (snapshot) => {
             const data = snapshot.val();
             const sessions = data ? Object.values(data) : [];
             callback(sessions);
         });
         this.listeners.sessions.push(callback);
+    }
+
+    // Carga puntual (once) de TODAS las sesiones, sin filtrar por fecha.
+    // Usada para informes PDF, comparaciones e injury-prediction que
+    // necesitan histórico completo bajo demanda.
+    async loadAllSessions() {
+        try {
+            const snapshot = await this.sessionsRef.once('value');
+            const data = snapshot.val();
+            return data ? Object.values(data) : [];
+        } catch (error) {
+            console.error('Error loading full session history:', error);
+            return [];
+        }
     }
 
     // ========== PLAYERS ==========

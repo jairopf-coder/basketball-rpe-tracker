@@ -237,6 +237,16 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
     const container = document.getElementById('injuryPredictionView');
     if (!container) return;
 
+    // Las predicciones de riesgo pueden usar tendencias a medio plazo que
+    // excedan la ventana de ~4 meses cargada al iniciar. Si el histórico
+    // completo aún no está cargado, lo cargamos en segundo plano y
+    // re-renderizamos cuando esté listo (no bloquea el render inicial).
+    if (!this._fullHistoryLoaded) {
+        this.ensureFullSessionHistory().then(() => {
+            if (this.currentView === 'prediction') this.renderInjuryPredictionDashboard();
+        });
+    }
+
     // Ensure state object exists (in case of first load)
     if (!this._predState) {
         this._predState = { sortOrder: 'desc', selected: new Set(), expanded: new Set() };
