@@ -306,7 +306,7 @@
 
                 <!-- PASO 1: Datos compartidos + selección jugadoras -->
                 <div id="sessionStep1">
-                    <div class="form-group" style="padding:1rem 1.5rem">
+                    <div class="form-group" style="padding:0.75rem 1.5rem">
                         <label>👥 Jugadoras que participan</label>
                         <div id="playerButtons" class="player-buttons">
                             <!-- Se llenará dinámicamente -->
@@ -318,15 +318,15 @@
                         </div>
                     </div>
 
-                    <div class="form-group" style="padding:1rem 1.5rem">
+                    <div class="form-group" style="padding:0.75rem 1.5rem">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:end">
                             <div>
-                                <label style="display:block;font-weight:600;margin-bottom:.5rem">📅 Fecha</label>
+                                <label style="display:block;font-weight:600;margin-bottom:.4rem">📅 Fecha</label>
                                 <input type="date" id="sessionDate" required style="width:100%">
                             </div>
                             <div>
-                                <label style="display:block;font-weight:600;margin-bottom:.5rem">🕐 Momento</label>
-                                <div class="session-type-toggle" style="grid-template-columns:1fr 1fr">
+                                <label style="display:block;font-weight:600;margin-bottom:.4rem">🕐 Momento</label>
+                                <div class="session-time-toggle">
                                     <input type="radio" id="timeMorning" name="sessionTime" value="morning" checked>
                                     <label for="timeMorning" class="type-option time-option">☀️ Mañana</label>
                                     <input type="radio" id="timeAfternoon" name="sessionTime" value="afternoon">
@@ -336,7 +336,7 @@
                         </div>
                     </div>
 
-                    <div class="form-group" style="padding:1rem 1.5rem">
+                    <div class="form-group" style="padding:0.75rem 1.5rem">
                         <label>🗓️ Temporada</label>
                         <div class="season-selector-row">
                             <select id="sessionSeason" class="season-select">
@@ -349,7 +349,7 @@
                         </div>
                     </div>
 
-                    <div class="form-group" style="padding:1rem 1.5rem">
+                    <div class="form-group" style="padding:0.75rem 1.5rem">
                         <label>⏱️ Duración (minutos)</label>
                         <div class="duration-selector">
                             <button type="button" class="duration-btn" data-duration="30">30'</button>
@@ -369,7 +369,7 @@
                         <input type="hidden" id="sessionDuration" value="60">
                     </div>
 
-                    <div class="form-group" style="padding:1rem 1.5rem">
+                    <div class="form-group" style="padding:0.75rem 1.5rem">
                         <label>Tipo de Sesión</label>
                         <div class="session-type-toggle">
                             <input type="radio" id="typeTraining" name="sessionType" value="training" checked>

@@ -717,6 +717,16 @@ header h1 {
     gap: 1rem;
 }
 
+/* 2-option time selector (Mañana / Tarde) — always 2 cols, smaller gap */
+.session-time-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+.session-time-toggle input[type="radio"] {
+    display: none;
+}
+
 .session-type-toggle input[type="radio"] {
     display: none;
 }
