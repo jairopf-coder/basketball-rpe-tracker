@@ -726,6 +726,11 @@ header h1 {
 .session-time-toggle input[type="radio"] {
     display: none;
 }
+.session-time-toggle input:checked + .type-option.time-option {
+    background: #673ab7;
+    color: white;
+    border-color: #673ab7;
+}
 
 .session-type-toggle input[type="radio"] {
     display: none;
