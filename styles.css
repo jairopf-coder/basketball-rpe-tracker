@@ -192,6 +192,13 @@ label {
     -webkit-overflow-scrolling: touch;
 }
 
+/* Global layout constraint — prevents zoom-out expansion */
+#app {
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
 /* Header */
 header {
     background: var(--bg-surface);
@@ -558,7 +565,9 @@ header h1 {
     max-width: 600px;
     max-height: 90vh;       /* fallback */
     max-height: 90dvh;      /* respeta chrome dinámico de iOS/iPadOS */
-    overflow-y: auto;
+    overflow-y: hidden;     /* el body interno scrollea, no el content */
+    display: flex;
+    flex-direction: column;
     animation: slideUp 0.3s;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
@@ -592,6 +601,21 @@ header h1 {
 }
 
 /* Form */
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
+.modal-footer {
+    flex-shrink: 0;
+}
+
+.modal-header {
+    flex-shrink: 0;
+}
+
 .form-group {
     padding: 1.5rem;
     border-bottom: 1px solid var(--border);

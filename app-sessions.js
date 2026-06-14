@@ -154,6 +154,9 @@ RPETracker.prototype.goToStep2 = function() {
     document.getElementById('dot1').classList.remove('active');
     document.getElementById('dot1').classList.add('done');
     document.getElementById('dot2').classList.add('active');
+    // Scroll al inicio del modal al entrar en paso 2
+    const mc = document.querySelector('#newSessionModal .modal-content');
+    if (mc) mc.scrollTop = 0;
 };
 
 RPETracker.prototype.renderPlayerRpeList = function() {
@@ -174,14 +177,13 @@ RPETracker.prototype.renderPlayerRpeList = function() {
                 </div>
                 <div class="rpe-btn-grid" id="rpeBtns-${player.id}">
                     ${[1,2,3,4,5,6,7,8,9,10].map(v => `
-                        <button type="button" class="rpe-num-btn ${v===5?'selected':''}"
+                        <button type="button" class="rpe-num-btn"
                             data-player="${player.id}" data-val="${v}"
-                            ${v===5?`style="background:${this.getRPEColor(v)};color:white;border-color:${this.getRPEColor(v)};"` : ''}
                             onclick="window.rpeTracker?.selectRPEButton('${player.id}',${v})">
                             ${v}
                         </button>`).join('')}
                 </div>
-                <input type="hidden" id="rpeHidden-${player.id}" value="5">
+                <input type="hidden" id="rpeHidden-${player.id}" value="">
                 <textarea class="player-rpe-notes" id="notes-${player.id}" rows="2"
                     placeholder="Incidencias de ${player.name} (opcional)..."></textarea>
             </div>`;
@@ -236,12 +238,30 @@ RPETracker.prototype.saveTeamSession = function() {
     const type = document.querySelector('input[name="sessionType"]:checked').value;
     const season = this._getSelectedSeason();
     if (season === null) return; // error ya mostrado
+
+    // Verificar que todas las jugadoras tengan RPE seleccionado
+    const missingRpe = (this.selectedPlayerIds || []).filter(pid => {
+        const h = document.getElementById('rpeHidden-' + pid);
+        return !h || h.value === '';
+    });
+    if (missingRpe.length > 0) {
+        const names = missingRpe.map(pid => {
+            const p = this.players.find(x => x.id === pid);
+            return p ? p.name : pid;
+        }).join(', ');
+        this.showToast('Selecciona RPE para: ' + names, 'warning');
+        const sb = document.querySelector('#newSessionModal .btn-primary');
+        if (sb) { sb.disabled = false; sb.textContent = 'Guardar sesion'; }
+        this._savingTeamSession = false;
+        return;
+    }
+
     const baseId = Date.now();
 
     this.selectedPlayerIds.forEach((playerId, i) => {
         const hidden = document.getElementById(`rpeHidden-${playerId}`);
         const notesEl = document.getElementById(`notes-${playerId}`);
-        const rpe = hidden ? parseInt(hidden.value) : 5;
+        const rpe = hidden ? parseInt(hidden.value) || 0 : 0;
         const notes = notesEl ? notesEl.value : '';
         const session = {
             id: (baseId + i).toString(),

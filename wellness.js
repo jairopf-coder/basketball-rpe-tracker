@@ -518,11 +518,13 @@ RPETracker.prototype._renderWModal = function(today) {
                     <label class="form-label">📝 Notas (opcional)</label>
                     <textarea id="wFormNotes" class="form-textarea" rows="2" placeholder="Estrés, viaje, enfermedad..."></textarea>
                 </div>
-                <div id="wOverallPreview" class="wellness-overall-preview">
+            </div>
+            <div class="modal-footer" style="flex-direction:column;gap:.6rem;align-items:stretch">
+                <div id="wOverallPreview" class="wellness-overall-preview" style="margin:0">
                     <span style="color:var(--text-secondary);font-size:.88rem;font-weight:600">Puntuación global estimada:</span>
-                    <strong id="wOverallScore" style="font-size:1.4rem">3.0 / 5</strong>
+                    <strong id="wOverallScore" style="font-size:1.4rem">— / 5</strong>
                 </div>
-                <div style="display:flex;gap:.75rem;margin-top:1rem">
+                <div style="display:flex;gap:.75rem">
                     <button class="btn-secondary" style="flex:1" onclick="window.rpeTracker?.closeWellnessModal()">Cancelar</button>
                     <button class="btn-primary" style="flex:1" onclick="window.rpeTracker?.saveWellnessEntry()">💾 Guardar</button>
                 </div>
@@ -987,28 +989,28 @@ RPETracker.prototype.openWellnessQuick = function() {
         soreness: { icon: '💪', label: 'Muscular' }
     };
 
-    // Build rows – one per player
+    // Build rows – one per player (buttons 1-5 instead of sliders)
     const buildRows = () => this.players.map(player => {
         const existing = (this.wellnessData||[]).find(w => w.playerId === player.id && w.date === today);
-        const initials = metrics.map(m => existing ? (existing[m] || 3) : 3);
+        const initials = metrics.map(m => existing ? (existing[m] || null) : null);
 
-        const sliders = metrics.map((m, mi) => {
+        const btnCells = metrics.map((m, mi) => {
             const val = initials[mi];
             const cfg = metaConfig[m];
-            const pips = [1,2,3,4,5].map(i =>
-                `<span class="wq-pip${i <= val ? ' wq-pip-on' : ''}" data-pos="${i}"></span>`
-            ).join('');
-            return `<div class="wq-slider-cell">
-                <div class="wq-slider-header">
+            const btns = [1,2,3,4,5].map(n => {
+                const active = val === n;
+                const color = active ? `background:${this._wColor(n)};border-color:${this._wColor(n)};color:#fff` : '';
+                return `<button type="button" class="wq-val-btn${active ? ' wq-val-btn--active' : ''}"
+                    style="${color}"
+                    data-player="${player.id}" data-metric="${m}" data-val="${n}"
+                    id="wqBtn_${player.id}_${m}_${n}">${n}</button>`;
+            }).join('');
+            return `<div class="wq-btn-cell">
+                <div class="wq-btn-cell-header">
                     <span class="wq-metric-icon">${cfg.icon}</span>
                     <span class="wq-metric-lbl">${cfg.label}</span>
-                    <span class="wq-metric-val" id="wqVal_${player.id}_${m}" style="color:${this._wColor(val)}">${val}</span>
                 </div>
-                <input type="range" min="1" max="5" step="1" value="${val}"
-                    class="wq-slider"
-                    data-player="${player.id}" data-metric="${m}"
-                    id="wqSlider_${player.id}_${m}">
-                <div class="wq-pips" id="wqPips_${player.id}_${m}">${pips}</div>
+                <div class="wq-btn-row" id="wqBtnRow_${player.id}_${m}">${btns}</div>
             </div>`;
         }).join('');
 
@@ -1019,7 +1021,7 @@ RPETracker.prototype.openWellnessQuick = function() {
                 <span class="wq-player-name">${player.name}${player.number ? `<span class="wq-num"> #${player.number}</span>` : ''}</span>
                 ${alreadyFilled ? '<span class="wq-done-badge">✓</span>' : ''}
             </div>
-            <div class="wq-sliders-wrap">${sliders}</div>
+            <div class="wq-sliders-wrap">${btnCells}</div>
         </div>`;
     }).join('');
 
@@ -1051,22 +1053,27 @@ RPETracker.prototype.openWellnessQuick = function() {
 
     document.body.appendChild(overlay);
 
-    // Attach events via delegation
-    overlay.addEventListener('input', e => {
-        if (!e.target.classList.contains('wq-slider')) return;
-        const { player: pid, metric: m } = e.target.dataset;
-        const val = parseInt(e.target.value);
-        // Update value display
-        const valEl = document.getElementById(`wqVal_${pid}_${m}`);
-        if (valEl) { valEl.textContent = val; valEl.style.color = this._wColor(val); }
-        // Update pips
-        const pipsEl = document.getElementById(`wqPips_${pid}_${m}`);
-        if (pipsEl) {
-            pipsEl.querySelectorAll('.wq-pip').forEach(pip => {
-                const pos = parseInt(pip.dataset.pos);
-                pip.classList.toggle('wq-pip-on', pos <= val);
-                if (pos <= val) pip.style.background = this._wColor(val);
-                else pip.style.background = '';
+    // Attach events via delegation — button click
+    overlay.addEventListener('click', e => {
+        const btn = e.target.closest('.wq-val-btn');
+        if (!btn) return;
+        const { player: pid, metric: m, val: valStr } = btn.dataset;
+        const val = parseInt(valStr);
+        const row = document.getElementById(`wqBtnRow_${pid}_${m}`);
+        if (row) {
+            row.querySelectorAll('.wq-val-btn').forEach(b => {
+                const bv = parseInt(b.dataset.val);
+                const active = bv === val;
+                b.classList.toggle('wq-val-btn--active', active);
+                if (active) {
+                    b.style.background = this._wColor(val);
+                    b.style.borderColor = this._wColor(val);
+                    b.style.color = '#fff';
+                } else {
+                    b.style.background = '';
+                    b.style.borderColor = '';
+                    b.style.color = '';
+                }
             });
         }
     });
@@ -1086,16 +1093,19 @@ RPETracker.prototype.saveWellnessQuick = function() {
     let count = 0;
     this.players.forEach(player => {
         const get = m => {
-            const el = overlay.querySelector(`#wqSlider_${player.id}_${m}`);
-            return el ? parseInt(el.value) : 3;
+            const active = overlay.querySelector(`#wqBtnRow_${player.id}_${m} .wq-val-btn--active`);
+            return active ? parseInt(active.dataset.val) : null;
         };
+        const s=get('sleep'), fa=get('fatigue'), mo=get('mood'), so=get('soreness');
+        // Skip players with no values set at all
+        if ([s,fa,mo,so].every(v=>v===null)) return;
         const entry = {
             id: `w_${player.id}_${today}`,
             playerId: player.id, date: today,
-            sleep:    get('sleep'),
-            fatigue:  get('fatigue'),
-            mood:     get('mood'),
-            soreness: get('soreness'),
+            sleep:    s ?? 3,
+            fatigue:  fa ?? 3,
+            mood:     mo ?? 3,
+            soreness: so ?? 3,
             notes: '',
             savedAt: new Date().toISOString()
         };
@@ -1133,19 +1143,17 @@ RPETracker.prototype.saveWellnessQuick = function() {
 .wq-num{opacity:.55;font-weight:400}
 .wq-done-badge{background:var(--success-color,#4caf50);color:#fff;font-size:.65rem;padding:.05rem .35rem;border-radius:8px;flex-shrink:0}
 
-/* Sliders grid */
+/* Button grid */
 .wq-sliders-wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem}
-.wq-slider-cell{display:flex;flex-direction:column;gap:.2rem}
+.wq-btn-cell{display:flex;flex-direction:column;gap:.3rem}
 .wq-col-header{justify-content:center;align-items:center;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:.04em;text-align:center}
-.wq-slider-header{display:flex;align-items:center;gap:.3rem;font-size:.72rem}
+.wq-btn-cell-header{display:flex;align-items:center;gap:.3rem;font-size:.72rem}
 .wq-metric-icon{flex-shrink:0}
 .wq-metric-lbl{flex:1;color:var(--text-secondary);font-size:.7rem}
-.wq-metric-val{font-weight:700;font-size:.82rem;min-width:1rem;text-align:right;transition:color .2s}
-.wq-slider{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:var(--border-color);outline:none;cursor:pointer}
-.wq-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--primary-color);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-.wq-pips{display:flex;gap:3px}
-.wq-pip{flex:1;height:3px;border-radius:2px;background:var(--border-color);transition:background .15s}
-.wq-pip-on{background:var(--primary-color)}
+.wq-btn-row{display:flex;gap:3px}
+.wq-val-btn{flex:1;border:1.5px solid var(--border-color);border-radius:6px;background:var(--bg-surface,#fff);font-size:.78rem;font-weight:700;cursor:pointer;padding:.25rem 0;text-align:center;transition:background .12s,border-color .12s,color .12s;touch-action:manipulation;line-height:1.2;color:var(--text-secondary)}
+.wq-val-btn:hover{border-color:var(--text-secondary);color:var(--text-primary)}
+.wq-val-btn--active{color:#fff}
 
 /* Mobile: card scroll */
 @media(max-width:767px){
