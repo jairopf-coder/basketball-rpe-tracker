@@ -4159,6 +4159,9 @@ header h1 {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .db-right-header {
