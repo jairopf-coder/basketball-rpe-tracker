@@ -225,6 +225,35 @@ header h1 {
 .header-actions {
     display: flex;
     gap: 0.5rem;
+    align-items: center;
+}
+
+.header-action-btn {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 8px;
+    border: 1.5px solid var(--border-input);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.header-action-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.header-badge {
+    background: #f44336;
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 99px;
+    line-height: 1.4;
 }
 
 /* Tabs */
@@ -2259,6 +2288,7 @@ header h1 {
     .header-actions {
         gap: 0.35rem;
     }
+    .header-action-btn { display: none; }
 
     /* Ocultar botones secundarios del header en móvil — accesibles desde las pestañas */
     #backupBtn, #exportBtn {

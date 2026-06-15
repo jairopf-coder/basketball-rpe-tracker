@@ -56,6 +56,8 @@
             </div>
             <div class="header-actions">
                 <button id="darkModeBtn" class="dark-mode-btn" onclick="DarkMode.toggle()" title="Modo oscuro">🌙</button>
+                <button id="headerPreSessionBtn" class="header-action-btn" onclick="window.rpeTracker?.openPreSessionModal()" title="Resumen pre-entrenamiento">▶ Pre-sesión</button>
+                <button id="headerWellnessBtn" class="header-action-btn" onclick="window.rpeTracker?.openWellnessBulk()" title="Wellness rápido del equipo">✏️ Wellness <span id="headerWellnessBadge" style="display:none" class="header-badge">0</span></button>
                 <button id="addBtn" class="btn-primary">+ Nueva Sesión</button>
                 <button id="gearBtn" class="gear-btn" onclick="window.rpeTracker?.showGearMenu()" title="Opciones">⚙️</button>
             </div>
@@ -144,28 +146,7 @@
         <!-- Dashboard View -->
         <div id="dashboardView" class="view active">
             <div class="dashboard-container">
-                <h2>📊 Dashboard del Equipo</h2>
-
-                <!-- Quick-action buttons -->
-                <div class="dashboard-quick-actions" id="dashboardQuickActions">
-                    <button class="dqa-btn" onclick="window.rpeTracker?.openNewSessionModal()" aria-label="Nueva sesión de entrenamiento">
-                        <span class="dqa-icon">🏀</span>
-                        <span class="dqa-label">Nueva sesión</span>
-                    </button>
-                    <button class="dqa-btn" onclick="window.rpeTracker?.switchView('wellness')" aria-label="Registrar wellness del equipo">
-                        <span class="dqa-icon">❤️</span>
-                        <span class="dqa-label">Wellness</span>
-                    </button>
-                    <button class="dqa-btn" onclick="window.rpeTracker?.switchView('weekplan')" aria-label="Ver planificación semanal">
-                        <span class="dqa-icon">📅</span>
-                        <span class="dqa-label">Planificación</span>
-                    </button>
-                    <button class="dqa-btn" id="loadFullHistoryBtn" onclick="window.rpeTracker?.loadFullHistoryFromButton()" aria-label="Cargar histórico completo de sesiones">
-                        <span class="dqa-icon">📜</span>
-                        <span class="dqa-label">Cargar histórico</span>
-                    </button>
-                </div>
-
+                <button id="loadFullHistoryBtn" style="display:none" onclick="window.rpeTracker?.loadFullHistoryFromButton()"></button>
                 <div id="dashboardContent"></div>
             </div>
 

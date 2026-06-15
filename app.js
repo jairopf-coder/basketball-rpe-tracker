@@ -460,6 +460,12 @@ class RPETracker {
 
         this.currentView = viewName;
 
+        // Show header action buttons only on dashboard view
+        const _hpBtn = document.getElementById('headerPreSessionBtn');
+        const _hwBtn = document.getElementById('headerWellnessBtn');
+        if (_hpBtn) _hpBtn.style.display = viewName === 'dashboard' ? '' : 'none';
+        if (_hwBtn) _hwBtn.style.display = viewName === 'dashboard' ? '' : 'none';
+
         // Sync grouped nav
         if (typeof NavMenu !== 'undefined') NavMenu.syncToView(viewName);
         

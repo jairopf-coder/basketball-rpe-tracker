@@ -351,7 +351,6 @@ RPETracker.prototype.renderDashboard = function() {
     // ---- End Team Fatigue Index Widget ----
 
     container.innerHTML = `
-        ${todayPanelHTML}
         ${bannerHTML}
         ${isMatchDay || this._matchDayMode ? `
         <div class="db-matchday-bar">
@@ -359,9 +358,35 @@ RPETracker.prototype.renderDashboard = function() {
             <button class="db-matchday-toggle" onclick="window.rpeTracker?._toggleMatchDayMode()">${matchDayBtnLabel}</button>
         </div>` : ''}
         ${this._matchDayMode ? this._renderMatchDayView(availGroups, players) : `
+
+        <!-- KPI bar: siempre visible arriba -->
+        <div class="db-kpi-bar">
+            <div class="db-kpi db-kpi--${todaySessionCount > 0 ? 'ok' : 'neutral'}" onclick="window.rpeTracker?.switchView('sessions')" title="Ver sesiones de hoy">
+                <span class="db-kpi-val">${todaySessionCount}</span>
+                <span class="db-kpi-lbl">sesiones hoy</span>
+            </div>
+            <div class="db-kpi db-kpi--${avgRPE7 !== '—' && parseFloat(avgRPE7) > 7 ? 'warn' : avgRPE7 !== '—' && parseFloat(avgRPE7) < 4 ? 'low' : 'neutral'}">
+                <span class="db-kpi-val">${avgRPE7}</span>
+                <span class="db-kpi-lbl">RPE medio 7d</span>
+            </div>
+            <div class="db-kpi db-kpi--${acAlertCount > 0 ? 'danger' : 'ok'}" onclick="window.rpeTracker?.switchView('analytics')" title="Ver analítica">
+                <span class="db-kpi-val">${acAlertCount}</span>
+                <span class="db-kpi-lbl">alertas A:C</span>
+            </div>
+            <div class="db-kpi db-kpi--${availGroups.out.length > 0 ? 'warn' : 'ok'}" onclick="window.rpeTracker?.switchView('injury')" title="Ver lesiones">
+                <span class="db-kpi-val">${availGroups.ok.length}/${this.players.length}</span>
+                <span class="db-kpi-lbl">aptas hoy</span>
+            </div>
+            ${pendingCount > 0 ? `
+            <div class="db-kpi db-kpi--warn db-kpi--pending" onclick="window.rpeTracker?.openWellnessBulk()" title="Wellness pendiente">
+                <span class="db-kpi-val">${pendingCount}</span>
+                <span class="db-kpi-lbl">sin wellness</span>
+            </div>` : ''}
+        </div>
+
         <div class="db-split">
 
-            <!-- Columna izquierda: métricas + wellness -->
+            <!-- Columna izquierda: métricas de carga -->
             <div class="db-left">
                 <div class="db-left-section">
                     <div class="db-left-label">Carga equipo 7d</div>
@@ -378,7 +403,7 @@ RPETracker.prototype.renderDashboard = function() {
                         <span class="db-metric-val" style="color:#ff9800">${avgRPE7}</span>
                     </div>
                     <div class="db-metric-row">
-                        <span class="db-metric-lbl">Entrenos</span>
+                        <span class="db-metric-lbl">Entrenamientos</span>
                         <span class="db-metric-val">${trainingCount}</span>
                     </div>
                     <div class="db-metric-row">
@@ -408,30 +433,24 @@ RPETracker.prototype.renderDashboard = function() {
                 </div>
             </div>
 
-            <!-- Columna central: ratio A:C + disponibilidad -->
+            <!-- Columna central: ratio A:C + comparativa -->
             <div class="db-right">
                 <div class="db-right-header">
-                    <span class="db-right-label">Ratio A:C</span>
-                    <div class="db-right-header-actions">
+                    <div class="db-right-header-left">
+                        <span class="db-right-title">Ratio A:C — jugadoras</span>
                         <div class="db-avail-pills-inline">
                             <span class="db-avail-pill db-avail-ok">${availGroups.ok.length} <span>aptas</span></span>
                             <span class="db-avail-pill db-avail-caution">${availGroups.caution.length} <span>precaución</span></span>
                             <span class="db-avail-pill db-avail-out">${availGroups.out.length} <span>no disp.</span></span>
                         </div>
-                        <div class="db-right-header-btns">
-                            <button class="db-presession-btn" onclick="window.rpeTracker?.openPreSessionModal()" title="Resumen pre-entrenamiento">
-                                ▶ Pre-sesión
-                            </button>
-                            <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
-                                ${sortLabel[this._dashSort]}
-                            </button>
-                            <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Generar informe PDF">
-                                📄
-                            </button>
-                            <button class="db-sort-btn db-sort-btn--pass" onclick="window.rpeTracker?.openWellnessBulk()" title="Pase rápido de wellness">
-                                ✏️${_pendingW.length > 0 ? ` <span class="db-pass-badge">${_pendingW.length}</span>` : ''}
-                            </button>
-                        </div>
+                    </div>
+                    <div class="db-right-header-btns">
+                        <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
+                            ${sortLabel[this._dashSort]}
+                        </button>
+                        <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Informe PDF">
+                            📄
+                        </button>
                     </div>
                 </div>
                 <div class="db-right-legend">
@@ -439,19 +458,17 @@ RPETracker.prototype.renderDashboard = function() {
                     <span style="color:#ff9800">● precaución</span>
                     <span style="color:#f44336">● peligro</span>
                     <span style="color:#2196f3">● bajo</span>
+                    <span style="margin-left:auto;font-size:0.65rem;color:var(--text-faint)">😴⚡😊💪 = wellness 7d</span>
                 </div>
                 <div class="db-players">
                     ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
                 </div>
-                ${wellnessMiniSummary}
-                ${teamReadinessWidget}
-                ${teamFatigueWidget}
                 ${this._renderPlayerComparisonSection()}
             </div>
 
-            <!-- Columna calendario -->
+            <!-- Columna derecha: calendario + wellness + fatiga + pending -->
             <div class="db-cal" id="dbCalColumn">
-                <!-- filled by renderDashboardCalendar() -->
+                <!-- filled by renderDashboardCalendar() + _renderRightWidgets() -->
             </div>
 
         </div>
@@ -509,6 +526,13 @@ RPETracker.prototype.renderDashboard = function() {
         this._updateNavAlertBadge();
         // Render mini calendar column
         this.renderDashboardCalendar();
+        this._renderRightWidgets();
+        // Update wellness badge in global header
+        const _hBadge = document.getElementById('headerWellnessBadge');
+        if (_hBadge) {
+            if (_pendingW.length > 0) { _hBadge.textContent = _pendingW.length; _hBadge.style.display = 'inline'; }
+            else { _hBadge.style.display = 'none'; }
+        }
         // Render comparativa de jugadoras (radar wellness)
         this._renderComparisonRadar();
         this._bindComparisonEvents();
@@ -614,6 +638,90 @@ RPETracker.prototype._fallbackCopy = function(text) {
     try { document.execCommand('copy'); this.showToast('📋 Mensaje copiado — pégalo en WhatsApp', 'success'); }
     catch (e) { this.showToast('No se pudo copiar. Copia manualmente.', 'error'); }
     document.body.removeChild(ta);
+};
+
+// ── _renderRightWidgets — wellness + fatiga + pending en columna derecha ──
+RPETracker.prototype._renderRightWidgets = function() {
+    const col = document.getElementById('dbCalColumn');
+    if (!col) return;
+
+    const _wToday = new Date().toISOString().slice(0, 10);
+    const _wData  = this.wellnessData || [];
+    const _pendingW = this.players.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
+
+    // Wellness summary
+    const wsum = (() => {
+        const todayEntries = _wData.filter(e => e.date === _wToday);
+        if (!todayEntries.length) return '';
+        const avg = (field) => {
+            const vals = todayEntries.map(e => e[field]).filter(v => v != null);
+            return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : '—';
+        };
+        const sleep = avg('sleep'), fatigue = avg('fatigue'), mood = avg('mood'), soreness = avg('soreness');
+        const col = (val, invert=false) => {
+            const n = parseFloat(val);
+            if (isNaN(n)) return 'var(--text-faint)';
+            const good = invert ? n <= 2.5 : n >= 3.5;
+            const bad  = invert ? n >= 3.5 : n <= 2.5;
+            return good ? '#4caf50' : bad ? '#f44336' : '#ff9800';
+        };
+        const pct = (val) => Math.round((parseFloat(val)||0) / 5 * 100);
+        return `<div class="db-rw-section">
+            <div class="db-rw-label">Wellness hoy
+                <span class="db-rw-coverage">${todayEntries.length}/${this.players.length}</span>
+            </div>
+            <div class="db-rw-bars">
+                ${[['😴 Sueño', sleep, false],['⚡ Energía', fatigue, true],['😊 Humor', mood, false],['💪 Agujetas', soreness, true]]
+                    .map(([lbl, val, inv]) => `
+                <div class="db-rw-bar-row">
+                    <span class="db-rw-bar-lbl">${lbl}</span>
+                    <div class="db-rw-bar-track"><div class="db-rw-bar-fill" style="width:${pct(val)}%;background:${col(val,inv)}"></div></div>
+                    <span class="db-rw-bar-num" style="color:${col(val,inv)}">${val}</span>
+                </div>`).join('')}
+            </div>
+        </div>`;
+    })();
+
+    // Fatigue index
+    const _tfResult = (typeof calcTeamFatigueIndex === 'function' && this.players.length > 0)
+        ? calcTeamFatigueIndex(this.players, (pid) => this.calculateAcuteChronicRatio(pid), _wData)
+        : null;
+    const fatigueHTML = _tfResult ? `<div class="db-rw-section">
+        <div class="db-rw-label">Fatiga del equipo</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:0.75rem;color:var(--text-secondary)">${_tfResult.label}</span>
+            <span style="font-size:0.82rem;font-weight:600;color:${_tfResult.color}">${_tfResult.index}/100</span>
+        </div>
+        <div style="height:6px;background:var(--bg-subtle);border-radius:3px;overflow:hidden">
+            <div style="width:${_tfResult.index}%;height:100%;background:${_tfResult.color};border-radius:3px"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-faint);margin-top:3px">
+            <span>Descansado</span><span>Fatiga alta</span>
+        </div>
+    </div>` : '';
+
+    // Pending wellness + actions
+    const pendingHTML = `<div class="db-rw-section db-rw-actions">
+        <button class="db-presession-btn db-rw-btn" onclick="window.rpeTracker?.openPreSessionModal()" style="width:100%;margin-bottom:6px">
+            ▶ Pre-sesión
+        </button>
+        <button class="db-rw-btn db-rw-btn--wellness" onclick="window.rpeTracker?.openWellnessBulk()">
+            ✏️ Wellness rápido${_pendingW.length > 0 ? ` <span class="db-pass-badge">${_pendingW.length}</span>` : ''}
+        </button>
+        ${_pendingW.length > 0 ? `
+        <div class="db-rw-pending">
+            <span class="db-rw-pending-lbl">Sin wellness:</span>
+            <span class="db-rw-pending-names">${_pendingW.map(p => esc(p.name.split(' ')[0])).join(', ')}</span>
+        </div>` : `<div class="db-rw-pending db-rw-pending--ok">✅ Todas al día</div>`}
+    </div>`;
+
+    // Inject after calendar content
+    const existing = col.querySelector('.db-rw-widgets');
+    if (existing) existing.remove();
+    const wrap = document.createElement('div');
+    wrap.className = 'db-rw-widgets';
+    wrap.innerHTML = wsum + fatigueHTML + pendingHTML;
+    col.appendChild(wrap);
 };
 
 // ── renderDashboardCalendar ──────────────────────────────────────────
