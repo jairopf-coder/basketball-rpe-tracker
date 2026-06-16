@@ -729,7 +729,7 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
     if(document.getElementById('wellness-styles')) return;
     const s=document.createElement('style');s.id='wellness-styles';
     s.textContent=`
-.wellness-wrap{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:1rem;padding:1rem}
+.wellness-wrap{display:flex;flex-direction:column;gap:1rem}
 .wellness-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .wellness-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:12px;padding:1.1rem 1.25rem}
 .wellness-section-title{font-size:.9rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin:0 0 .85rem}
@@ -778,7 +778,7 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 .btn-icon-sm:hover{opacity:1;background:rgba(244,67,54,.1)}
 .btn-danger-sm{background:none;border:1px solid #f44336;color:#f44336;padding:.25rem .6rem;border-radius:6px;font-size:.78rem;cursor:pointer;transition:background .15s}
 .btn-danger-sm:hover{background:rgba(244,67,54,.1)}
-@media(max-width:640px){.wellness-wrap{padding:.5rem}.wellness-header{flex-direction:column}.ws-label-lo,.ws-label-hi{width:55px;font-size:.65rem}.ws-pips{margin:.35rem 55px 0}}
+@media(max-width:640px){.wellness-header{flex-direction:column}.ws-label-lo,.ws-label-hi{width:55px;font-size:.65rem}.ws-pips{margin:.35rem 55px 0}}
 `;
     document.head.appendChild(s);
 })();

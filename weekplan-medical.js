@@ -1103,7 +1103,7 @@ RPETracker.prototype._drawCorrChart = function(data) {
     if(document.getElementById('batch4-styles')) return;
     const s=document.createElement('style');s.id='batch4-styles';
     s.textContent=`
-.weekplan-wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:1rem;padding:1rem}
+.weekplan-wrap{display:flex;flex-direction:column;gap:1rem}
 .weekplan-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .weekplan-summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem}
 .wp-sum-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:.85rem 1rem;text-align:center;display:flex;flex-direction:column;gap:.25rem}
@@ -1142,7 +1142,7 @@ RPETracker.prototype._drawCorrChart = function(data) {
 .mic-label{font-size:.7rem;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
 .mic-val{font-size:.88rem;font-weight:600}
 @media(max-width:900px){.weekplan-grid{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:640px){.weekplan-grid{grid-template-columns:repeat(2,1fr)}.weekplan-summary-row{grid-template-columns:repeat(2,1fr)}.weekplan-wrap{padding:.5rem}}
+@media(max-width:640px){.weekplan-grid{grid-template-columns:repeat(2,1fr)}.weekplan-summary-row{grid-template-columns:repeat(2,1fr)}}
 `;
     document.head.appendChild(s);
 })();
