@@ -4129,13 +4129,60 @@ header h1 {
 /* ===== DASHBOARD LAYOUT A — DOS COLUMNAS ===== */
 .dashboard-container { padding: 0; max-width: 100%; }
 
+/* KPI bar — siempre visible arriba del dashboard */
+.db-kpi-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 1200px;
+    margin: 0 auto;
+    border: 0.5px solid var(--border);
+    border-bottom: none;
+    background: var(--bg-surface);
+}
+.db-kpi {
+    padding: 0.7rem 1rem;
+    border-right: 0.5px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: default;
+}
+.db-kpi:last-child { border-right: none; }
+.db-kpi[onclick] { cursor: pointer; transition: background 0.15s; }
+.db-kpi[onclick]:hover { background: var(--bg-subtle); }
+.db-kpi-val {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.1;
+}
+.db-kpi-lbl {
+    font-size: 0.68rem;
+    color: var(--text-faint);
+}
+.db-kpi--warn .db-kpi-val   { color: #e65100; }
+.db-kpi--danger .db-kpi-val { color: #c62828; }
+.db-kpi--ok .db-kpi-val     { color: #2e7d32; }
+.db-kpi--low .db-kpi-val    { color: #1565c0; }
+[data-theme="dark"] .db-kpi--warn .db-kpi-val   { color: #ffb74d; }
+[data-theme="dark"] .db-kpi--danger .db-kpi-val { color: #ef9a9a; }
+[data-theme="dark"] .db-kpi--ok .db-kpi-val     { color: #81c784; }
+[data-theme="dark"] .db-kpi--low .db-kpi-val    { color: #64b5f6; }
+[data-theme="dark"] .db-kpi-bar { background: var(--bg-surface); }
+
+@media (max-width: 768px) {
+    .db-kpi-bar { grid-template-columns: repeat(2, 1fr); max-width: 100%; border-left: none; border-right: none; }
+    .db-kpi-val { font-size: 1.15rem; }
+    .db-kpi-lbl { font-size: 0.6rem; }
+}
+
 /* Split layout — 3 columns */
 .db-split {
     display: grid;
     grid-template-columns: 240px minmax(0,1fr) 310px;
-    height: calc(100vh - 110px);         /* fallback para Safari < 15.4 */
-    height: calc(100dvh - 110px);
-    height: calc(100dvh - 110px);        /* respeta chrome dinámico de iOS/iPadOS */
+    height: calc(100vh - 170px);         /* fallback para Safari < 15.4 — incluye KPI bar */
+    height: calc(100dvh - 170px);
+    height: calc(100dvh - 170px);        /* respeta chrome dinámico de iOS/iPadOS */
     overflow: hidden;
     max-width: 1200px;
     margin: 0 auto;
@@ -4202,9 +4249,6 @@ header h1 {
     padding: 0.55rem 1.25rem 0.45rem;
     border-bottom: 0.5px solid var(--border);
     background: var(--bg-surface);
-    position: sticky;
-    top: 0;
-    z-index: 1;
 }
 
 .db-right-header-actions {
@@ -4261,12 +4305,15 @@ header h1 {
     background: var(--bg-surface);
     border-bottom: 0.5px solid var(--border);
 }
+/* Header + leyenda forman un único bloque fijo (envueltos en .db-right-sticky) */
+.db-right-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-surface);
+}
 
 .db-players {
-    flex: 1;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
     padding: 0.25rem 1.25rem 1rem;
 }
 

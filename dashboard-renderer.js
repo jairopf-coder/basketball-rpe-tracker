@@ -435,6 +435,7 @@ RPETracker.prototype.renderDashboard = function() {
 
             <!-- Columna central: ratio A:C + comparativa -->
             <div class="db-right">
+                <div class="db-right-sticky">
                 <div class="db-right-header">
                     <div class="db-right-header-left">
                         <span class="db-right-title">Ratio A:C — jugadoras</span>
@@ -460,6 +461,7 @@ RPETracker.prototype.renderDashboard = function() {
                     <span style="color:#2196f3">● bajo</span>
                     <span style="margin-left:auto;font-size:0.65rem;color:var(--text-faint)">😴⚡😊💪 = wellness 7d</span>
                 </div>
+                </div><!-- /db-right-sticky -->
                 <div class="db-players">
                     ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
                 </div>
@@ -700,20 +702,13 @@ RPETracker.prototype._renderRightWidgets = function() {
         </div>
     </div>` : '';
 
-    // Pending wellness + actions
-    const pendingHTML = `<div class="db-rw-section db-rw-actions">
-        <button class="db-presession-btn db-rw-btn" onclick="window.rpeTracker?.openPreSessionModal()" style="width:100%;margin-bottom:6px">
-            ▶ Pre-sesión
-        </button>
-        <button class="db-rw-btn db-rw-btn--wellness" onclick="window.rpeTracker?.openWellnessBulk()">
-            ✏️ Wellness rápido${_pendingW.length > 0 ? ` <span class="db-pass-badge">${_pendingW.length}</span>` : ''}
-        </button>
-        ${_pendingW.length > 0 ? `
+    // Pending wellness info (action buttons live in the global header now)
+    const pendingHTML = _pendingW.length > 0 ? `<div class="db-rw-section">
+        <div class="db-rw-label">Sin wellness hoy</div>
         <div class="db-rw-pending">
-            <span class="db-rw-pending-lbl">Sin wellness:</span>
             <span class="db-rw-pending-names">${_pendingW.map(p => esc(p.name.split(' ')[0])).join(', ')}</span>
-        </div>` : `<div class="db-rw-pending db-rw-pending--ok">✅ Todas al día</div>`}
-    </div>`;
+        </div>
+    </div>` : `<div class="db-rw-section"><div class="db-rw-pending db-rw-pending--ok">✅ Todas al día</div></div>`;
 
     // Inject after calendar content
     const existing = col.querySelector('.db-rw-widgets');
