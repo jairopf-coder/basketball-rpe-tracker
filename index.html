@@ -55,7 +55,7 @@
                         <span class="connection-label">Conectando...</span>
                     </div>
                 </div>
-                <div class="header-actions">
+                <div class="header-actions" id="headerActions">
                     <button id="headerPreSessionBtn" class="header-action-btn" onclick="window.rpeTracker?.openPreSessionModal()" title="Resumen pre-entrenamiento">▶ Pre-sesión</button>
                     <button id="headerWellnessBtn" class="header-action-btn" onclick="window.rpeTracker?.openWellnessQuick()" title="Wellness rápido del equipo">✏️ Wellness <span id="headerWellnessBadge" style="display:none" class="header-badge">0</span></button>
                     <button id="addBtn" class="btn-primary">+ Nueva Sesión</button>
@@ -66,14 +66,22 @@
             <input type="file" id="seasonFileInput" accept=".json" style="display:none">
         </header>
 
-        <!-- Barra de grupos — visible solo en desktop (≥641px) -->
+        <!-- Barra de grupos de pestañas — visible en pantallas ≥641px (bottom-nav la sustituye en móvil).
+             El slot #headerActionsSlot recibe los botones de acción (Pre-sesión, Wellness, Nueva Sesión,
+             Opciones) solo en escritorio (≥769px); por debajo de eso permanecen en el header. -->
         <nav class="nav-groups" id="navGroups" aria-label="Grupos de navegación">
             <div class="nav-group-bar">
-                <button class="nav-group-btn active" data-group="dashboard" onclick="NavMenu.selectGroup('dashboard')" aria-label="Dashboard principal">📊 Inicio</button>
-                <button class="nav-group-btn" data-group="carga" onclick="NavMenu.selectGroup('carga')" aria-label="Carga y análisis">🏋️ Carga</button>
-                <button class="nav-group-btn" data-group="salud" onclick="NavMenu.selectGroup('salud')" aria-label="Salud y lesiones">❤️ Salud</button>
-                <button class="nav-group-btn" data-group="rendimiento" onclick="NavMenu.selectGroup('rendimiento')" aria-label="Rendimiento">💪 Rendimiento</button>
-                <button class="nav-group-btn" data-group="equipo" onclick="NavMenu.selectGroup('equipo')" aria-label="Equipo">👥 Equipo</button>
+                <div class="nav-group-tabs">
+                    <button class="nav-group-btn active" data-group="dashboard" onclick="NavMenu.selectGroup('dashboard')" aria-label="Dashboard principal">📊 Inicio</button>
+                    <button class="nav-group-btn" data-group="carga" onclick="NavMenu.selectGroup('carga')" aria-label="Carga y análisis">🏋️ Carga</button>
+                    <button class="nav-group-btn" data-group="salud" onclick="NavMenu.selectGroup('salud')" aria-label="Salud y lesiones">❤️ Salud</button>
+                    <button class="nav-group-btn" data-group="rendimiento" onclick="NavMenu.selectGroup('rendimiento')" aria-label="Rendimiento">💪 Rendimiento</button>
+                    <button class="nav-group-btn" data-group="equipo" onclick="NavMenu.selectGroup('equipo')" aria-label="Equipo">👥 Equipo</button>
+                </div>
+                <div id="headerActionsSlot" class="header-actions-slot"></div>
+            </div>
+            <div class="nav-sub-bar" id="navSubBar" style="display:none"></div>
+        </nav>
             </div>
             <div class="nav-sub-bar" id="navSubBar" style="display:none"></div>
         </nav>
@@ -210,7 +218,7 @@
 
         <!-- Injury Management View -->
         <div id="injuryView" class="view">
-            <div class="injury-container" id="injuryManagementView" style="padding: 2rem; max-width: 1400px; margin: 0 auto;">
+            <div class="injury-container" id="injuryManagementView" style="padding: 2rem 1.5rem; max-width: 1200px; margin: 0 auto;">
                 <!-- Injury management will be rendered here -->
             </div>
         </div>
@@ -815,6 +823,30 @@
         // Initial FAB visibility
         BottomNav.syncToView('dashboard');
     });
+    </script>
+
+    <!-- Reubicación responsive de los botones de acción (Pre-sesión, Wellness, Nueva Sesión, Opciones):
+         en escritorio (≥641px) viven en la fila de navegación junto a "Inicio";
+         en móvil (≤640px) vuelven a su posición original en el header. -->
+    <script>
+    (function () {
+        function placeHeaderActions() {
+            const actions = document.getElementById('headerActions');
+            const desktopSlot = document.getElementById('headerActionsSlot');
+            const headerInner = document.querySelector('header .header-inner');
+            if (!actions || !desktopSlot || !headerInner) return;
+
+            const isDesktop = window.matchMedia('(min-width: 769px)').matches;
+            if (isDesktop && actions.parentElement !== desktopSlot) {
+                desktopSlot.appendChild(actions);
+            } else if (!isDesktop && actions.parentElement !== headerInner) {
+                headerInner.appendChild(actions);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', placeHeaderActions);
+        window.addEventListener('resize', placeHeaderActions);
+    })();
     </script>
 </body>
 </html>
