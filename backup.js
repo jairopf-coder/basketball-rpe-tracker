@@ -35,6 +35,11 @@ RPETracker.prototype.showGearMenu = function() {
                 <span class="gear-icon">📅</span><span>Ver temporada anterior</span>
             </button>
             <div class="gear-divider"></div>
+            <div class="gear-section-label">Apariencia</div>
+            <button class="gear-item" onclick="DarkMode.toggle();document.getElementById('gearMenuOverlay').remove()">
+                <span class="gear-icon">🌙</span><span>Modo oscuro / claro</span>
+            </button>
+            <div class="gear-divider"></div>
             <div class="gear-section-label">Acceso</div>
             <button class="gear-item" onclick="AppAuth.showPinSettings();document.getElementById('gearMenuOverlay').remove()">
                 <span class="gear-icon">🔑</span><span>Gestionar PINs</span>

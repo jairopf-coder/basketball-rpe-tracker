@@ -47,19 +47,20 @@
     <div id="app" style="display:none">
         <!-- Header -->
         <header>
-            <div class="header-left">
-                <h1>🏀 RPE Baloncesto</h1>
-                <div id="connectionIndicator" class="connection-indicator connecting">
-                    <span class="connection-dot"></span>
-                    <span class="connection-label">Conectando...</span>
+            <div class="header-inner">
+                <div class="header-left">
+                    <h1>🏀 RPE Baloncesto</h1>
+                    <div id="connectionIndicator" class="connection-indicator connecting">
+                        <span class="connection-dot"></span>
+                        <span class="connection-label">Conectando...</span>
+                    </div>
                 </div>
-            </div>
-            <div class="header-actions">
-                <button id="darkModeBtn" class="dark-mode-btn" onclick="DarkMode.toggle()" title="Modo oscuro">🌙</button>
-                <button id="headerPreSessionBtn" class="header-action-btn" onclick="window.rpeTracker?.openPreSessionModal()" title="Resumen pre-entrenamiento">▶ Pre-sesión</button>
-                <button id="headerWellnessBtn" class="header-action-btn" onclick="window.rpeTracker?.openWellnessQuick()" title="Wellness rápido del equipo">✏️ Wellness <span id="headerWellnessBadge" style="display:none" class="header-badge">0</span></button>
-                <button id="addBtn" class="btn-primary">+ Nueva Sesión</button>
-                <button id="gearBtn" class="gear-btn" onclick="window.rpeTracker?.showGearMenu()" title="Opciones">⚙️</button>
+                <div class="header-actions">
+                    <button id="headerPreSessionBtn" class="header-action-btn" onclick="window.rpeTracker?.openPreSessionModal()" title="Resumen pre-entrenamiento">▶ Pre-sesión</button>
+                    <button id="headerWellnessBtn" class="header-action-btn" onclick="window.rpeTracker?.openWellnessQuick()" title="Wellness rápido del equipo">✏️ Wellness <span id="headerWellnessBadge" style="display:none" class="header-badge">0</span></button>
+                    <button id="addBtn" class="btn-primary">+ Nueva Sesión</button>
+                    <button id="gearBtn" class="gear-btn" onclick="window.rpeTracker?.showGearMenu()" title="Opciones">⚙️</button>
+                </div>
             </div>
             <input type="file" id="restoreFile"    accept=".json" style="display:none">
             <input type="file" id="seasonFileInput" accept=".json" style="display:none">

@@ -202,20 +202,26 @@ label {
 /* Header */
 header {
     background: var(--bg-surface);
-    padding: 1rem 1.5rem;
-    /* Safe area for iPad PWA (notch / Dynamic Island) */
-    padding-top: max(1rem, env(safe-area-inset-top));
-    padding-left: max(1.5rem, env(safe-area-inset-left));
-    padding-right: max(1.5rem, env(safe-area-inset-right));
     box-shadow: var(--shadow-sm);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     position: sticky;
     top: 0;
     z-index: 100;
     transition: background 0.25s;
 }
+
+header .header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem 1.5rem;
+    /* Safe area for iPad PWA (notch / Dynamic Island) */
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 
 header h1 {
     font-size: 1.5rem;
@@ -269,6 +275,8 @@ header h1 {
 
 .nav-group-bar {
     display: flex;
+    max-width: 1200px;
+    margin: 0 auto;
     border-bottom: 1px solid var(--border);
     padding: 0 1rem;
     gap: 0;
@@ -304,6 +312,8 @@ header h1 {
 
 .nav-sub-bar {
     display: flex;
+    max-width: 1200px;
+    margin: 0 auto;
     background: var(--bg-subtle);
     border-bottom: 1px solid var(--border);
     padding: 0 1rem;
@@ -311,6 +321,7 @@ header h1 {
     overflow-x: auto;
     scrollbar-width: none;
 }
+.nav-sub-bar:empty { display: none !important; border: none; padding: 0; }
 
 .nav-sub-bar::-webkit-scrollbar { display: none; }
 
@@ -4131,8 +4142,7 @@ header h1 {
 
 /* KPI bar — siempre visible arriba del dashboard */
 .db-kpi-bar {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: flex;
     max-width: 1200px;
     margin: 0 auto;
     border: 0.5px solid var(--border);
@@ -4140,12 +4150,14 @@ header h1 {
     background: var(--bg-surface);
 }
 .db-kpi {
+    flex: 1;
     padding: 0.7rem 1rem;
     border-right: 0.5px solid var(--border);
     display: flex;
     flex-direction: column;
     gap: 2px;
     cursor: default;
+    min-width: 0;
 }
 .db-kpi:last-child { border-right: none; }
 .db-kpi[onclick] { cursor: pointer; transition: background 0.15s; }
@@ -4171,7 +4183,8 @@ header h1 {
 [data-theme="dark"] .db-kpi-bar { background: var(--bg-surface); }
 
 @media (max-width: 768px) {
-    .db-kpi-bar { grid-template-columns: repeat(2, 1fr); max-width: 100%; border-left: none; border-right: none; }
+    .db-kpi-bar { flex-wrap: wrap; max-width: 100%; border-left: none; border-right: none; }
+    .db-kpi { flex: 1 1 50%; }
     .db-kpi-val { font-size: 1.15rem; }
     .db-kpi-lbl { font-size: 0.6rem; }
 }
@@ -4243,9 +4256,10 @@ header h1 {
 
 .db-right-header {
     display: flex;
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.4rem;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     padding: 0.55rem 1.25rem 0.45rem;
     border-bottom: 0.5px solid var(--border);
     background: var(--bg-surface);
@@ -4257,6 +4271,21 @@ header h1 {
     justify-content: space-between;
     width: 100%;
     gap: 0.5rem;
+}
+
+.db-right-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.db-right-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
 }
 
 .db-avail-pills-inline {

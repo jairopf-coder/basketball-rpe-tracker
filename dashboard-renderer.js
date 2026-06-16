@@ -378,7 +378,7 @@ RPETracker.prototype.renderDashboard = function() {
                 <span class="db-kpi-lbl">aptas hoy</span>
             </div>
             ${pendingCount > 0 ? `
-            <div class="db-kpi db-kpi--warn db-kpi--pending" onclick="window.rpeTracker?.openWellnessBulk()" title="Wellness pendiente">
+            <div class="db-kpi db-kpi--warn db-kpi--pending" onclick="window.rpeTracker?.openWellnessQuick()" title="Wellness pendiente">
                 <span class="db-kpi-val">${pendingCount}</span>
                 <span class="db-kpi-lbl">sin wellness</span>
             </div>` : ''}
