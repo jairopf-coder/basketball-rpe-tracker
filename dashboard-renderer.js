@@ -377,11 +377,10 @@ RPETracker.prototype.renderDashboard = function() {
                 <span class="db-kpi-val">${availGroups.ok.length}/${this.players.length}</span>
                 <span class="db-kpi-lbl">aptas hoy</span>
             </div>
-            ${pendingCount > 0 ? `
-            <div class="db-kpi db-kpi--warn db-kpi--pending" onclick="window.rpeTracker?.openWellnessQuick()" title="Wellness pendiente">
-                <span class="db-kpi-val">${pendingCount}</span>
-                <span class="db-kpi-lbl">sin wellness</span>
-            </div>` : ''}
+            <div class="db-kpi db-kpi--${pendingCount > 0 ? 'warn' : 'ok'} db-kpi--pending" onclick="window.rpeTracker?.openWellnessQuick()" title="Wellness del equipo hoy">
+                <span class="db-kpi-val">${this.players.length - pendingCount}/${this.players.length}</span>
+                <span class="db-kpi-lbl">wellness hoy</span>
+            </div>
         </div>
 
         <div class="db-split">

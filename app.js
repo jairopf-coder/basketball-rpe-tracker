@@ -228,6 +228,7 @@ class RPETracker {
     constructor() {
         this.sessions = this.loadSessions();
         this.players = this.loadPlayers();
+        this.wellnessData = this.loadWellnessData();
         this.currentSessionId = null;
         this.currentView = 'dashboard';
         this.currentPlayerFilter = 'all';
