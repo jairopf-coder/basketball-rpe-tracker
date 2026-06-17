@@ -4208,14 +4208,13 @@ header h1 {
     .db-kpi-lbl { font-size: 0.6rem; }
 }
 
-/* Split layout — 3 columns */
+/* Split layout — 3 columns.
+   Cada columna ocupa solo el alto de su propio contenido (align-items:start)
+   y es la página la que scrollea entera — una sola barra de scroll. */
 .db-split {
     display: grid;
     grid-template-columns: 240px minmax(0,1fr) 310px;
-    height: calc(100vh - 170px);         /* fallback para Safari < 15.4 — incluye KPI bar */
-    height: calc(100dvh - 170px);
-    height: calc(100dvh - 170px);        /* respeta chrome dinámico de iOS/iPadOS */
-    overflow: hidden;
+    align-items: start;
     max-width: 1200px;
     margin: 0 auto;
     border-left: 0.5px solid var(--border);
@@ -4227,9 +4226,6 @@ header h1 {
     border-right: 0.5px solid var(--border);
     background: var(--bg-subtle);
     padding: 1rem 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
 }
@@ -4263,14 +4259,11 @@ header h1 {
 .db-metric-lbl { color: var(--text-muted); }
 .db-metric-val { font-weight: 700; color: var(--text-primary); }
 
-/* Right column */
+/* Right column (centro) — sin scroll propio, ver .db-split */
 .db-right {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .db-right-header {
@@ -4353,11 +4346,8 @@ header h1 {
     background: var(--bg-surface);
     border-bottom: 0.5px solid var(--border);
 }
-/* Header + leyenda forman un único bloque fijo (envueltos en .db-right-sticky) */
+/* Header + leyenda forman un único bloque (envueltos en .db-right-sticky) */
 .db-right-sticky {
-    position: sticky;
-    top: 0;
-    z-index: 1;
     background: var(--bg-surface);
 }
 
@@ -4529,9 +4519,6 @@ header h1 {
     padding: 0.65rem 1rem 0.4rem;
     border-bottom: 0.5px solid var(--border);
     background: var(--bg-surface);
-    position: sticky;
-    top: 0;
-    z-index: 1;
 }
 
 .db-cal-title {
@@ -4597,10 +4584,6 @@ header h1 {
 .db-cal-nav-btn:hover { background: var(--bg-elevated); color: #ff6600; }
 
 .db-cal-body {
-    flex: 1;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
     padding: 0.5rem;
 }
 
@@ -4796,6 +4779,92 @@ header h1 {
     border-radius: 50%;
     flex-shrink: 0;
 }
+
+/* ── Widgets bajo el calendario: Wellness hoy / Fatiga / Pendientes ── */
+.db-rw-section {
+    padding: 0.6rem 1rem 0.7rem;
+    border-top: 0.5px solid var(--border);
+}
+
+.db-rw-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.55rem;
+}
+
+.db-rw-coverage {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-subtle);
+    padding: 1px 6px;
+    border-radius: 10px;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.db-rw-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.db-rw-bar-row {
+    display: grid;
+    grid-template-columns: 70px 1fr 28px;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.db-rw-bar-lbl {
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.db-rw-bar-track {
+    height: 6px;
+    background: var(--bg-subtle);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.db-rw-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+.db-rw-bar-num {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.db-rw-pending {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.db-rw-pending-names { color: var(--text-secondary); }
+
+.db-rw-pending--ok {
+    color: #2e7d32;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .db-rw-bar-track { background: #2a2a32; }
+[data-theme="dark"] .db-rw-pending--ok { color: #81c784; }
 
 [data-theme="dark"] .db-cal { background: var(--bg-surface); border-color: var(--border); }
 [data-theme="dark"] .db-cal-header { background: var(--bg-surface); }
