@@ -41,57 +41,6 @@ RPETracker.prototype.renderDashboard = function() {
     const _wData  = this.wellnessData || [];
     const _pendingW = this.players.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
 
-    // Chips de wellness expandidas con color por estado
-    const wellnessChipsExpanded = this.players.length === 0 ? '' : (() => {
-        const chipColor = (p) => {
-            const todayEntry = _wData.find(e => e.playerId === p.id && e.date === _wToday);
-            if (!todayEntry) return { bg: 'var(--bg-subtle)', border: 'var(--border)', dot: '#bbb', label: '—' };
-            const overall = (todayEntry.sleep + (6 - todayEntry.fatigue) + todayEntry.mood + (6 - todayEntry.soreness)) / 4;
-            if (overall >= 4)   return { bg: '#e8f5e9', border: '#a5d6a7', dot: '#4caf50', label: overall.toFixed(1) };
-            if (overall >= 2.5) return { bg: '#fff8e1', border: '#ffe082', dot: '#ff9800', label: overall.toFixed(1) };
-            return { bg: '#ffebee', border: '#ef9a9a', dot: '#f44336', label: overall.toFixed(1) };
-        };
-        return this.players.map(p => {
-            const c = chipColor(p);
-            return `<div class="db-w-chip-full" style="background:${c.bg};border-color:${c.border}" onclick="window.rpeTracker?.switchView('wellness')" title="${esc(p.name)}">
-                ${PlayerTokens.avatar(p, 18, '0.55rem')}
-                <span class="db-w-chip-name">${esc(p.name.split(' ')[0])}</span>
-                <span class="db-w-chip-val" style="color:${c.dot}">${c.label}</span>
-            </div>`;
-        }).join('');
-    })();
-
-    // Mini resumen wellness equipo para columna Ratio
-    const wellnessMiniSummary = (() => {
-        if (!this.players.length) return '';
-        const todayEntries = _wData.filter(e => e.date === _wToday);
-        if (!todayEntries.length) return '';
-        const avg = (field) => {
-            const vals = todayEntries.map(e => e[field]).filter(v => v != null);
-            return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : '—';
-        };
-        const sleep = avg('sleep'), fatigue = avg('fatigue'), mood = avg('mood'), soreness = avg('soreness');
-        const dot = (val, invert = false) => {
-            const n = parseFloat(val);
-            if (isNaN(n)) return '#ccc';
-            const good = invert ? n <= 2.5 : n >= 3.5;
-            const bad  = invert ? n >= 3.5 : n <= 2.5;
-            return good ? '#4caf50' : bad ? '#f44336' : '#ff9800';
-        };
-        const covered = todayEntries.length;
-        const total   = this.players.length;
-        return `<div class="db-wsum">
-            <div class="db-wsum-header">
-                <span class="db-wsum-label">Wellness hoy</span>
-                <span class="db-wsum-coverage">${covered}/${total}</span>
-            </div>
-            <div class="db-wsum-row"><span class="db-wsum-metric">😴 Sueño</span><span class="db-wsum-val" style="color:${dot(sleep)}">${sleep}</span></div>
-            <div class="db-wsum-row"><span class="db-wsum-metric">⚡ Fatiga</span><span class="db-wsum-val" style="color:${dot(fatigue,true)}">${fatigue}</span></div>
-            <div class="db-wsum-row"><span class="db-wsum-metric">😊 Humor</span><span class="db-wsum-val" style="color:${dot(mood)}">${mood}</span></div>
-            <div class="db-wsum-row"><span class="db-wsum-metric">💪 Agujetas</span><span class="db-wsum-val" style="color:${dot(soreness,true)}">${soreness}</span></div>
-        </div>`;
-    })();
-
     // Sort order — persisted on instance
     if (!this._dashSort) this._dashSort = 'risk'; // 'risk' | 'safe' | 'name'
 
@@ -168,35 +117,6 @@ RPETracker.prototype.renderDashboard = function() {
         else                                                     availGroups.ok.push(entry);
     });
 
-    const availRow = ({ player, activeInjury, avgRPE7, r, ratio }) => {
-        let icon, color, detail;
-        const _tAR = this.getPlayerThresholds(player.id);
-        if (activeInjury) {
-            icon = '🔴'; color = '#f44336';
-            detail = activeInjury.location ? this.getLocationName(activeInjury.location) : 'lesión activa';
-        } else if (r > _tAR.high) {
-            icon = '🟠'; color = '#ff9800'; detail = `Ratio ${ratio.ratio}`;
-        } else if (r > 0 && r < _tAR.low) {
-            icon = '🔵'; color = '#2196f3'; detail = `Ratio ${ratio.ratio}`;
-        } else {
-            icon = '🟢'; color = '#4caf50'; detail = avgRPE7 ? `RPE 7d: ${avgRPE7}` : 'Sin datos';
-        }
-        return `
-            <div class="db-avail-row">
-                <span class="db-avail-icon">${icon}</span>
-                ${PlayerTokens.avatar(player, 22, '0.65rem')}
-                <span class="db-avail-name">${esc(player.name)}${player.number ? `<span class="db-num">#${esc(player.number)}</span>` : ''}</span>
-                <span class="db-avail-detail" style="color:${color}">${detail}</span>
-            </div>`;
-    };
-
-    const availSection = (title, entries, emptyMsg) =>
-        entries.length === 0 ? '' : `
-            <div class="db-avail-section">
-                <div class="db-avail-section-title">${title} <span class="db-avail-count">${entries.length}</span></div>
-                ${entries.map(availRow).join('')}
-            </div>`;
-
     // ── Alert banner data ──────────────────────────────────────
     const alertPlayers = players.filter(p => { if (p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); return parseFloat(p.ratio.ratio) > _t.high; });
     const warnPlayers  = players.filter(p => { if (p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
@@ -245,41 +165,6 @@ RPETracker.prototype.renderDashboard = function() {
     const isMatchDay = ['morning','afternoon'].some(s => todayPlan[s]?.type === 'match' && todayPlan[s]?.enabled);
     const matchDayBtnLabel = this._matchDayMode ? '← Vista normal' : '🏟️ Modo partido';
 
-    // ---- Team Readiness Widget ----
-    const rdyPlayerData = this.players.map(player => ({
-        player,
-        score: this.calculateReadiness(player.id)
-    })).sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
-
-    const withData = rdyPlayerData.filter(d => d.score !== null);
-    const teamAvg  = withData.length
-        ? Math.round(withData.reduce((s, d) => s + d.score, 0) / withData.length)
-        : null;
-    const teamLbl  = this.readinessLabel(teamAvg);
-
-    const rdyRows = rdyPlayerData.map(({ player, score }) => {
-        const lbl = this.readinessLabel(score);
-        const txt = score !== null ? score : '—';
-        return `<div class="rdy-row">
-            ${PlayerTokens.avatar(player, 18, '0.55rem')}
-            <span class="rdy-name">${player.name}</span>
-            <div class="rdy-bar-wrap"><div class="rdy-bar-fill ${lbl.cls}" style="width:${score !== null ? score : 0}%"></div></div>
-            <span class="rdy-val" style="color:${lbl.color}">${lbl.icon} ${txt}</span>
-        </div>`;
-    }).join('');
-
-    const teamReadinessWidget = withData.length === 0 ? '' : `
-        <div class="db-readiness-widget">
-            <div class="db-readiness-header">
-                <span class="db-readiness-title">⚡ Readiness del Equipo</span>
-                <span class="db-readiness-avg ${teamLbl.cls}" style="color:${teamLbl.color};background:${teamLbl.bg}">
-                    ${teamLbl.icon} ${teamAvg !== null ? teamAvg + '/100' : '—'}
-                </span>
-            </div>
-            <div class="rdy-rows">${rdyRows}</div>
-        </div>`;
-    // ---- End Team Readiness Widget ----
-
     // ── "Hoy" panel ────────────────────────────────────────────
     const todaySessions = this.sessions.filter(s => s.date && s.date.slice(0, 10) === _wToday);
     const todayPlayerIds = [...new Set(todaySessions.map(s => s.playerId))];
@@ -289,66 +174,7 @@ RPETracker.prototype.renderDashboard = function() {
         const t = this.getPlayerThresholds(p.player.id);
         return parseFloat(p.ratio.ratio) > t.high;
     }).length;
-    const activeInjCount = (this.injuries || []).filter(i => i.status === 'active').length;
     const pendingCount   = _pendingW.length;
-
-    // Pending wellness names for WhatsApp message
-    const pendingNames = _pendingW.map(p => esc(p.name.split(' ')[0])).join(', ');
-
-    const todayPanelHTML = `
-        <div class="db-today-panel">
-            <div class="db-today-header">
-                <span class="db-today-title">Hoy — ${new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-            </div>
-            <div class="db-today-kpis">
-                <div class="db-today-kpi" onclick="window.rpeTracker?.switchView('sessions')" title="Ver sesiones de hoy">
-                    <span class="db-today-kpi-val">${todaySessionCount}</span>
-                    <span class="db-today-kpi-lbl">sesiones hoy</span>
-                </div>
-                <div class="db-today-kpi db-today-kpi--${pendingCount === 0 ? 'ok' : 'warn'}" onclick="window.rpeTracker?.switchView('wellness')" title="Wellness pendiente">
-                    <span class="db-today-kpi-val">${pendingCount}</span>
-                    <span class="db-today-kpi-lbl">sin wellness</span>
-                </div>
-                <div class="db-today-kpi db-today-kpi--${acAlertCount > 0 ? 'danger' : 'ok'}" onclick="window.rpeTracker?.switchView('analytics')" title="Alertas A:C">
-                    <span class="db-today-kpi-val">${acAlertCount}</span>
-                    <span class="db-today-kpi-lbl">alertas A:C</span>
-                </div>
-                <div class="db-today-kpi db-today-kpi--${activeInjCount > 0 ? 'danger' : 'ok'}" onclick="window.rpeTracker?.switchView('injury')" title="Lesiones activas">
-                    <span class="db-today-kpi-val">${activeInjCount}</span>
-                    <span class="db-today-kpi-lbl">lesionadas</span>
-                </div>
-            </div>
-            ${pendingCount > 0 ? `
-            <div class="db-today-pending">
-                <span class="db-today-pending-label">Sin wellness hoy:</span>
-                <span class="db-today-pending-names">${pendingNames}</span>
-                <button class="db-today-wa-btn" onclick="window.rpeTracker?.copyWellnessPendingWA()" title="Copiar mensaje para WhatsApp">
-                    📋 Copiar aviso
-                </button>
-            </div>` : `
-            <div class="db-today-pending db-today-pending--ok">
-                <span class="db-today-pending-label">✅ Todas han rellenado el wellness hoy</span>
-            </div>`}
-        </div>`;
-
-    // ---- Team Fatigue Index Widget ----
-    const _tfResult = (typeof calcTeamFatigueIndex === 'function' && this.players.length > 0)
-        ? calcTeamFatigueIndex(this.players, (pid) => this.calculateAcuteChronicRatio(pid), this.wellnessData || [])
-        : null;
-    const teamFatigueWidget = _tfResult ? `
-        <div class="db-fatigue-widget">
-            <div class="db-fatigue-header">
-                <span class="db-fatigue-title">🔥 Fatiga del Equipo</span>
-                <span class="db-fatigue-badge" style="color:${_tfResult.color};background:${_tfResult.color}18;border:1px solid ${_tfResult.color}44;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500">${_tfResult.label}</span>
-            </div>
-            <div class="db-fatigue-bar-wrap" style="background:var(--color-background-secondary);border-radius:6px;height:8px;margin:8px 0;overflow:hidden">
-                <div style="width:${_tfResult.index}%;height:100%;background:${_tfResult.color};border-radius:6px;transition:width 0.6s ease"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--color-text-secondary)">
-                <span>Descansado</span><span style="font-weight:500;color:${_tfResult.color}">${_tfResult.index}/100</span><span>Fatiga alta</span>
-            </div>
-        </div>` : '';
-    // ---- End Team Fatigue Index Widget ----
 
     container.innerHTML = `
         ${bannerHTML}

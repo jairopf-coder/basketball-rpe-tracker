@@ -4594,24 +4594,6 @@ header h1 {
     .db-comparison .cmp-table { min-width: 480px; }
 }
 
-/* Availability column */
-.db-avail {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    border-left: 0.5px solid var(--border);
-    background: var(--bg-subtle);
-}
-
-.db-avail-summary {
-    display: flex;
-    gap: 6px;
-    padding: 0.5rem 1rem;
-    border-bottom: 0.5px solid var(--border);
-    background: var(--bg-surface);
-    flex-wrap: wrap;
-}
-
 .db-avail-pill {
     display: inline-flex;
     align-items: center;
@@ -4626,53 +4608,6 @@ header h1 {
 .db-avail-ok      { background: var(--success-soft); color: var(--success); }
 .db-avail-caution { background: var(--warning-soft); color: var(--warning); }
 .db-avail-out     { background: var(--danger-soft);  color: var(--danger); }
-
-.db-avail-list {
-    flex: 1;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    padding: 0.25rem 0 1rem;
-}
-
-.db-avail-section {
-    padding: 0.4rem 1rem 0.2rem;
-}
-
-.db-avail-section-title {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 0.3rem;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.db-avail-count {
-    background: #eee;
-    color: var(--text-muted);
-    font-size: 0.6rem;
-    padding: 1px 5px;
-    border-radius: 10px;
-    font-weight: 600;
-}
-
-.db-avail-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0.3rem 0;
-    border-bottom: 0.5px solid var(--border);
-    font-size: 0.82rem;
-}
-
-.db-avail-row:last-child { border-bottom: none; }
-.db-avail-icon  { font-size: 11px; flex-shrink: 0; }
-.db-avail-name  { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.db-avail-detail { font-size: 0.72rem; white-space: nowrap; flex-shrink: 0; }
 
 /* ── Dashboard Calendar column ─────────────────────────────────────── */
 .db-cal {
@@ -5052,21 +4987,9 @@ header h1 {
     }
 }
 
-/* iPad portrait (Air/Mini): hide right availability column, show 2 cols */
-@media (min-width: 769px) and (max-width: 900px) {
-    .db-split {
-        grid-template-columns: 190px minmax(0,1fr);
-        max-width: 100%;
-    }
-    .db-avail {
-        display: none;
-    }
-}
-
 @media (max-width: 768px) {
     .db-split { grid-template-columns: 1fr; min-height: auto; }
     .db-left { border-right: none; border-bottom: 0.5px solid var(--border); }
-    .db-avail { border-left: none; border-top: 0.5px solid var(--border); }
     .db-cal   { border-left: none; border-top: 0.5px solid var(--border); }
     .db-left-section { padding: 0.5rem 1rem 0.6rem; }
     .db-metric-row { font-size: 0.82rem; }
@@ -5625,14 +5548,6 @@ header h1 {
 [data-theme="dark"] .db-player-name { color: var(--text-primary); }
 [data-theme="dark"] .db-bar-lo,
 [data-theme="dark"] .db-bar-hi { background: var(--border-input); }
-
-/* Dashboard columna derecha (disponibilidad) */
-[data-theme="dark"] .db-avail { background: var(--bg-subtle); border-color: var(--border); }
-[data-theme="dark"] .db-avail-summary { background: var(--bg-surface); border-color: var(--border); }
-[data-theme="dark"] .db-avail-section-title { color: var(--text-muted); }
-[data-theme="dark"] .db-avail-count { background: var(--bg-elevated); color: var(--text-secondary); }
-[data-theme="dark"] .db-avail-row { border-color: var(--border); }
-[data-theme="dark"] .db-avail-name { color: var(--text-primary); }
 
 /* Dashboard botón sort y header */
 [data-theme="dark"] .db-sort-btn { background: var(--bg-elevated); border-color: var(--border-input); color: var(--text-muted); }
@@ -6309,40 +6224,6 @@ details[open] .ewma-toggle-hint { display: none; }
     float: right;
 }
 
-/* Wellness chips expandidas (con score por jugadora) */
-.db-left-section--wellness { flex: 1; overflow-y: auto; }
-.db-w-chips-full {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    margin-top: 4px;
-}
-.db-w-chip-full {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 6px 3px 4px;
-    border-radius: 8px;
-    border: 0.5px solid var(--border);
-    cursor: pointer;
-    font-size: 0.75rem;
-    transition: opacity 0.15s;
-}
-.db-w-chip-full:hover { opacity: 0.8; }
-.db-w-chip-name {
-    flex: 1;
-    color: var(--text-primary);
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.db-w-chip-val {
-    font-weight: 700;
-    font-size: 0.72rem;
-    flex-shrink: 0;
-}
-
 /* Botón pase rápido anclado al fondo de columna izquierda */
 .db-left-section--action {
     padding: 0.6rem 1.25rem;
@@ -6382,45 +6263,6 @@ details[open] .ewma-toggle-hint { display: none; }
 .db-quick-pass-btn:hover .db-quick-pass-badge {
     background: rgba(255,255,255,0.3);
 }
-
-/* Mini resumen wellness al fondo de columna Ratio */
-.db-wsum {
-    border-top: 0.5px solid var(--border);
-    padding: 0.5rem 1.25rem 0.75rem;
-    background: var(--bg-subtle);
-    flex-shrink: 0;
-}
-.db-wsum-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.3rem;
-}
-.db-wsum-label {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-.db-wsum-coverage {
-    font-size: 0.65rem;
-    color: var(--text-faint);
-    background: var(--bg-elevated);
-    padding: 1px 5px;
-    border-radius: 10px;
-}
-.db-wsum-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.18rem 0;
-    font-size: 0.75rem;
-    border-bottom: 0.5px solid var(--border);
-}
-.db-wsum-row:last-child { border-bottom: none; }
-.db-wsum-metric { color: var(--text-muted); }
-.db-wsum-val { font-weight: 700; }
 
 /* PDF icon button en cabecera Disponibilidad */
 .db-sort-btn--icon { padding: 3px 7px; font-size: 0.85rem; }
@@ -6798,10 +6640,7 @@ details[open] .ewma-toggle-hint { display: none; }
         overflow: visible;
     }
     .db-left { border-right: none; border-bottom: 0.5px solid var(--border); overflow-y: visible; }
-    .db-avail { border-left: none; border-top: 0.5px solid var(--border); overflow-y: visible; }
     .db-cal   { border-left: none; border-top: 0.5px solid var(--border); overflow-y: visible; min-height: 320px; }
-    .db-players { overflow-y: visible; max-height: none; }
-    .db-avail-list { overflow-y: visible; max-height: none; }
 }
 
 /* ============================================================
@@ -8588,69 +8427,6 @@ details[open] .ewma-toggle-hint { display: none; }
     }
 }
 
-/* ---- Team Readiness Widget ---- */
-.db-readiness-widget {
-    margin-top: 0.85rem;
-    background: var(--bg-card, #fff);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md, 10px);
-    padding: 0.75rem 0.9rem;
-}
-.db-readiness-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.65rem;
-}
-.db-readiness-title {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-.db-readiness-avg {
-    font-size: 0.8rem;
-    font-weight: 700;
-    padding: 0.2rem 0.6rem;
-    border-radius: 20px;
-}
-.rdy-rows { display: flex; flex-direction: column; gap: 0.35rem; }
-.rdy-row {
-    display: grid;
-    grid-template-columns: 20px 1fr 70px 46px;
-    align-items: center;
-    gap: 0.4rem;
-}
-.rdy-name {
-    font-size: 0.78rem;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.rdy-bar-wrap {
-    background: var(--bg-subtle);
-    border-radius: 4px;
-    height: 7px;
-    overflow: hidden;
-}
-.rdy-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 0.4s ease;
-}
-.rdy-bar-fill.rdy-green  { background: #4caf50; }
-.rdy-bar-fill.rdy-yellow { background: #ffca28; }
-.rdy-bar-fill.rdy-red    { background: #ef5350; }
-.rdy-bar-fill.rdy-none   { background: var(--border); }
-.rdy-val {
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-align: right;
-    white-space: nowrap;
-}
-
 /* ---- Edit Player Modal — A:C Thresholds section ---- */
 .ac-thresholds-details {
     border: 1px solid var(--border);
@@ -8733,109 +8509,6 @@ details[open] .ewma-toggle-hint { display: none; }
     white-space: nowrap;
 }
 .db-alert-btn-team:hover { opacity: 1; }
-
-/* ================================================================
-   TODAY PANEL
-   ================================================================ */
-.db-today-panel {
-    background: var(--bg-card);
-    border: 0.5px solid var(--border);
-    border-radius: 12px;
-    margin-bottom: 0.75rem;
-    overflow: hidden;
-}
-.db-today-header {
-    padding: 0.55rem 1rem;
-    border-bottom: 0.5px solid var(--border);
-    background: var(--bg-subtle);
-}
-.db-today-title {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: capitalize;
-    letter-spacing: 0.02em;
-}
-.db-today-kpis {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0;
-}
-.db-today-kpi {
-    padding: 0.65rem 0.5rem;
-    text-align: center;
-    cursor: pointer;
-    border-right: 0.5px solid var(--border);
-    transition: background 0.15s;
-}
-.db-today-kpi:last-child { border-right: none; }
-.db-today-kpi:hover { background: var(--bg-subtle); }
-.db-today-kpi-val {
-    display: block;
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.1;
-}
-.db-today-kpi-lbl {
-    display: block;
-    font-size: 0.65rem;
-    color: var(--text-secondary);
-    margin-top: 0.15rem;
-    white-space: nowrap;
-}
-.db-today-kpi--warn .db-today-kpi-val  { color: #e65100; }
-.db-today-kpi--danger .db-today-kpi-val { color: #c62828; }
-.db-today-kpi--ok .db-today-kpi-val    { color: #2e7d32; }
-[data-theme="dark"] .db-today-kpi--warn .db-today-kpi-val   { color: #ffb74d; }
-[data-theme="dark"] .db-today-kpi--danger .db-today-kpi-val { color: #ef9a9a; }
-[data-theme="dark"] .db-today-kpi--ok .db-today-kpi-val     { color: #81c784; }
-.db-today-pending {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-top: 0.5px solid var(--border);
-    flex-wrap: wrap;
-    background: #fff8e1;
-}
-[data-theme="dark"] .db-today-pending { background: rgba(255,193,7,0.08); }
-.db-today-pending--ok { background: #f1f8e9; }
-[data-theme="dark"] .db-today-pending--ok { background: rgba(76,175,80,0.08); }
-.db-today-pending-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    white-space: nowrap;
-}
-.db-today-pending-names {
-    font-size: 0.72rem;
-    color: #e65100;
-    flex: 1;
-    min-width: 0;
-}
-[data-theme="dark"] .db-today-pending-names { color: #ffb74d; }
-.db-today-wa-btn {
-    flex-shrink: 0;
-    font-size: 0.7rem;
-    padding: 0.25rem 0.6rem;
-    border-radius: 6px;
-    border: 0.5px solid #e65100;
-    background: transparent;
-    color: #e65100;
-    cursor: pointer;
-    font-weight: 600;
-    transition: background 0.15s;
-    white-space: nowrap;
-}
-.db-today-wa-btn:hover { background: rgba(230,81,0,0.08); }
-[data-theme="dark"] .db-today-wa-btn { border-color: #ffb74d; color: #ffb74d; }
-[data-theme="dark"] .db-today-wa-btn:hover { background: rgba(255,183,77,0.1); }
-@media (max-width: 480px) {
-    .db-today-kpi-val { font-size: 1.2rem; }
-    .db-today-kpi-lbl { font-size: 0.6rem; }
-    .db-today-pending { gap: 0.35rem; }
-}
 
 /* ================================================================
    A) PRE-SESSION BUTTON
