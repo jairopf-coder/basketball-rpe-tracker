@@ -211,12 +211,16 @@ RPETracker.prototype.renderDashboard = function() {
 
         <div class="db-split">
 
-            <!-- Columna izquierda: métricas de carga -->
+            <!-- COLUMNA IZQUIERDA: tarjeta gráfico + tarjeta métricas + tarjeta calendario -->
             <div class="db-left">
+
+                <!-- Tarjeta 1: Gráfico de carga 7d -->
                 <div class="db-left-section">
-                    <div class="db-left-label">Carga equipo 7d</div>
+                    <div class="db-left-label">📈 Carga equipo 7d</div>
                     <canvas id="teamSparklineCanvas" class="db-team-sparkline" width="200" height="70"></canvas>
                 </div>
+
+                <!-- Tarjeta 2: Resumen semana + temporada -->
                 <div class="db-left-section">
                     <div class="db-left-label">Esta semana</div>
                     <div class="db-metric-row">
@@ -235,9 +239,7 @@ RPETracker.prototype.renderDashboard = function() {
                         <span class="db-metric-lbl">Partidos</span>
                         <span class="db-metric-val">${matchCount}</span>
                     </div>
-                </div>
-                <div class="db-left-section">
-                    <div class="db-left-label">Temporada</div>
+                    <div class="db-left-label" style="margin-top:0.9rem">Temporada</div>
                     <div class="db-metric-row">
                         <span class="db-metric-lbl">Total sesiones</span>
                         <span class="db-metric-val">${totalSessions}</span>
@@ -256,46 +258,52 @@ RPETracker.prototype.renderDashboard = function() {
                         <span class="db-metric-val" style="color:#f44336">${activeInjuries}</span>
                     </div>` : ''}
                 </div>
+
+                <!-- Tarjeta 5: Calendario + Wellness/Fatiga/Pendientes -->
+                <div class="db-cal" id="dbCalColumn">
+                    <!-- filled by renderDashboardCalendar() + _renderRightWidgets() -->
+                </div>
+
             </div>
 
-            <!-- Columna central: ratio A:C + comparativa -->
+            <!-- COLUMNA DERECHA: tarjeta ratio A:C + comparativa + radar -->
             <div class="db-right">
+
+                <!-- Tarjeta 3: Ratio A:C jugadoras -->
                 <div class="db-right-sticky">
-                <div class="db-right-header">
-                    <div class="db-right-header-left">
-                        <span class="db-right-title">Ratio A:C — jugadoras</span>
-                        <div class="db-avail-pills-inline">
-                            <span class="db-avail-pill db-avail-ok">${availGroups.ok.length} <span>aptas</span></span>
-                            <span class="db-avail-pill db-avail-caution">${availGroups.caution.length} <span>precaución</span></span>
-                            <span class="db-avail-pill db-avail-out">${availGroups.out.length} <span>no disp.</span></span>
+                    <div class="db-right-header">
+                        <div class="db-right-header-left">
+                            <span class="db-right-title">Ratio A:C — jugadoras</span>
+                            <div class="db-avail-pills-inline">
+                                <span class="db-avail-pill db-avail-ok">${availGroups.ok.length} <span>aptas</span></span>
+                                <span class="db-avail-pill db-avail-caution">${availGroups.caution.length} <span>precaución</span></span>
+                                <span class="db-avail-pill db-avail-out">${availGroups.out.length} <span>no disp.</span></span>
+                            </div>
+                        </div>
+                        <div class="db-right-header-btns">
+                            <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
+                                ${sortLabel[this._dashSort]}
+                            </button>
+                            <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Informe PDF">
+                                📄
+                            </button>
                         </div>
                     </div>
-                    <div class="db-right-header-btns">
-                        <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
-                            ${sortLabel[this._dashSort]}
-                        </button>
-                        <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Informe PDF">
-                            📄
-                        </button>
+                    <div class="db-right-legend">
+                        <span style="color:#4caf50">● óptimo</span>
+                        <span style="color:#ff9800">● precaución</span>
+                        <span style="color:#f44336">● peligro</span>
+                        <span style="color:#2196f3">● bajo</span>
+                        <span style="margin-left:auto;font-size:0.65rem;color:var(--text-faint)">😴⚡😊💪 = wellness 7d</span>
                     </div>
-                </div>
-                <div class="db-right-legend">
-                    <span style="color:#4caf50">● óptimo</span>
-                    <span style="color:#ff9800">● precaución</span>
-                    <span style="color:#f44336">● peligro</span>
-                    <span style="color:#2196f3">● bajo</span>
-                    <span style="margin-left:auto;font-size:0.65rem;color:var(--text-faint)">😴⚡😊💪 = wellness 7d</span>
-                </div>
                 </div><!-- /db-right-sticky -->
                 <div class="db-players">
                     ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
                 </div>
-                ${this._renderPlayerComparisonSection()}
-            </div>
 
-            <!-- Columna derecha: calendario + wellness + fatiga + pending -->
-            <div class="db-cal" id="dbCalColumn">
-                <!-- filled by renderDashboardCalendar() + _renderRightWidgets() -->
+                <!-- Tarjetas 4 y 6: Comparativa + Radar -->
+                ${this._renderPlayerComparisonSection()}
+
             </div>
 
         </div>

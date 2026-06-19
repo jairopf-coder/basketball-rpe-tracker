@@ -143,19 +143,19 @@ RPETracker.prototype._renderPlayerComparisonSection = function() {
             </table>
             <div class="cmp-table-hint">Ordenado por mayor riesgo (A:C). 😴⚡😊💪 en escala 1–5 (mayor = mejor).</div>
         </div>
+    </div>
 
-        <div class="db-comparison-radar">
-            <div class="cmp-radar-header">
-                <span class="db-left-label">🕸️ Radar de wellness (7 días)</span>
-                <span class="cmp-subtitle">Selecciona hasta ${MAX_RADAR_PLAYERS} jugadoras</span>
-            </div>
-            <div class="cmp-checks">${checkboxes}</div>
-            <div class="cmp-radar-canvas-wrap">
-                <canvas id="comparisonRadarCanvas" height="280"></canvas>
-            </div>
-            <div id="comparisonRadarEmpty" class="cmp-radar-empty" style="display:none">
-                Selecciona al menos una jugadora con datos de wellness.
-            </div>
+    <div class="db-comparison-radar">
+        <div class="cmp-radar-header">
+            <span class="db-left-label">🕸️ Radar de wellness (7 días)</span>
+            <span class="cmp-subtitle">Selecciona hasta ${MAX_RADAR_PLAYERS} jugadoras</span>
+        </div>
+        <div class="cmp-checks">${checkboxes}</div>
+        <div class="cmp-radar-canvas-wrap">
+            <canvas id="comparisonRadarCanvas" height="280"></canvas>
+        </div>
+        <div id="comparisonRadarEmpty" class="cmp-radar-empty" style="display:none">
+            Selecciona al menos una jugadora con datos de wellness.
         </div>
     </div>`;
 };

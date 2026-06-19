@@ -4156,47 +4156,51 @@ header h1 {
     .nav-groups { top: 48px; }
 }
 
-/* ===== DASHBOARD LAYOUT A — DOS COLUMNAS ===== */
-/* (el padding de .dashboard-container ya lo definen las reglas responsive
-   compartidas con .players-container/.analytics-container más arriba en
-   el archivo — antes se anulaban aquí con padding:0, causando que el
-   dashboard pareciera "pegado" a los bordes a diferencia del resto de vistas) */
+/* ===== DASHBOARD LAYOUT — TARJETAS ===== */
+/*
+   Nuevo diseño: el dashboard usa el mismo sistema de tarjetas que
+   el resto de vistas (Salud, Wellness, etc.).
+   El contenedor padre es .dashboard-container (ya definido arriba con
+   padding + max-width 1200px), por lo que aquí solo definimos el grid
+   interno y las tarjetas.
+*/
 
-/* KPI bar — siempre visible arriba del dashboard */
+/* ── KPI bar — tarjeta superior ─────────────────────────────────── */
 .db-kpi-bar {
     display: flex;
-    max-width: 1200px;
-    margin: 0 auto;
-    border: 0.5px solid var(--border);
-    border-bottom: none;
-    border-radius: 12px 12px 0 0;
-    overflow: hidden;
     background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1rem;
 }
 .db-kpi {
-    flex: 0 0 20%;
-    padding: 0.7rem 1rem;
-    border-right: 0.5px solid var(--border);
+    flex: 1;
+    padding: 0.85rem 1rem;
+    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 2px;
+    gap: 3px;
     cursor: default;
     min-width: 0;
+    transition: background 0.15s;
 }
 .db-kpi:last-child { border-right: none; }
-.db-kpi[onclick] { cursor: pointer; transition: background 0.15s; }
+.db-kpi[onclick] { cursor: pointer; }
 .db-kpi[onclick]:hover { background: var(--bg-subtle); }
 .db-kpi-val {
-    font-size: 1.4rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1.1;
 }
 .db-kpi-lbl {
-    font-size: 0.68rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
+    font-weight: 500;
 }
 .db-kpi--warn .db-kpi-val   { color: #e65100; }
 .db-kpi--danger .db-kpi-val { color: #c62828; }
@@ -4206,82 +4210,82 @@ header h1 {
 [data-theme="dark"] .db-kpi--danger .db-kpi-val { color: #ef9a9a; }
 [data-theme="dark"] .db-kpi--ok .db-kpi-val     { color: #81c784; }
 [data-theme="dark"] .db-kpi--low .db-kpi-val    { color: #64b5f6; }
-[data-theme="dark"] .db-kpi-bar { background: var(--bg-surface); }
-
-@media (max-width: 768px) {
-    .db-kpi-bar { flex-wrap: wrap; max-width: 100%; border-left: none; border-right: none; border-radius: 0; }
-    .db-kpi { flex: 1 1 50%; }
-    .db-kpi-val { font-size: 1.15rem; }
-    .db-kpi-lbl { font-size: 0.6rem; }
+[data-theme="dark"] .db-kpi-bar {
+    background: var(--bg-surface);
+    border-color: var(--border);
 }
 
-/* Split layout — 3 columns.
-   Cada columna ocupa solo el alto de su propio contenido (align-items:start)
-   y es la página la que scrollea entera — una sola barra de scroll. */
+/* ── Grid principal: 2 columnas en escritorio ────────────────────── */
 .db-split {
     display: grid;
-    grid-template-columns: 240px minmax(0,1fr) 310px;
+    grid-template-columns: 260px 1fr;
     align-items: start;
-    max-width: 1200px;
-    margin: 0 auto;
-    border: 0.5px solid var(--border);
-    border-radius: 0 0 12px 12px;
-    overflow: hidden;
-    background: var(--bg-surface);
+    gap: 1rem;
 }
 
-/* Left column */
+/* Columna izquierda: carga + métricas + calendario, apiladas */
 .db-left {
-    border-right: 0.5px solid var(--border);
-    padding: 1rem 0;
     display: flex;
     flex-direction: column;
+    gap: 1rem;
 }
 
+/* Cada bloque de la columna izquierda es una tarjeta */
 .db-left-section {
-    padding: 0.5rem 1.25rem 0.75rem;
-    border-bottom: 0.5px solid var(--border);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    box-shadow: var(--shadow-sm);
 }
-
-.db-left-section:last-child { border-bottom: none; }
 
 .db-left-label {
-    font-size: 0.68rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 0.5rem;
+    letter-spacing: 0.07em;
+    margin-bottom: 0.65rem;
 }
 
 .db-metric-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.3rem 0;
-    border-bottom: 0.5px solid var(--border);
+    padding: 0.32rem 0;
+    border-bottom: 1px solid var(--border);
     font-size: 0.85rem;
 }
-
 .db-metric-row:last-child { border-bottom: none; }
 .db-metric-lbl { color: var(--text-muted); }
 .db-metric-val { font-weight: 700; color: var(--text-primary); }
 
-/* Right column (centro) — sin scroll propio, ver .db-split */
+/* ── Columna derecha: stack vertical de tarjetas ──────────────────── */
 .db-right {
     display: flex;
     flex-direction: column;
+    gap: 1rem;
     min-width: 0;
 }
 
+/* Tarjeta: Ratio A:C + comparativa + radar (todo en .db-right) */
+.db-right-sticky {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+    box-shadow: none; /* unificado con db-players abajo */
+}
+
+/* Header interno de la tarjeta ratio A:C */
 .db-right-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.5rem;
-    padding: 0.55rem 1.25rem 0.45rem;
-    border-bottom: 0.5px solid var(--border);
+    padding: 0.75rem 1.1rem 0.55rem;
+    border-bottom: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
     background: var(--bg-surface);
 }
 
@@ -4302,8 +4306,8 @@ header h1 {
 }
 
 .db-right-title {
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 0.88rem;
+    font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
 }
@@ -4321,25 +4325,24 @@ header h1 {
 }
 
 .db-right-label {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
 }
 
 .db-sort-btn {
     font-size: 0.75rem;
-    padding: 3px 10px;
+    padding: 4px 12px;
     border-radius: 20px;
-    border: 0.5px solid var(--border);
+    border: 1px solid var(--border);
     background: var(--bg-surface);
     color: var(--text-muted);
     cursor: pointer;
     transition: all 0.15s;
     white-space: nowrap;
 }
-
 .db-sort-btn:hover {
     border-color: var(--primary);
     color: var(--primary);
@@ -4350,17 +4353,19 @@ header h1 {
     gap: 0.75rem;
     font-size: 0.68rem;
     color: var(--text-muted);
-    padding: 0.3rem 1.25rem;
-    background: var(--bg-surface);
-    border-bottom: 0.5px solid var(--border);
-}
-/* Header + leyenda forman un único bloque (envueltos en .db-right-sticky) */
-.db-right-sticky {
-    background: var(--bg-surface);
+    padding: 0.35rem 1.1rem;
+    background: var(--bg-subtle);
+    border-bottom: 1px solid var(--border);
 }
 
+/* Lista de jugadoras — cierra la tarjeta ratio A:C */
 .db-players {
-    padding: 0.25rem 1.25rem 1rem;
+    padding: 0.25rem 1.1rem 0.9rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    box-shadow: var(--shadow-sm);
 }
 
 .db-player-row {
@@ -4369,9 +4374,8 @@ header h1 {
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 0;
-    border-bottom: 0.5px solid var(--border);
+    border-bottom: 1px solid var(--border);
 }
-
 .db-player-row:last-child { border-bottom: none; }
 
 .db-player-name {
@@ -4384,7 +4388,6 @@ header h1 {
     align-items: center;
     gap: 5px;
 }
-
 .db-num { font-size: 0.72rem; color: var(--text-muted); font-weight: 400; }
 
 .db-player-bar {
@@ -4395,7 +4398,6 @@ header h1 {
     overflow: visible;
     outline: 1px solid var(--border);
 }
-
 .db-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
 
 .db-bar-lo, .db-bar-hi {
@@ -4409,14 +4411,9 @@ header h1 {
 .db-bar-lo { left: 40%; }
 .db-bar-hi { left: 65%; }
 
-[data-theme="dark"] .db-player-bar {
-    background: #2a2a32;
-    outline-color: #3e3e4a;
-}
+[data-theme="dark"] .db-player-bar  { background: #2a2a32; outline-color: #3e3e4a; }
 [data-theme="dark"] .db-bar-lo,
-[data-theme="dark"] .db-bar-hi {
-    background: #666;
-}
+[data-theme="dark"] .db-bar-hi      { background: #666; }
 
 .db-player-ratio { font-size: 0.88rem; font-weight: 700; text-align: right; }
 .db-player-icon  { font-size: 13px; text-align: center; }
@@ -4429,13 +4426,24 @@ header h1 {
     background: var(--bg-subtle);
     min-width: 30px;
 }
-.db-empty        { color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0; text-align: center; }
+.db-empty { color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0; text-align: center; }
 
-/* ── Comparativa de jugadoras + radar de wellness (dentro de .db-right) ── */
-.db-comparison,
+/* ── Comparativa de jugadoras — tarjeta independiente ────────────── */
+.db-comparison {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.1rem 1.1rem;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Radar de wellness — tarjeta independiente */
 .db-comparison-radar {
-    padding: 1rem 1.25rem 1.1rem;
-    border-top: 0.5px solid var(--border);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.1rem 1.1rem;
+    box-shadow: var(--shadow-sm);
 }
 
 .db-comparison-header,
@@ -4447,35 +4455,26 @@ header h1 {
     gap: 0.4rem;
     margin-bottom: 0.75rem;
 }
-
 .db-comparison-header .db-left-label,
-.cmp-radar-header .db-left-label {
-    margin-bottom: 0;
-}
+.cmp-radar-header .db-left-label { margin-bottom: 0; }
 
 .cmp-subtitle {
     font-size: 0.72rem;
     color: var(--text-muted);
 }
 
-/* Aplanamos la tarjeta compartida con el comparador de Analítica (sombra +
-   radio propios) para que aquí se integre como una sección más del panel,
-   en vez de flotar como una tarjeta independiente dentro de otra */
 .db-comparison .cmp-table-wrap {
     border-radius: 8px;
     box-shadow: none;
     background: transparent;
-    border: 0.5px solid var(--border);
+    border: 1px solid var(--border);
     margin-top: 0;
 }
-
 .db-comparison .cmp-table { min-width: 560px; font-size: 0.8rem; }
-
 .db-comparison .cmp-table thead tr {
     background: var(--bg-subtle);
-    border-bottom: 0.5px solid var(--border);
+    border-bottom: 1px solid var(--border);
 }
-
 .db-comparison .cmp-table th {
     padding: 0.5rem 0.6rem;
     text-align: center;
@@ -4484,47 +4483,17 @@ header h1 {
     color: var(--text-muted);
     white-space: nowrap;
 }
-
 .db-comparison .cmp-table td { vertical-align: middle; }
 
-.cmp-th-player {
-    text-align: left !important;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.cmp-td-player {
-    padding: 0.5rem 0.6rem;
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    white-space: nowrap;
-}
-
-.cmp-player-name {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
+.cmp-th-player { text-align: left !important; text-transform: uppercase; letter-spacing: 0.04em; }
+.cmp-td-player { padding: 0.5rem 0.6rem; display: flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+.cmp-player-name { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
 .db-comparison .cmp-td-ratio,
-.db-comparison .cmp-td-w {
-    padding: 0.5rem 0.6rem;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-secondary);
-}
-
+.db-comparison .cmp-td-w { padding: 0.5rem 0.6rem; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
 .cmp-td-flag { padding: 0.5rem 0.4rem; text-align: center; width: 28px; }
 .cmp-flag    { font-size: 0.85rem; }
 .cmp-nodata  { color: var(--text-muted); }
-
-.cmp-table-hint {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    padding: 0.55rem 0.75rem;
-    border-top: 0.5px solid var(--border);
-}
+.cmp-table-hint { font-size: 0.7rem; color: var(--text-muted); padding: 0.55rem 0.75rem; border-top: 1px solid var(--border); }
 
 .badge-insuf {
     display: inline-flex;
@@ -4539,14 +4508,8 @@ header h1 {
     white-space: nowrap;
 }
 
-/* Radar de wellness — selector de jugadoras + gráfico */
-.cmp-checks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-bottom: 0.85rem;
-}
-
+/* Radar: selector de jugadoras */
+.cmp-checks { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.85rem; }
 .cmp-check {
     display: inline-flex;
     align-items: center;
@@ -4554,46 +4517,18 @@ header h1 {
     font-size: 0.78rem;
     padding: 3px 9px 3px 6px;
     border-radius: 20px;
-    border: 0.5px solid var(--border);
+    border: 1px solid var(--border);
     background: var(--bg-subtle);
     cursor: pointer;
     user-select: none;
 }
+.cmp-check .cmp-radar-checkbox { margin: 0; accent-color: var(--primary); cursor: pointer; }
+.cmp-check-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.cmp-check-name { font-weight: 500; color: var(--text-secondary); }
+.cmp-radar-canvas-wrap { position: relative; height: 280px; }
+.cmp-radar-empty { text-align: center; padding: 2rem 1rem; font-size: 0.85rem; color: var(--text-muted); }
 
-.cmp-check .cmp-radar-checkbox {
-    margin: 0;
-    accent-color: var(--primary);
-    cursor: pointer;
-}
-
-.cmp-check-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.cmp-check-name {
-    font-weight: 500;
-    color: var(--text-secondary);
-}
-
-.cmp-radar-canvas-wrap {
-    position: relative;
-    height: 280px;
-}
-
-.cmp-radar-empty {
-    text-align: center;
-    padding: 2rem 1rem;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-}
-
-@media (max-width: 768px) {
-    .db-comparison .cmp-table { min-width: 480px; }
-}
-
+/* ── Pills de disponibilidad ─────────────────────────────────────── */
 .db-avail-pill {
     display: inline-flex;
     align-items: center;
@@ -4603,36 +4538,38 @@ header h1 {
     padding: 2px 7px;
     border-radius: 20px;
 }
-
 .db-avail-pill span { font-weight: 400; color: inherit; opacity: 0.75; }
 .db-avail-ok      { background: var(--success-soft); color: var(--success); }
 .db-avail-caution { background: var(--warning-soft); color: var(--warning); }
 .db-avail-out     { background: var(--danger-soft);  color: var(--danger); }
 
-/* ── Dashboard Calendar column ─────────────────────────────────────── */
+/* ── Calendario — tarjeta dentro de .db-left, bajo las métricas ───── */
 .db-cal {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    border-left: 0.5px solid var(--border);
     background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
 }
 
 .db-cal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.65rem 1rem 0.4rem;
-    border-bottom: 0.5px solid var(--border);
+    padding: 0.75rem 1rem 0.5rem;
+    border-bottom: 1px solid var(--border);
     background: var(--bg-surface);
 }
 
 .db-cal-title {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
 }
 
 .db-cal-tabs {
@@ -4642,7 +4579,6 @@ header h1 {
     border-radius: 6px;
     padding: 2px;
 }
-
 .db-cal-tab {
     font-size: 0.68rem;
     font-weight: 600;
@@ -4654,7 +4590,6 @@ header h1 {
     cursor: pointer;
     transition: all 0.15s;
 }
-
 .db-cal-tab.active {
     background: var(--bg-surface);
     color: var(--primary);
@@ -4666,16 +4601,10 @@ header h1 {
     align-items: center;
     justify-content: space-between;
     padding: 0.35rem 1rem;
-    border-bottom: 0.5px solid var(--border);
+    border-bottom: 1px solid var(--border);
     background: var(--bg-subtle);
 }
-
-.db-cal-nav-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
+.db-cal-nav-label { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
 .db-cal-nav-btn {
     background: none;
     border: none;
@@ -4686,24 +4615,13 @@ header h1 {
     border-radius: 4px;
     transition: all 0.15s;
 }
-
 .db-cal-nav-btn:hover { background: var(--bg-elevated); color: var(--primary); }
 
-.db-cal-body {
-    padding: 0.5rem;
-}
+.db-cal-body { padding: 0.6rem; }
 
-/* Monthly mini-calendar */
-.db-mini-cal {
-    width: 100%;
-}
-
-.db-mini-cal-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
-}
-
+/* Calendario mensual */
+.db-mini-cal { width: 100%; }
+.db-mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
 .db-mini-cal-dow {
     font-size: 0.6rem;
     font-weight: 600;
@@ -4712,7 +4630,6 @@ header h1 {
     padding: 2px 0 4px;
     text-transform: uppercase;
 }
-
 .db-mini-day {
     aspect-ratio: 1;
     border-radius: 5px;
@@ -4726,17 +4643,9 @@ header h1 {
     min-height: 30px;
     transition: background 0.1s;
 }
-
 .db-mini-day.has-event { cursor: pointer; }
 .db-mini-day.has-event:hover { background: var(--bg-elevated) !important; }
-
-.db-mini-day-num {
-    font-size: 0.7rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    line-height: 1;
-}
-
+.db-mini-day-num { font-size: 0.7rem; font-weight: 500; color: var(--text-muted); line-height: 1; }
 .db-mini-day.today .db-mini-day-num {
     background: var(--primary);
     color: #fff;
@@ -4748,52 +4657,23 @@ header h1 {
     justify-content: center;
     font-weight: 700;
 }
-
 .db-mini-day.empty { cursor: default; }
+.db-mini-day-dot { width: 5px; height: 5px; border-radius: 50%; margin-top: 2px; flex-shrink: 0; }
+.db-mini-day-bar { width: 80%; height: 3px; border-radius: 2px; margin-top: 2px; }
+.db-mini-day-icon { font-size: 0.7rem; line-height: 1; margin-top: 1px; }
 
-.db-mini-day-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    margin-top: 2px;
-    flex-shrink: 0;
-}
-
-.db-mini-day-bar {
-    width: 80%;
-    height: 3px;
-    border-radius: 2px;
-    margin-top: 2px;
-}
-
-.db-mini-day-icon {
-    font-size: 0.7rem;
-    line-height: 1;
-    margin-top: 1px;
-}
-
-/* Weekly view */
-.db-week-view {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
+/* Vista semanal */
+.db-week-view { display: flex; flex-direction: column; gap: 3px; }
 .db-week-day-row {
     display: flex;
     align-items: stretch;
     gap: 0;
     border-radius: 6px;
     overflow: hidden;
-    border: 0.5px solid var(--border);
+    border: 1px solid var(--border);
     min-height: 36px;
 }
-
-.db-week-day-row.today-row {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 1px #ff660022;
-}
-
+.db-week-day-row.today-row { border-color: var(--primary); box-shadow: 0 0 0 1px #ff660022; }
 .db-week-day-label {
     width: 36px;
     flex-shrink: 0;
@@ -4803,38 +4683,13 @@ header h1 {
     justify-content: center;
     background: var(--bg-subtle);
     padding: 4px 0;
-    border-right: 0.5px solid var(--border);
+    border-right: 1px solid var(--border);
 }
-
-.db-week-day-name {
-    font-size: 0.6rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-}
-
-.db-week-day-num {
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1;
-}
-
-.db-week-day-row.today-row .db-week-day-label {
-    background: #ff660015;
-}
-
-.db-week-day-row.today-row .db-week-day-num { color: var(--primary); }
-
-.db-week-sessions {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
-    padding: 4px 8px;
-}
-
+.db-week-day-name { font-size: 0.6rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+.db-week-day-num  { font-size: 0.78rem; font-weight: 700; color: var(--text-primary); line-height: 1; }
+.db-week-day-row.today-row .db-week-day-label { background: #ff660015; }
+.db-week-day-row.today-row .db-week-day-num   { color: var(--primary); }
+.db-week-sessions { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 4px 8px; }
 .db-week-session-chip {
     display: flex;
     align-items: center;
@@ -4845,51 +4700,27 @@ header h1 {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.db-week-session-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.db-week-rest { font-size: 0.68rem; color: var(--text-muted); font-style: italic; padding: 4px 8px; align-self: center; }
 
-.db-week-session-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.db-week-rest {
-    font-size: 0.68rem;
-    color: var(--text-muted);
-    font-style: italic;
-    padding: 4px 8px;
-    align-self: center;
-}
-
-/* Legend strip */
+/* Leyenda del calendario */
 .db-cal-legend {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    padding: 0.4rem 0.5rem 0.2rem;
-    border-top: 0.5px solid var(--border);
+    padding: 0.4rem 0.6rem 0.35rem;
+    border-top: 1px solid var(--border);
     margin-top: 0.4rem;
 }
+.db-cal-legend-item { display: flex; align-items: center; gap: 3px; font-size: 0.62rem; color: var(--text-muted); }
+.db-cal-legend-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
-.db-cal-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 0.62rem;
-    color: var(--text-muted);
-}
-
-.db-cal-legend-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-/* ── Widgets bajo el calendario: Wellness hoy / Fatiga / Pendientes ── */
+/* ── Widgets de la columna derecha (wellness/fatiga/pendientes) ───── */
+/* Ahora son secciones internas de .db-cal — sin borde propio,
+   separadas por una línea entre ellas */
 .db-rw-section {
-    padding: 0.6rem 1rem 0.7rem;
-    border-top: 0.5px solid var(--border);
+    padding: 0.75rem 1rem 0.8rem;
+    border-top: 1px solid var(--border);
 }
 
 .db-rw-label {
@@ -4897,12 +4728,12 @@ header h1 {
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    font-size: 0.68rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 0.55rem;
+    letter-spacing: 0.07em;
+    margin-bottom: 0.6rem;
 }
 
 .db-rw-coverage {
@@ -4916,89 +4747,69 @@ header h1 {
     letter-spacing: normal;
 }
 
-.db-rw-bars {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-}
-
+.db-rw-bars { display: flex; flex-direction: column; gap: 0.45rem; }
 .db-rw-bar-row {
     display: grid;
     grid-template-columns: 70px 1fr 28px;
     align-items: center;
     gap: 0.55rem;
 }
-
-.db-rw-bar-lbl {
-    font-size: 0.74rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.db-rw-bar-track {
-    height: 6px;
-    background: var(--bg-subtle);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.db-rw-bar-fill {
-    height: 100%;
-    border-radius: 3px;
-    transition: width 0.4s ease;
-}
-
-.db-rw-bar-num {
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-align: right;
-}
-
-.db-rw-pending {
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    line-height: 1.5;
-}
-
+.db-rw-bar-lbl { font-size: 0.74rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.db-rw-bar-track { height: 6px; background: var(--bg-subtle); border-radius: 3px; overflow: hidden; }
+.db-rw-bar-fill  { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.db-rw-bar-num   { font-size: 0.78rem; font-weight: 700; text-align: right; }
+.db-rw-pending   { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; }
 .db-rw-pending-names { color: var(--text-secondary); }
+.db-rw-pending--ok { color: #2e7d32; font-weight: 600; }
 
-.db-rw-pending--ok {
-    color: #2e7d32;
-    font-weight: 600;
-}
-
-[data-theme="dark"] .db-rw-bar-track { background: #2a2a32; }
+/* ── Dark mode ───────────────────────────────────────────────────── */
+[data-theme="dark"] .db-rw-bar-track  { background: #2a2a32; }
 [data-theme="dark"] .db-rw-pending--ok { color: #81c784; }
-
-[data-theme="dark"] .db-cal { background: var(--bg-surface); border-color: var(--border); }
-[data-theme="dark"] .db-cal-header { background: var(--bg-surface); }
-[data-theme="dark"] .db-cal-nav { background: var(--bg-subtle); }
-[data-theme="dark"] .db-mini-day-dot { opacity: 0.85; }
+[data-theme="dark"] .db-cal           { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .db-cal-header    { background: var(--bg-surface); }
+[data-theme="dark"] .db-cal-nav       { background: var(--bg-subtle); }
+[data-theme="dark"] .db-mini-day-dot  { opacity: 0.85; }
 [data-theme="dark"] .db-week-day-label { background: var(--bg-subtle); }
 [data-theme="dark"] .db-week-day-row.today-row .db-week-day-label { background: #ff660020; }
+[data-theme="dark"] .db-left-section  { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .db-right-sticky  { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .db-right-header  { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .db-right-legend  { background: var(--bg-subtle); border-color: var(--border); }
+[data-theme="dark"] .db-players       { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .db-comparison    { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .db-comparison-radar { background: var(--bg-surface); border-color: var(--border); }
 
-/* Mobile: stack all columns */
+/* ── Responsive ──────────────────────────────────────────────────── */
 @media (min-width: 769px) and (max-width: 1100px) {
     .db-split {
-        grid-template-columns: 210px minmax(0,1fr) 270px;
-        max-width: 100%;
+        grid-template-columns: 220px 1fr;
     }
 }
 
 @media (max-width: 768px) {
-    .db-split { grid-template-columns: 1fr; min-height: auto; }
-    .db-left { border-right: none; border-bottom: 0.5px solid var(--border); }
-    .db-cal   { border-left: none; border-top: 0.5px solid var(--border); }
-    .db-left-section { padding: 0.5rem 1rem 0.6rem; }
-    .db-metric-row { font-size: 0.82rem; }
-    .db-right-header { padding: 0.5rem 1rem 0.35rem; }
-    .db-right-legend { padding: 0.25rem 1rem; font-size: 0.65rem; gap: 0.5rem; }
-    .db-players { padding: 0.25rem 1rem 1rem; }
-    .db-player-row { grid-template-columns: 20px 110px 1fr 38px 18px; gap: 0.4rem; }
-    .db-player-name { font-size: 0.82rem; }
+    .db-kpi-bar {
+        flex-wrap: wrap;
+        border-radius: 12px;
+        margin-bottom: 0.75rem;
+    }
+    .db-kpi          { flex: 1 1 50%; border-bottom: 1px solid var(--border); }
+    .db-kpi:nth-child(2n) { border-right: none; }
+    .db-kpi:nth-last-child(-n+2):nth-child(odd),
+    .db-kpi:last-child    { border-bottom: none; }
+    .db-kpi-val      { font-size: 1.2rem; }
+    .db-kpi-lbl      { font-size: 0.62rem; }
+
+    .db-split        { grid-template-columns: 1fr; gap: 0.75rem; }
+    .db-left         { grid-column: 1; grid-row: auto; }
+    .db-right        { grid-column: 1; grid-row: auto; }
+
+    .db-right-header { padding: 0.6rem 1rem 0.45rem; border-radius: 12px 12px 0 0; }
+    .db-right-legend { padding: 0.3rem 1rem; font-size: 0.65rem; gap: 0.5rem; }
+    .db-players      { padding: 0.25rem 1rem 0.85rem; border-radius: 0 0 12px 12px; }
+    .db-player-row   { grid-template-columns: 20px 110px 1fr 38px 18px; gap: 0.4rem; }
+    .db-player-name  { font-size: 0.82rem; }
     .db-player-ratio { font-size: 0.82rem; }
+    .db-comparison .cmp-table { min-width: 480px; }
 }
 
 /* ===================================================================
@@ -5552,8 +5363,6 @@ header h1 {
 /* Dashboard botón sort y header */
 [data-theme="dark"] .db-sort-btn { background: var(--bg-elevated); border-color: var(--border-input); color: var(--text-muted); }
 [data-theme="dark"] .db-sort-btn:hover { border-color: var(--primary); color: var(--primary); }
-[data-theme="dark"] .db-right-header { background: var(--bg-surface); }
-[data-theme="dark"] .db-right-legend { background: var(--bg-surface); }
 
 /* Info box (caja azul informativa EWMA en Análisis A:C) */
 [data-theme="dark"] .info-box,
@@ -6631,17 +6440,6 @@ details[open] .ewma-toggle-hint { display: none; }
 
 /* Nav badge – trend variant (purple) */
 .nav-alert-badge--trend { background: #9c27b0 !important; }
-
-/* Mobile responsive dashboard — columna única */
-@media (max-width: 640px) {
-    .db-split {
-        grid-template-columns: 1fr;
-        height: auto;
-        overflow: visible;
-    }
-    .db-left { border-right: none; border-bottom: 0.5px solid var(--border); overflow-y: visible; }
-    .db-cal   { border-left: none; border-top: 0.5px solid var(--border); overflow-y: visible; min-height: 320px; }
-}
 
 /* ============================================================
    MÓDULO DE RENDIMIENTO FÍSICO — Gimnasio & Tests
