@@ -259,11 +259,6 @@ RPETracker.prototype.renderDashboard = function() {
                     </div>` : ''}
                 </div>
 
-                <!-- Tarjeta 5: Calendario + Wellness/Fatiga/Pendientes -->
-                <div class="db-cal" id="dbCalColumn">
-                    <!-- filled by renderDashboardCalendar() + _renderRightWidgets() -->
-                </div>
-
             </div>
 
             <!-- COLUMNA DERECHA: tarjeta ratio A:C + comparativa + radar -->
@@ -303,6 +298,21 @@ RPETracker.prototype.renderDashboard = function() {
 
                 <!-- Tarjetas 4 y 6: Comparativa + Radar -->
                 ${this._renderPlayerComparisonSection()}
+
+            </div>
+
+            <!-- COLUMNA DERECHA (nueva): Calendario + Wellness/Fatiga/Pendientes -->
+            <div class="db-cal-col">
+
+                <!-- Tarjeta 5: Calendario -->
+                <div class="db-cal" id="dbCalColumn">
+                    <!-- filled by renderDashboardCalendar() -->
+                </div>
+
+                <!-- Tarjeta 7: Wellness hoy / Fatiga / Pendientes -->
+                <div class="db-rw-card" id="dbRightWidgets">
+                    <!-- filled by _renderRightWidgets() -->
+                </div>
 
             </div>
 
@@ -475,9 +485,9 @@ RPETracker.prototype._fallbackCopy = function(text) {
     document.body.removeChild(ta);
 };
 
-// ── _renderRightWidgets — wellness + fatiga + pending en columna derecha ──
+// ── _renderRightWidgets — wellness + fatiga + pending en tarjeta propia ──
 RPETracker.prototype._renderRightWidgets = function() {
-    const col = document.getElementById('dbCalColumn');
+    const col = document.getElementById('dbRightWidgets');
     if (!col) return;
 
     const _wToday = new Date().toISOString().slice(0, 10);
@@ -543,13 +553,8 @@ RPETracker.prototype._renderRightWidgets = function() {
         </div>
     </div>` : `<div class="db-rw-section"><div class="db-rw-pending db-rw-pending--ok">✅ Todas al día</div></div>`;
 
-    // Inject after calendar content
-    const existing = col.querySelector('.db-rw-widgets');
-    if (existing) existing.remove();
-    const wrap = document.createElement('div');
-    wrap.className = 'db-rw-widgets';
-    wrap.innerHTML = wsum + fatigueHTML + pendingHTML;
-    col.appendChild(wrap);
+    // Render into dedicated card (id="dbRightWidgets")
+    col.innerHTML = wsum + fatigueHTML + pendingHTML;
 };
 
 // ── renderDashboardCalendar ──────────────────────────────────────────
