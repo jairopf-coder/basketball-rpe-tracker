@@ -12,10 +12,6 @@ RPETracker.prototype.renderDashboard = function() {
     const container = document.getElementById('dashboardContent');
     if (!container) return;
 
-    // Ocultar botón "Cargar histórico" si ya se cargó todo
-    const histBtn = document.getElementById('loadFullHistoryBtn');
-    if (histBtn) histBtn.style.display = this._fullHistoryLoaded ? 'none' : '';
-
     // Show skeleton while computing (clears automatically when we set innerHTML)
     if (container.children.length === 0 || container.querySelector('.skeleton-card')) {
         if (typeof Skeleton !== 'undefined') Skeleton.show(container, 4, '72px');

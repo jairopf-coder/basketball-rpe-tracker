@@ -192,9 +192,12 @@ label {
     -webkit-overflow-scrolling: touch;
 }
 
-/* Global layout constraint — prevents zoom-out expansion */
+/* Global layout constraint — prevents zoom-out expansion.
+   1200px para que el fondo del header y la barra de navegación
+   coincidan exactamente con el ancho del resto del contenido
+   (todos los contenedores de página ya usan max-width: 1200px). */
 #app {
-    max-width: 1400px;
+    max-width: 1200px;
     margin: 0 auto;
     width: 100%;
 }
