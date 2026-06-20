@@ -4486,8 +4486,9 @@ header h1 {
 .db-comparison .cmp-table td { vertical-align: middle; }
 
 .cmp-th-player { text-align: left !important; text-transform: uppercase; letter-spacing: 0.04em; }
-.cmp-td-player { padding: 0.5rem 0.6rem; display: flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
-.cmp-player-name { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+.cmp-td-player { padding: 0.5rem 0.6rem; white-space: nowrap; }
+.cmp-td-player-inner { display: flex; align-items: center; flex-wrap: nowrap; gap: 0.45rem; min-width: 0; }
+.cmp-player-name { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; }
 .db-comparison .cmp-td-ratio,
 .db-comparison .cmp-td-w { padding: 0.5rem 0.6rem; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
 .cmp-td-flag { padding: 0.5rem 0.4rem; text-align: center; width: 28px; }
@@ -4559,7 +4560,7 @@ header h1 {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 1rem 0.5rem;
+    padding: 0.75rem 1.1rem 0.5rem;
     border-bottom: 1px solid var(--border);
     background: var(--bg-surface);
 }
@@ -4600,7 +4601,7 @@ header h1 {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.35rem 1rem;
+    padding: 0.35rem 1.1rem;
     border-bottom: 1px solid var(--border);
     background: var(--bg-subtle);
 }
@@ -4719,7 +4720,7 @@ header h1 {
 /* Ahora son secciones internas de .db-cal — sin borde propio,
    separadas por una línea entre ellas */
 .db-rw-section {
-    padding: 0.75rem 1rem 0.8rem;
+    padding: 0.75rem 1.1rem 0.8rem;
     border-top: 1px solid var(--border);
 }
 

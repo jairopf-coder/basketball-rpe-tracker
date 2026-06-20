@@ -95,8 +95,10 @@ RPETracker.prototype._renderPlayerComparisonSection = function() {
     const tableRows = rows.map(({ player, ratio, wellness }) => `
         <tr class="cmp-row">
             <td class="cmp-td-player">
-                ${PlayerTokens.avatar(player, 22, '0.6rem')}
-                <span class="cmp-player-name">${esc(player.name)}</span>
+                <div class="cmp-td-player-inner">
+                    ${PlayerTokens.avatar(player, 22, '0.6rem')}
+                    <span class="cmp-player-name">${esc(player.name)}</span>
+                </div>
             </td>
             <td class="cmp-td-ratio">${ratioCell(ratio, player.id)}</td>
             <td class="cmp-td-w">${wellnessCell(wellness, 'sleep')}</td>
