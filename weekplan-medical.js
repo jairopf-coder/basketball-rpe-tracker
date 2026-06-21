@@ -1752,7 +1752,7 @@ RPETracker.prototype.renderMicrociclo = function() {
     const styles = `
     <style>
     /* ── Microciclo Layout ─────────────────────────────── */
-    .mc-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:.75rem}
+    .mc-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-bottom:1.5rem}
     @media(max-width:480px){.mc-kpi-row{grid-template-columns:1fr 1fr;}}
     @media(max-width:320px){.mc-kpi-row{grid-template-columns:1fr;}}
 
@@ -1766,7 +1766,7 @@ RPETracker.prototype.renderMicrociclo = function() {
     .mc-kpi-bad {border-color:var(--danger-color,#f44336);background:color-mix(in srgb,var(--danger-color,#f44336) 10%,transparent)}
 
     /* ── Progress bar ──────────────────────────────────── */
-    .mc-bar-card{margin-bottom:.75rem}
+    .mc-bar-card{margin-bottom:1.5rem}
     .mc-bar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem}
     .mc-bar-pct{font-size:1.1rem;font-weight:700;color:var(--text-primary)}
     .mc-bar-track{position:relative;height:.75rem;background:var(--border-color);border-radius:.4rem;overflow:visible}
@@ -1832,7 +1832,7 @@ RPETracker.prototype.renderMicrociclo = function() {
 
     container.innerHTML = `
         ${styles}
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.4rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:.4rem">
             <h2 style="margin:0;font-size:1.1rem;font-weight:700;color:var(--text-primary)">📆 Dashboard Microciclo</h2>
             <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
                 <span style="font-size:.78rem;color:var(--text-secondary)">${weekLabel}</span>
@@ -1841,9 +1841,9 @@ RPETracker.prototype.renderMicrociclo = function() {
         </div>
         ${kpiCards}
         ${progressBar}
-        <div class="wellness-card" style="margin-bottom:.75rem">
+        <div class="wellness-card" style="margin-bottom:1.5rem">
             <h3 class="wellness-section-title">📊 Carga diaria: semana actual vs anterior</h3>
-            <canvas id="mcWeekCompareChart" height="160" style="width:100%;display:block"></canvas>
+            <canvas id="mcWeekCompareChart" class="chart-canvas"></canvas>
             <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:.65rem;font-size:.76rem;color:var(--text-secondary)">
                 <span style="display:flex;align-items:center;gap:.35rem"><span style="display:inline-block;width:14px;height:10px;border-radius:3px;background:var(--primary-color,#ff9800)"></span>${weekLabel}</span>
                 <span style="display:flex;align-items:center;gap:.35rem"><span style="display:inline-block;width:14px;height:10px;border-radius:3px;background:rgba(160,160,160,.5)"></span>${prevWeekLabel}</span>
