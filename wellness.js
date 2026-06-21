@@ -729,7 +729,7 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
     if(document.getElementById('wellness-styles')) return;
     const s=document.createElement('style');s.id='wellness-styles';
     s.textContent=`
-.wellness-wrap{display:flex;flex-direction:column;gap:1rem}
+.wellness-wrap{display:flex;flex-direction:column;gap:1.5rem}
 .wellness-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .wellness-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:12px;padding:1.1rem 1.25rem}
 .wellness-section-title{font-size:.9rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin:0 0 .85rem}

@@ -968,7 +968,7 @@ header h1 {
 }
 
 .analytics-container {
-    padding: 2rem 1.5rem;
+    padding: 1.5rem;
     max-width: 1200px;
     margin: 0 auto;
 }
@@ -3090,7 +3090,7 @@ header h1 {
     }
 
     .analytics-container {
-        padding: 1.75rem 1.5rem;
+        padding: 1.5rem;
         max-width: 1200px;
         margin: 0 auto;
     }
@@ -9479,7 +9479,7 @@ details[open] .ewma-toggle-hint { display: none; }
     display: flex;
     flex-direction: column;
     gap: .5rem;
-    padding: 1rem 0;
+    padding: 1.5rem 0;
 }
 .season-block-row {
     display: flex;

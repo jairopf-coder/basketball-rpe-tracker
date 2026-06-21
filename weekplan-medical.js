@@ -853,7 +853,7 @@ RPETracker.prototype._getRehabLoadData = function(inj, player) {
 // ============================================================
 
 RPETracker.prototype.renderLoadInjuryCorrelation = function() {
-    const el = document.getElementById('correlationView');
+    const el = document.getElementById('correlationContentView');
     if (!el) return;
 
     const injuries = this.injuries || [];
@@ -1103,7 +1103,7 @@ RPETracker.prototype._drawCorrChart = function(data) {
     if(document.getElementById('batch4-styles')) return;
     const s=document.createElement('style');s.id='batch4-styles';
     s.textContent=`
-.weekplan-wrap{display:flex;flex-direction:column;gap:1rem}
+.weekplan-wrap{display:flex;flex-direction:column;gap:1.5rem}
 .weekplan-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .weekplan-summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem}
 .wp-sum-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:.85rem 1rem;text-align:center;display:flex;flex-direction:column;gap:.25rem}
