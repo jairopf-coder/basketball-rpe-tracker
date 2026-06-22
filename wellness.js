@@ -432,39 +432,71 @@ RPETracker.prototype._drawWellnessTrendChart = function() {
 // ========== HISTORY ==========
 
 RPETracker.prototype._renderWHistory = function() {
-    const all=[...(this.wellnessData||[])].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
+    const all=[...(this.wellnessData||[])].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,90);
     if(!all.length) return `<div class="wellness-card" style="text-align:center;padding:2rem;color:var(--text-secondary)">
         <p style="font-size:2rem">📋</p><p>Sin registros aún. ¡Empieza hoy!</p></div>`;
+
+    // Agrupar por fecha
+    const byDate = {};
+    all.forEach(w => {
+        if(!byDate[w.date]) byDate[w.date] = [];
+        byDate[w.date].push(w);
+    });
+    const dates = Object.keys(byDate).sort((a,b) => b.localeCompare(a));
+
+    const dot = v => v!=null
+        ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${this._wColor(v)}" title="${v}/5"></span> ${v}`
+        : '—';
+
+    const groupsHTML = dates.map(date => {
+        const records = byDate[date];
+        const dayLabel = this._wFmtDate(date);
+        const avgOverall = records.reduce((s,w) => s + this._wOverall(w), 0) / records.length;
+
+        const rowsHTML = records.map(w => {
+            const p = this.players.find(x => x.id === w.playerId);
+            if(!p) return '';
+            const o = this._wOverall(w);
+            return `<tr>
+                <td><div style="display:flex;align-items:center;gap:.35rem">${PlayerTokens.avatar(p,17,'.5rem')}<span style="font-size:.83rem">${p.name}</span></div></td>
+                <td style="font-size:.82rem">${dot(w.sleep)}</td>
+                <td style="font-size:.82rem">${dot(w.fatigue)}</td>
+                <td style="font-size:.82rem">${dot(w.mood)}</td>
+                <td style="font-size:.82rem">${dot(w.soreness)}</td>
+                <td><strong style="color:${this._wColor(o)}">${o.toFixed(1)}</strong></td>
+                <td style="font-size:.78rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.notes||'—')}</td>
+                <td><button class="btn-icon-sm" onclick="window.rpeTracker?._deleteWellness('${w.id}')">🗑️</button></td>
+            </tr>`;
+        }).join('');
+
+        return `
+        <details class="wh-day-group">
+            <summary class="wh-day-summary">
+                <span class="wh-day-label">${dayLabel}</span>
+                <span class="wh-day-meta">
+                    <span class="wh-day-count">${records.length} registro${records.length>1?'s':''}</span>
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${this._wColor(avgOverall)}"></span>
+                    <span style="font-size:.82rem;font-weight:600;color:${this._wColor(avgOverall)}">${avgOverall.toFixed(1)}</span>
+                </span>
+                <span class="wh-day-chevron">›</span>
+            </summary>
+            <div class="wh-day-body">
+                <div style="overflow-x:auto">
+                    <table class="wellness-history-table">
+                        <thead><tr><th>Jugadora</th><th>😴</th><th>⚡</th><th>😊</th><th>💪</th><th>Global</th><th>Notas</th><th></th></tr></thead>
+                        <tbody>${rowsHTML}</tbody>
+                    </table>
+                </div>
+            </div>
+        </details>`;
+    }).join('');
 
     return `<div class="wellness-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
             <h3 class="wellness-section-title" style="margin:0">📋 Historial reciente</h3>
             <button class="btn-danger-sm" onclick="window.rpeTracker?._clearWellness()">🗑️ Limpiar todo</button>
         </div>
-        <div style="overflow-x:auto">
-            <table class="wellness-history-table">
-                <thead><tr><th>Fecha</th><th>Jugadora</th><th>😴</th><th>⚡</th><th>😊</th><th>💪</th><th>Global</th><th>Notas</th><th></th></tr></thead>
-                <tbody>
-                    ${all.map(w=>{
-                        const p=this.players.find(x=>x.id===w.playerId);
-                        if(!p)return'';
-                        const o=this._wOverall(w);
-                        const dot=v=>v!=null?`<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${this._wColor(v)}" title="${v}/5"></span> ${v}`:'—';
-                        return `<tr>
-                            <td style="white-space:nowrap;font-size:.8rem">${this._wFmtDate(w.date)}</td>
-                            <td><div style="display:flex;align-items:center;gap:.35rem">${PlayerTokens.avatar(p,17,'.5rem')}<span style="font-size:.83rem">${p.name}</span></div></td>
-                            <td style="font-size:.82rem">${dot(w.sleep)}</td>
-                            <td style="font-size:.82rem">${dot(w.fatigue)}</td>
-                            <td style="font-size:.82rem">${dot(w.mood)}</td>
-                            <td style="font-size:.82rem">${dot(w.soreness)}</td>
-                            <td><strong style="color:${this._wColor(o)}">${o.toFixed(1)}</strong></td>
-                            <td style="font-size:.78rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.notes||'—')}</td>
-                            <td><button class="btn-icon-sm" onclick="window.rpeTracker?._deleteWellness('${w.id}')">🗑️</button></td>
-                        </tr>`;
-                    }).join('')}
-                </tbody>
-            </table>
-        </div>
+        <div class="wh-groups">${groupsHTML}</div>
     </div>`;
 };
 
@@ -778,6 +810,17 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 .btn-icon-sm:hover{opacity:1;background:rgba(244,67,54,.1)}
 .btn-danger-sm{background:none;border:1px solid #f44336;color:#f44336;padding:.25rem .6rem;border-radius:6px;font-size:.78rem;cursor:pointer;transition:background .15s}
 .btn-danger-sm:hover{background:rgba(244,67,54,.1)}
+/* ── Historial agrupado por día ── */
+.wh-groups{display:flex;flex-direction:column;gap:.4rem}
+.wh-day-group{border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.wh-day-summary{display:flex;align-items:center;gap:.75rem;padding:.65rem 1rem;cursor:pointer;list-style:none;user-select:none;background:var(--bg-surface)}
+.wh-day-summary::-webkit-details-marker{display:none}
+.wh-day-label{font-size:.87rem;font-weight:600;color:var(--text-primary);flex:1}
+.wh-day-meta{display:flex;align-items:center;gap:.4rem;flex-shrink:0}
+.wh-day-count{font-size:.75rem;color:var(--text-secondary);background:var(--bg-subtle);padding:.1rem .45rem;border-radius:10px;border:1px solid var(--border)}
+.wh-day-chevron{font-size:1.1rem;color:var(--text-muted);transition:transform .2s ease;flex-shrink:0}
+.wh-day-group[open] .wh-day-chevron{transform:rotate(90deg)}
+.wh-day-body{border-top:1px solid var(--border);padding:.6rem .75rem;background:var(--bg-subtle)}
 @media(max-width:640px){.wellness-header{flex-direction:column}.ws-label-lo,.ws-label-hi{width:55px;font-size:.65rem}.ws-pips{margin:.35rem 55px 0}}
 `;
     document.head.appendChild(s);
