@@ -280,6 +280,7 @@ RPETracker.prototype.saveTeamSession = function() {
 
     this.saveSessions();
     this.renderSessions();
+    if (this.currentView === 'dashboard') this.renderDashboard();
     this.closeModal('newSessionModal');
     const n = this.selectedPlayerIds.length;
 

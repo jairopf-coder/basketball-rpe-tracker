@@ -4346,6 +4346,7 @@ header h1 {
     border: 1px solid var(--border);
     border-radius: 12px 12px 0 0;
     box-shadow: none; /* unificado con db-players abajo */
+    /* La leyenda ya no está aquí — está entre db-players y db-comparison */
 }
 
 /* Header interno de la tarjeta ratio A:C */
@@ -4420,6 +4421,18 @@ header h1 {
     color: var(--primary);
 }
 
+/* Lista de jugadoras — parte central de la tarjeta ratio A:C */
+.db-players {
+    padding: 0.25rem 1.1rem 0.5rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-bottom: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Leyenda — cierra la tarjeta ratio A:C, pegada debajo de db-players */
 .db-right-legend {
     display: flex;
     gap: 0.75rem;
@@ -4427,15 +4440,8 @@ header h1 {
     color: var(--text-muted);
     padding: 0.35rem 1.1rem;
     background: var(--bg-subtle);
-    border-bottom: 1px solid var(--border);
-}
-
-/* Lista de jugadoras — cierra la tarjeta ratio A:C */
-.db-players {
-    padding: 0.25rem 1.1rem 0.9rem;
-    background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-top: none;
+    border-top: 1px solid var(--border);
     border-radius: 0 0 12px 12px;
     box-shadow: var(--shadow-sm);
 }
@@ -4541,17 +4547,18 @@ header h1 {
     background: transparent;
     border: 1px solid var(--border);
     margin-top: 0;
+    overflow-x: hidden; /* sin scroll horizontal */
 }
-.db-comparison .cmp-table { min-width: 560px; font-size: 0.8rem; }
+.db-comparison .cmp-table { width: 100%; min-width: 0; font-size: 0.75rem; }
 .db-comparison .cmp-table thead tr {
     background: var(--bg-subtle);
     border-bottom: 1px solid var(--border);
 }
 .db-comparison .cmp-table th {
-    padding: 0.5rem 0.6rem;
+    padding: 0.35rem 0.3rem;
     text-align: center;
     font-weight: 600;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     color: var(--text-muted);
     white-space: nowrap;
 }
@@ -4562,7 +4569,7 @@ header h1 {
 .cmp-td-player-inner { display: flex; align-items: center; flex-wrap: nowrap; gap: 0.45rem; min-width: 0; }
 .cmp-player-name { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; }
 .db-comparison .cmp-td-ratio,
-.db-comparison .cmp-td-w { padding: 0.5rem 0.6rem; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.db-comparison .cmp-td-w { padding: 0.4rem 0.3rem; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
 .cmp-td-flag { padding: 0.5rem 0.4rem; text-align: center; width: 28px; }
 .cmp-flag    { font-size: 0.85rem; }
 .cmp-nodata  { color: var(--text-muted); }
@@ -4899,12 +4906,12 @@ header h1 {
     .db-cal-col      { grid-column: 1; grid-row: auto; gap: 0.75rem; }
 
     .db-right-header { padding: 0.6rem 1rem 0.45rem; border-radius: 12px 12px 0 0; }
-    .db-right-legend { padding: 0.3rem 1rem; font-size: 0.65rem; gap: 0.5rem; }
-    .db-players      { padding: 0.25rem 1rem 0.85rem; border-radius: 0 0 12px 12px; }
+    .db-right-legend { padding: 0.3rem 1rem; font-size: 0.65rem; gap: 0.5rem; border-radius: 0 0 12px 12px; }
+    .db-players      { padding: 0.25rem 1rem 0.5rem; border-radius: 0; }
     .db-player-row   { grid-template-columns: 20px 110px 1fr 38px 18px; gap: 0.4rem; }
     .db-player-name  { font-size: 0.82rem; }
     .db-player-ratio { font-size: 0.82rem; }
-    .db-comparison .cmp-table { min-width: 480px; }
+    .db-comparison .cmp-table { min-width: 0; font-size: 0.72rem; }
 }
 
 /* ===================================================================

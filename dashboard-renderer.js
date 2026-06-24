@@ -161,10 +161,20 @@ RPETracker.prototype.renderDashboard = function() {
     const isMatchDay = ['morning','afternoon'].some(s => todayPlan[s]?.type === 'match' && todayPlan[s]?.enabled);
     const matchDayBtnLabel = this._matchDayMode ? '← Vista normal' : '🏟️ Modo partido';
 
-    // ── "Hoy" panel ────────────────────────────────────────────
-    const todaySessions = this.sessions.filter(s => s.date && s.date.slice(0, 10) === _wToday);
-    const todayPlayerIds = [...new Set(todaySessions.map(s => s.playerId))];
-    const todaySessionCount = todayPlayerIds.length;
+    // ── KPI: Ratio A:C medio del equipo (últimos 7 días) ──────────
+    const _acValues = this.players
+        .map(p => this.calculateAcuteChronicRatio(p.id))
+        .filter(r => r.confidence !== 'low' && r.ratio !== 'N/A')
+        .map(r => parseFloat(r.ratio))
+        .filter(v => !isNaN(v));
+    const teamAC     = _acValues.length > 0
+        ? (_acValues.reduce((s, v) => s + v, 0) / _acValues.length).toFixed(2)
+        : '—';
+    const teamACStatus = teamAC === '—' ? 'neutral'
+        : parseFloat(teamAC) > 1.5 ? 'danger'
+        : parseFloat(teamAC) > 1.3 ? 'warn'
+        : parseFloat(teamAC) < 0.8 ? 'low'
+        : 'ok';
 
     const acAlertCount  = players.filter(p => {
         const t = this.getPlayerThresholds(p.player.id);
@@ -183,9 +193,9 @@ RPETracker.prototype.renderDashboard = function() {
 
         <!-- KPI bar: siempre visible arriba -->
         <div class="db-kpi-bar">
-            <div class="db-kpi db-kpi--${todaySessionCount > 0 ? 'ok' : 'neutral'}" onclick="window.rpeTracker?.switchView('sessions')" title="Ver sesiones de hoy">
-                <span class="db-kpi-val">${todaySessionCount}</span>
-                <span class="db-kpi-lbl">sesiones hoy</span>
+            <div class="db-kpi db-kpi--${teamACStatus}" title="Ratio A:C medio del equipo (jugadoras con datos suficientes: ${_acValues.length}/${this.players.length})">
+                <span class="db-kpi-val">${teamAC}</span>
+                <span class="db-kpi-lbl">ratio A:C equipo</span>
             </div>
             <div class="db-kpi db-kpi--${avgRPE7 !== '—' && parseFloat(avgRPE7) > 7 ? 'warn' : avgRPE7 !== '—' && parseFloat(avgRPE7) < 4 ? 'low' : 'neutral'}">
                 <span class="db-kpi-val">${avgRPE7}</span>
@@ -280,16 +290,16 @@ RPETracker.prototype.renderDashboard = function() {
                             </button>
                         </div>
                     </div>
-                    <div class="db-right-legend">
-                        <span style="color:#4caf50">● óptimo</span>
-                        <span style="color:#ff9800">● precaución</span>
-                        <span style="color:#f44336">● peligro</span>
-                        <span style="color:#2196f3">● bajo</span>
-                        <span style="margin-left:auto;font-size:0.65rem;color:var(--text-faint)">😴⚡😊💪 = wellness 7d</span>
-                    </div>
                 </div><!-- /db-right-sticky -->
                 <div class="db-players">
                     ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
+                </div>
+                <div class="db-right-legend">
+                    <span style="color:#4caf50">● óptimo</span>
+                    <span style="color:#ff9800">● precaución</span>
+                    <span style="color:#f44336">● peligro</span>
+                    <span style="color:#2196f3">● bajo</span>
+                    <span style="margin-left:auto;font-size:0.65rem;color:var(--text-faint)">😴⚡😊💪 = wellness 7d</span>
                 </div>
 
                 <!-- Tarjetas 4 y 6: Comparativa + Radar -->
