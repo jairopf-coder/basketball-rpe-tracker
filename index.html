@@ -229,6 +229,11 @@
             <div class="analytics-container" id="teamStatusView"></div>
         </div>
 
+        <!-- Próximos objetivos View -->
+        <div id="objectivesView" class="view">
+            <div class="analytics-container" id="objectivesContainer"></div>
+        </div>
+
         <!-- Weekly Planning View -->
         <div id="weekplanView" class="view">
             <div class="analytics-container" id="weeklyPlanView"></div>
@@ -607,6 +612,7 @@
     <script src="injury-management.js"></script>
     <script src="injury-management-2.js"></script>
     <script src="team-status.js"></script>
+    <script src="objectives.js"></script>
     <script src="wellness.js"></script>
     <script src="weekplan-medical.js"></script>
     <script src="strength.js"></script>
@@ -731,7 +737,7 @@
     // Primary views mapped to each bottom-nav tab
     const BN_PRIMARY_VIEWS = {
         dashboard: ['dashboard'],
-        equipo:    ['players', 'teamstatus'],
+        equipo:    ['players', 'teamstatus', 'objectives'],
         carga:     ['microciclo', 'analytics', 'weekplan', 'seasonblocks', 'sessions'],
     };
 
