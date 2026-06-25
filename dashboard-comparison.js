@@ -68,86 +68,107 @@ RPETracker.prototype._renderPlayerComparisonSection = function() {
         return { player, ratio, wellness: w };
     });
 
-    // Orden por riesgo (ratio descendente), igual que dashboard principal
+    // Orden por riesgo (ratio descendente)
     rows.sort((a, b) => {
         const ra = a.ratio.confidence === 'low' ? -1 : parseFloat(a.ratio.ratio) || 0;
         const rb = b.ratio.confidence === 'low' ? -1 : parseFloat(b.ratio.ratio) || 0;
         return rb - ra;
     });
 
-    const ratioCell = (ratio, playerId) => {
-        if (ratio.confidence === 'low') {
-            return `<span class="badge-insuf" title="${esc(ratio.message || 'Datos insuficientes')}">⚠️ Insuf.</span>`;
-        }
+    return _renderWellnessHeatmap(rows, this);
+};
+
+// ── Heatmap unificado: jugadora × A:C + dimensiones wellness ─────────────
+function _renderWellnessHeatmap(rows, tracker) {
+    const dims = ['sleep', 'fatigue', 'mood', 'soreness'];
+    const labels = { sleep: '😴 Sueño', fatigue: '⚡ Energía', mood: '😊 Humor', soreness: '💪 Muscular' };
+    const invertedDims = new Set(['fatigue', 'soreness']);
+
+    const heatColor = (val) => {
+        if (val === null || val === undefined) return 'var(--bg-subtle)';
+        if (val >= 4.0) return '#2e7d3220';
+        if (val >= 3.0) return '#f9a82520';
+        return '#c6282820';
+    };
+    const heatText = (val) => {
+        if (val === null || val === undefined) return 'var(--text-faint)';
+        if (val >= 4.0) return '#2e7d32';
+        if (val >= 3.0) return '#e65100';
+        return '#c62828';
+    };
+
+    // A:C color reutilizando getRatioColor del tracker
+    const acColor = (ratio) => {
+        if (!tracker || ratio.confidence === 'low' || ratio.ratio === 'N/A') return 'var(--text-muted)';
+        return tracker.getRatioColor(ratio.ratio);
+    };
+    const acDisplay = (ratio) => {
+        if (ratio.confidence === 'low') return `<span title="${esc(ratio.message || 'Datos insuf.')}">⚠️</span>`;
         if (ratio.ratio === 'N/A') return '—';
-        const color = this.getRatioColor(ratio.ratio);
-        return `<span style="color:${color};font-weight:600">${ratio.ratio}</span>`;
+        return `<span style="color:${acColor(ratio)};font-weight:700">${ratio.ratio}</span>`;
     };
 
-    const wellnessCell = (w, dim) => {
-        if (!w.values) return '<span class="cmp-nodata">—</span>';
-        // Para mostrar al usuario, deshacemos la inversión de fatigue/soreness
-        let raw = w.values[dim];
-        if (dim === 'fatigue' || dim === 'soreness') raw = 6 - raw;
-        return raw.toFixed(1);
-    };
+    const rowsHtml = rows.map(({ player, ratio, wellness }) => {
+        const cells = dims.map(dim => {
+            if (!wellness.values) {
+                return `<td class="wh-cell wh-nodata" title="Sin datos">—</td>`;
+            }
+            const val = wellness.values[dim];
+            const displayVal = invertedDims.has(dim) ? (6 - val).toFixed(1) : val.toFixed(1);
+            return `<td class="wh-cell" style="background:${heatColor(val)};color:${heatText(val)}" title="${labels[dim]}: ${displayVal}/5">${displayVal}</td>`;
+        }).join('');
 
-    const tableRows = rows.map(({ player, ratio, wellness }) => `
-        <tr class="cmp-row">
-            <td class="cmp-td-player">
-                <div class="cmp-td-player-inner">
-                    ${PlayerTokens.avatar(player, 22, '0.6rem')}
-                    <span class="cmp-player-name">${esc(player.name)}</span>
-                </div>
+        let overall = null;
+        if (wellness.values) {
+            const sum = dims.reduce((s, d) => s + wellness.values[d], 0);
+            overall = sum / dims.length;
+        }
+        const overallHtml = overall !== null
+            ? `<td class="wh-cell wh-overall" style="background:${heatColor(overall)};color:${heatText(overall)}">${overall.toFixed(1)}</td>`
+            : `<td class="wh-cell wh-nodata">—</td>`;
+
+        return `<tr>
+            <td class="wh-name">
+                ${PlayerTokens.avatar(player, 20, '0.58rem')}
+                <span>${esc(player.name.split(' ')[0])}</span>
             </td>
-            <td class="cmp-td-ratio">${ratioCell(ratio, player.id)}</td>
-            <td class="cmp-td-w">${wellnessCell(wellness, 'sleep')}</td>
-            <td class="cmp-td-w">${wellnessCell(wellness, 'fatigue')}</td>
-            <td class="cmp-td-w">${wellnessCell(wellness, 'mood')}</td>
-            <td class="cmp-td-w">${wellnessCell(wellness, 'soreness')}</td>
-            ${wellness.count === 0 ? '<td class="cmp-td-flag"><span class="cmp-flag" title="Sin registros de wellness en 7 días">⚠️</span></td>' : '<td class="cmp-td-flag"></td>'}
-        </tr>`).join('');
+            <td class="wh-cell wh-ac">${acDisplay(ratio)}</td>
+            ${cells}
+            ${overallHtml}
+        </tr>`;
+    }).join('');
 
-    // Checkboxes para el radar (limitar a MAX_RADAR_PLAYERS seleccionadas inicialmente)
-    if (!this._radarSelectedIds) {
-        this._radarSelectedIds = this.players.slice(0, MAX_RADAR_PLAYERS).map(p => p.id);
-    }
-    const selected = new Set(this._radarSelectedIds);
-
-    const checkboxes = this.players.map(p => `
-        <label class="cmp-check">
-            <input type="checkbox" class="cmp-radar-checkbox" data-player-id="${esc(p.id)}" ${selected.has(p.id) ? 'checked' : ''}>
-            <span class="cmp-check-dot" style="background:${PlayerTokens.get(p)}"></span>
-            <span class="cmp-check-name">${esc(p.name.split(' ')[0])}</span>
-        </label>`).join('');
+    if (rows.length === 0) return '';
 
     return `
-    <div class="db-comparison">
-        <div class="db-comparison-header">
-            <span class="db-left-label">📊 Comparativa de jugadoras</span>
-            <span class="cmp-subtitle">A:C ratio + Wellness medio (7 días)</span>
+    <div class="db-comparison-radar">
+        <div class="cmp-radar-header">
+            <span class="db-left-label">🌡️ Carga y wellness — 7 días</span>
+            <span class="cmp-subtitle">A:C + bienestar por jugadora · mayor = mejor</span>
         </div>
-
-        <div class="cmp-table-wrap">
-            <table class="cmp-table">
+        <div class="wh-wrap">
+            <table class="wh-table">
                 <thead>
                     <tr>
-                        <th class="cmp-th-player">Jugadora</th>
-                        <th>A:C</th>
+                        <th class="wh-th-name">Jugadora</th>
+                        <th title="Ratio Agudo:Crónico">A:C</th>
                         <th title="Sueño">😴</th>
-                        <th title="Energía (5=descansada)">⚡</th>
+                        <th title="Energía">⚡</th>
                         <th title="Humor">😊</th>
-                        <th title="Dolor muscular (5=sin dolor)">💪</th>
-                        <th></th>
+                        <th title="Muscular">💪</th>
+                        <th class="wh-th-overall" title="Media wellness global">Ø</th>
                     </tr>
                 </thead>
-                <tbody>${tableRows}</tbody>
+                <tbody>${rowsHtml}</tbody>
             </table>
-            <div class="cmp-table-hint">Ordenado por mayor riesgo (A:C). 😴⚡😊💪 en escala 1–5 (mayor = mejor).</div>
         </div>
-    </div>
-
-    ${_renderWellnessHeatmap(rows)}`;
+        <div class="wh-legend">
+            <span class="wh-leg-item wh-leg-good">≥4 bueno</span>
+            <span class="wh-leg-item wh-leg-warn">3–4 normal</span>
+            <span class="wh-leg-item wh-leg-bad">≤3 atención</span>
+            <span style="margin-left:auto;font-size:10px;color:var(--text-faint)">Ordenado por mayor A:C</span>
+        </div>
+    </div>`;
 };
 
 // ── Heatmap de wellness ───────────────────────────────────────────────────
@@ -403,6 +424,7 @@ RPETracker.prototype._bindComparisonEvents = function() {
         }
         .wh-overall { border-left: 2px solid var(--border); }
         .wh-nodata { color: var(--text-faint); font-weight: 400; background: var(--bg-subtle) !important; }
+        .wh-ac { border-left: 2px solid var(--border); font-size: 12px; font-weight: 600; }
         .wh-legend {
             display: flex;
             gap: 10px;
