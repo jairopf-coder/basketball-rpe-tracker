@@ -567,6 +567,33 @@ FirebaseSync.prototype.loadAnamnesis = function(playerId, callback) {
     });
 };
 
+// ── Partidos / Próximos objetivos ─────────────────────────
+FirebaseSync.prototype.saveMatches = async function(matches) {
+    try {
+        const obj = {};
+        matches.forEach(m => { obj[m.id] = m; });
+        if (!this.db) { Store.set('matches', matches); return; }
+        await this.db.ref('matches').set(obj);
+        Store.set('matches', matches);
+    } catch (e) {
+        console.error('Error saving matches:', e);
+        Store.set('matches', matches);
+        await this._enqueueWrite('matches', Object.fromEntries(matches.map(m => [m.id, m])));
+    }
+};
+
+FirebaseSync.prototype.onMatchesChange = function(callback) {
+    if (!this.db) {
+        const local = Store.get('matches');
+        callback(Array.isArray(local) ? local : []);
+        return;
+    }
+    this.db.ref('matches').on('value', snapshot => {
+        const val = snapshot.val();
+        callback(val ? Object.values(val) : []);
+    });
+};
+
 // Verificar conexión — se llama aquí para garantizar que todos los
 // FirebaseSync.prototype.* estén definidos antes de que checkConnection
 // acceda a _drainQueue y _updatePendingCount.

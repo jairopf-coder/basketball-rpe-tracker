@@ -29,6 +29,7 @@ const NavMenu = {
             items: [
                 { view: 'players',    label: '👥 Jugadoras' },
                 { view: 'teamstatus', label: '🚦 Estado equipo' },
+                { view: 'objectives', label: '🎯 Próximos objetivos' },
             ],
             default: 'players'
         },
@@ -238,6 +239,7 @@ class RPETracker {
         this.injuries = [];
         this.availability = {};
         this.weekPlan = null;
+        this.matches = this.loadMatches(); // próximos objetivos / partidos
         this.exerciseLibrary = null; // se carga lazy en strength.js
         this.gymSessions     = null;
         this.testSessions    = null;
@@ -517,6 +519,9 @@ class RPETracker {
                 break;
             case 'teamstatus':
                 if (typeof this.renderTeamStatus === 'function') this.renderTeamStatus();
+                break;
+            case 'objectives':
+                if (typeof this.renderObjectives === 'function') this.renderObjectives();
                 break;
             case 'wellness':
                 if (typeof this.renderWellnessDashboard === 'function') this.renderWellnessDashboard();
@@ -864,6 +869,27 @@ class RPETracker {
         } else {
             Store.set('players', this.players);
         }
+    }
+
+    saveMatches() {
+        if (window.firebaseSync) {
+            window.firebaseSync.saveMatches(this.matches);
+        } else {
+            Store.set('matches', this.matches);
+        }
+    }
+
+    loadMatches() {
+        const local = Store.get('matches');
+        if (window.firebaseSync && !this._matchesListenerSet) {
+            this._matchesListenerSet = true;
+            window.firebaseSync.onMatchesChange((updated) => {
+                this.matches = updated.sort((a, b) => a.date.localeCompare(b.date));
+                if (this.currentView === 'objectives') this.renderObjectives();
+                if (this.currentView === 'dashboard') this.renderDashboard();
+            });
+        }
+        return Array.isArray(local) ? local.sort((a, b) => a.date.localeCompare(b.date)) : [];
     }
 
     showToast(message, type = 'success') {

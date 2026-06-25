@@ -191,13 +191,30 @@ RPETracker.prototype.renderDashboard = function() {
         </div>` : ''}
         ${this._matchDayMode ? this._renderMatchDayView(availGroups, players) : `
 
+
         <!-- KPI bar: siempre visible arriba -->
-        <div class="db-kpi-bar">
-            <div class="db-kpi db-kpi--${teamACStatus}" title="Ratio A:C medio del equipo (jugadoras con datos suficientes: ${_acValues.length}/${this.players.length})">
+        <div class="db-kpi-bar">${(() => {
+            // Próximo partido
+            const nm = this.getNextMatch ? this.getNextMatch() : null;
+            let nextMatchHtml = '—';
+            let nextMatchSub  = 'próximo partido';
+            if (nm) {
+                const { day, month, weekday } = (() => {
+                    const [y,mo,d] = nm.date.split('-').map(Number);
+                    const dt = new Date(y, mo-1, d);
+                    const days   = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+                    const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+                    return { day: dt.getDate(), month: months[dt.getMonth()], weekday: days[dt.getDay()] };
+                })();
+                nextMatchHtml = `${weekday} ${day} ${month}`;
+                nextMatchSub  = `vs ${nm.rival || '—'}`;
+            }
+            return `
+            <div class="db-kpi db-kpi--${teamACStatus} db-kpi--7d" title="Ratio A:C medio del equipo (jugadoras con datos suficientes: ${_acValues.length}/${this.players.length})">
                 <span class="db-kpi-val">${teamAC}</span>
-                <span class="db-kpi-lbl">ratio A:C equipo</span>
+                <span class="db-kpi-lbl">ratio A:C 7d</span>
             </div>
-            <div class="db-kpi db-kpi--${avgRPE7 !== '—' && parseFloat(avgRPE7) > 7 ? 'warn' : avgRPE7 !== '—' && parseFloat(avgRPE7) < 4 ? 'low' : 'neutral'}">
+            <div class="db-kpi db-kpi--${avgRPE7 !== '—' && parseFloat(avgRPE7) > 7 ? 'warn' : avgRPE7 !== '—' && parseFloat(avgRPE7) < 4 ? 'low' : 'neutral'} db-kpi--7d">
                 <span class="db-kpi-val">${avgRPE7}</span>
                 <span class="db-kpi-lbl">RPE medio 7d</span>
             </div>
@@ -213,7 +230,11 @@ RPETracker.prototype.renderDashboard = function() {
                 <span class="db-kpi-val">${this.players.length - pendingCount}/${this.players.length}</span>
                 <span class="db-kpi-lbl">wellness hoy</span>
             </div>
-        </div>
+            <div class="db-kpi db-kpi--match" onclick="window.rpeTracker?.switchView('objectives')" title="Ver próximos objetivos">
+                <span class="db-kpi-val db-kpi-val--match">${nextMatchHtml}</span>
+                <span class="db-kpi-lbl">${nextMatchSub}</span>
+            </div>`;
+        })()}</div>
 
         <div class="db-split">
 
