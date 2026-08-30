@@ -304,6 +304,16 @@ const AppAuth = {
                     <button class="btn-primary" id="um-create-btn" onclick="AppAuth.createUser()">Crear cuenta</button>
                 </div>
 
+                <div class="um-section" id="um-session-section" style="display:none;margin-top:1.5rem">
+                    <h3 class="um-section-title">📝 Cuentas creadas en esta sesión</h3>
+                    <p style="font-size:0.8rem;color:var(--text-secondary);margin:0 0 0.5rem">
+                        Cópialas ahora a un lugar seguro (gestor de contraseñas, nota privada).
+                        Esta lista desaparece al recargar la app y no se guarda en ningún sitio.
+                    </p>
+                    <div id="um-session-list" class="um-session-list"></div>
+                    <button class="btn-secondary" style="margin-top:0.5rem" onclick="AppAuth._copySessionAccounts()">📋 Copiar todas</button>
+                </div>
+
                 <div class="um-section" style="margin-top:1.5rem">
                     <h3 class="um-section-title">📋 Usuarios registrados</h3>
                     <div id="um-user-list" class="um-user-list">
@@ -338,6 +348,34 @@ const AppAuth = {
             .sort((a, b) => a.name.localeCompare(b.name))
             .map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${(p.name || '').replace(/</g, '&lt;')}${p.number ? ` #${p.number}` : ''}</option>`)
             .join('');
+    },
+
+    // Pinta la lista de cuentas creadas en esta sesión (solo en memoria, se pierde al recargar)
+    _renderSessionAccounts() {
+        const section = document.getElementById('um-session-section');
+        const list    = document.getElementById('um-session-list');
+        if (!section || !list || !this._sessionAccounts?.length) return;
+
+        section.style.display = '';
+        list.innerHTML = this._sessionAccounts.map(a => `
+            <div class="um-session-row">
+                <span><strong>${(a.displayName || '').replace(/</g, '&lt;')}</strong> — ${a.email}</span>
+                <span class="um-session-pass">🔑 ${a.password}</span>
+            </div>
+        `).join('');
+    },
+
+    _copySessionAccounts() {
+        if (!this._sessionAccounts?.length) return;
+        const text = this._sessionAccounts
+            .map(a => `${a.displayName} | ${a.email} | ${a.password}`)
+            .join('\n');
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                if (window.rpeTracker?.showToast) window.rpeTracker.showToast('📋 Copiado al portapapeles', 'success');
+                else alert('Copiado al portapapeles');
+            })
+            .catch(() => alert('No se pudo copiar automáticamente. Selecciona el texto manualmente:\n\n' + text));
     },
 
     // Muestra/oculta el selector de jugadora vinculada según el rol elegido
@@ -401,6 +439,11 @@ const AppAuth = {
 
             this._umSuccess(`✅ Cuenta creada: ${email}`);
             this._loadUserList();
+
+            // Guardar en la lista de sesión (solo en memoria del navegador, nunca en Firebase)
+            this._sessionAccounts = this._sessionAccounts || [];
+            this._sessionAccounts.push({ displayName, email, password });
+            this._renderSessionAccounts();
 
             // Limpiar formulario
             document.getElementById('um-displayName').value = '';
