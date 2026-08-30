@@ -6078,6 +6078,31 @@ details[open] .ewma-toggle-hint { display: none; }
     .ts-table-wrap,
     .cmp-table-wrap,
     .pvr-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Tarjeta de jugadora (Equipo): en móvil no cabe todo en una fila
+       (avatar+nombre, 3 stats, sparkline y 5 iconos), así que se apila
+       en filas completas en vez de comprimirse hacia la derecha. */
+    .player-card {
+        flex-wrap: wrap;
+        row-gap: 0.65rem;
+    }
+    .player-info {
+        width: 100%;
+    }
+    .player-stats {
+        order: 2;
+        width: 100%;
+        justify-content: space-around;
+    }
+    .player-sparkline-row {
+        order: 3;
+        width: 100%;
+    }
+    .player-actions {
+        order: 4;
+        width: 100%;
+        justify-content: space-around;
+    }
 }
 
 /* Bottom nav — menú "Más" (Rendimiento en móvil) */
