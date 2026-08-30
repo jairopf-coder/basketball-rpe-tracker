@@ -34,6 +34,9 @@ RPETracker.prototype.showGearMenu = function() {
             <button class="gear-item" onclick="document.getElementById('seasonFileInput').click();document.getElementById('gearMenuOverlay').remove()">
                 <span class="gear-icon">📅</span><span>Ver temporada anterior</span>
             </button>
+            <button class="gear-item gear-item--danger" onclick="document.getElementById('gearMenuOverlay').remove();window.rpeTracker?.showFullResetModal()">
+                <span class="gear-icon">🧨</span><span>Reset total (empezar de 0)</span>
+            </button>
             <div class="gear-divider"></div>
             <div class="gear-section-label">Apariencia</div>
             <button class="gear-item" onclick="DarkMode.toggle();document.getElementById('gearMenuOverlay').remove()">
@@ -225,6 +228,112 @@ RPETracker.prototype._confirmSeasonClear = function(expectedAnswer) {
     document.getElementById('clearConfirmOverlay')?.remove();
     this.showToast('✅ Temporada archivada y datos borrados', 'success');
     setTimeout(() => location.reload(), 1500);
+};
+
+// ─── Reset total (empezar de 0, sin tocar el login) ────────────────────────────
+
+RPETracker.prototype.showFullResetModal = function() {
+    if (typeof AppAuth !== 'undefined' && AppAuth.isStaff && !AppAuth.isStaff()) return;
+
+    document.getElementById('fullResetOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'fullResetOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:3000;display:flex;align-items:center;justify-content:center;padding:1rem';
+
+    overlay.innerHTML = `
+        <div class="clear-confirm-modal">
+            <div class="clear-confirm-icon">🧨</div>
+            <h2 class="clear-confirm-title">Reset total de la app</h2>
+            <p class="clear-confirm-desc">
+                Se descargará primero un backup completo con <strong>todo</strong> lo que hay ahora
+                (jugadoras, sesiones, wellness, lesiones, gimnasio, tests, partidos, planificación,
+                notas clínicas).<br><br>
+                Después se borrará todo ese contenido. El equipo quedará vacío, listo para empezar
+                la temporada desde 0.<br><br>
+                <strong>Tu cuenta y las demás cuentas de acceso (staff, fisio, jugadoras) no se tocan</strong>
+                — podrás seguir entrando con tu usuario y contraseña de siempre.<br><br>
+                Esta acción no se puede deshacer.
+            </p>
+            <div class="clear-confirm-challenge">
+                <span class="clear-challenge-label">Para confirmar, escribe exactamente:</span>
+                <span class="clear-challenge-sum">BORRAR TODO</span>
+                <input type="text" id="fullResetInput" class="clear-challenge-input"
+                    placeholder="Escribe aquí" autocomplete="off">
+                <span id="fullResetError" class="clear-challenge-error" style="display:none">No coincide. Escribe exactamente BORRAR TODO</span>
+            </div>
+            <div class="clear-confirm-actions">
+                <button class="btn-secondary" onclick="document.getElementById('fullResetOverlay').remove()">Cancelar</button>
+                <button class="btn-danger" id="fullResetConfirmBtn" onclick="window.rpeTracker?._confirmFullReset()">
+                    🧨 Borrar todo y empezar de 0
+                </button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+    setTimeout(() => document.getElementById('fullResetInput')?.focus(), 100);
+};
+
+RPETracker.prototype._confirmFullReset = async function() {
+    const input = document.getElementById('fullResetInput');
+    const errorEl = document.getElementById('fullResetError');
+    const btn = document.getElementById('fullResetConfirmBtn');
+    const given = (input?.value || '').trim().toUpperCase();
+
+    if (given !== 'BORRAR TODO') {
+        if (errorEl) errorEl.style.display = 'block';
+        if (input) { input.style.borderColor = '#f44336'; input.focus(); }
+        return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Borrando…'; }
+
+    try {
+        // 1. Backup completo antes de borrar nada
+        const now = new Date();
+        const backup = {
+            version: '3.0',
+            type: 'full-reset-backup',
+            exportDate: now.toISOString(),
+            players:      this.players      || [],
+            sessions:     this.sessions     || [],
+            wellnessData: this.wellnessData || [],
+            injuries:     this.injuries     || [],
+            gymSessions:  this.gymSessions  || [],
+            weekPlan:     this.weekPlan     || null,
+            testSessions: this.testSessions || null
+        };
+        const fn = `RPE_Backup_ResetTotal_${now.toISOString().slice(0, 10)}.json`;
+        this._downloadJSON(backup, fn);
+
+        // 2. Borrar todos los nodos operativos de Firebase.
+        //    IMPORTANTE: 'users' nunca se incluye aquí — ahí viven las cuentas
+        //    de acceso (staff/fisio/jugadoras) y no deben tocarse en un reset.
+        if (window.firebaseDB) {
+            const nodesToWipe = [
+                'players', 'sessions', 'testSessions', 'wellness', 'wellnessPlayer',
+                'injuries', 'gymSessions', 'weekPlan', 'matches', 'seasonBlocks', 'clinicalNotes'
+            ];
+            await Promise.all(nodesToWipe.map(node => window.firebaseDB.ref(node).remove()));
+        }
+
+        // 3. Limpiar también cualquier resto en localStorage
+        localStorage.removeItem('basketballWeekPlan');
+        localStorage.removeItem('basketballInjuries');
+        localStorage.removeItem('basketballWellness');
+        localStorage.removeItem('basketballAvailability');
+
+        document.getElementById('fullResetOverlay')?.remove();
+        this.showToast('✅ App reiniciada. Ya puedes añadir tu equipo real.', 'success');
+        setTimeout(() => location.reload(), 1500);
+
+    } catch (e) {
+        console.error('Error en reset total:', e);
+        if (errorEl) {
+            errorEl.textContent = 'Error al borrar: ' + (e.message || e);
+            errorEl.style.display = 'block';
+        }
+        if (btn) { btn.disabled = false; btn.textContent = '🧨 Borrar todo y empezar de 0'; }
+    }
 };
 
 // ─── View past season ─────────────────────────────────────────────────────────
