@@ -309,11 +309,26 @@ RPETracker.prototype._confirmFullReset = async function() {
         //    IMPORTANTE: 'users' nunca se incluye aquí — ahí viven las cuentas
         //    de acceso (staff/fisio/jugadoras) y no deben tocarse en un reset.
         if (window.firebaseDB) {
+            // Nodos con permiso de escritura en su propia raíz: se pueden borrar directamente.
             const nodesToWipe = [
-                'players', 'sessions', 'testSessions', 'wellness', 'wellnessPlayer',
-                'injuries', 'gymSessions', 'weekPlan', 'matches', 'seasonBlocks', 'clinicalNotes'
+                'players', 'sessions', 'testSessions', 'wellness', 'injuries',
+                'gymSessions', 'strength', 'weekPlan', 'matches', 'seasonBlocks',
+                'clinicalNotes', 'anamnesis'
             ];
-            await Promise.all(nodesToWipe.map(node => window.firebaseDB.ref(node).remove()));
+            for (const node of nodesToWipe) {
+                try {
+                    await window.firebaseDB.ref(node).remove();
+                } catch (nodeErr) {
+                    throw new Error(`nodo "${node}": ${nodeErr.message}`);
+                }
+            }
+
+            // 'wellnessPlayer' solo tiene permiso de escritura por jugadora
+            // (wellnessPlayer/{uid}), no en el nodo raíz, así que se borra
+            // cada jugadora por separado en vez de borrar el nodo entero.
+            const wpSnap = await window.firebaseDB.ref('wellnessPlayer').once('value');
+            const wpUids = wpSnap.val() ? Object.keys(wpSnap.val()) : [];
+            await Promise.all(wpUids.map(uid => window.firebaseDB.ref('wellnessPlayer/' + uid).remove()));
         }
 
         // 3. Limpiar también cualquier resto en localStorage
