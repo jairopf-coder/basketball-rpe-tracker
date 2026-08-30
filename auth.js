@@ -286,11 +286,19 @@ const AppAuth = {
                     </div>
                     <div class="form-group">
                         <label>Rol</label>
-                        <select id="um-role" class="form-input">
+                        <select id="um-role" class="form-input" onchange="AppAuth._toggleUmPlayerLink()">
                             <option value="player">👤 Jugadora</option>
                             <option value="fisio">🩺 Fisioterapeuta</option>
                             <option value="staff">🏋️ Cuerpo técnico</option>
                         </select>
+                    </div>
+                    <div class="form-group" id="um-playerLink-group">
+                        <label>Jugadora vinculada</label>
+                        <select id="um-playerLink" class="form-input">
+                            <option value="">— Selecciona una jugadora —</option>
+                            ${AppAuth._playerOptionsHtml()}
+                        </select>
+                        <small style="color:var(--text-secondary)">Así sus respuestas de wellness se asociarán a su ficha automáticamente.</small>
                     </div>
                     <div id="um-create-error" class="login-error" style="display:none"></div>
                     <button class="btn-primary" id="um-create-btn" onclick="AppAuth.createUser()">Crear cuenta</button>
@@ -320,6 +328,29 @@ const AppAuth = {
         });
 
         this._loadUserList();
+    },
+
+    // Devuelve las <option> del roster de jugadoras para los selectores de vínculo
+    _playerOptionsHtml(selectedId) {
+        const players = (window.rpeTracker && window.rpeTracker.players) || [];
+        return players
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${(p.name || '').replace(/</g, '&lt;')}${p.number ? ` #${p.number}` : ''}</option>`)
+            .join('');
+    },
+
+    // Muestra/oculta el selector de jugadora vinculada según el rol elegido
+    _toggleUmPlayerLink() {
+        const role = document.getElementById('um-role')?.value;
+        const group = document.getElementById('um-playerLink-group');
+        if (group) group.style.display = role === 'player' ? '' : 'none';
+    },
+
+    _toggleUePlayerLink() {
+        const role = document.getElementById('ue-role')?.value;
+        const group = document.getElementById('ue-playerLink-group');
+        if (group) group.style.display = role === 'player' ? '' : 'none';
     },
 
     async createUser() {
@@ -353,12 +384,17 @@ const AppAuth = {
             await cred.user.updateProfile({ displayName });
 
             // Guardar rol en Realtime Database (usando el auth PRINCIPAL del staff, que sí tiene permisos de escritura)
-            await window.firebaseDB.ref(`users/${uid}`).set({
-                email,
-                role,
-                displayName,
-                createdAt: Date.now()
-            });
+            const userRecord = { email, role, displayName, createdAt: Date.now() };
+
+            const linkedPlayerId = role === 'player' ? document.getElementById('um-playerLink')?.value : '';
+            if (linkedPlayerId) userRecord.playerId = linkedPlayerId;
+
+            await window.firebaseDB.ref(`users/${uid}`).set(userRecord);
+
+            // Vínculo inverso: la ficha de la jugadora también guarda el uid de su cuenta.
+            if (linkedPlayerId) {
+                await window.firebaseDB.ref(`players/${linkedPlayerId}/authUid`).set(uid);
+            }
 
             // Cerrar la app secundaria
             await secondaryApp.delete();
@@ -370,6 +406,8 @@ const AppAuth = {
             document.getElementById('um-displayName').value = '';
             document.getElementById('um-emailUser').value   = '';
             document.getElementById('um-password').value    = '';
+            const linkSelect = document.getElementById('um-playerLink');
+            if (linkSelect) linkSelect.value = '';
 
         } catch (e) {
             const msgs = {
@@ -409,11 +447,13 @@ const AppAuth = {
             }
 
             const roleLabel = { staff: '🏋️ Staff', fisio: '🩺 Fisio', player: '👤 Jugadora' };
+            const playersById = {};
+            ((window.rpeTracker && window.rpeTracker.players) || []).forEach(p => { playersById[p.id] = p.name; });
             const rows = Object.entries(users).map(([uid, u]) => `
                 <div class="um-user-row">
                     <div class="um-user-info">
                         <span class="um-user-name">${u.displayName || '—'}</span>
-                        <span class="um-user-email">${u.email || '—'}</span>
+                        <span class="um-user-email">${u.email || '—'}${u.role === 'player' ? (u.playerId && playersById[u.playerId] ? ` · vinculada a ${playersById[u.playerId]}` : ' · sin vincular') : ''}</span>
                     </div>
                     <span class="um-user-role um-role-${u.role}">${roleLabel[u.role] || u.role}</span>
                     <button class="um-edit-btn" onclick="AppAuth.editUser('${uid}', '${(u.displayName || '').replace(/'/g, "\\'")}')" title="Editar usuario">✏️</button>
@@ -444,7 +484,14 @@ const AppAuth = {
         if (!ok) return;
 
         try {
+            const snap = await window.firebaseDB.ref(`users/${uid}`).once('value');
+            const linkedPlayerId = (snap.val() || {}).playerId || null;
+
             await window.firebaseDB.ref(`users/${uid}`).remove();
+            if (linkedPlayerId) {
+                await window.firebaseDB.ref(`players/${linkedPlayerId}/authUid`).remove();
+            }
+
             this._loadUserList();
         } catch (e) {
             AppAlert.show(`Error al eliminar: ${esc(e.message)}`);
@@ -481,10 +528,17 @@ const AppAuth = {
                         </div>
                         <div class="form-group">
                             <label>Rol</label>
-                            <select id="ue-role" class="form-input">
+                            <select id="ue-role" class="form-input" onchange="AppAuth._toggleUePlayerLink()">
                                 <option value="player"  ${u.role === 'player'  ? 'selected' : ''}>👤 Jugadora</option>
                                 <option value="fisio"   ${u.role === 'fisio'   ? 'selected' : ''}>🩺 Fisioterapeuta</option>
                                 <option value="staff"   ${u.role === 'staff'   ? 'selected' : ''}>🏋️ Cuerpo técnico</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="ue-playerLink-group" style="display:${u.role === 'player' ? '' : 'none'}">
+                            <label>Jugadora vinculada</label>
+                            <select id="ue-playerLink" class="form-input">
+                                <option value="">— Sin vincular —</option>
+                                ${AppAuth._playerOptionsHtml(u.playerId)}
                             </select>
                         </div>
                         <div id="ue-error" class="login-error" style="display:none"></div>
@@ -520,7 +574,23 @@ const AppAuth = {
         }
 
         try {
-            await window.firebaseDB.ref(`users/${uid}`).update({ displayName, email, role });
+            const snap = await window.firebaseDB.ref(`users/${uid}`).once('value');
+            const previousPlayerId = (snap.val() || {}).playerId || null;
+
+            const newPlayerId = role === 'player' ? (document.getElementById('ue-playerLink')?.value || null) : null;
+
+            const updates = { displayName, email, role };
+            updates.playerId = newPlayerId || null;
+            await window.firebaseDB.ref(`users/${uid}`).update(updates);
+
+            // Si la jugadora vinculada cambió, actualizar el vínculo inverso en 'players'
+            if (previousPlayerId && previousPlayerId !== newPlayerId) {
+                await window.firebaseDB.ref(`players/${previousPlayerId}/authUid`).remove();
+            }
+            if (newPlayerId) {
+                await window.firebaseDB.ref(`players/${newPlayerId}/authUid`).set(uid);
+            }
+
             document.getElementById('um-edit-modal')?.remove();
             this._loadUserList();
         } catch (e) {
