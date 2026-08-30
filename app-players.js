@@ -342,3 +342,104 @@ RPETracker.prototype.handleEditPlayerSubmit = function(e) {
     this.showToast('✅ Jugadora actualizada correctamente');
 };
 
+// ─── Importar jugadoras en lote ────────────────────────────────────────────────
+// Permite pegar una lista (una jugadora por línea, dorsal opcional separado por
+// coma) y crearlas todas de una vez, en vez de una a una desde el formulario.
+
+RPETracker.prototype.showBulkImportPlayersModal = function() {
+    document.getElementById('bulkImportOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'bulkImportOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:3000;display:flex;align-items:center;justify-content:center;padding:1rem';
+
+    overlay.innerHTML = `
+        <div class="clear-confirm-modal" style="text-align:left;max-width:480px">
+            <h2 class="clear-confirm-title" style="text-align:center">📋 Importar lista de jugadoras</h2>
+            <p class="clear-confirm-desc" style="text-align:center">
+                Pega una jugadora por línea. El dorsal es opcional, sepáralo con una coma.
+            </p>
+            <div class="form-group">
+                <textarea id="bulkImportTextarea" class="form-input" rows="8"
+                    style="font-family:monospace;resize:vertical"
+                    placeholder="Laura Gómez, 7
+Ana Pérez, 10
+Marta Ruiz"></textarea>
+            </div>
+            <div id="bulkImportError" class="login-error" style="display:none"></div>
+            <div class="clear-confirm-actions">
+                <button class="btn-secondary" onclick="document.getElementById('bulkImportOverlay').remove()">Cancelar</button>
+                <button class="btn-primary" id="bulkImportConfirmBtn" onclick="window.rpeTracker?._confirmBulkImportPlayers()">
+                    Importar
+                </button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+    setTimeout(() => document.getElementById('bulkImportTextarea')?.focus(), 100);
+};
+
+RPETracker.prototype._confirmBulkImportPlayers = function() {
+    const textarea = document.getElementById('bulkImportTextarea');
+    const errorEl   = document.getElementById('bulkImportError');
+    const lines = (textarea?.value || '').split('\n').map(l => l.trim()).filter(Boolean);
+
+    if (!lines.length) {
+        if (errorEl) { errorEl.textContent = 'Pega al menos una jugadora.'; errorEl.style.display = 'block'; }
+        return;
+    }
+
+    const usedColors = this.players.map(p => p.color).filter(Boolean);
+    let colorPtr = 0;
+    const nextColor = () => {
+        for (let i = 0; i < PlayerTokens.PALETTE.length; i++) {
+            const c = PlayerTokens.PALETTE[(colorPtr + i) % PlayerTokens.PALETTE.length];
+            if (!usedColors.includes(c)) { usedColors.push(c); colorPtr += i + 1; return c; }
+        }
+        const c = PlayerTokens.PALETTE[colorPtr % PlayerTokens.PALETTE.length];
+        colorPtr++;
+        return c;
+    };
+
+    const added = [];
+    const skipped = [];
+
+    lines.forEach(line => {
+        const parts = line.split(',').map(p => p.trim());
+        const name = parts[0]?.slice(0, 60);
+        if (!name) return;
+
+        let number = null;
+        if (parts[1]) {
+            const num = parseInt(parts[1], 10);
+            if (!isNaN(num) && num >= 0 && num <= 99) number = String(num);
+        }
+
+        const duplicate = this.players.find(p => p.name.trim().toLowerCase() === name.toLowerCase());
+        if (duplicate) { skipped.push(name); return; }
+
+        const player = {
+            id: Date.now().toString() + '_' + Math.random().toString(36).slice(2, 7),
+            name: name,
+            number: number,
+            color: nextColor(),
+            createdAt: new Date().toISOString()
+        };
+        this.players.push(player);
+        added.push(name);
+    });
+
+    if (added.length) {
+        this.savePlayers();
+        this.renderPlayers();
+        this.populatePlayerSelects();
+    }
+
+    document.getElementById('bulkImportOverlay')?.remove();
+
+    if (skipped.length) {
+        this.showToast(`✅ ${added.length} jugadora(s) añadida(s). ⚠️ ${skipped.length} omitida(s) por nombre duplicado: ${skipped.join(', ')}`, 'warning');
+    } else {
+        this.showToast(`✅ ${added.length} jugadora(s) añadida(s) correctamente`, 'success');
+    }
+};
+
