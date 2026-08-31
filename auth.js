@@ -73,17 +73,21 @@ const AppAuth = {
         const existing = document.getElementById('login-screen');
         if (existing) existing.remove();
 
+        const platform = this._platform();
+        const t = key => PlayerI18n.t(key);
+
         const screen = document.createElement('div');
         screen.id = 'login-screen';
         screen.innerHTML = `
             <div class="login-container">
+                <div class="login-lang-row">${PlayerI18n.toggleHTML('AppAuth._onLoginLangChange')}</div>
                 <div class="login-logo">🏀</div>
-                <h1 class="login-title">RPE Baloncesto</h1>
-                <p class="login-subtitle">Accede con tu cuenta</p>
+                <h1 class="login-title">${esc(t('loginTitle'))}</h1>
+                <p class="login-subtitle">${esc(t('loginSubtitle'))}</p>
 
                 <div class="login-form">
                     <div class="login-field">
-                        <label class="login-label">Email</label>
+                        <label class="login-label">${esc(t('loginEmail'))}</label>
                         <input
                             type="email"
                             id="login-email"
@@ -95,7 +99,7 @@ const AppAuth = {
                         >
                     </div>
                     <div class="login-field">
-                        <label class="login-label">Contraseña</label>
+                        <label class="login-label">${esc(t('loginPassword'))}</label>
                         <div class="login-input-wrap">
                             <input
                                 type="password"
@@ -111,9 +115,14 @@ const AppAuth = {
                     <div id="login-error" class="login-error" style="display:${errorMsg ? 'block' : 'none'}">${errorMsg ? esc(errorMsg) : ''}</div>
 
                     <button class="login-btn" id="login-btn" onclick="AppAuth.handleLogin()">
-                        Entrar
+                        ${esc(t('loginBtn'))}
                     </button>
                 </div>
+
+                <details class="login-install-help">
+                    <summary>${esc(t('installHelpToggle'))}</summary>
+                    <div class="ig-steps login-install-steps">${this._renderInstallSteps(platform)}</div>
+                </details>
 
                 <p class="login-version">BasketballRPE v22</p>
             </div>
@@ -127,6 +136,15 @@ const AppAuth = {
 
         // Auto-focus email
         setTimeout(() => document.getElementById('login-email')?.focus(), 100);
+    },
+
+    /** Cambia idioma en el login y vuelve a pintar conservando el email ya escrito */
+    _onLoginLangChange(lang) {
+        PlayerI18n.setLang(lang);
+        const email = document.getElementById('login-email')?.value || '';
+        this.showLoginScreen();
+        const emailInput = document.getElementById('login-email');
+        if (emailInput) emailInput.value = email;
     },
 
     _togglePassword() {
@@ -831,87 +849,101 @@ const AppAuth = {
         const existing = document.getElementById('install-gate');
         if (existing) existing.remove();
 
-        const isIOS     = platform === 'ios';
-        const isAndroid = platform === 'android';
+        const t = key => PlayerI18n.t(key);
 
-        const steps = isIOS ? `
+        const screen = document.createElement('div');
+        screen.id = 'install-gate';
+        screen.innerHTML = `
+            <div class="ig-container">
+                <div class="login-lang-row">${PlayerI18n.toggleHTML('AppAuth._onGateLangChange')}</div>
+                <div class="ig-logo">🏀</div>
+                <h1 class="ig-title">${esc(t('installTitle'))}</h1>
+                <p class="ig-subtitle">${esc(t('installSubtitle'))}</p>
+                <div class="ig-steps">${this._renderInstallSteps(platform)}</div>
+                <div class="ig-confirm">
+                    <p class="ig-confirm-label">${esc(t('installConfirmLabel'))}</p>
+                    <button class="ig-btn-already" onclick="AppAuth._checkInstallAndProceed()">
+                        ${esc(t('installConfirmBtn'))}
+                    </button>
+                </div>
+                <button class="wl-logout" onclick="AppAuth.logout()">${esc(t('installBackBtn'))}</button>
+            </div>
+        `;
+        document.body.appendChild(screen);
+    },
+
+    /** Cambia idioma en la pantalla de instalación y vuelve a pintarla */
+    _onGateLangChange(lang) {
+        PlayerI18n.setLang(lang);
+        this.showInstallGate();
+    },
+
+    /** Pasos ilustrados (iOS/Android/escritorio) para añadir la PWA a la pantalla de inicio.
+     *  Reutilizado tanto en la ayuda desplegable del login como en la pantalla de bloqueo tras iniciar sesión. */
+    _renderInstallSteps(platform) {
+        const t = key => PlayerI18n.t(key);
+        if (platform === 'ios') {
+            return `
             <div class="ig-step">
                 <div class="ig-step-num">1</div>
                 <div class="ig-step-text">
-                    <strong>Abre esta página en Safari</strong>
-                    <span>Debe ser Safari de Apple, no Chrome ni otro navegador.</span>
+                    <strong>${esc(t('iosStep1Title'))}</strong>
+                    <span>${esc(t('iosStep1Sub'))}</span>
                 </div>
                 ${this._svgSafari()}
             </div>
             <div class="ig-step">
                 <div class="ig-step-num">2</div>
                 <div class="ig-step-text">
-                    <strong>Pulsa el botón Compartir</strong>
-                    <span>El icono ⬆ en la barra inferior de Safari.</span>
+                    <strong>${esc(t('iosStep2Title'))}</strong>
+                    <span>${esc(t('iosStep2Sub'))}</span>
                 </div>
                 ${this._svgShare()}
             </div>
             <div class="ig-step">
                 <div class="ig-step-num">3</div>
                 <div class="ig-step-text">
-                    <strong>Toca "Añadir a pantalla de inicio"</strong>
-                    <span>Desplázate en el menú y pulsa ese botón. Luego toca <em>Añadir</em>.</span>
+                    <strong>${esc(t('iosStep3Title'))}</strong>
+                    <span>${esc(t('iosStep3Sub'))}</span>
                 </div>
                 ${this._svgAddHome()}
-            </div>
-        ` : isAndroid ? `
+            </div>`;
+        }
+        if (platform === 'android') {
+            return `
             <div class="ig-step">
                 <div class="ig-step-num">1</div>
                 <div class="ig-step-text">
-                    <strong>Abre esta página en Chrome</strong>
-                    <span>Usa Google Chrome para Android.</span>
+                    <strong>${esc(t('androidStep1Title'))}</strong>
+                    <span>${esc(t('androidStep1Sub'))}</span>
                 </div>
                 ${this._svgChrome()}
             </div>
             <div class="ig-step">
                 <div class="ig-step-num">2</div>
                 <div class="ig-step-text">
-                    <strong>Pulsa el menú ⋮ (tres puntos)</strong>
-                    <span>En la esquina superior derecha de Chrome.</span>
+                    <strong>${esc(t('androidStep2Title'))}</strong>
+                    <span>${esc(t('androidStep2Sub'))}</span>
                 </div>
                 ${this._svgMenuDots()}
             </div>
             <div class="ig-step">
                 <div class="ig-step-num">3</div>
                 <div class="ig-step-text">
-                    <strong>Selecciona "Añadir a pantalla de inicio"</strong>
-                    <span>O si aparece el banner de instalación, pulsa <em>Instalar</em>.</span>
+                    <strong>${esc(t('androidStep3Title'))}</strong>
+                    <span>${esc(t('androidStep3Sub'))}</span>
                 </div>
                 ${this._svgAddHome()}
-            </div>
-        ` : `
+            </div>`;
+        }
+        return `
             <div class="ig-step">
                 <div class="ig-step-num">ℹ️</div>
                 <div class="ig-step-text">
-                    <strong>Abre esta página desde un móvil</strong>
-                    <span>La app de wellness está pensada para iPhone o Android.</span>
+                    <strong>${esc(t('desktopStepTitle'))}</strong>
+                    <span>${esc(t('desktopStepSub'))}</span>
                 </div>
-            </div>
-        `;
-
-        const screen = document.createElement('div');
-        screen.id = 'install-gate';
-        screen.innerHTML = `
-            <div class="ig-container">
-                <div class="ig-logo">🏀</div>
-                <h1 class="ig-title">Instala la app primero</h1>
-                <p class="ig-subtitle">Para registrar tu wellness necesitas tener la app guardada en tu pantalla de inicio. Solo tarda 30 segundos.</p>
-                <div class="ig-steps">${steps}</div>
-                <div class="ig-confirm">
-                    <p class="ig-confirm-label">Cuando la tengas instalada, ábrela desde tu pantalla de inicio y vuelve a entrar.</p>
-                    <button class="ig-btn-already" onclick="AppAuth._checkInstallAndProceed()">
-                        ✅ Ya la tengo instalada
-                    </button>
-                </div>
-                <button class="wl-logout" onclick="AppAuth.logout()">🔒 Volver al inicio</button>
-            </div>
-        `;
-        document.body.appendChild(screen);
+            </div>`;
     },
 
     _checkInstallAndProceed() {
@@ -922,7 +954,7 @@ const AppAuth = {
             const btn = document.querySelector('.ig-btn-already');
             if (btn) {
                 const orig = btn.textContent;
-                btn.textContent = '⚠️ No detectada como instalada — ábrela desde inicio';
+                btn.textContent = PlayerI18n.t('installNotDetected');
                 btn.style.background = 'var(--danger, #c62828)';
                 setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 3000);
             }
