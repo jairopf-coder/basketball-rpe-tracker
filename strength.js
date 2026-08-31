@@ -63,8 +63,8 @@ const DEFAULT_EXERCISES = [
 ];
 
 const TEST_DEFINITIONS = [
-    { id: 'cmj',       name: 'CMJ',                    unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Counter Movement Jump' },
-    { id: 'sj',        name: 'SJ',                     unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Squat Jump' },
+    { id: 'cmj',       name: 'CMJ',                    unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Counter Movement Jump', powerCalc: true },
+    { id: 'sj',        name: 'SJ',                     unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Squat Jump', powerCalc: true },
     { id: 'slcmj',     name: 'Single Leg CMJ',         unit: 'cm',   bilateral: true,  inputType: 'flight',   description: 'CMJ unilateral' },
     { id: 'dj',        name: 'Drop Jump',              unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Drop Jump + RSI' },
     { id: 'sts',       name: 'Side to Side Hop',       unit: 'reps', bilateral: true,  inputType: 'count',    description: 'Saltos laterales 30s' },
@@ -72,6 +72,7 @@ const TEST_DEFINITIONS = [
     { id: 'sprint10',  name: 'Sprint 10m',             unit: 's',    bilateral: false, inputType: 'time',     description: 'Tiempo en segundos' },
     { id: 'sprint20',  name: 'Sprint 20m',             unit: 's',    bilateral: false, inputType: 'time',     description: 'Tiempo en segundos' },
     { id: 'ift3015',   name: '30-15 IFT',              unit: 'km/h', bilateral: false, inputType: 'speed',    description: 'Velocidad última etapa completada (VIFT)' },
+    { id: 'five0five', name: '5-0-5',                  unit: 's',    bilateral: true,  inputType: 'time',     description: 'Agilidad: 5m - giro 180° - 5m' },
 ];
 
 // ─────────────────────────────────────────
@@ -82,6 +83,19 @@ const TEST_DEFINITIONS = [
 function flightToHeight(ms) {
     const t = ms / 1000;
     return ((9.81 * t * t) / 8 * 100).toFixed(1); // cm
+}
+
+/**
+ * Potencia pico de salto — ecuación de Sayers et al. (1999)
+ * Peak Power (W) = 60.7 × altura salto (cm) + 45.3 × peso (kg) − 2055
+ * Validada para CMJ y SJ mediante plataforma de fuerza.
+ */
+function sayersPeakPower(jumpHeightCm, bodyWeightKg) {
+    const h = parseFloat(jumpHeightCm);
+    const w = parseFloat(bodyWeightKg);
+    if (isNaN(h) || isNaN(w) || w <= 0) return null;
+    const power = 60.7 * h + 45.3 * w - 2055;
+    return power > 0 ? power : 0;
 }
 
 /** Epley 1RM estimado */
@@ -1766,9 +1780,12 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                 const _percColor = _perc >= 60 ? 'var(--color-success,#639922)' : _perc >= 35 ? 'var(--color-warning,#EF9F27)' : 'var(--color-danger,#E24B4A)';
                 _percBadge = `<span style="font-size:10px;font-weight:500;padding:1px 6px;border-radius:10px;background:${_percColor}18;color:${_percColor};border:1px solid ${_percColor}44">P${_perc} equipo</span>`;
             }
+            const _powerHTML = (def.powerCalc && val.power != null)
+                ? `<div class="test-height-calc">⚡ ${val.power} W · ${val.powerPerKg} W/kg</div>` : '';
             return `<div class="test-summary-card">
                 <div class="test-summary-name">${def.name}</div>
                 <div class="test-summary-value">${val.value != null ? val.value + def.unit : '—'}</div>
+                ${_powerHTML}
                 ${_percBadge}
             </div>`;
         }).join('');
@@ -1794,14 +1811,17 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                         ${asym !== null ? `<span class="test-asym" style="color:${asymColor(asym)}">Δ ${asym}%</span>` : ''}
                     </div>`;
                 }
+                const _powerSpan = (def.powerCalc && val.power != null)
+                    ? `<span style="color:var(--text-muted);font-size:0.8rem">⚡ ${val.power} W · ${val.powerPerKg} W/kg</span>` : '';
                 return `<div class="test-result-row">
                     <span class="test-result-name">${def.name}</span>
                     <span><strong>${val.value != null ? val.value + def.unit : '—'}</strong></span>
+                    ${_powerSpan}
                 </div>`;
             }).join('');
             return `<div class="str-session-row str-session-row--test">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-                    <strong>${ts.date}</strong>
+                    <strong>${ts.date}</strong>${ts.bodyWeight ? `<span style="font-size:0.75rem;color:var(--text-muted)">Peso: ${ts.bodyWeight} kg</span>` : ''}
                     <button class="str-del-btn" onclick="window.rpeTracker._deleteTestSession('${ts.id}')">🗑</button>
                 </div>
                 ${rowsHTML}
@@ -1994,6 +2014,7 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
                         <input type="number" class="form-input" id="test_${def.id}_value" placeholder="—" step="any"
                             oninput="window.rpeTracker._updateTestSingle('${def.id}')">
                         ${def.inputType === 'flight' ? `<div class="test-height-calc" id="testH_${def.id}_value">—</div>` : ''}
+                        ${def.powerCalc ? `<div class="test-height-calc" id="testP_${def.id}_value">—</div>` : ''}
                     </div>
                 </div>
             </div>`;
@@ -2007,7 +2028,7 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
                 <button class="modal-close" onclick="document.getElementById('testModal').classList.remove('active')">✕</button>
             </div>
             <div class="modal-body" style="padding:1.25rem">
-                <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+                <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem">
                     <div>
                         <label class="form-label">Jugadora</label>
                         <select id="testPlayerSel" class="form-select">${playerOpts}</select>
@@ -2016,8 +2037,13 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
                         <label class="form-label">Fecha</label>
                         <input type="date" id="testDate" class="form-input" value="${today}">
                     </div>
+                    <div>
+                        <label class="form-label">Peso (kg) <span style="font-weight:400;color:var(--text-muted)">— opcional</span></label>
+                        <input type="number" class="form-input" id="testBodyWeight" placeholder="—" step="any" min="0"
+                            oninput="window.rpeTracker._updateTestPower()">
+                    </div>
                 </div>
-                <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1rem">Rellena solo los tests realizados hoy. Los campos vacíos no se guardan.</p>
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1rem">Rellena solo los tests realizados hoy. Los campos vacíos no se guardan. El peso es solo para esta sesión de test (no se guarda en la ficha de la jugadora) y se usa para calcular la potencia de salto en CMJ y SJ.</p>
                 <div class="test-inputs-grid">${testsHTML}</div>
                 <div style="margin-top:1.5rem;text-align:right">
                     <button class="btn-secondary" onclick="document.getElementById('testModal').classList.remove('active')" style="margin-right:0.5rem">Cancelar</button>
@@ -2063,11 +2089,34 @@ RPETracker.prototype._updateTestSingle = function(testId) {
     const hEl = document.getElementById(`testH_${testId}_value`);
     const v   = parseFloat(el?.value);
     if (hEl) hEl.textContent = !isNaN(v) ? `↕ ${flightToHeight(v)} cm` : '—';
+    if (def.powerCalc) this._updateTestPowerFor(testId);
+};
+
+/** Recalcula la potencia (Sayers) para un test concreto usando el peso introducido */
+RPETracker.prototype._updateTestPowerFor = function(testId) {
+    const def = TEST_DEFINITIONS.find(t => t.id === testId);
+    if (!def || !def.powerCalc) return;
+    const pEl = document.getElementById(`testP_${testId}_value`);
+    if (!pEl) return;
+    const flightMs = parseFloat(document.getElementById(`test_${testId}_value`)?.value);
+    const weight   = parseFloat(document.getElementById('testBodyWeight')?.value);
+    if (isNaN(flightMs) || isNaN(weight) || weight <= 0) { pEl.textContent = '—'; return; }
+    const heightCm = flightToHeight(flightMs);
+    const power = sayersPeakPower(heightCm, weight);
+    if (power === null) { pEl.textContent = '—'; return; }
+    const relPower = (power / weight).toFixed(1);
+    pEl.textContent = `⚡ ${power.toFixed(0)} W · ${relPower} W/kg`;
+};
+
+/** Recalcula la potencia de todos los tests con powerCalc (llamado al cambiar el peso) */
+RPETracker.prototype._updateTestPower = function() {
+    TEST_DEFINITIONS.filter(d => d.powerCalc).forEach(d => this._updateTestPowerFor(d.id));
 };
 
 RPETracker.prototype._saveTestSession = function() {
-    const playerId = document.getElementById('testPlayerSel')?.value;
-    const date     = document.getElementById('testDate')?.value;
+    const playerId  = document.getElementById('testPlayerSel')?.value;
+    const date      = document.getElementById('testDate')?.value;
+    const bodyWeight = parseFloat(document.getElementById('testBodyWeight')?.value);
     if (!playerId || !date) { this.showToast('Selecciona jugadora y fecha', 'error'); return; }
 
     const results = {};
@@ -2084,7 +2133,15 @@ RPETracker.prototype._saveTestSession = function() {
             const v = parseFloat(document.getElementById(`test_${def.id}_value`)?.value);
             if (!isNaN(v)) {
                 const finalVal = def.inputType === 'flight' ? parseFloat(flightToHeight(v)) : v;
-                results[def.id] = { value: finalVal, raw: v };
+                const entry = { value: finalVal, raw: v };
+                if (def.powerCalc && !isNaN(bodyWeight) && bodyWeight > 0) {
+                    const power = sayersPeakPower(finalVal, bodyWeight);
+                    if (power !== null) {
+                        entry.power = parseFloat(power.toFixed(0));
+                        entry.powerPerKg = parseFloat((power / bodyWeight).toFixed(1));
+                    }
+                }
+                results[def.id] = entry;
             }
         }
     });
@@ -2092,6 +2149,7 @@ RPETracker.prototype._saveTestSession = function() {
     if (Object.keys(results).length === 0) { this.showToast('Introduce al menos un resultado', 'error'); return; }
 
     const session = { id: Date.now().toString(), playerId, date, results, createdAt: new Date().toISOString() };
+    if (!isNaN(bodyWeight) && bodyWeight > 0) session.bodyWeight = bodyWeight;
     if (!this.testSessions) this.testSessions = [];
     this.testSessions.push(session);
     this._saveTestSessions();
