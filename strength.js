@@ -63,10 +63,10 @@ const DEFAULT_EXERCISES = [
 ];
 
 const TEST_DEFINITIONS = [
-    { id: 'cmj',       name: 'CMJ',                    unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Counter Movement Jump', powerCalc: true },
-    { id: 'sj',        name: 'SJ',                     unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Squat Jump', powerCalc: true },
-    { id: 'slcmj',     name: 'Single Leg CMJ',         unit: 'cm',   bilateral: true,  inputType: 'flight',   description: 'CMJ unilateral' },
-    { id: 'dj',        name: 'Drop Jump',              unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Drop Jump + RSI' },
+    { id: 'cmj',       name: 'CMJ',                    unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Counter Movement Jump', powerCalc: true, multiTrial: 3 },
+    { id: 'sj',        name: 'SJ',                     unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Squat Jump', powerCalc: true, multiTrial: 3 },
+    { id: 'slcmj',     name: 'Single Leg CMJ',         unit: 'cm',   bilateral: true,  inputType: 'flight',   description: 'CMJ unilateral', multiTrial: 3 },
+    { id: 'dj',        name: 'Drop Jump',              unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Drop Jump + RSI', multiTrial: 3 },
     { id: 'sts',       name: 'Side to Side Hop',       unit: 'reps', bilateral: true,  inputType: 'count',    description: 'Saltos laterales 30s' },
     { id: 'triple',    name: 'Triple Hop',             unit: 'cm',   bilateral: true,  inputType: 'distance', description: 'Triple salto unilateral' },
     { id: 'sprint10',  name: 'Sprint 10m',             unit: 's',    bilateral: false, inputType: 'time',     description: 'Tiempo en segundos' },
@@ -1979,7 +1979,33 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
 
     const testsHTML = TEST_DEFINITIONS.map(def => {
         if (def.bilateral) {
-            // Campos izquierda + derecha + índice asimetría calculado
+            // ── Salto unilateral con 3 intentos por lado + media ──
+            if (def.inputType === 'flight' && def.multiTrial) {
+                const trialInputs = (side) => [1, 2, 3].map(n => `
+                    <input type="number" class="form-input test-trial-input-sm" id="test_${def.id}_${side}_${n}" placeholder="S${n}" step="any"
+                        oninput="window.rpeTracker._updateTestMultiAsym('${def.id}')">`).join('');
+                return `
+                <div class="test-input-row">
+                    <div class="test-input-name">${def.name} <span class="test-input-desc">${def.description} · media de 3 saltos</span></div>
+                    <div class="test-input-fields test-input-fields--bilateral">
+                        <div>
+                            <label class="form-label">Izquierda (ms)</label>
+                            <div class="test-trial-group">${trialInputs('left')}</div>
+                            <div class="test-height-calc" id="testH_${def.id}_left">—</div>
+                        </div>
+                        <div>
+                            <label class="form-label">Derecha (ms)</label>
+                            <div class="test-trial-group">${trialInputs('right')}</div>
+                            <div class="test-height-calc" id="testH_${def.id}_right">—</div>
+                        </div>
+                        <div class="test-asym-display" id="testAsym_${def.id}">
+                            <span class="test-asym-label">Asimetría</span>
+                            <span class="test-asym-value" id="testAsymVal_${def.id}">—</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            // Campos izquierda + derecha + índice asimetría calculado (un único intento)
             const extraLabel = def.inputType === 'flight' ? 'Tiempo vuelo (ms)' : def.unit;
             return `
             <div class="test-input-row">
@@ -2004,6 +2030,23 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
                 </div>
             </div>`;
         } else {
+            // ── Salto bipodal con 3 intentos + media (CMJ, SJ, Drop Jump) ──
+            if (def.inputType === 'flight' && def.multiTrial) {
+                const trialInputs = [1, 2, 3].map(n => `
+                    <input type="number" class="form-input test-trial-input-sm" id="test_${def.id}_value_${n}" placeholder="Salto ${n}" step="any"
+                        oninput="window.rpeTracker._updateTestMulti('${def.id}')">`).join('');
+                return `
+                <div class="test-input-row">
+                    <div class="test-input-name">${def.name} <span class="test-input-desc">${def.description} · media de 3 saltos (ms)</span></div>
+                    <div class="test-input-fields">
+                        <div>
+                            <div class="test-trial-group">${trialInputs}</div>
+                            <div class="test-height-calc" id="testH_${def.id}_value">Media: —</div>
+                            ${def.powerCalc ? `<div class="test-height-calc" id="testP_${def.id}_value">—</div>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }
             const label = def.inputType === 'flight' ? 'Tiempo vuelo (ms)' : `Valor (${def.unit})`;
             return `
             <div class="test-input-row">
@@ -2054,6 +2097,49 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
     modal.classList.add('active');
 };
 
+/** Media de altura (cm) a partir de hasta 3 inputs de tiempo de vuelo (ms). baseId = p.ej. "cmj_value" o "slcmj_left" */
+RPETracker.prototype._avgHeightFromTrials = function(baseId) {
+    const heights = [];
+    for (let n = 1; n <= 3; n++) {
+        const v = parseFloat(document.getElementById(`test_${baseId}_${n}`)?.value);
+        if (!isNaN(v)) heights.push(parseFloat(flightToHeight(v)));
+    }
+    if (heights.length === 0) return null;
+    const avg = heights.reduce((a, b) => a + b, 0) / heights.length;
+    return parseFloat(avg.toFixed(1));
+};
+
+/** Recalcula la media (y potencia si aplica) de un test bipodal con 3 intentos (CMJ, SJ, Drop Jump) */
+RPETracker.prototype._updateTestMulti = function(testId) {
+    const def = TEST_DEFINITIONS.find(t => t.id === testId);
+    if (!def) return;
+    const avg = this._avgHeightFromTrials(`${testId}_value`);
+    const hEl = document.getElementById(`testH_${testId}_value`);
+    if (hEl) hEl.textContent = avg != null ? `Media: ↕ ${avg} cm` : 'Media: —';
+    if (def.powerCalc) this._updateTestPowerFor(testId);
+};
+
+/** Recalcula medias por pierna y asimetría para un test unilateral con 3 intentos por lado (Single Leg CMJ) */
+RPETracker.prototype._updateTestMultiAsym = function(testId) {
+    const lAvg = this._avgHeightFromTrials(`${testId}_left`);
+    const rAvg = this._avgHeightFromTrials(`${testId}_right`);
+    const lEl = document.getElementById(`testH_${testId}_left`);
+    const rEl = document.getElementById(`testH_${testId}_right`);
+    if (lEl) lEl.textContent = lAvg != null ? `Media: ↕ ${lAvg} cm` : '—';
+    if (rEl) rEl.textContent = rAvg != null ? `Media: ↕ ${rAvg} cm` : '—';
+
+    const asymEl = document.getElementById(`testAsymVal_${testId}`);
+    if (!asymEl) return;
+    if (lAvg != null && rAvg != null && (lAvg > 0 || rAvg > 0)) {
+        const pct = asymmetry(lAvg, rAvg);
+        asymEl.textContent = `${pct}%`;
+        asymEl.style.color = asymColor(pct);
+    } else {
+        asymEl.textContent = '—';
+        asymEl.style.color = '';
+    }
+};
+
 RPETracker.prototype._updateTestAsym = function(testId) {
     const def = TEST_DEFINITIONS.find(t => t.id === testId);
     if (!def) return;
@@ -2098,10 +2184,11 @@ RPETracker.prototype._updateTestPowerFor = function(testId) {
     if (!def || !def.powerCalc) return;
     const pEl = document.getElementById(`testP_${testId}_value`);
     if (!pEl) return;
-    const flightMs = parseFloat(document.getElementById(`test_${testId}_value`)?.value);
-    const weight   = parseFloat(document.getElementById('testBodyWeight')?.value);
-    if (isNaN(flightMs) || isNaN(weight) || weight <= 0) { pEl.textContent = '—'; return; }
-    const heightCm = flightToHeight(flightMs);
+    const heightCm = def.multiTrial
+        ? this._avgHeightFromTrials(`${testId}_value`)
+        : (() => { const ms = parseFloat(document.getElementById(`test_${testId}_value`)?.value); return !isNaN(ms) ? parseFloat(flightToHeight(ms)) : null; })();
+    const weight = parseFloat(document.getElementById('testBodyWeight')?.value);
+    if (heightCm == null || isNaN(weight) || weight <= 0) { pEl.textContent = '—'; return; }
     const power = sayersPeakPower(heightCm, weight);
     if (power === null) { pEl.textContent = '—'; return; }
     const relPower = (power / weight).toFixed(1);
@@ -2122,18 +2209,55 @@ RPETracker.prototype._saveTestSession = function() {
     const results = {};
     TEST_DEFINITIONS.forEach(def => {
         if (def.bilateral) {
-            const lv = parseFloat(document.getElementById(`test_${def.id}_left`)?.value);
-            const rv = parseFloat(document.getElementById(`test_${def.id}_right`)?.value);
-            if (!isNaN(lv) || !isNaN(rv)) {
-                const leftVal  = !isNaN(lv) ? (def.inputType === 'flight' ? parseFloat(flightToHeight(lv)) : lv) : null;
-                const rightVal = !isNaN(rv) ? (def.inputType === 'flight' ? parseFloat(flightToHeight(rv)) : rv) : null;
-                results[def.id] = { left: leftVal, right: rightVal, raw_left: lv, raw_right: rv };
+            let leftVal = null, rightVal = null, raw_left, raw_right, trials_left, trials_right;
+            if (def.inputType === 'flight' && def.multiTrial) {
+                const lh = [], rh = [];
+                for (let n = 1; n <= 3; n++) {
+                    const lv = parseFloat(document.getElementById(`test_${def.id}_left_${n}`)?.value);
+                    const rv = parseFloat(document.getElementById(`test_${def.id}_right_${n}`)?.value);
+                    if (!isNaN(lv)) lh.push(parseFloat(flightToHeight(lv)));
+                    if (!isNaN(rv)) rh.push(parseFloat(flightToHeight(rv)));
+                }
+                const avg = arr => parseFloat((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1));
+                if (lh.length) { leftVal = avg(lh); trials_left = lh; }
+                if (rh.length) { rightVal = avg(rh); trials_right = rh; }
+            } else {
+                const lv = parseFloat(document.getElementById(`test_${def.id}_left`)?.value);
+                const rv = parseFloat(document.getElementById(`test_${def.id}_right`)?.value);
+                if (!isNaN(lv)) { leftVal = def.inputType === 'flight' ? parseFloat(flightToHeight(lv)) : lv; raw_left = lv; }
+                if (!isNaN(rv)) { rightVal = def.inputType === 'flight' ? parseFloat(flightToHeight(rv)) : rv; raw_right = rv; }
+            }
+            if (leftVal !== null || rightVal !== null) {
+                const entry = { left: leftVal, right: rightVal };
+                if (raw_left !== undefined) entry.raw_left = raw_left;
+                if (raw_right !== undefined) entry.raw_right = raw_right;
+                if (trials_left !== undefined) entry.trials_left = trials_left;
+                if (trials_right !== undefined) entry.trials_right = trials_right;
+                results[def.id] = entry;
             }
         } else {
-            const v = parseFloat(document.getElementById(`test_${def.id}_value`)?.value);
-            if (!isNaN(v)) {
-                const finalVal = def.inputType === 'flight' ? parseFloat(flightToHeight(v)) : v;
-                const entry = { value: finalVal, raw: v };
+            let finalVal = null, raw, trials;
+            if (def.inputType === 'flight' && def.multiTrial) {
+                const heights = [];
+                for (let n = 1; n <= 3; n++) {
+                    const v = parseFloat(document.getElementById(`test_${def.id}_value_${n}`)?.value);
+                    if (!isNaN(v)) heights.push(parseFloat(flightToHeight(v)));
+                }
+                if (heights.length) {
+                    finalVal = parseFloat((heights.reduce((a, b) => a + b, 0) / heights.length).toFixed(1));
+                    trials = heights;
+                }
+            } else {
+                const v = parseFloat(document.getElementById(`test_${def.id}_value`)?.value);
+                if (!isNaN(v)) {
+                    finalVal = def.inputType === 'flight' ? parseFloat(flightToHeight(v)) : v;
+                    raw = v;
+                }
+            }
+            if (finalVal !== null) {
+                const entry = { value: finalVal };
+                if (raw !== undefined) entry.raw = raw;
+                if (trials !== undefined) entry.trials = trials;
                 if (def.powerCalc && !isNaN(bodyWeight) && bodyWeight > 0) {
                     const power = sayersPeakPower(finalVal, bodyWeight);
                     if (power !== null) {
