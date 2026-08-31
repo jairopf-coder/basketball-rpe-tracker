@@ -266,6 +266,7 @@ const AppAuth = {
                     <button class="btn-close" aria-label="Cerrar" onclick="document.getElementById('userMgmtModal').remove()">&times;</button>
                 </div>
 
+                <div class="modal-body">
                 <div class="um-section">
                     <h3 class="um-section-title">➕ Crear nueva cuenta</h3>
                     <div class="form-group">
@@ -319,6 +320,7 @@ const AppAuth = {
                     <div id="um-user-list" class="um-user-list">
                         <div style="color:var(--text-secondary)">Cargando…</div>
                     </div>
+                </div>
                 </div>
 
                 <div class="modal-footer">
