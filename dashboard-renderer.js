@@ -29,6 +29,18 @@ RPETracker.prototype.renderDashboard = function() {
     const avgRPE7 = recent7.length > 0
         ? (recent7.reduce((s, x) => s + x.rpe, 0) / recent7.length).toFixed(1) : '—';
 
+    // RPE medio de la última sesión (agrupando por fecha+turno+tipo, igual que countUniqueSessions)
+    let avgRPELastSession = '—';
+    if (this.sessions.length > 0) {
+        const sortedByDate = [...this.sessions].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const last = sortedByDate[0];
+        const lastKey = `${last.date.slice(0, 10)}_${last.timeOfDay || 'unknown'}_${last.type || 'training'}`;
+        const lastSessionEntries = this.sessions.filter(s =>
+            `${s.date.slice(0, 10)}_${s.timeOfDay || 'unknown'}_${s.type || 'training'}` === lastKey
+        );
+        avgRPELastSession = (lastSessionEntries.reduce((sum, s) => sum + s.rpe, 0) / lastSessionEntries.length).toFixed(1);
+    }
+
     // Active injuries
     const activeInjuries = (this.injuries || []).filter(i => i.status === 'active').length;
 
@@ -257,6 +269,10 @@ RPETracker.prototype.renderDashboard = function() {
                     <div class="db-metric-row">
                         <span class="db-metric-lbl">RPE medio</span>
                         <span class="db-metric-val" style="color:#ff9800">${avgRPE7}</span>
+                    </div>
+                    <div class="db-metric-row">
+                        <span class="db-metric-lbl">RPE medio última sesión</span>
+                        <span class="db-metric-val" style="color:#ff9800">${avgRPELastSession}</span>
                     </div>
                     <div class="db-metric-row">
                         <span class="db-metric-lbl">Entrenamientos</span>

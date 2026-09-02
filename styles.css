@@ -6163,10 +6163,14 @@ details[open] .ewma-toggle-hint { display: none; }
     .ts-table-wrap,
     .cmp-table-wrap,
     .pvr-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
 
-    /* Tarjeta de jugadora (Equipo): en móvil no cabe todo en una fila
-       (avatar+nombre, 3 stats, sparkline y 5 iconos), así que se apila
-       en filas completas en vez de comprimirse hacia la derecha. */
+/* Tarjeta de jugadora (Equipo): en móvil Y en tablet vertical (iPad incluido)
+   no cabe todo en una fila (avatar+nombre, 3 stats, sparkline y 5 iconos),
+   así que se apila en filas completas en vez de comprimirse/desbordarse.
+   1100px cubre el ancho vertical de cualquier iPad (744-1024px) sin afectar
+   al modo escritorio real ni al horizontal de iPad (≥1080px). */
+@media (max-width: 1100px) {
     .player-card {
         flex-wrap: wrap;
         row-gap: 0.65rem;
