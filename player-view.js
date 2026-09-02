@@ -1,6 +1,11 @@
 // ======================================================================
 // PLAYER VIEW — Vista exclusiva para rol 'player' en modo PWA instalada
-// Guarda en Firebase: /wellnessPlayer/{uid}/{date}
+// Menú principal: Wellness diario | RPE de sesión
+//   - Wellness: sueño/fatiga/ánimo/dolor → /wellnessPlayer/{uid}/{date}
+//   - RPE: jugadora elige Mañana/Tarde/Partido y valora 1-10 con botones
+//          de color → /playerRpeReports/{uid}/{date}/{sessionType}
+//     (nodo separado de /sessions del staff: no conocemos la duración,
+//      así que no se mezcla con el cálculo de carga de entrenamiento)
 // ======================================================================
 // Requiere: AppAuth, PlayerI18n, window.firebaseDB (opcional — funciona offline)
 // ======================================================================
@@ -13,15 +18,17 @@ const PlayerView = (() => {
         '#fb923c','#f97316','#ef4444','#dc2626','#b91c1c','#7f1d1d',
     ];
 
+    const RPE_TYPES = [
+        { key: 'morning',   icon: '☀️', labelKey: 'rpeTypeMorning' },
+        { key: 'afternoon', icon: '🌙', labelKey: 'rpeTypeAfternoon' },
+        { key: 'match',     icon: '🏟️', labelKey: 'rpeTypeMatch' },
+    ];
+
     // ---- Estado interno ----
-    let _state = {
-        rpe:     0,
-        date:    _today(),
-        sleep:   0,
-        fatigue: 0,
-        mood:    0,
-        pain:    0,
-    };
+    let _view = 'menu'; // 'menu' | 'wellness' | 'wellnessDone' | 'rpeType' | 'rpeValue' | 'rpeDone'
+    let _screenEl = null;
+    let _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0 };
+    let _rpeState = { date: _today(), sessionType: null, value: 0 };
 
     // ---- Helpers ----
     function _today() {
@@ -37,12 +44,11 @@ const PlayerView = (() => {
             .replace(/'/g,'&#39;');
     }
 
-    function _allAnswered() {
-        return _state.rpe > 0
-            && _state.sleep > 0
-            && _state.fatigue > 0
-            && _state.mood > 0
-            && _state.pain > 0;
+    function _allWellnessAnswered() {
+        return _wellnessState.sleep > 0
+            && _wellnessState.fatigue > 0
+            && _wellnessState.mood > 0
+            && _wellnessState.pain > 0;
     }
 
     function _fmtDate(iso) {
@@ -53,50 +59,12 @@ const PlayerView = (() => {
     }
 
     // ---- Persistencia ----
-    async function _save() {
-        const uid  = AppAuth._currentUser?.uid;
-        if (!uid) throw new Error('Usuario no autenticado');
-
-        // Intentar leer el playerId vinculado al usuario desde /users/{uid}/playerId
-        let playerId = null;
-        if (window.firebaseDB) {
-            try {
-                const snap = await window.firebaseDB.ref('users/' + uid + '/playerId').once('value');
-                playerId = snap.val() || null;
-            } catch (_) { /* offline — continuar sin playerId */ }
-        }
-
-        const entry = {
-            uid,
-            date:    _state.date,
-            rpe:     _state.rpe,
-            sleep:   _state.sleep,
-            fatigue: _state.fatigue,
-            mood:    _state.mood,
-            pain:    _state.pain,
-            ts:      new Date().toISOString(),
-        };
-        if (playerId) entry.playerId = playerId;
-
-        // Nodo principal: /wellnessPlayer/{uid}/{date}
-        const fbPath = `wellnessPlayer/${uid}/${_state.date}`;
-
-        if (window.firebaseDB) {
-            try {
-                await window.firebaseDB.ref(fbPath).set(entry);
-            } catch (e) {
-                // Offline: encolar en localStorage para re-sync posterior
-                _queueOffline(fbPath, entry);
-            }
-        } else {
-            _queueOffline(fbPath, entry);
-        }
-
-        // Siempre guardar copia local para hasAnsweredToday
-        const stored = JSON.parse(localStorage.getItem('pv_wellness') || '{}');
-        if (!stored[uid]) stored[uid] = {};
-        stored[uid][_state.date] = entry;
-        localStorage.setItem('pv_wellness', JSON.stringify(stored));
+    async function _getLinkedPlayerId(uid) {
+        if (!window.firebaseDB) return null;
+        try {
+            const snap = await window.firebaseDB.ref('users/' + uid + '/playerId').once('value');
+            return snap.val() || null;
+        } catch (_) { return null; /* offline — continuar sin playerId */ }
     }
 
     function _queueOffline(path, data) {
@@ -105,75 +73,114 @@ const PlayerView = (() => {
         localStorage.setItem('pv_offline_q', JSON.stringify(q));
     }
 
-    // Intenta re-sincronizar entradas pendientes (llamado tras login exitoso)
+    async function _writeToFirebase(path, entry) {
+        if (window.firebaseDB) {
+            try { await window.firebaseDB.ref(path).set(entry); return; }
+            catch (e) { /* cae a offline */ }
+        }
+        _queueOffline(path, entry);
+    }
+
+    // Intenta re-sincronizar entradas pendientes (llamado al abrir la vista)
     async function _drainQueue() {
         if (!window.firebaseDB) return;
         const q = JSON.parse(localStorage.getItem('pv_offline_q') || '[]');
         if (!q.length) return;
         const remaining = [];
         for (const item of q) {
-            try {
-                await window.firebaseDB.ref(item.path).set(item.data);
-            } catch (_) {
-                remaining.push(item);
-            }
+            try { await window.firebaseDB.ref(item.path).set(item.data); }
+            catch (_) { remaining.push(item); }
         }
         localStorage.setItem('pv_offline_q', JSON.stringify(remaining));
     }
 
-    function _hasAnsweredToday() {
+    async function _saveWellness() {
+        const uid = AppAuth._currentUser?.uid;
+        if (!uid) throw new Error('Usuario no autenticado');
+        const playerId = await _getLinkedPlayerId(uid);
+
+        const entry = {
+            uid, date: _wellnessState.date,
+            sleep: _wellnessState.sleep, fatigue: _wellnessState.fatigue,
+            mood: _wellnessState.mood, pain: _wellnessState.pain,
+            ts: new Date().toISOString(),
+        };
+        if (playerId) entry.playerId = playerId;
+
+        await _writeToFirebase(`wellnessPlayer/${uid}/${_wellnessState.date}`, entry);
+
+        const stored = JSON.parse(localStorage.getItem('pv_wellness') || '{}');
+        if (!stored[uid]) stored[uid] = {};
+        stored[uid][_wellnessState.date] = entry;
+        localStorage.setItem('pv_wellness', JSON.stringify(stored));
+    }
+
+    async function _saveRpe() {
+        const uid = AppAuth._currentUser?.uid;
+        if (!uid) throw new Error('Usuario no autenticado');
+        const playerId = await _getLinkedPlayerId(uid);
+        const date = _rpeState.date;
+        const sessionType = _rpeState.sessionType;
+
+        const entry = {
+            uid, date, sessionType, rpe: _rpeState.value,
+            ts: new Date().toISOString(),
+        };
+        if (playerId) entry.playerId = playerId;
+
+        await _writeToFirebase(`playerRpeReports/${uid}/${date}/${sessionType}`, entry);
+
+        const stored = JSON.parse(localStorage.getItem('pv_rpe') || '{}');
+        if (!stored[uid]) stored[uid] = {};
+        if (!stored[uid][date]) stored[uid][date] = {};
+        stored[uid][date][sessionType] = entry;
+        localStorage.setItem('pv_rpe', JSON.stringify(stored));
+    }
+
+    function _hasAnsweredWellnessToday() {
         const uid = AppAuth._currentUser?.uid;
         if (!uid) return false;
         const stored = JSON.parse(localStorage.getItem('pv_wellness') || '{}');
         return !!(stored[uid] && stored[uid][_today()]);
     }
 
-    // ---- Render ----
-    function _renderLangToggle() {
-        return `<div class="pv-lang-row">${PlayerI18n.toggleHTML('PlayerView._onLangChange')}</div>`;
+    function _hasAnsweredRpeToday(sessionType) {
+        const uid = AppAuth._currentUser?.uid;
+        if (!uid) return false;
+        const stored = JSON.parse(localStorage.getItem('pv_rpe') || '{}');
+        return !!(stored[uid] && stored[uid][_today()] && stored[uid][_today()][sessionType]);
     }
 
-    function _renderRPESlider() {
-        const v = _state.rpe;
-        const color = v > 0 ? RPE_COLORS[v] : 'var(--border)';
-        const labels = PlayerI18n.rpeLabels();
-        const label = v > 0 ? `${v} — ${labels[v]}` : PlayerI18n.t('pvRpeMove');
+    function _showInlineError(anchorBtn, msg) {
+        const errEl = document.getElementById('pv-error-msg');
+        if (errEl) { errEl.textContent = msg; return; }
+        const p = document.createElement('p');
+        p.id = 'pv-error-msg';
+        p.className = 'pv-error';
+        p.textContent = msg;
+        if (anchorBtn && anchorBtn.parentNode) anchorBtn.parentNode.insertBefore(p, anchorBtn);
+    }
+
+    // ---- Render: piezas reutilizables ----
+    function _shell(inner) {
+        const name = AppAuth._currentUser?.displayName || PlayerI18n.t('pvDefaultName');
         return `
-        <div class="pv-question">
-            <div class="pv-q-label">${_esc(PlayerI18n.t('pvRpeLabel'))}</div>
-            <div class="pv-q-sub">${_esc(PlayerI18n.t('pvRpeSub'))}</div>
-            <div class="pv-rpe-wrap">
-                <input
-                    type="range"
-                    min="1" max="10" step="1"
-                    value="${v > 0 ? v : 5}"
-                    id="pv-rpe-slider"
-                    class="pv-rpe-slider"
-                    style="--rpe-color:${color}"
-                    oninput="PlayerView._onRpe(this.value)"
-                    aria-label="RPE"
-                >
-                <div class="pv-rpe-badge" id="pv-rpe-badge"
-                     style="background:${color};color:${v > 0 ? '#fff' : 'var(--text-faint)'}">
-                    ${v > 0 ? v : '—'}
-                </div>
+        <div class="pv-container">
+            <div class="pv-lang-row">${PlayerI18n.toggleHTML('PlayerView._onLangChange')}</div>
+            <div class="pv-header">
+                <div class="pv-logo">🏀</div>
+                <h1 class="pv-title">${_esc(PlayerI18n.t('pvGreeting'))} ${_esc(name)}!</h1>
+                <p class="pv-subtitle">${_fmtDate(_today())}</p>
             </div>
-            <div class="pv-rpe-desc" id="pv-rpe-desc"
-                 style="color:${v > 0 ? color : 'var(--text-faint)'}">
-                ${_esc(label)}
-            </div>
-            <div class="pv-rpe-ticks" aria-hidden="true">
-                ${[1,2,3,4,5,6,7,8,9,10].map(n =>
-                    `<span style="color:${RPE_COLORS[n]}">${n}</span>`
-                ).join('')}
-            </div>
+            ${inner}
+            <button class="pv-logout" onclick="AppAuth.logout()">${_esc(PlayerI18n.t('pvLogout'))}</button>
         </div>`;
     }
 
     function _renderWellnessButtons() {
         const meta = PlayerI18n.wellnessMeta();
         return Object.entries(meta).map(([key, m]) => {
-            const selected = _state[key];
+            const selected = _wellnessState[key];
             return `
             <div class="pv-question">
                 <div class="pv-q-label">${m.icon} ${_esc(m.label)}</div>
@@ -201,12 +208,127 @@ const PlayerView = (() => {
                 type="date"
                 id="pv-date-input"
                 class="pv-date-input"
-                value="${_esc(_state.date)}"
+                value="${_esc(_wellnessState.date)}"
                 max="${_esc(_today())}"
                 onchange="PlayerView._onDate(this.value)"
                 aria-label="Fecha / Date"
             >
         </div>`;
+    }
+
+    // ---- Render: pantallas ----
+    function _render() {
+        if (!_screenEl) return;
+        switch (_view) {
+            case 'wellness':    return _renderWellnessForm();
+            case 'wellnessDone': return _renderWellnessDone(false);
+            case 'rpeType':     return _renderRpeTypeSelect();
+            case 'rpeValue':    return _renderRpeValueSelect();
+            case 'rpeDone':     return _renderRpeDone();
+            case 'menu':
+            default:            return _renderMenu();
+        }
+    }
+
+    function _renderMenu() {
+        const wellnessDone = _hasAnsweredWellnessToday();
+        _screenEl.innerHTML = _shell(`
+            <button class="pv-menu-btn${wellnessDone ? ' done' : ''}" onclick="PlayerView._goWellness()">
+                <span><span class="pv-menu-btn-icon">🧘</span>${_esc(PlayerI18n.t('menuWellnessBtn'))}</span>
+                ${wellnessDone ? `<span class="pv-menu-btn-check">✅</span>` : ''}
+            </button>
+            <button class="pv-menu-btn" onclick="PlayerView._goRpeType()">
+                <span><span class="pv-menu-btn-icon">🏃</span>${_esc(PlayerI18n.t('menuRpeBtn'))}</span>
+            </button>
+        `);
+    }
+
+    function _renderWellnessForm() {
+        if (_hasAnsweredWellnessToday()) { _view = 'wellnessDone'; return _renderWellnessDone(false); }
+        _screenEl.innerHTML = _shell(`
+            <button class="pv-back-btn" onclick="PlayerView._goMenu()">${_esc(PlayerI18n.t('backBtn'))}</button>
+            <div id="pv-step-form">
+                ${_renderWellnessButtons()}
+                ${_renderDateField()}
+                <button
+                    class="pv-submit"
+                    id="pv-submit-btn"
+                    onclick="PlayerView._onSubmitWellness()"
+                    ${_allWellnessAnswered() ? '' : 'disabled'}
+                >
+                    ${_esc(PlayerI18n.t('pvSubmit'))}
+                </button>
+            </div>
+        `);
+    }
+
+    function _renderWellnessDone(justSubmitted) {
+        _screenEl.innerHTML = _shell(`
+            <button class="pv-back-btn" onclick="PlayerView._goMenu()">${_esc(PlayerI18n.t('backBtn'))}</button>
+            <div class="pv-done-icon">✅</div>
+            <h2 class="pv-done-title">${_esc(PlayerI18n.t(justSubmitted ? 'pvDoneTitle' : 'pvAlreadyTitle'))}</h2>
+            <p class="pv-done-sub">${PlayerI18n.t(justSubmitted ? 'pvDoneSub' : 'pvAlreadySub')}</p>
+        `);
+    }
+
+    function _renderRpeTypeSelect() {
+        const rows = RPE_TYPES.map(t => {
+            const done = _hasAnsweredRpeToday(t.key);
+            return `
+            <button class="pv-type-btn${done ? ' done' : ''}" ${done ? 'disabled' : ''} onclick="PlayerView._selectRpeType('${t.key}')">
+                <span>${t.icon} ${_esc(PlayerI18n.t(t.labelKey))}</span>
+                ${done ? `<span class="pv-menu-btn-check">✅</span>` : ''}
+            </button>`;
+        }).join('');
+        _screenEl.innerHTML = _shell(`
+            <button class="pv-back-btn" onclick="PlayerView._goMenu()">${_esc(PlayerI18n.t('backBtn'))}</button>
+            <div class="pv-question">
+                <div class="pv-q-label">${_esc(PlayerI18n.t('rpeSelectTypeTitle'))}</div>
+                <div class="pv-type-row">${rows}</div>
+            </div>
+        `);
+    }
+
+    function _renderRpeValueSelect() {
+        const v = _rpeState.value;
+        const labels = PlayerI18n.rpeLabels();
+        const desc = v > 0 ? `${v} — ${labels[v]}` : PlayerI18n.t('pvRpeMove');
+        const descColor = v > 0 ? RPE_COLORS[v] : 'var(--text-faint)';
+        const grid = [1,2,3,4,5,6,7,8,9,10].map(n => {
+            const c = RPE_COLORS[n];
+            const style = n === v
+                ? `background:${c};border-color:${c};color:#fff`
+                : `color:${c};border-color:${c}`;
+            return `<button class="pv-rpe-btn${n === v ? ' selected' : ''}" style="${style}" onclick="PlayerView._onRpeValue(${n})">${n}</button>`;
+        }).join('');
+        _screenEl.innerHTML = _shell(`
+            <button class="pv-back-btn" onclick="PlayerView._goRpeType()">${_esc(PlayerI18n.t('backBtn'))}</button>
+            <div class="pv-question">
+                <div class="pv-q-label">${_esc(PlayerI18n.t('pvRpeLabel'))}</div>
+                <div class="pv-q-sub">${_esc(PlayerI18n.t('rpeSelectValueSub'))}</div>
+                <div class="pv-rpe-grid">${grid}</div>
+                <div class="pv-rpe-desc" style="color:${descColor}">${_esc(desc)}</div>
+            </div>
+            <button
+                class="pv-submit"
+                id="pv-rpe-submit-btn"
+                onclick="PlayerView._onSubmitRpe()"
+                ${v > 0 ? '' : 'disabled'}
+            >
+                ${_esc(PlayerI18n.t('rpeSubmit'))}
+            </button>
+        `);
+    }
+
+    function _renderRpeDone() {
+        _screenEl.innerHTML = _shell(`
+            <div class="pv-done-icon">✅</div>
+            <h2 class="pv-done-title">${_esc(PlayerI18n.t('pvDoneTitle'))}</h2>
+            <p class="pv-done-sub">${PlayerI18n.t('pvDoneSub')}</p>
+            <button class="pv-menu-btn" style="margin-top:1rem" onclick="PlayerView._goMenu()">
+                ${_esc(PlayerI18n.t('backToMenuBtn'))}
+            </button>
+        `);
     }
 
     // ---- Pantalla principal ----
@@ -216,172 +338,101 @@ const PlayerView = (() => {
         const existing = document.getElementById('player-view-screen');
         if (existing) existing.remove();
 
-        _state = {
-            rpe: 0, date: _today(),
-            sleep: 0, fatigue: 0, mood: 0, pain: 0,
-        };
+        _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0 };
+        _rpeState = { date: _today(), sessionType: null, value: 0 };
+        _view = 'menu';
 
-        const name = AppAuth._currentUser?.displayName || PlayerI18n.t('pvDefaultName');
+        _screenEl = document.createElement('div');
+        _screenEl.id = 'player-view-screen';
+        document.body.appendChild(_screenEl);
 
-        const screen = document.createElement('div');
-        screen.id = 'player-view-screen';
-
-        if (_hasAnsweredToday()) {
-            _renderDone(screen, name, true);
-        } else {
-            _renderForm(screen, name);
-        }
-
-        document.body.appendChild(screen);
+        _render();
         _drainQueue();
     }
 
-    function _renderForm(screen, name) {
-        screen.innerHTML = `
-        <div class="pv-container">
-            ${_renderLangToggle()}
-            <div class="pv-header">
-                <div class="pv-logo">🏀</div>
-                <h1 class="pv-title">${_esc(PlayerI18n.t('pvGreeting'))} ${_esc(name)}!</h1>
-                <p class="pv-subtitle">${_fmtDate(_today())}</p>
-            </div>
-
-            <div id="pv-step-form">
-                ${_renderRPESlider()}
-                ${_renderWellnessButtons()}
-                ${_renderDateField()}
-
-                <button
-                    class="pv-submit"
-                    id="pv-submit-btn"
-                    onclick="PlayerView._onSubmit()"
-                    disabled
-                    aria-label="${_esc(PlayerI18n.t('pvSubmit'))}"
-                >
-                    ${_esc(PlayerI18n.t('pvSubmit'))}
-                </button>
-            </div>
-
-            <div id="pv-step-done" style="display:none">
-                ${_doneHTML()}
-            </div>
-
-            <button class="pv-logout" onclick="AppAuth.logout()">${_esc(PlayerI18n.t('pvLogout'))}</button>
-        </div>`;
-        _updateSubmitBtn();
+    // ---- Navegación ----
+    function _goMenu() {
+        _view = 'menu';
+        _rpeState = { date: _today(), sessionType: null, value: 0 };
+        _render();
+    }
+    function _goWellness() { _view = 'wellness'; _render(); }
+    function _goRpeType()  { _view = 'rpeType'; _render(); }
+    function _selectRpeType(type) {
+        _rpeState.sessionType = type;
+        _rpeState.value = 0;
+        _view = 'rpeValue';
+        _render();
     }
 
-    function _renderDone(screen, name, alreadyDone) {
-        screen.innerHTML = `
-        <div class="pv-container">
-            ${_renderLangToggle()}
-            <div class="pv-header">
-                <div class="pv-logo">🏀</div>
-                <h1 class="pv-title">${_esc(PlayerI18n.t('pvGreeting'))} ${_esc(name)}!</h1>
-                <p class="pv-subtitle">${_fmtDate(_today())}</p>
-            </div>
-            <div id="pv-step-done">
-                ${alreadyDone ? _alreadyDoneHTML() : _doneHTML()}
-            </div>
-            <button class="pv-logout" onclick="AppAuth.logout()">${_esc(PlayerI18n.t('pvLogout'))}</button>
-        </div>`;
-    }
-
-    function _doneHTML() {
-        return `
-        <div class="pv-done-icon">✅</div>
-        <h2 class="pv-done-title">${_esc(PlayerI18n.t('pvDoneTitle'))}</h2>
-        <p class="pv-done-sub">${PlayerI18n.t('pvDoneSub')}</p>`;
-    }
-
-    function _alreadyDoneHTML() {
-        return `
-        <div class="pv-done-icon">✅</div>
-        <h2 class="pv-done-title">${_esc(PlayerI18n.t('pvAlreadyTitle'))}</h2>
-        <p class="pv-done-sub">${PlayerI18n.t('pvAlreadySub')}</p>`;
-    }
-
-    // ---- Handlers (expuestos globalmente a través del objeto) ----
-    function _onRpe(val) {
-        _state.rpe = parseInt(val, 10);
-        const color  = RPE_COLORS[_state.rpe];
-        const labels = PlayerI18n.rpeLabels();
-        const badge  = document.getElementById('pv-rpe-badge');
-        const desc   = document.getElementById('pv-rpe-desc');
-        const slider = document.getElementById('pv-rpe-slider');
-        if (badge)  { badge.textContent = _state.rpe; badge.style.background = color; badge.style.color = '#fff'; }
-        if (desc)   { desc.textContent  = `${_state.rpe} — ${labels[_state.rpe]}`; desc.style.color = color; }
-        if (slider) { slider.style.setProperty('--rpe-color', color); }
-        _updateSubmitBtn();
-    }
-
+    // ---- Handlers de formulario ----
     function _onWellness(key, val) {
-        _state[key] = val;
-        // Actualizar botones de esa dimensión
+        _wellnessState[key] = val;
         document.querySelectorAll(`.pv-scale-btn[onclick*="'${key}'"]`).forEach(btn => {
             const btnVal = parseInt(btn.querySelector('.pv-scale-num').textContent, 10);
             btn.classList.toggle('selected', btnVal === val);
             btn.setAttribute('aria-pressed', btnVal === val ? 'true' : 'false');
         });
-        _updateSubmitBtn();
+        const btn = document.getElementById('pv-submit-btn');
+        if (btn) btn.disabled = !_allWellnessAnswered();
     }
 
     function _onDate(val) {
-        _state.date = val || _today();
+        _wellnessState.date = val || _today();
     }
 
-    function _updateSubmitBtn() {
-        const btn = document.getElementById('pv-submit-btn');
-        if (btn) btn.disabled = !_allAnswered();
+    function _onRpeValue(n) {
+        _rpeState.value = n;
+        _renderRpeValueSelect();
     }
 
     /** Cambia el idioma y vuelve a pintar la pantalla actual conservando las respuestas ya dadas */
     function _onLangChange(lang) {
         PlayerI18n.setLang(lang);
-        const screen = document.getElementById('player-view-screen');
-        if (!screen) return;
-        const name = AppAuth._currentUser?.displayName || PlayerI18n.t('pvDefaultName');
-        if (_hasAnsweredToday()) {
-            _renderDone(screen, name, true);
-        } else {
-            _renderForm(screen, name);
+        _render();
+    }
+
+    async function _onSubmitWellness() {
+        if (!_allWellnessAnswered()) return;
+        const btn = document.getElementById('pv-submit-btn');
+        if (btn) { btn.disabled = true; btn.textContent = PlayerI18n.t('pvSaving'); }
+        try {
+            await _saveWellness();
+            _view = 'wellnessDone';
+            _renderWellnessDone(true);
+        } catch (e) {
+            if (btn) { btn.disabled = false; btn.textContent = PlayerI18n.t('pvSubmit'); }
+            _showInlineError(btn, PlayerI18n.t('pvErrorSave'));
         }
     }
 
-    async function _onSubmit() {
-        if (!_allAnswered()) return;
-        const btn = document.getElementById('pv-submit-btn');
+    async function _onSubmitRpe() {
+        if (!_rpeState.value) return;
+        const btn = document.getElementById('pv-rpe-submit-btn');
         if (btn) { btn.disabled = true; btn.textContent = PlayerI18n.t('pvSaving'); }
-
         try {
-            await _save();
-            const form = document.getElementById('pv-step-form');
-            const done = document.getElementById('pv-step-done');
-            if (form) form.style.display = 'none';
-            if (done) { done.innerHTML = _doneHTML(); done.style.display = ''; }
+            await _saveRpe();
+            _view = 'rpeDone';
+            _renderRpeDone();
         } catch (e) {
-            if (btn) { btn.disabled = false; btn.textContent = PlayerI18n.t('pvSubmit'); }
-            const errEl = document.getElementById('pv-error-msg');
-            const msgText = PlayerI18n.t('pvErrorSave');
-            if (errEl) errEl.textContent = msgText;
-            else {
-                const msg = document.createElement('p');
-                msg.id = 'pv-error-msg';
-                msg.className = 'pv-error';
-                msg.textContent = msgText;
-                btn && btn.parentNode && btn.parentNode.insertBefore(msg, btn);
-            }
+            if (btn) { btn.disabled = false; btn.textContent = PlayerI18n.t('rpeSubmit'); }
+            _showInlineError(btn, PlayerI18n.t('pvErrorSave'));
         }
     }
 
     // ---- API pública ----
     return {
         show,
-        _onRpe,
         _onWellness,
         _onDate,
-        _onSubmit,
+        _onRpeValue,
+        _onSubmitWellness,
+        _onSubmitRpe,
         _onLangChange,
+        _goMenu,
+        _goWellness,
+        _goRpeType,
+        _selectRpeType,
         _drainQueue,
     };
 

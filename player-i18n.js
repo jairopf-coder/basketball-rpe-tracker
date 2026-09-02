@@ -44,8 +44,7 @@ const PlayerI18n = (() => {
             pvGreeting: '¡Hola,',
             pvDefaultName: 'Jugadora',
             pvRpeLabel: '🏃 RPE — Percepción del esfuerzo',
-            pvRpeSub: '¿Cómo fue de duro el último entrenamiento?',
-            pvRpeMove: 'Mueve el slider',
+            pvRpeMove: 'Elige un valor',
             pvDateLabel: '📅 Fecha',
             pvSubmit: 'Registrar',
             pvSaving: 'Guardando…',
@@ -56,6 +55,20 @@ const PlayerI18n = (() => {
             pvAlreadyTitle: '¡Ya respondiste hoy!',
             pvAlreadySub: 'Ya has enviado tu cuestionario de hoy.<br>¡Hasta mañana!',
             dateLocale: 'es-ES',
+
+            // Menú principal (Wellness / RPE)
+            menuWellnessBtn: 'Wellness diario',
+            menuRpeBtn: 'RPE de sesión',
+            backBtn: '← Volver',
+            backToMenuBtn: 'Volver al menú',
+
+            // Selección de tipo de sesión para el RPE
+            rpeSelectTypeTitle: '¿Qué sesión quieres valorar?',
+            rpeTypeMorning: 'Mañana',
+            rpeTypeAfternoon: 'Tarde',
+            rpeTypeMatch: 'Partido',
+            rpeSelectValueSub: 'Valora del 1 (mínimo esfuerzo) al 10 (máximo esfuerzo)',
+            rpeSubmit: 'Registrar RPE',
 
             rpeLabels: ['', 'Reposo absoluto', 'Muy, muy suave', 'Suave', 'Moderado', 'Algo duro', 'Duro', 'Muy duro', 'Muy, muy duro', 'Casi máximo', 'Esfuerzo máximo'],
             wellness: {
@@ -97,8 +110,7 @@ const PlayerI18n = (() => {
             pvGreeting: 'Hi,',
             pvDefaultName: 'Player',
             pvRpeLabel: '🏃 RPE — Perceived exertion',
-            pvRpeSub: 'How hard was your last training session?',
-            pvRpeMove: 'Move the slider',
+            pvRpeMove: 'Choose a value',
             pvDateLabel: '📅 Date',
             pvSubmit: 'Submit',
             pvSaving: 'Saving…',
@@ -109,6 +121,20 @@ const PlayerI18n = (() => {
             pvAlreadyTitle: 'Already submitted today!',
             pvAlreadySub: "You've already sent today's questionnaire.<br>See you tomorrow!",
             dateLocale: 'en-GB',
+
+            // Main menu (Wellness / RPE)
+            menuWellnessBtn: 'Daily wellness',
+            menuRpeBtn: 'Session RPE',
+            backBtn: '← Back',
+            backToMenuBtn: 'Back to menu',
+
+            // Session type selection for RPE
+            rpeSelectTypeTitle: 'Which session do you want to rate?',
+            rpeTypeMorning: 'Morning',
+            rpeTypeAfternoon: 'Afternoon',
+            rpeTypeMatch: 'Match',
+            rpeSelectValueSub: 'Rate from 1 (minimum effort) to 10 (maximum effort)',
+            rpeSubmit: 'Submit RPE',
 
             rpeLabels: ['', 'Complete rest', 'Very, very light', 'Light', 'Moderate', 'Somewhat hard', 'Hard', 'Very hard', 'Very, very hard', 'Near maximal', 'Maximal effort'],
             wellness: {
