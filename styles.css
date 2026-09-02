@@ -4096,6 +4096,45 @@ header h1 {
 .pv-scale-num  { font-size: 1.05rem; font-weight: 700; line-height: 1; }
 .pv-scale-lbl  { font-size: 0.6rem; line-height: 1.2; }
 
+/* Menú principal (Wellness / RPE) */
+.pv-menu-btn {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+    padding: 1.25rem 1.5rem; margin-bottom: 1rem; border-radius: 14px;
+    border: 1.5px solid var(--border); background: var(--bg-surface); color: var(--text-primary);
+    font-size: 1.05rem; font-weight: 700; cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s; touch-action: manipulation;
+}
+.pv-menu-btn:active { transform: scale(0.98); }
+.pv-menu-btn.done { opacity: 0.65; }
+.pv-menu-btn-icon { font-size: 1.5rem; margin-right: 0.6rem; }
+.pv-menu-btn-check { font-size: 1.15rem; }
+
+/* Botón "volver" */
+.pv-back-btn { background: none; border: none; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; padding: 0.5rem 0; margin-bottom: 0.5rem; }
+
+/* Selección de tipo de sesión (Mañana / Tarde / Partido) */
+.pv-type-row  { display: flex; flex-direction: column; gap: 0.75rem; }
+.pv-type-btn  {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+    padding: 1rem 1.25rem; border-radius: 12px; border: 2px solid var(--border);
+    background: var(--bg-surface); font-size: 1rem; font-weight: 600; color: var(--text-primary);
+    cursor: pointer; touch-action: manipulation; transition: border-color 0.15s, transform 0.1s;
+}
+.pv-type-btn:not(:disabled):hover { border-color: var(--primary); }
+.pv-type-btn:not(:disabled):active { transform: scale(0.98); }
+.pv-type-btn.done { opacity: 0.55; cursor: default; }
+
+/* Grid de RPE 1-10 con código de color */
+.pv-rpe-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin: 1rem 0 0.75rem; }
+.pv-rpe-btn  {
+    aspect-ratio: 1; border-radius: 12px; border: 2px solid var(--border);
+    background: var(--bg-surface); font-size: 1.25rem; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: transform 0.1s; touch-action: manipulation;
+}
+.pv-rpe-btn:active { transform: scale(0.9); }
+.pv-rpe-desc { text-align: center; font-weight: 700; font-size: 0.95rem; min-height: 1.3rem; }
+
 /* Campo fecha */
 .pv-date-row   { display: flex; align-items: center; gap: 0.75rem; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border); padding: 0.85rem 1rem; margin-bottom: 1rem; }
 .pv-date-label { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); white-space: nowrap; }
@@ -4120,6 +4159,9 @@ header h1 {
 [data-theme="dark"] .pv-scale-btn  { background: var(--bg-surface); border-color: var(--border-input); color: var(--text-primary); }
 [data-theme="dark"] .pv-scale-btn.selected { background: var(--primary); border-color: var(--primary); color: #fff; }
 [data-theme="dark"] .pv-date-row   { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .pv-menu-btn   { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .pv-type-btn   { background: var(--bg-surface); border-color: var(--border); }
+[data-theme="dark"] .pv-rpe-btn    { background: var(--bg-surface); }
 [data-theme="dark"] .pv-rpe-slider { background: var(--bg-elevated, var(--bg-surface)); }
 
 /* ===== PANTALLA DE WELLNESS ===== */
