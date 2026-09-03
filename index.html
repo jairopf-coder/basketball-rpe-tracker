@@ -68,7 +68,8 @@
 
         <!-- Barra de grupos de pestañas — visible en pantallas ≥641px (bottom-nav la sustituye en móvil).
              El slot #headerActionsSlot recibe los botones de acción (Pre-sesión, Wellness, Nueva Sesión,
-             Opciones) solo en escritorio (≥769px); por debajo de eso permanecen en el header. -->
+             Opciones) solo en escritorio ancho / iPad horizontal (≥1100px); por debajo de eso permanecen
+             en el header, donde caben sin pelearse con las 5 pestañas (ver script al final del body). -->
         <nav class="nav-groups" id="navGroups" aria-label="Grupos de navegación">
             <div class="nav-group-bar">
                 <div class="nav-group-tabs">
@@ -830,8 +831,9 @@
     </script>
 
     <!-- Reubicación responsive de los botones de acción (Pre-sesión, Wellness, Nueva Sesión, Opciones):
-         en escritorio (≥641px) viven en la fila de navegación junto a "Inicio";
-         en móvil (≤640px) vuelven a su posición original en el header. -->
+         en escritorio ancho y iPad horizontal (≥1100px) viven en la fila de navegación junto a "Inicio";
+         por debajo de eso (móvil e iPad vertical) permanecen en su posición original en el header,
+         donde tienen sitio de sobra para acomodarse sin pelearse con las 5 pestañas. -->
     <script>
     (function () {
         function placeHeaderActions() {
@@ -840,7 +842,7 @@
             const headerInner = document.querySelector('header .header-inner');
             if (!actions || !desktopSlot || !headerInner) return;
 
-            const isDesktop = window.matchMedia('(min-width: 769px)').matches;
+            const isDesktop = window.matchMedia('(min-width: 1100px)').matches;
             if (isDesktop && actions.parentElement !== desktopSlot) {
                 desktopSlot.appendChild(actions);
             } else if (!isDesktop && actions.parentElement !== headerInner) {
