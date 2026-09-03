@@ -6194,6 +6194,18 @@ details[open] .ewma-toggle-hint { display: none; }
     }
 }
 
+/* Cabecera: por debajo de 1100px los 4 botones de acción se quedan en el
+   header (ver script de placeHeaderActions en index.html) en vez de
+   trasladarse a la fila de pestañas. Red de seguridad: si aun así el
+   título + los 4 botones no caben en una línea (iPad vertical con letra
+   grande, etc.), que se repartan en dos filas en vez de solaparse. */
+@media (min-width: 769px) and (max-width: 1100px) {
+    header .header-inner {
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+    }
+}
+
 /* Bottom nav — menú "Más" (Rendimiento en móvil) */
 .bn-more-menu {
     position: fixed;
