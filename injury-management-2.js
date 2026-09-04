@@ -14,17 +14,17 @@ RPETracker.prototype.renderAvailabilityTable = function() {
     }
     
     let html = `
-        <div class="availability-section" style="background: white; padding: 1.5rem; border-radius: 12px; margin: 2rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <h3>📅 Disponibilidad Próximos 7 Días</h3>
+        <div class="availability-section" style="background: var(--bg-surface); padding: 1.5rem; border-radius: 12px; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+            <h3 style="margin-top:0">📅 Disponibilidad Próximos 7 Días</h3>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
                     <thead>
-                        <tr style="background: #f5f5f5;">
-                            <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #ddd;">Jugadora</th>
+                        <tr style="background: var(--bg-subtle);">
+                            <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border);">Jugadora</th>
                             ${next7Days.map(date => `
-                                <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #ddd;">
+                                <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid var(--border);">
                                     <div>${date.toLocaleDateString('es-ES', { weekday: 'short' })}</div>
-                                    <div style="font-size: 0.85rem; color: #666;">${date.getDate()}/${date.getMonth() + 1}</div>
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary);">${date.getDate()}/${date.getMonth() + 1}</div>
                                 </th>
                             `).join('')}
                         </tr>
@@ -34,7 +34,7 @@ RPETracker.prototype.renderAvailabilityTable = function() {
                     </tbody>
                 </table>
             </div>
-            <div style="display: flex; gap: 1rem; margin-top: 1rem; font-size: 0.85rem;">
+            <div style="display: flex; gap: 1rem; margin-top: 1rem; font-size: 0.85rem; flex-wrap: wrap;">
                 <span>✅ Disponible</span>
                 <span style="color: #ff9800;">⚠️ Limitada</span>
                 <span style="color: #f44336;">🏥 Lesionada</span>
@@ -50,7 +50,7 @@ RPETracker.prototype.renderAvailabilityRow = function(player, dates) {
     const activeInjury = this.injuries.find(i => i.playerId === player.id && i.status === 'active');
     
     let row = `
-        <tr style="border-bottom: 1px solid #eee;">
+        <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 0.75rem; font-weight: 600;">
                 ${player.name}${player.number ? ` #${player.number}` : ''}
             </td>
@@ -114,7 +114,12 @@ RPETracker.prototype.toggleAvailability = function(playerId, dateKey) {
     }
     
     this.saveAvailability();
-    this.renderInjuryManagement();
+    // Refresca el hub (vista real). Fallback al render clásico si no está disponible.
+    if (typeof this.renderInjuryHub === 'function') {
+        this.renderInjuryHub();
+    } else if (typeof this.renderInjuryManagement === 'function') {
+        this.renderInjuryManagement();
+    }
 };
 
 // ========== UPDATE RTP PHASE ==========
@@ -157,7 +162,7 @@ RPETracker.prototype.updateRTPPhase = function(injuryId) {
                 <h2>🔄 Actualizar Fase RTP — ${player.name}</h2>
                 <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
             </div>
-            <div style="padding:1.5rem">
+            <div class="modal-body" style="padding:1.5rem">
                 <div style="background:var(--bg-subtle);padding:1rem;border-radius:8px;margin-bottom:1rem">
                     <strong>Fase Actual: ${injury.rtpPhase} — ${currentPhase.name}</strong>
                     <p style="margin-top:0.5rem;color:var(--text-muted)">${currentPhase.description}</p>
@@ -190,13 +195,13 @@ RPETracker.prototype.updateRTPPhase = function(injuryId) {
                 </div>
 
                 <div id="phaseInfo" style="background:var(--bg-subtle);padding:1rem;border-radius:8px;margin-top:1rem"></div>
+                </div><!-- /modal-body -->
 
                 <div class="modal-footer">
                     <button onclick="this.closest('.modal').remove()" class="btn-secondary">Cancelar</button>
                     <button id="saveRTPBtn" onclick="window.rpeTracker?.saveRTPUpdate('${injuryId}');this.closest('.modal').remove();"
                             class="btn-primary">💾 Guardar Actualización</button>
                 </div>
-            </div>
         </div>`;
 
     document.body.appendChild(modal);
