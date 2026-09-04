@@ -677,6 +677,12 @@ RPETracker.prototype._renderMedCard = function(inj) {
             <div class="med-info-cell"><span class="mic-label">📈 Progreso</span><span class="mic-val">${inj.rtpProgress||0}%</span></div>
         </div>
         ${inj.description ? `<p style="margin:.6rem 0 0;font-size:.83rem;color:var(--text-secondary)">${esc(inj.description)}</p>` : ''}
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border-color)">
+            ${inj.status === 'active' ? `
+            <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.updateRTPPhase('${inj.id}')">🔄 Actualizar RTP</button>
+            <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.markAsRecovered('${inj.id}')">✅ Dar de alta</button>` : ''}
+            <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.openClinicalNotesPanel('${inj.playerId}')">📓 Notas clínicas</button>
+        </div>
     </div>`;
 };
 

@@ -2513,6 +2513,7 @@ header h1 {
     .filter-select, .search-input {
         width: 100%;
         font-size: 0.9rem;
+        font-size: max(0.9rem, 16px); /* evita zoom automático en iOS/iPadOS al enfocar */
     }
 
     /* Botones de duración: más pequeños */
@@ -3419,6 +3420,7 @@ header h1 {
     border: 1.5px solid #e0e0e0;
     border-radius: 8px;
     font-size: 0.9rem;
+    font-size: max(0.9rem, 16px); /* evita zoom automático en iOS/iPadOS al enfocar */
     background: var(--bg-surface);
     cursor: pointer;
     transition: border-color 0.2s;
@@ -5187,6 +5189,7 @@ header h1 {
     outline: none;
     background: transparent;
     font-size: 0.95rem;
+    font-size: max(0.95rem, 16px); /* evita zoom automático en iOS/iPadOS al enfocar */
     color: var(--text-primary);
 }
 .players-search-bar input::placeholder { color: var(--text-faint); }
@@ -5693,6 +5696,7 @@ header h1 {
 .wp-select-xs {
     width: 100%;
     font-size: .75rem;
+    font-size: max(.75rem, 16px); /* evita zoom automático en iOS/iPadOS al enfocar */
     padding: .2rem .3rem;
     border-radius: 5px;
     border: 1px solid var(--border-input);
@@ -7010,7 +7014,7 @@ details[open] .ewma-toggle-hint { display: none; }
 
 /* 3 intentos por salto */
 .test-trial-group { display: flex; gap: 0.4rem; }
-.test-trial-input-sm { width: 100%; min-width: 0; font-size: 0.85rem; padding: 0.4rem 0.3rem; text-align: center; }
+.test-trial-input-sm { width: 100%; min-width: 0; font-size: 0.85rem; font-size: max(0.85rem, 16px); padding: 0.4rem 0.3rem; text-align: center; }
 
 /* Responsive */
 @media (max-width: 600px) {
@@ -7292,6 +7296,7 @@ details[open] .ewma-toggle-hint { display: none; }
     width: 52px;
     padding: 0.25rem 0.35rem;
     font-size: 0.85rem;
+    font-size: max(0.85rem, 16px); /* evita zoom automático en iOS/iPadOS al enfocar */
     border: 1px solid var(--border-input);
     border-radius: 5px;
     background: var(--bg-input);
@@ -7370,7 +7375,7 @@ details[open] .ewma-toggle-hint { display: none; }
     }
     /* Ocultar separadores y columnas RPE en pantallas muy estrechas */
     .gym-set-sep { display: none; }
-    .gym-set-input { min-height: 38px; font-size: 0.95rem; padding: 0.3rem 0.4rem; }
+    .gym-set-input { min-height: 38px; font-size: max(0.95rem, 16px); padding: 0.3rem 0.4rem; } /* evita zoom automático en iOS/iPadOS al enfocar */
     .gym-set-input--rpe { display: none; }
 }
 
@@ -7579,6 +7584,7 @@ details[open] .ewma-toggle-hint { display: none; }
     width: 52px;
     padding: 0.3rem 0.35rem;
     font-size: 0.82rem;
+    font-size: max(0.82rem, 16px); /* evita zoom automático en iOS/iPadOS al enfocar */
     border: 1.5px solid var(--border-input);
     border-radius: 5px;
     background: var(--bg-input);
@@ -8160,6 +8166,7 @@ details[open] .ewma-toggle-hint { display: none; }
     border-radius: 8px;
     padding: 0.45rem 0.75rem;
     font-size: 0.85rem;
+    font-size: max(0.85rem, 16px); /* evita zoom automático en iOS/iPadOS al enfocar */
     background: var(--bg-subtle);
     color: var(--text-primary);
     outline: none;
@@ -8526,6 +8533,7 @@ details[open] .ewma-toggle-hint { display: none; }
     border: 1px solid var(--border);
     border-radius: 6px;
     font-size: 0.85rem;
+    font-size: max(0.85rem, 16px); /* evita zoom automático en iOS/iPadOS al enfocar */
     background: var(--bg-input, var(--bg-surface));
     color: var(--text-primary);
 }
@@ -8807,6 +8815,7 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 .pvr-player-select {
     font-size: 0.78rem;
+    font-size: max(0.78rem, 16px); /* evita zoom automático en iOS/iPadOS al enfocar */
     padding: 0.25rem 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: 6px;
