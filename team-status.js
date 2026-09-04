@@ -285,7 +285,16 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
         .legend-item { display: flex; align-items: center; gap: 4px; }
         .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee; display: flex; justify-content: space-between; font-size: 10px; color: #bbb; }
+        .print-bar { position: sticky; top: 0; background: #fff; padding-bottom: 10px; z-index: 10; display: flex; gap: 10px; }
+        .print-btn, .close-btn { padding: 9px 18px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .print-btn { background: #ff6600; color: #fff; }
+        .close-btn { background: #eee; color: #333; }
     </style></head><body>
+
+    <div class="print-bar no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+    </div>
 
     <div class="header">
         <div class="header-left">
