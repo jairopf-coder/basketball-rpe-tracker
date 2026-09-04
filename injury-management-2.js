@@ -279,7 +279,11 @@ RPETracker.prototype.saveRTPUpdate = function(injuryId) {
     }
 
     this.saveInjuries();
-    this.renderInjuryManagement();
+    if (typeof this.renderInjuryHub === 'function') {
+        this.renderInjuryHub();
+    } else if (typeof this.renderInjuryManagement === 'function') {
+        this.renderInjuryManagement();
+    }
     this.showToast('🔄 Fase RTP actualizada');
 };
 
@@ -461,7 +465,11 @@ RPETracker.prototype.markAsRecovered = function(injuryId) {
     });
     
     this.saveInjuries();
-    this.renderInjuryManagement();
+    if (typeof this.renderInjuryHub === 'function') {
+        this.renderInjuryHub();
+    } else if (typeof this.renderInjuryManagement === 'function') {
+        this.renderInjuryManagement();
+    }
     this.showToast('✅ Jugadora marcada como recuperada');
     });
 };
