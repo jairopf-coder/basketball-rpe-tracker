@@ -37,6 +37,14 @@ RPETracker.prototype.exportAllCharts = function() {
 
 // ========== PDF REPORT GENERATION ==========
 
+// Placeholder ligero mostrado mientras se cargan los datos del informe.
+// Se reutiliza en todos los informes que necesitan datos async antes de pintar el HTML final.
+RPETracker.prototype.buildLoadingPlaceholderHTML = function() {
+    return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Generando informe…</title>
+    <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#999}</style>
+    </head><body>⏳ Generando informe…</body></html>`;
+};
+
 RPETracker.prototype.generatePDFReport = async function(playerId, reportType = 'weekly') {
     const player = this.players.find(p => p.id === playerId);
     if (!player) {
@@ -44,18 +52,27 @@ RPETracker.prototype.generatePDFReport = async function(playerId, reportType = '
         return;
     }
 
+    // La ventana se abre YA, de forma síncrona dentro del gesto de tap/click del usuario.
+    // En iOS/iPadOS Safari, si window.open() se llama después de un await, el navegador
+    // lo interpreta como un popup no solicitado por el usuario y lo bloquea en silencio.
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('⚠️ El navegador ha bloqueado la ventana del informe. Permite las ventanas emergentes para esta web e inténtalo de nuevo.');
+        return;
+    }
+    printWindow.document.write(this.buildLoadingPlaceholderHTML());
+
     // Informes pueden requerir histórico anterior a la ventana de ~4 meses
     // cargada al iniciar (paginación de /sessions). Cargar todo si falta.
     await this.ensureFullSessionHistory();
 
     const report = this.buildReportData(playerId, reportType);
     const html = this.buildReportHTML(player, report, reportType);
-    
-    // Create printable window
-    const printWindow = window.open('', '_blank');
+
+    printWindow.document.open();
     printWindow.document.write(html);
     printWindow.document.close();
-    
+
     // Auto print
     setTimeout(() => {
         printWindow.print();
@@ -133,6 +150,7 @@ RPETracker.prototype.buildReportHTML = function(player, report, reportType) {
     <style>
         @media print {
             @page { margin: 2cm; }
+            .no-print { display: none !important; }
         }
         body {
             font-family: Arial, sans-serif;
@@ -142,6 +160,31 @@ RPETracker.prototype.buildReportHTML = function(player, report, reportType) {
             margin: 0 auto;
             padding: 20px;
         }
+        .report-toolbar {
+            position: sticky;
+            top: 0;
+            background: #fff;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding: 12px 0;
+            margin: -20px -20px 20px;
+            border-bottom: 1px solid #eee;
+            z-index: 10;
+        }
+        .print-btn, .close-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .print-btn { background: #ff6600; color: #fff; }
+        .close-btn { background: #eee; color: #333; }
         .header {
             text-align: center;
             border-bottom: 3px solid #ff6600;
@@ -250,6 +293,10 @@ RPETracker.prototype.buildReportHTML = function(player, report, reportType) {
     </style>
 </head>
 <body>
+    <div class="report-toolbar no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+    </div>
     <div class="header">
         <h1>🏀 Informe ${reportTitle}</h1>
         <div class="subtitle">${esc(player.name)}${player.number ? ` #${esc(player.number)}` : ''}</div>
@@ -439,13 +486,22 @@ RPETracker.prototype.buildSessionsTable = function(sessions) {
 // ========== TEAM PDF REPORT ==========
 
 RPETracker.prototype.generateTeamPDFReport = async function(reportType = 'weekly') {
+    // La ventana se abre YA, dentro del gesto del usuario (ver nota en generatePDFReport
+    // sobre el bloqueo de popups en iOS/iPadOS Safari cuando hay un await antes de window.open).
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('⚠️ El navegador ha bloqueado la ventana del informe. Permite las ventanas emergentes para esta web e inténtalo de nuevo.');
+        return;
+    }
+    printWindow.document.write(this.buildLoadingPlaceholderHTML());
+
     // Informes pueden requerir histórico anterior a la ventana cargada al iniciar.
     await this.ensureFullSessionHistory();
 
     const summary = this.getWeeklySummary ? this.getWeeklySummary() : {};
     const html = this.buildTeamReportHTML(summary, reportType);
-    
-    const printWindow = window.open('', '_blank');
+
+    printWindow.document.open();
     printWindow.document.write(html);
     printWindow.document.close();
     
@@ -465,10 +521,19 @@ RPETracker.prototype.buildTeamReportHTML = function(summary, reportType) {
     <meta charset="UTF-8">
     <title>Informe de Equipo</title>
     <style>
-        /* Same styles as individual report */
+        @media print { .no-print { display: none !important; } }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .report-toolbar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .print-btn, .close-btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .print-btn { background: #ff6600; color: #fff; }
+        .close-btn { background: #eee; color: #333; }
     </style>
 </head>
 <body>
+    <div class="report-toolbar no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+    </div>
     <h1>Informe del Equipo - Basketball RPE Tracker</h1>
     <p>Total sesiones: ${summary.sessions || 0}</p>
     <p>Jugadoras en riesgo: ${summary.playersAtRisk || 0}</p>
@@ -535,7 +600,7 @@ RPETracker.prototype.exportSessionsHistoryPDF = function() {
 <meta charset="UTF-8">
 <title>Historial de Sesiones — ${now.toLocaleDateString('es-ES')}</title>
 <style>
-  @media print { @page { margin: 1.5cm; size: A4 landscape; } }
+  @media print { @page { margin: 1.5cm; size: A4 landscape; } .no-print { display: none !important; } }
   body { font-family: Arial, sans-serif; font-size: 11px; color: #222; margin: 0; padding: 16px; }
   h1 { color: #ff6600; margin: 0 0 4px; font-size: 18px; }
   .subtitle { color: #666; font-size: 12px; margin-bottom: 20px; }
@@ -545,9 +610,17 @@ RPETracker.prototype.exportSessionsHistoryPDF = function() {
   td { padding: 5px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
   tr:hover { background: #fafafa; }
   .footer { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 10px; color: #999; font-size: 10px; text-align: center; }
+  .report-toolbar { position: sticky; top: 0; background: #fff; display: flex; gap: 10px; padding: 10px 0; margin-bottom: 10px; border-bottom: 1px solid #eee; z-index: 10; }
+  .print-btn, .close-btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .print-btn { background: #ff6600; color: #fff; }
+  .close-btn { background: #eee; color: #333; }
 </style>
 </head>
 <body>
+  <div class="report-toolbar no-print">
+    <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+    <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+  </div>
   <h1>🏀 Historial de Sesiones</h1>
   <div class="subtitle">Exportado el ${now.toLocaleString('es-ES')} · ${sorted.length} sesiones · ${this.players.length} jugadoras</div>
 
@@ -805,11 +878,18 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
   .print-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
                background: #ff6600; color: #fff; border: none; border-radius: 8px;
                font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 20px; }
+  .close-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
+               background: #eee; color: #333; border: none; border-radius: 8px;
+               font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 20px; }
+  .print-bar { position: sticky; top: 0; background: #fff; padding-top: 6px; z-index: 10; display: flex; gap: 10px; }
 </style>
 </head>
 <body>
 
+<div class="print-bar no-print">
 <button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+<button class="close-btn no-print" onclick="window.close()">✕ Cerrar informe</button>
+</div>
 
 <div class="rpt-header">
   <div>
@@ -1030,6 +1110,10 @@ RPETracker.prototype.generatePlayerReport = function(playerId) {
   .print-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
                background: ${color}; color: #fff; border: none; border-radius: 8px;
                font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 20px; }
+  .close-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
+               background: #eee; color: #333; border: none; border-radius: 8px;
+               font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 20px; }
+  .print-bar { position: sticky; top: 0; background: #fff; padding-top: 6px; z-index: 10; display: flex; gap: 10px; }
 
   /* ── KPI row ── */
   .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
@@ -1065,7 +1149,10 @@ RPETracker.prototype.generatePlayerReport = function(playerId) {
 </head>
 <body>
 
+<div class="print-bar no-print">
 <button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+<button class="close-btn no-print" onclick="window.close()">✕ Cerrar informe</button>
+</div>
 
 <div class="rpt-header">
   <div class="rpt-avatar">${avatarLetter}</div>

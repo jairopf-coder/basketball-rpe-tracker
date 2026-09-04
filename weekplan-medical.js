@@ -1199,10 +1199,10 @@ RPETracker.prototype._injHubTab = function(tab) {
 };
 
 RPETracker.prototype.showNewInjuryForm = function() {
-    // Redirect to the existing injury management form
-    if (typeof this.renderInjuryManagement === 'function') {
-        // Temporarily swap injuryView content to the form
-        this.renderInjuryManagement();
+    // Abre el modal de alta de lesión directamente (se añade a document.body,
+    // no depende de #injuryManagementView, que el hub de lesiones ya no mantiene en el DOM).
+    if (typeof this.openAddInjuryModal === 'function') {
+        this.openAddInjuryModal();
     }
 };
 

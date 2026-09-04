@@ -507,7 +507,13 @@ RPETracker.prototype.saveNewInjury = function() {
     
     this.injuries.push(injury);
     this.saveInjuries();
-    this.renderInjuryManagement();
+    // La vista de lesiones activa es el "hub" (weekplan-medical.js); refrescamos esa.
+    // Fallback al render clásico solo si el hub no está disponible.
+    if (typeof this.renderInjuryHub === 'function') {
+        this.renderInjuryHub();
+    } else if (typeof this.renderInjuryManagement === 'function') {
+        this.renderInjuryManagement();
+    }
     this.showToast('🏥 Lesión registrada');
 };
 
