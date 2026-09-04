@@ -12,6 +12,9 @@ class Injury {
         this.startDate = data.startDate;
         this.endDate = data.endDate || null; // null if still injured
         this.description = data.description || '';
+        this.mechanism = data.mechanism || '';               // Mecanismo lesional (ya se capturaba en el formulario pero no se guardaba)
+        this.initialTreatment = data.initialTreatment || '';  // Tratamiento inicial aplicado (idem)
+        this.painLevel = (data.painLevel === null || data.painLevel === undefined) ? null : data.painLevel; // Dolor EVA 0-10 (idem)
         this.rtpPhase = data.rtpPhase || 1; // Return to Play phase (1-6)
         this.rtpProgress = data.rtpProgress || 0; // 0-100%
         this.notes = data.notes || '';
@@ -492,6 +495,170 @@ RPETracker.prototype.updateInjuryTimeline = function() {
     };
     
     document.getElementById('timelineText').textContent = timelines[severity] || '1-3 semanas';
+};
+
+// ========== EDITAR LESIÓN EXISTENTE ==========
+// Modal independiente del de "Nueva lesión" (IDs de campo distintos con prefijo "edit")
+// para que nunca puedan chocar si por lo que sea ambos modales llegaran a coexistir en el DOM.
+
+RPETracker.prototype.editInjuryModal = function(injuryId) {
+    const injury = this.injuries.find(i => i.id === injuryId);
+    if (!injury) {
+        if (typeof AppAlert !== 'undefined') AppAlert.show('❌ Lesión no encontrada');
+        else alert('❌ Lesión no encontrada');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+
+    const playerOptions = this.players.map(p =>
+        `<option value="${p.id}" ${p.id === injury.playerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ` #${p.number}` : ''}</option>`
+    ).join('');
+
+    const typeOptions = { muscle: 'Muscular', joint: 'Articular', bone: 'Ósea', tendon: 'Tendón/Ligamento', other: 'Otra' };
+    const locationOptions = { ankle: 'Tobillo', knee: 'Rodilla', hamstring: 'Isquiotibiales', quadriceps: 'Cuádriceps', calf: 'Gemelos', groin: 'Ingle', back: 'Espalda', shoulder: 'Hombro', wrist: 'Muñeca', finger: 'Dedos', other: 'Otra' };
+    const severityOptions = { minor: 'Leve (3-7 días)', moderate: 'Moderada (1-3 semanas)', severe: 'Grave (3+ semanas)' };
+    const mechanismOptions = ['Contacto', 'Sobreuso', 'Fatiga', 'Reglamentario', 'Gesto técnico', 'Otro'];
+
+    const buildSelect = (id, options, current, onchange) => `
+        <select id="${id}" required ${onchange ? `onchange="${onchange}"` : ''}>
+            ${Object.entries(options).map(([val, label]) =>
+                `<option value="${val}" ${val === current ? 'selected' : ''}>${label}</option>`
+            ).join('')}
+        </select>`;
+
+    const painLevel = injury.painLevel != null ? injury.painLevel : 5;
+
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Editar Lesión</h2>
+                <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
+            </div>
+            <form id="editInjuryForm" style="display:flex;flex-direction:column;flex:1;min-height:0">
+                <div class="modal-body" style="padding: 1.5rem">
+                <div class="form-group">
+                    <label>👤 Jugadora</label>
+                    <select id="editInjuryPlayerId" required>
+                        ${playerOptions}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>🩹 Tipo de Lesión</label>
+                    ${buildSelect('editInjuryType', typeOptions, injury.type)}
+                </div>
+
+                <div class="form-group">
+                    <label>📍 Localización</label>
+                    ${buildSelect('editInjuryLocation', locationOptions, injury.location)}
+                </div>
+
+                <div class="form-group">
+                    <label>⚠️ Severidad</label>
+                    ${buildSelect('editInjurySeverity', severityOptions, injury.severity, "window.rpeTracker?.updateEditInjuryTimeline()")}
+                </div>
+
+                <div class="form-group">
+                    <label>📅 Fecha de Lesión</label>
+                    <input type="date" id="editInjuryStartDate" value="${esc(injury.startDate || '')}" required>
+                </div>
+
+                <div class="form-group">
+                    <label>📝 Descripción</label>
+                    <textarea id="editInjuryDescription" rows="2" placeholder="Describe cómo ocurrió la lesión...">${esc(injury.description || '')}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>⚡ Mecanismo lesional</label>
+                    <select id="editInjuryMechanism">
+                        <option value="" ${!injury.mechanism ? 'selected' : ''}>Sin especificar</option>
+                        ${mechanismOptions.map(m => `<option value="${m}" ${injury.mechanism === m ? 'selected' : ''}>${m}${m === 'Contacto' ? ' (choque/caída)' : m === 'Sobreuso' ? ' / carga acumulada' : m === 'Fatiga' ? ' muscular' : m === 'Reglamentario' ? '' : m === 'Gesto técnico' ? ' / torsión' : ''}</option>`).join('')}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>🩹 Tratamiento inicial aplicado</label>
+                    <input type="text" id="editInjuryInitialTreatment" value="${esc(injury.initialTreatment || '')}" placeholder="p.ej. Hielo 20min, vendaje funcional...">
+                </div>
+
+                <div class="form-group">
+                    <label>😣 Dolor inicial (EVA): <strong id="editInjuryPainDisplay">${painLevel}</strong>/10</label>
+                    <input type="range" id="editInjuryPainLevel" min="0" max="10" value="${painLevel}"
+                           oninput="document.getElementById('editInjuryPainDisplay').textContent=this.value"
+                           style="width:100%;margin-top:0.25rem">
+                    <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-muted)">
+                        <span>Sin dolor</span><span>Máximo</span>
+                    </div>
+                </div>
+
+                <div id="editInjuryTimeline" style="background:var(--bg-subtle);padding:0.6rem 1rem;border-radius:8px;margin-top:0.5rem;font-size:0.88rem">
+                    <strong>Tiempo estimado:</strong> <span id="editTimelineText">—</span>
+                </div>
+                </div><!-- /modal-body -->
+
+                <div class="modal-footer">
+                    <button type="button" onclick="this.closest('.modal').remove()" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">💾 Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    this.updateEditInjuryTimeline();
+
+    document.getElementById('editInjuryForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.saveEditedInjury(injuryId);
+        modal.remove();
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+};
+
+RPETracker.prototype.updateEditInjuryTimeline = function() {
+    const severity = document.getElementById('editInjurySeverity')?.value;
+    const timelines = {
+        'minor': '3-7 días',
+        'moderate': '1-3 semanas (7-21 días)',
+        'severe': '3+ semanas (21-90 días)'
+    };
+    const el = document.getElementById('editTimelineText');
+    if (el) el.textContent = timelines[severity] || '1-3 semanas';
+};
+
+RPETracker.prototype.saveEditedInjury = function(injuryId) {
+    const injury = this.injuries.find(i => i.id === injuryId);
+    if (!injury) return;
+
+    // Solo se actualizan los campos del formulario de edición.
+    // rtpPhase, rtpProgress, status, endDate, history y id NO se tocan aquí:
+    // esos los gestionan "Actualizar RTP" y "Dar de alta", para no pisar ese progreso.
+    injury.playerId = document.getElementById('editInjuryPlayerId').value;
+    injury.type = document.getElementById('editInjuryType').value;
+    injury.location = document.getElementById('editInjuryLocation').value;
+    injury.severity = document.getElementById('editInjurySeverity').value;
+    injury.startDate = document.getElementById('editInjuryStartDate').value;
+    injury.description = document.getElementById('editInjuryDescription').value;
+    injury.mechanism = document.getElementById('editInjuryMechanism')?.value || '';
+    injury.initialTreatment = document.getElementById('editInjuryInitialTreatment')?.value || '';
+    injury.painLevel = parseInt(document.getElementById('editInjuryPainLevel')?.value);
+    if (isNaN(injury.painLevel)) injury.painLevel = null;
+    // El tiempo estimado de recuperación depende de la severidad; se recalcula si ha cambiado.
+    injury.timeline = injury.calculateTimeline(injury.severity);
+
+    this.saveInjuries();
+    if (typeof this.renderInjuryHub === 'function') {
+        this.renderInjuryHub();
+    } else if (typeof this.renderInjuryManagement === 'function') {
+        this.renderInjuryManagement();
+    }
+    this.showToast('✏️ Lesión actualizada');
 };
 
 RPETracker.prototype.saveNewInjury = function() {

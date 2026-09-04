@@ -682,6 +682,7 @@ RPETracker.prototype._renderMedCard = function(inj) {
             <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.updateRTPPhase('${inj.id}')">🔄 Actualizar RTP</button>
             <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.markAsRecovered('${inj.id}')">✅ Dar de alta</button>` : ''}
             <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.openClinicalNotesPanel('${inj.playerId}')">📓 Notas clínicas</button>
+            <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.editInjuryModal('${inj.id}')">✏️ Editar</button>
         </div>
     </div>`;
 };
