@@ -368,7 +368,8 @@ RPETracker.prototype.openAddInjuryModal = function(playerId = null) {
                 <h2>🏥 Registrar Lesión</h2>
                 <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
             </div>
-            <form id="injuryForm" style="padding: 1.5rem;">
+            <form id="injuryForm" style="display:flex;flex-direction:column;flex:1;min-height:0">
+                <div class="modal-body" style="padding: 1.5rem">
                 <div class="form-group">
                     <label>👤 Jugadora</label>
                     <select id="injuryPlayerId" required>
@@ -455,6 +456,7 @@ RPETracker.prototype.openAddInjuryModal = function(playerId = null) {
                 <div id="injuryTimeline" style="background:var(--bg-subtle);padding:0.6rem 1rem;border-radius:8px;margin-top:0.5rem;font-size:0.88rem">
                     <strong>Tiempo estimado:</strong> <span id="timelineText">3-7 días</span>
                 </div>
+                </div><!-- /modal-body -->
 
                 <div class="modal-footer">
                     <button type="button" onclick="this.closest('.modal').remove()" class="btn-secondary">Cancelar</button>

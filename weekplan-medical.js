@@ -1186,6 +1186,8 @@ RPETracker.prototype.renderInjuryHub = function() {
                     onclick="window.rpeTracker?._injHubTab('individual')">👤 Individual</button>
                 <button class="an-tab ${this._injuryHubTab==='equipo'?'active':''}"
                     onclick="window.rpeTracker?._injHubTab('equipo')">👥 Equipo</button>
+                <button class="an-tab ${this._injuryHubTab==='disponibilidad'?'active':''}"
+                    onclick="window.rpeTracker?._injHubTab('disponibilidad')">📅 Disponibilidad</button>
             </div>
 
             <!-- Tab content -->
@@ -1214,10 +1216,13 @@ RPETracker.prototype.showNewInjuryForm = function() {
 
 RPETracker.prototype._renderInjHubTab = function() {
     switch (this._injuryHubTab) {
-        case 'gestion':    return this._renderInjGestion();
-        case 'individual': return this._renderInjIndividual();
-        case 'equipo':     return this._renderInjEquipo();
-        default:           return '';
+        case 'gestion':         return this._renderInjGestion();
+        case 'individual':      return this._renderInjIndividual();
+        case 'equipo':          return this._renderInjEquipo();
+        case 'disponibilidad':  return (typeof this.renderAvailabilityTable === 'function')
+            ? this.renderAvailabilityTable()
+            : '<div class="inj-empty">Disponibilidad no disponible</div>';
+        default:                return '';
     }
 };
 
