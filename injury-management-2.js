@@ -311,7 +311,7 @@ RPETracker.prototype.showRTPProgram = function(injuryId) {
             <div style="padding: 1.5rem; max-height: 70vh; overflow-y: auto;">
                 <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
                     <strong>Lesión:</strong> ${this.getTypeName(injury.type)} - ${this.getLocationName(injury.location)}<br>
-                    <strong>Severidad:</strong> ${injury.severity === 'minor' ? 'Leve' : injury.severity === 'moderate' ? 'Moderada' : 'Grave'}<br>
+                    <strong>Severidad:</strong> ${injury.severity === 'minor' ? 'Leve' : injury.severity === 'moderate' ? 'Moderada' : injury.severity === 'very_severe' ? 'Muy grave' : 'Grave'}<br>
                     <strong>Fase Actual:</strong> ${injury.rtpPhase} de 6<br>
                     <strong>Días desde lesión:</strong> ${injury.getDaysInjured()}
                 </div>

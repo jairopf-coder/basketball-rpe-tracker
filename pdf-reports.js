@@ -1033,7 +1033,7 @@ RPETracker.prototype.generatePlayerReport = function(playerId) {
         .filter(i => i.playerId === playerId)
         .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
 
-    const severityLabel = { minor: 'Leve', moderate: 'Moderada', severe: 'Grave' };
+    const severityLabel = { minor: 'Leve', moderate: 'Moderada', severe: 'Grave', very_severe: 'Muy grave' };
     const injRows = playerInjuries.map(inj => {
         const start    = new Date(inj.startDate).toLocaleDateString('es-ES');
         const loc      = (typeof this.getLocationName === 'function') ? this.getLocationName(inj.location) : (inj.location || '—');

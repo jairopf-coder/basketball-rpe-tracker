@@ -8,7 +8,7 @@ class Injury {
         this.playerId = data.playerId;
         this.type = data.type; // 'muscle', 'joint', 'bone', 'other'
         this.location = data.location; // 'ankle', 'knee', 'hamstring', etc.
-        this.severity = data.severity; // 'minor', 'moderate', 'severe'
+        this.severity = data.severity; // 'minor', 'moderate', 'severe', 'very_severe'
         this.startDate = data.startDate;
         this.endDate = data.endDate || null; // null if still injured
         this.description = data.description || '';
@@ -29,7 +29,8 @@ class Injury {
         const timelines = {
             'minor': { min: 3, max: 7 },
             'moderate': { min: 7, max: 21 },
-            'severe': { min: 21, max: 90 }
+            'severe': { min: 21, max: 90 },
+            'very_severe': { min: 90, max: 270 } // Lesiones mayores/quirúrgicas: rotura de Aquiles, LCA, fracturas graves...
         };
         return timelines[severity] || timelines['moderate'];
     }
@@ -228,7 +229,7 @@ RPETracker.prototype._renderInjuryACChart = function(injury) {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
     const textColor = isDark ? '#aaa' : '#666';
-    const sevColors = { minor: '#4caf50', moderate: '#ff9800', severe: '#f44336' };
+    const sevColors = { minor: '#4caf50', moderate: '#ff9800', severe: '#f44336', very_severe: '#7b1fa2' };
     const lineColor = sevColors[injury.severity] || '#ff6600';
 
     const zonePlugin = {
@@ -414,7 +415,8 @@ RPETracker.prototype.openAddInjuryModal = function(playerId = null) {
                     <select id="injurySeverity" required onchange="window.rpeTracker?.updateInjuryTimeline()">
                         <option value="minor">Leve (3-7 días)</option>
                         <option value="moderate">Moderada (1-3 semanas)</option>
-                        <option value="severe">Grave (3+ semanas)</option>
+                        <option value="severe">Grave (3-12 semanas)</option>
+                        <option value="very_severe">Muy grave (3-9 meses, quirúrgica)</option>
                     </select>
                 </div>
                 
@@ -491,7 +493,8 @@ RPETracker.prototype.updateInjuryTimeline = function() {
     const timelines = {
         'minor': '3-7 días',
         'moderate': '1-3 semanas (7-21 días)',
-        'severe': '3+ semanas (21-90 días)'
+        'severe': '3-12 semanas (21-90 días)',
+        'very_severe': '3-9 meses (90-270 días)'
     };
     
     document.getElementById('timelineText').textContent = timelines[severity] || '1-3 semanas';
@@ -518,7 +521,7 @@ RPETracker.prototype.editInjuryModal = function(injuryId) {
 
     const typeOptions = { muscle: 'Muscular', joint: 'Articular', bone: 'Ósea', tendon: 'Tendón/Ligamento', other: 'Otra' };
     const locationOptions = { ankle: 'Tobillo', knee: 'Rodilla', hamstring: 'Isquiotibiales', quadriceps: 'Cuádriceps', calf: 'Gemelos', groin: 'Ingle', back: 'Espalda', shoulder: 'Hombro', wrist: 'Muñeca', finger: 'Dedos', other: 'Otra' };
-    const severityOptions = { minor: 'Leve (3-7 días)', moderate: 'Moderada (1-3 semanas)', severe: 'Grave (3+ semanas)' };
+    const severityOptions = { minor: 'Leve (3-7 días)', moderate: 'Moderada (1-3 semanas)', severe: 'Grave (3-12 semanas)', very_severe: 'Muy grave (3-9 meses, quirúrgica)' };
     const mechanismOptions = ['Contacto', 'Sobreuso', 'Fatiga', 'Reglamentario', 'Gesto técnico', 'Otro'];
 
     const buildSelect = (id, options, current, onchange) => `
@@ -626,7 +629,8 @@ RPETracker.prototype.updateEditInjuryTimeline = function() {
     const timelines = {
         'minor': '3-7 días',
         'moderate': '1-3 semanas (7-21 días)',
-        'severe': '3+ semanas (21-90 días)'
+        'severe': '3-12 semanas (21-90 días)',
+        'very_severe': '3-9 meses (90-270 días)'
     };
     const el = document.getElementById('editTimelineText');
     if (el) el.textContent = timelines[severity] || '1-3 semanas';
@@ -796,8 +800,8 @@ RPETracker.prototype.renderInjuryCard = function(injury) {
     const phase           = RTP_PHASES ? RTP_PHASES[injury.rtpPhase] : null;
     const progressPercent = injury.rtpProgress || 0;
 
-    const sevColor = { minor:'#4caf50', moderate:'#ff9800', severe:'#f44336' };
-    const sevLabel = { minor:'Leve', moderate:'Moderada', severe:'Grave' };
+    const sevColor = { minor:'#4caf50', moderate:'#ff9800', severe:'#f44336', very_severe:'#7b1fa2' };
+    const sevLabel = { minor:'Leve', moderate:'Moderada', severe:'Grave', very_severe:'Muy grave' };
     const col = sevColor[injury.severity] || '#999';
 
     // RTP phase stepper
@@ -912,8 +916,8 @@ RPETracker.prototype.renderCompactInjuryCard = function(injury) {
     if (!player) return '';
 
     const daysInjured = injury.getDaysInjured();
-    const sevLabel = { minor:'Leve', moderate:'Moderada', severe:'Grave' };
-    const sevColor = { minor:'#4caf50', moderate:'ff9800', severe:'#f44336' };
+    const sevLabel = { minor:'Leve', moderate:'Moderada', severe:'Grave', very_severe:'Muy grave' };
+    const sevColor = { minor:'#4caf50', moderate:'#ff9800', severe:'#f44336', very_severe:'#7b1fa2' };
     const col = '#' + (sevColor[injury.severity] || '999').replace('#','');
 
     // Pre/post comparison data
