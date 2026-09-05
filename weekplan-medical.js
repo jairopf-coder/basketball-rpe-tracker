@@ -649,8 +649,8 @@ RPETracker.prototype._renderMedCard = function(inj) {
 
     const statusColors={active:'#f44336',recovered:'#4caf50',recurring:'#ff9800'};
     const statusLabel={active:'🔴 Activa',recovered:'🟢 Recuperada',recurring:'🟠 Recurrente'};
-    const severityColors={minor:'#4caf50',moderate:'#ff9800',severe:'#f44336'};
-    const severityLabel={minor:'Leve',moderate:'Moderada',severe:'Grave'};
+    const severityColors={minor:'#4caf50',moderate:'#ff9800',severe:'#f44336',very_severe:'#7b1fa2'};
+    const severityLabel={minor:'Leve',moderate:'Moderada',severe:'Grave',very_severe:'Muy grave'};
     const typeLabel=typeof this.getTypeName==='function'?this.getTypeName(inj.type):(inj.type||'Desconocido');
     const locLabel=typeof this.getLocationName==='function'?this.getLocationName(inj.location):(inj.location||'—');
 
