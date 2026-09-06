@@ -347,15 +347,28 @@ FirebaseSync.prototype.onInjuriesChange = function(callback) {
 // ========== WEEK PLAN (Firebase sync) ==========
 
 FirebaseSync.prototype.saveWeekPlan = async function(weekPlan) {
+    // Guardar primero en localStorage: si el usuario recarga la página
+    // antes de que la escritura remota termine, el respaldo local ya
+    // ha quedado hecho y no se pierden cambios.
+    Store.set('weekPlan', weekPlan);
     try {
-        if (!this.db) { Store.set('weekPlan', weekPlan); return; }
+        if (!this.db) return;
         await this.db.ref('weekPlan').set(weekPlan);
-        Store.set('weekPlan', weekPlan);
     } catch (e) {
         console.error('Error saving weekPlan to Firebase:', e);
-        Store.set('weekPlan', weekPlan);
         await this._enqueueWrite('weekPlan', weekPlan);
     }
+};
+
+// Escucha cambios en tiempo real del plan semanal (equivalente a
+// onSessionsChange/onPlayersChange). Sin esto, un dispositivo nunca
+// se entera de los cambios guardados desde otro.
+FirebaseSync.prototype.onWeekPlanChange = function(callback) {
+    if (!this.db) return;
+    this.db.ref('weekPlan').on('value', snapshot => {
+        const data = snapshot.val();
+        if (data) callback(data);
+    });
 };
 
 FirebaseSync.prototype.saveClinicalNotes = async function(notes) {
