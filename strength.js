@@ -69,10 +69,10 @@ const TEST_DEFINITIONS = [
     { id: 'dj',        name: 'Drop Jump',              unit: 'cm',   bilateral: false, inputType: 'flight',   description: 'Drop Jump + RSI', multiTrial: 3 },
     { id: 'sts',       name: 'Side to Side Hop',       unit: 'reps', bilateral: true,  inputType: 'count',    description: 'Saltos laterales 30s' },
     { id: 'triple',    name: 'Triple Hop',             unit: 'cm',   bilateral: true,  inputType: 'distance', description: 'Triple salto unilateral' },
-    { id: 'sprint10',  name: 'Sprint 10m',             unit: 's',    bilateral: false, inputType: 'time',     description: 'Tiempo en segundos' },
-    { id: 'sprint20',  name: 'Sprint 20m',             unit: 's',    bilateral: false, inputType: 'time',     description: 'Tiempo en segundos' },
+    { id: 'sprint10',  name: 'Sprint 10m',             unit: 's',    bilateral: false, inputType: 'time',     description: 'Tiempo en segundos', lowerIsBetter: true },
+    { id: 'sprint20',  name: 'Sprint 20m',             unit: 's',    bilateral: false, inputType: 'time',     description: 'Tiempo en segundos', lowerIsBetter: true },
     { id: 'ift3015',   name: '30-15 IFT',              unit: 'km/h', bilateral: false, inputType: 'speed',    description: 'Velocidad última etapa completada (VIFT)' },
-    { id: 'five0five', name: '5-0-5',                  unit: 's',    bilateral: true,  inputType: 'time',     description: 'Agilidad: 5m - giro 180° - 5m' },
+    { id: 'five0five', name: '5-0-5',                  unit: 's',    bilateral: true,  inputType: 'time',     description: 'Agilidad: 5m - giro 180° - 5m', lowerIsBetter: true },
 ];
 
 // ─────────────────────────────────────────
