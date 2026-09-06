@@ -8573,6 +8573,19 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 .db-alert-btn-team:hover { opacity: 1; }
 
+/* ── Aviso de planificación semanal pendiente (domingos) ─────────── */
+.db-alert-banner--planning {
+    background: linear-gradient(135deg, rgba(33,150,243,0.10), rgba(3,169,244,0.08));
+    border-left: 3px solid #2196f3;
+    color: #1565c0;
+}
+[data-theme="dark"] .db-alert-banner--planning {
+    background: rgba(33,150,243,0.14);
+    border-left-color: #64b5f6;
+    color: #90caf9;
+}
+
+
 /* ================================================================
    A) PRE-SESSION BUTTON
    ================================================================ */
