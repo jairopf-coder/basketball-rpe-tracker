@@ -691,6 +691,21 @@ RPETracker.prototype.renderDashboardCalendar = function() {
         }
     }
 
+    // Partidos programados (módulo "Próximos objetivos") — fecha exacta, no recurrente
+    (this.matches || []).forEach(m => {
+        if (m.date) addEvent(m.date, 'match', 'scheduled');
+    });
+
+    // Si un partido programado coincide con una sesión ya registrada ese mismo día,
+    // no lo dupliquemos: la sesión real (con RPE) ya representa ese partido.
+    Object.keys(eventMap).forEach(dateStr => {
+        const evts = eventMap[dateStr];
+        const hasRealMatch = evts.some(e => e.type === 'match' && e.source === 'real');
+        if (hasRealMatch) {
+            eventMap[dateStr] = evts.filter(e => !(e.type === 'match' && e.source === 'scheduled'));
+        }
+    });
+
     // Nav label
     const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                         'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -739,23 +754,26 @@ RPETracker.prototype.renderDashboardCalendar = function() {
             const isToday = dateStr === today;
             const events  = eventMap[dateStr] || [];
 
-            // Dominant event for this day (real > plan, match > training > rest)
-            const realEvents = events.filter(e => e.source === 'real');
-            const planEvents = events.filter(e => e.source === 'plan');
-            const dominant  = realEvents.length ? realEvents : planEvents;
+            // Evento dominante del día (real > partido programado > plan; partido > entreno > resto)
+            const realEvents      = events.filter(e => e.source === 'real');
+            const scheduledEvents = events.filter(e => e.source === 'scheduled');
+            const planEvents      = events.filter(e => e.source === 'plan');
+            const dominant  = realEvents.length ? realEvents : (scheduledEvents.length ? scheduledEvents : planEvents);
             const hasMatch  = dominant.some(e => e.type === 'match');
             const topType   = hasMatch ? 'match' : (dominant[0]?.type || null);
 
+            // "Confirmado" = ya jugado/registrado o partido con fecha exacta (no una suposición semanal)
+            const isConfirmed = realEvents.length > 0 || scheduledEvents.length > 0;
+
             let dotHTML = '';
             if (topType) {
-                const isReal = realEvents.length > 0;
                 const color  = typeColor[topType] || '#ccc';
-                dotHTML = `<div class="db-mini-day-dot" style="background:${color};opacity:${isReal ? 1 : 0.45};"></div>`;
+                dotHTML = `<div class="db-mini-day-dot" style="background:${color};opacity:${isConfirmed ? 1 : 0.45};"></div>`;
                 // Second dot if two different types on same day
                 const types = [...new Set(dominant.map(e => e.type))];
                 if (types.length > 1) {
                     const second = types.find(t => t !== topType);
-                    if (second) dotHTML += `<div class="db-mini-day-dot" style="background:${typeColor[second]||'#ccc'};opacity:${isReal?1:0.45};"></div>`;
+                    if (second) dotHTML += `<div class="db-mini-day-dot" style="background:${typeColor[second]||'#ccc'};opacity:${isConfirmed?1:0.45};"></div>`;
                 }
             }
 
@@ -763,9 +781,15 @@ RPETracker.prototype.renderDashboardCalendar = function() {
             const bgStyle = hasBg ? `background:${typeColor[topType]}12;` : '';
             const hasEvt  = events.length > 0;
 
+            const scheduledMatch = topType === 'match' ? (this.matches || []).find(m => m.date === dateStr) : null;
+            const tooltip = topType
+                ? (typeLabel[topType] + (scheduledMatch && scheduledMatch.rival ? ' vs ' + scheduledMatch.rival : ''))
+                : 'Sin actividad';
+
             bodyHTML += `<div class="db-mini-day${isToday ? ' today' : ''}${hasEvt ? ' has-event' : ''}"
+                onclick="window.rpeTracker?.showDashboardDaySummary('${dateStr}')"
                 style="${bgStyle}"
-                title="${topType ? typeLabel[topType] : 'Sin actividad'}">
+                title="${esc(tooltip)}">
                 <div class="db-mini-day-num">${d}</div>
                 <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;margin-top:1px;">${dotHTML}</div>
             </div>`;
@@ -807,20 +831,10 @@ RPETracker.prototype.renderDashboardCalendar = function() {
                 seen.add(k); return true;
             });
 
-            let sessHTML = '';
-            if (uniq.length === 0) {
-                sessHTML = `<span class="db-week-rest">Descanso</span>`;
-            } else {
-                sessHTML = `<div class="db-week-sessions">` +
-                    uniq.map(e => `
-                        <div class="db-week-session-chip">
-                            <div class="db-week-session-dot" style="background:${typeColor[e.type]||'#ccc'};opacity:${e.source==='plan'?0.45:1};"></div>
-                            <span>${typeIcon[e.type]} ${typeLabel[e.type]}${e.source==='plan'?' <span style="font-size:0.6rem;opacity:0.6">(plan)</span>':''}</span>
-                        </div>`).join('') +
-                    `</div>`;
-            }
+            const sourceTag = { plan: ' <span style="font-size:0.6rem;opacity:0.6">(plan)</span>', scheduled: ' <span style="font-size:0.6rem;opacity:0.6">(programado)</span>' };
 
-            bodyHTML += `<div class="db-week-day-row${isToday ? ' today-row' : ''}">
+            bodyHTML += `<div class="db-week-day-row${isToday ? ' today-row' : ''}"
+                onclick="window.rpeTracker?.showDashboardDaySummary('${dateStr}')">
                 <div class="db-week-day-label">
                     <div class="db-week-day-name">${dayShort[i]}</div>
                     <div class="db-week-day-num">${d.getDate()}</div>
@@ -831,7 +845,7 @@ RPETracker.prototype.renderDashboardCalendar = function() {
                         uniq.map(e => `
                             <div class="db-week-session-chip">
                                 <div class="db-week-session-dot" style="background:${typeColor[e.type]||'#ccc'};opacity:${e.source==='plan'?0.45:1};"></div>
-                                <span>${typeIcon[e.type]} ${typeLabel[e.type]}${e.source==='plan'?' <span style="font-size:0.6rem;opacity:0.55">(plan)</span>':''}</span>
+                                <span>${typeIcon[e.type]} ${typeLabel[e.type]}${sourceTag[e.source] || ''}</span>
                             </div>`).join('')
                     }</div>`
                 }
@@ -868,6 +882,148 @@ RPETracker.prototype.renderDashboardCalendar = function() {
             ${bodyHTML}
         </div>
     `;
+};
+
+// ── showDashboardDaySummary ────────────────────────────────────────────
+// Resumen al pulsar un día del mini-calendario de inicio: combina partido
+// programado (si lo hay), sesiones ya registradas (RPE) y, si no hay nada
+// real todavía, lo que diga la planificación semanal para ese día.
+RPETracker.prototype.showDashboardDaySummary = function(dateStr) {
+    const [y, mo, da] = dateStr.split('-').map(Number);
+    const { day, month, weekday } = _formatDate(dateStr);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const match   = (this.matches || []).find(m => m.date === dateStr) || null;
+    const entries = this.sessions.filter(s => s.date === dateStr);
+
+    let html = '';
+
+    // 1) Partido programado (fecha exacta, módulo "Próximos objetivos")
+    if (match) {
+        const isHome     = match.venue === 'casa';
+        const venueLabel = isHome ? '🏠 Casa' : `✈️ ${esc(match.venue || '—')}`;
+        const timeLabel  = match.time ? `🕐 ${esc(match.time)}` : '';
+        const compLabel  = match.competition === 'friendly' ? 'Amistoso' : esc(match.competition || 'Liga');
+        const hasResult  = match.localScore !== '' && match.localScore !== undefined
+                         && match.visitorScore !== '' && match.visitorScore !== undefined;
+        const resultHTML = hasResult
+            ? `<div class="cal-modal-day-avg" style="margin-top:0.5rem;">${esc(match.localTeam || 'Local')} <strong>${match.localScore}</strong> – <strong>${match.visitorScore}</strong> ${esc(match.visitorTeam || 'Visitante')}</div>`
+            : (dateStr < today ? '<div style="font-size:0.8rem;color:var(--text-faint);margin-top:0.4rem;">Sin resultado registrado</div>' : '');
+
+        html += `
+            <div class="cal-modal-slot">
+                <div class="cal-modal-slot-header">
+                    <span class="cal-modal-slot-title">🏟️ Partido vs ${esc(match.rival || '—')}</span>
+                    <span class="cal-modal-slot-meta">${venueLabel}${timeLabel ? ' &nbsp;·&nbsp; ' + timeLabel : ''} &nbsp;·&nbsp; ${compLabel}</span>
+                </div>
+                ${resultHTML}
+                <div style="margin-top:0.6rem;">
+                    <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._dbCalGoEditMatch('${match.id}')">✏️ Editar partido</button>
+                </div>
+            </div>
+        `;
+    }
+
+    // 2) Sesiones ya registradas ese día (RPE real)
+    if (entries.length > 0) {
+        const slots     = this.groupSessionsBySlot(entries);
+        const slotLabel = { morning: 'Mañana', afternoon: 'Tarde', evening: 'Noche' };
+
+        slots.forEach(slot => {
+            const label    = slotLabel[slot.timeOfDay] || slot.timeOfDay;
+            const icon     = slot.type === 'match' ? '🏟️' : '🏀';
+            const typeName = slot.type === 'match' ? 'Partido' : 'Entrenamiento';
+            const avgRPE   = (slot.entries.reduce((s, x) => s + x.rpe, 0) / slot.entries.length).toFixed(1);
+            const dur      = slot.entries[0].duration || 60;
+
+            html += `
+                <div class="cal-modal-slot">
+                    <div class="cal-modal-slot-header">
+                        <span class="cal-modal-slot-title">${icon} ${label} · ${typeName}</span>
+                        <span class="cal-modal-slot-meta">${dur}min &nbsp;·&nbsp; RPE medio <strong>${avgRPE}</strong> &nbsp;·&nbsp; ${slot.entries.length} jugadora${slot.entries.length !== 1 ? 's' : ''}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `
+            <div style="text-align:center;margin-top:0.5rem;">
+                <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._dbCalGoDayDetail('${dateStr}')">Ver detalle por jugadora</button>
+            </div>
+        `;
+    }
+
+    // 3) Si no hay nada real todavía, mostrar lo planificado para ese día de la semana
+    if (entries.length === 0 && !match && this.weekPlan && this.weekPlan.days) {
+        const dayKeys = ['lun','mar','mie','jue','vie','sab','dom'];
+        const dow     = (new Date(y, mo - 1, da).getDay() + 6) % 7; // 0=Lun
+        const dayPlan = this.weekPlan.days[dayKeys[dow]] || {};
+        const slotLabel2 = { morning: 'Mañana', afternoon: 'Tarde' };
+        const typeLabel2 = { training: 'Entreno', match: 'Partido', recovery: 'Recuperación', shooting: 'Tiro', gym: 'Gym' };
+        const typeIcon2  = { training: '🏀', match: '🏟️', recovery: '💪', shooting: '🎯', gym: '🏋️' };
+
+        const planSlots = ['morning', 'afternoon']
+            .map(slotKey => {
+                const s = dayPlan[slotKey];
+                if (!s || !s.enabled || !s.type || s.type === 'rest') return null;
+                return { slotKey, ...s };
+            })
+            .filter(Boolean);
+
+        if (planSlots.length > 0) {
+            html += planSlots.map(s => `
+                <div class="cal-modal-slot">
+                    <div class="cal-modal-slot-header">
+                        <span class="cal-modal-slot-title">${typeIcon2[s.type] || '🏀'} ${slotLabel2[s.slotKey]} · ${typeLabel2[s.type] || s.type} <span style="font-size:0.65rem;opacity:0.6;">(planificado)</span></span>
+                        <span class="cal-modal-slot-meta">${s.duration || 60}min${s.focus ? ' &nbsp;·&nbsp; ' + esc(s.focus) : ''}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    if (!html) {
+        html = `<div class="an-empty" style="padding:1.5rem;text-align:center;color:var(--text-secondary)">Sin actividad programada este día</div>`;
+    }
+
+    const MODAL_ID = 'dbDaySummaryModal';
+    document.getElementById(MODAL_ID)?.remove();
+
+    const labelId = 'dbDaySummaryTitle';
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = MODAL_ID;
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', labelId);
+    modal.innerHTML = `
+        <div class="modal-content cal-modal-content">
+            <div class="modal-header">
+                <h2 id="${labelId}">${weekday} ${day} de ${month}</h2>
+                <button onclick="document.getElementById('${MODAL_ID}')?.remove()" class="btn-close" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="cal-modal-body">${html}</div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const ftRelease = trapFocus(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) { ftRelease(); modal.remove(); } });
+    modal.addEventListener('keydown', e => { if (e.key === 'Escape') { ftRelease(); modal.remove(); } });
+};
+
+// Abre el formulario de edición de un partido desde el resumen del día
+RPETracker.prototype._dbCalGoEditMatch = function(matchId) {
+    document.getElementById('dbDaySummaryModal')?.remove();
+    this.switchView('objectives');
+    if (typeof this._objShowForm === 'function') this._objShowForm(matchId);
+};
+
+// Abre el detalle completo (por jugadora) de un día desde el resumen del mini-calendario
+RPETracker.prototype._dbCalGoDayDetail = function(dateStr) {
+    document.getElementById('dbDaySummaryModal')?.remove();
+    const [y, mo, da] = dateStr.split('-').map(Number);
+    if (typeof this.showDaySessions === 'function') this.showDaySessions(y, mo - 1, da);
 };
 
 // ── renderTeamRatios ─────────────────────────────────────────────────
