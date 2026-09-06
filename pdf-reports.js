@@ -1396,15 +1396,23 @@ RPETracker.prototype.buildTestsReportHTML = function(data) {
 
     const sections = testsData.map(({ def, perPlayer }) => {
         if (isTeam) {
+            const colCount = def.bilateral ? 5 : 4;
+            const asymCell = p => {
+                const { left, right } = p.last.result;
+                if (left == null || right == null) return '<td>—</td>';
+                const asym = asymmetry(left, right);
+                return `<td style="color:${asymColorHex(asym)}">Δ ${asym}%</td>`;
+            };
             const rows = perPlayer.map(p => {
                 if (!p.hasData) {
-                    return `<tr><td>${esc(p.player.name)}</td><td colspan="4" style="color:#999">Sin datos en el rango</td></tr>`;
+                    return `<tr><td>${esc(p.player.name)}</td><td colspan="${colCount}" style="color:#999">Sin datos en el rango</td></tr>`;
                 }
                 return `<tr>
                     <td>${esc(p.player.name)}</td>
                     <td>${fmtVal(def, p.first.repValue)} <span style="color:#999;font-size:0.8em">(${fmtDate(p.first.date)})</span></td>
                     <td>${fmtVal(def, p.last.repValue)} <span style="color:#999;font-size:0.8em">(${fmtDate(p.last.date)})</span></td>
                     <td>${p.delta != null ? (p.delta > 0 ? '+' : '') + p.delta + def.unit : '—'}</td>
+                    ${def.bilateral ? asymCell(p) : ''}
                     <td>${badge(p.improved)}</td>
                 </tr>`;
             }).join('');
@@ -1412,9 +1420,10 @@ RPETracker.prototype.buildTestsReportHTML = function(data) {
             <div class="section">
                 <h2>📊 ${esc(def.name)} <span style="font-size:0.6em;color:#999;font-weight:400">${esc(def.description)}</span></h2>
                 <table class="sessions-table">
-                    <thead><tr><th>Jugadora</th><th>Primer valor</th><th>Último valor</th><th>Δ</th><th>Estado</th></tr></thead>
+                    <thead><tr><th>Jugadora</th><th>Primer valor</th><th>Último valor</th><th>Δ</th>${def.bilateral ? '<th>Asimetría (última)</th>' : ''}<th>Estado</th></tr></thead>
                     <tbody>${rows}</tbody>
                 </table>
+                ${def.bilateral ? '<p style="color:#999;font-size:0.85em;margin-top:-8px">Asimetría calculada sobre la medición más reciente de cada jugadora dentro del rango.</p>' : ''}
             </div>`;
         }
 
