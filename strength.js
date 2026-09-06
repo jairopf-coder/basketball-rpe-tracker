@@ -85,6 +85,13 @@ function flightToHeight(ms) {
     return ((9.81 * t * t) / 8 * 100).toFixed(1); // cm
 }
 
+/** Inversa de flightToHeight: reconstruye el tiempo de vuelo (ms) aproximado a partir de una altura (cm) ya guardada. Usado solo para rellenar el formulario al editar un test. */
+function heightToFlight(cm) {
+    const h = cm / 100; // m
+    const t = Math.sqrt((8 * h) / 9.81); // s
+    return (t * 1000).toFixed(1); // ms
+}
+
 /**
  * Potencia pico de salto — ecuación de Sayers et al. (1999)
  * Peak Power (W) = 60.7 × altura salto (cm) + 45.3 × peso (kg) − 2055
@@ -1825,7 +1832,10 @@ RPETracker.prototype._renderTestPlayer = function(el) {
             return `<div class="str-session-row str-session-row--test">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
                     <strong>${ts.date}</strong>${ts.bodyWeight ? `<span style="font-size:0.75rem;color:var(--text-muted)">Peso: ${ts.bodyWeight} kg</span>` : ''}
-                    <button class="str-del-btn" onclick="window.rpeTracker._deleteTestSession('${ts.id}')">🗑</button>
+                    <div style="display:flex;gap:0.4rem">
+                        <button class="str-del-btn" onclick="window.rpeTracker._openNewTest(null, '${ts.id}')" title="Editar">✏️</button>
+                        <button class="str-del-btn" onclick="window.rpeTracker._deleteTestSession('${ts.id}')" title="Eliminar">🗑</button>
+                    </div>
                 </div>
                 ${rowsHTML}
             </div>`;
@@ -1964,13 +1974,19 @@ RPETracker.prototype._renderTestPlayer = function(el) {
     }
 };
 
-RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
+RPETracker.prototype._openNewTest = function(preselectedPlayerId, editSessionId) {
     if (!this.testSessions) this._loadStrengthData();
 
+    const editSession = editSessionId ? (this.testSessions || []).find(s => s.id === editSessionId) : null;
+    const isEdit = !!editSession;
+    const results = editSession ? (editSession.results || {}) : {};
+
     const playerOpts = this.players.map(p =>
-        `<option value="${p.id}" ${p.id === preselectedPlayerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ' #'+p.number : ''}</option>`
+        `<option value="${p.id}" ${p.id === (editSession ? editSession.playerId : preselectedPlayerId) ? 'selected' : ''}>${esc(p.name)}${p.number ? ' #'+p.number : ''}</option>`
     ).join('');
     const today = new Date().toISOString().slice(0, 10);
+    const dateVal = editSession ? editSession.date : today;
+    const bodyWeightVal = editSession && editSession.bodyWeight != null ? editSession.bodyWeight : '';
 
     let modal = document.getElementById('testModal');
     if (!modal) {
@@ -1981,24 +1997,27 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
     }
 
     const testsHTML = TEST_DEFINITIONS.map(def => {
+        const r = results[def.id];
         if (def.bilateral) {
             // ── Salto unilateral con 3 intentos por lado + media ──
             if (def.inputType === 'flight' && def.multiTrial) {
-                const trialInputs = (side) => [1, 2, 3].map(n => `
-                    <input type="number" class="form-input test-trial-input-sm" id="test_${def.id}_${side}_${n}" placeholder="S${n}" step="any"
-                        oninput="window.rpeTracker._updateTestMultiAsym('${def.id}')">`).join('');
+                const trialInputs = (side, trialsArr) => [1, 2, 3].map(n => {
+                    const v = trialsArr && trialsArr[n - 1] != null ? heightToFlight(trialsArr[n - 1]) : '';
+                    return `<input type="number" class="form-input test-trial-input-sm" id="test_${def.id}_${side}_${n}" placeholder="S${n}" step="any" value="${v}"
+                        oninput="window.rpeTracker._updateTestMultiAsym('${def.id}')">`;
+                }).join('');
                 return `
                 <div class="test-input-row">
                     <div class="test-input-name">${def.name} <span class="test-input-desc">${def.description} · media de 3 saltos</span></div>
                     <div class="test-input-fields test-input-fields--bilateral">
                         <div>
                             <label class="form-label">Izquierda (ms)</label>
-                            <div class="test-trial-group">${trialInputs('left')}</div>
+                            <div class="test-trial-group">${trialInputs('left', r?.trials_left)}</div>
                             <div class="test-height-calc" id="testH_${def.id}_left">—</div>
                         </div>
                         <div>
                             <label class="form-label">Derecha (ms)</label>
-                            <div class="test-trial-group">${trialInputs('right')}</div>
+                            <div class="test-trial-group">${trialInputs('right', r?.trials_right)}</div>
                             <div class="test-height-calc" id="testH_${def.id}_right">—</div>
                         </div>
                         <div class="test-asym-display" id="testAsym_${def.id}">
@@ -2010,19 +2029,21 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
             }
             // Campos izquierda + derecha + índice asimetría calculado (un único intento)
             const extraLabel = def.inputType === 'flight' ? 'Tiempo vuelo (ms)' : def.unit;
+            const lVal = r?.left != null ? r.left : '';
+            const rVal = r?.right != null ? r.right : '';
             return `
             <div class="test-input-row">
                 <div class="test-input-name">${def.name} <span class="test-input-desc">${def.description}</span></div>
                 <div class="test-input-fields test-input-fields--bilateral">
                     <div>
                         <label class="form-label">Izquierda (${extraLabel})</label>
-                        <input type="number" class="form-input" id="test_${def.id}_left" placeholder="—" step="any"
+                        <input type="number" class="form-input" id="test_${def.id}_left" placeholder="—" step="any" value="${lVal}"
                             oninput="window.rpeTracker._updateTestAsym('${def.id}')">
                         ${def.inputType === 'flight' ? `<div class="test-height-calc" id="testH_${def.id}_left">—</div>` : ''}
                     </div>
                     <div>
                         <label class="form-label">Derecha (${extraLabel})</label>
-                        <input type="number" class="form-input" id="test_${def.id}_right" placeholder="—" step="any"
+                        <input type="number" class="form-input" id="test_${def.id}_right" placeholder="—" step="any" value="${rVal}"
                             oninput="window.rpeTracker._updateTestAsym('${def.id}')">
                         ${def.inputType === 'flight' ? `<div class="test-height-calc" id="testH_${def.id}_right">—</div>` : ''}
                     </div>
@@ -2035,9 +2056,11 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
         } else {
             // ── Salto bipodal con 3 intentos + media (CMJ, SJ, Drop Jump) ──
             if (def.inputType === 'flight' && def.multiTrial) {
-                const trialInputs = [1, 2, 3].map(n => `
-                    <input type="number" class="form-input test-trial-input-sm" id="test_${def.id}_value_${n}" placeholder="Salto ${n}" step="any"
-                        oninput="window.rpeTracker._updateTestMulti('${def.id}')">`).join('');
+                const trialInputs = [1, 2, 3].map(n => {
+                    const v = r?.trials && r.trials[n - 1] != null ? heightToFlight(r.trials[n - 1]) : '';
+                    return `<input type="number" class="form-input test-trial-input-sm" id="test_${def.id}_value_${n}" placeholder="Salto ${n}" step="any" value="${v}"
+                        oninput="window.rpeTracker._updateTestMulti('${def.id}')">`;
+                }).join('');
                 return `
                 <div class="test-input-row">
                     <div class="test-input-name">${def.name} <span class="test-input-desc">${def.description} · media de 3 saltos (ms)</span></div>
@@ -2051,13 +2074,14 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
                 </div>`;
             }
             const label = def.inputType === 'flight' ? 'Tiempo vuelo (ms)' : `Valor (${def.unit})`;
+            const val = r?.value != null ? r.value : '';
             return `
             <div class="test-input-row">
                 <div class="test-input-name">${def.name} <span class="test-input-desc">${def.description}</span></div>
                 <div class="test-input-fields">
                     <div>
                         <label class="form-label">${label}</label>
-                        <input type="number" class="form-input" id="test_${def.id}_value" placeholder="—" step="any"
+                        <input type="number" class="form-input" id="test_${def.id}_value" placeholder="—" step="any" value="${val}"
                             oninput="window.rpeTracker._updateTestSingle('${def.id}')">
                         ${def.inputType === 'flight' ? `<div class="test-height-calc" id="testH_${def.id}_value">—</div>` : ''}
                         ${def.powerCalc ? `<div class="test-height-calc" id="testP_${def.id}_value">—</div>` : ''}
@@ -2070,7 +2094,7 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
     modal.innerHTML = `
         <div class="modal-content modal-content--wide">
             <div class="modal-header">
-                <div class="modal-header-inner"><h2>📊 Nuevo Test de Rendimiento</h2></div>
+                <div class="modal-header-inner"><h2>${isEdit ? '✏️ Editar Test de Rendimiento' : '📊 Nuevo Test de Rendimiento'}</h2></div>
                 <button class="modal-close" onclick="document.getElementById('testModal').classList.remove('active')">✕</button>
             </div>
             <div class="modal-body" style="padding:1.25rem">
@@ -2081,23 +2105,35 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId) {
                     </div>
                     <div>
                         <label class="form-label">Fecha</label>
-                        <input type="date" id="testDate" class="form-input" value="${today}">
+                        <input type="date" id="testDate" class="form-input" value="${dateVal}">
                     </div>
                     <div>
                         <label class="form-label">Peso (kg) <span style="font-weight:400;color:var(--text-muted)">— opcional</span></label>
-                        <input type="number" class="form-input" id="testBodyWeight" placeholder="—" step="any" min="0"
+                        <input type="number" class="form-input" id="testBodyWeight" placeholder="—" step="any" min="0" value="${bodyWeightVal}"
                             oninput="window.rpeTracker._updateTestPower()">
                     </div>
                 </div>
-                <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1rem">Rellena solo los tests realizados hoy. Los campos vacíos no se guardan. El peso es solo para esta sesión de test (no se guarda en la ficha de la jugadora) y se usa para calcular la potencia de salto en CMJ y SJ.</p>
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1rem">Rellena solo los tests realizados hoy. Los campos vacíos no se guardan${isEdit ? ' (si borras un valor que ya existía, se eliminará al guardar)' : ''}. El peso es solo para esta sesión de test (no se guarda en la ficha de la jugadora) y se usa para calcular la potencia de salto en CMJ y SJ.</p>
                 <div class="test-inputs-grid">${testsHTML}</div>
                 <div style="margin-top:1.5rem;text-align:right">
                     <button class="btn-secondary" onclick="document.getElementById('testModal').classList.remove('active')" style="margin-right:0.5rem">Cancelar</button>
-                    <button class="btn-primary" onclick="window.rpeTracker._saveTestSession()">💾 Guardar test</button>
+                    <button class="btn-primary" onclick="window.rpeTracker._saveTestSession(${isEdit ? `'${editSessionId}'` : 'null'})">💾 ${isEdit ? 'Guardar cambios' : 'Guardar test'}</button>
                 </div>
             </div>
         </div>`;
     modal.classList.add('active');
+
+    // Recalcula alturas/potencia/asimetría de los campos ya prellenados
+    if (isEdit) {
+        TEST_DEFINITIONS.forEach(def => {
+            if (!results[def.id]) return;
+            if (def.bilateral) {
+                def.multiTrial ? this._updateTestMultiAsym(def.id) : this._updateTestAsym(def.id);
+            } else {
+                def.multiTrial ? this._updateTestMulti(def.id) : this._updateTestSingle(def.id);
+            }
+        });
+    }
 };
 
 /** Media de altura (cm) a partir de hasta 3 inputs de tiempo de vuelo (ms). baseId = p.ej. "cmj_value" o "slcmj_left" */
@@ -2203,7 +2239,7 @@ RPETracker.prototype._updateTestPower = function() {
     TEST_DEFINITIONS.filter(d => d.powerCalc).forEach(d => this._updateTestPowerFor(d.id));
 };
 
-RPETracker.prototype._saveTestSession = function() {
+RPETracker.prototype._saveTestSession = function(editSessionId) {
     const playerId  = document.getElementById('testPlayerSel')?.value;
     const date      = document.getElementById('testDate')?.value;
     const bodyWeight = parseFloat(document.getElementById('testBodyWeight')?.value);
@@ -2275,14 +2311,25 @@ RPETracker.prototype._saveTestSession = function() {
 
     if (Object.keys(results).length === 0) { this.showToast('Introduce al menos un resultado', 'error'); return; }
 
-    const session = { id: Date.now().toString(), playerId, date, results, createdAt: new Date().toISOString() };
-    if (!isNaN(bodyWeight) && bodyWeight > 0) session.bodyWeight = bodyWeight;
     if (!this.testSessions) this.testSessions = [];
-    this.testSessions.push(session);
+
+    if (editSessionId) {
+        const idx = this.testSessions.findIndex(s => s.id === editSessionId);
+        if (idx === -1) { this.showToast('El test que intentas editar ya no existe', 'error'); return; }
+        const original = this.testSessions[idx];
+        const updated = { ...original, playerId, date, results, updatedAt: new Date().toISOString() };
+        if (!isNaN(bodyWeight) && bodyWeight > 0) updated.bodyWeight = bodyWeight;
+        else delete updated.bodyWeight;
+        this.testSessions[idx] = updated;
+    } else {
+        const session = { id: Date.now().toString(), playerId, date, results, createdAt: new Date().toISOString() };
+        if (!isNaN(bodyWeight) && bodyWeight > 0) session.bodyWeight = bodyWeight;
+        this.testSessions.push(session);
+    }
     this._saveTestSessions();
 
     document.getElementById('testModal')?.classList.remove('active');
-    this.showToast('✅ Test guardado', 'success');
+    this.showToast(editSessionId ? '✅ Test actualizado' : '✅ Test guardado', 'success');
     if (this.currentView === 'tests') this.renderTestsView();
 };
 
