@@ -37,11 +37,31 @@ RPETracker.prototype.loadWeekPlan = function() {
     } catch(e) {
         this.weekPlan = this._defaultWeekPlan();
     }
+
+    // Guard: registrar el listener en tiempo real UNA sola vez. Sin esto,
+    // un cambio guardado desde otro dispositivo nunca llegaba aquí (bug
+    // de sincronización diagnosticado: este módulo solo leía localStorage).
+    if (window.firebaseSync && !this._weekPlanListenerSet) {
+        this._weekPlanListenerSet = true;
+        window.firebaseSync.onWeekPlanChange((updatedPlan) => {
+            // Ignorar el eco del propio write mientras está en vuelo
+            if (this._savingWeekPlan) return;
+            this.weekPlan = updatedPlan;
+            if (this.currentView === 'weekplan') this.renderWeeklyPlanning();
+            if (this.currentView === 'dashboard') this.renderDashboard();
+            if (window._devMode) console.log('🔄 Plan semanal actualizado desde Firebase');
+        });
+    }
 };
 
 RPETracker.prototype.saveWeekPlan = function() {
     if (window.firebaseSync) {
-        window.firebaseSync.saveWeekPlan(this.weekPlan);
+        // Activar flag para que el listener reactivo no sobreescriba el
+        // estado local mientras el write está en vuelo.
+        this._savingWeekPlan = true;
+        window.firebaseSync.saveWeekPlan(this.weekPlan).finally(() => {
+            this._savingWeekPlan = false;
+        });
     } else {
         localStorage.setItem('basketballWeekPlan', JSON.stringify(this.weekPlan));
     }
