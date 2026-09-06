@@ -55,6 +55,12 @@ RPETracker.prototype.loadWeekPlan = function() {
 };
 
 RPETracker.prototype.saveWeekPlan = function() {
+    // Marca la fecha en la que se ha revisado/guardado la planificación.
+    // Se usa para el aviso de "planificación pendiente" de los domingos
+    // (ver renderDashboard): si hoy es domingo y ya se ha guardado hoy,
+    // se considera que la semana que empieza ya está planificada.
+    this.weekPlan.lastSavedDate = new Date().toISOString().slice(0, 10);
+
     if (window.firebaseSync) {
         // Activar flag para que el listener reactivo no sobreescriba el
         // estado local mientras el write está en vuelo.
@@ -69,17 +75,16 @@ RPETracker.prototype.saveWeekPlan = function() {
 
 RPETracker.prototype._defaultWeekPlan = function() {
     const emptySession = () => ({ type: 'rest', intensity: 'none', duration: 0, focus: '', enabled: false });
-    const trainingSession = (intensity, duration, focus) => ({ type: 'training', intensity, duration, focus, enabled: true });
     return {
         weekOffset: 0,
         days: {
-            lun: { morning: trainingSession('medium', 90, 'Técnica-táctica'),   afternoon: emptySession() },
-            mar: { morning: trainingSession('high',   90, 'Físico / Condición'), afternoon: emptySession() },
-            mie: { morning: emptySession(),                                       afternoon: emptySession() },
-            jue: { morning: trainingSession('medium', 75, 'Táctica'),            afternoon: emptySession() },
-            vie: { morning: trainingSession('low',    60, 'Activación previa'),  afternoon: emptySession() },
-            sab: { morning: { type: 'match', intensity: 'max', duration: 90, focus: 'PARTIDO', enabled: true }, afternoon: emptySession() },
-            dom: { morning: emptySession(),                                       afternoon: emptySession() }
+            lun: { morning: emptySession(), afternoon: emptySession() },
+            mar: { morning: emptySession(), afternoon: emptySession() },
+            mie: { morning: emptySession(), afternoon: emptySession() },
+            jue: { morning: emptySession(), afternoon: emptySession() },
+            vie: { morning: emptySession(), afternoon: emptySession() },
+            sab: { morning: emptySession(), afternoon: emptySession() },
+            dom: { morning: emptySession(), afternoon: emptySession() }
         }
     };
 };

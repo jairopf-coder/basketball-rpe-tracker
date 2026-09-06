@@ -167,6 +167,16 @@ RPETracker.prototype.renderDashboard = function() {
         </div>`;
     }
 
+    // ── Aviso dominical: recordar hacer la planificación de la semana que empieza ──
+    // Solo los domingos, y solo si todavía no se ha guardado/revisado hoy.
+    const _todayStr = new Date().toISOString().slice(0, 10);
+    if (new Date().getDay() === 0 && this.weekPlan?.lastSavedDate !== _todayStr) {
+        bannerHTML += `<div class="db-alert-banner db-alert-banner--planning">
+            <div class="db-alert-item">📅 <strong>Planificación pendiente</strong> — revisa la semana que empieza mañana</div>
+            <button class="db-alert-btn-team" onclick="window.rpeTracker?.switchView('weekplan')">Planificar →</button>
+        </div>`;
+    }
+
     // ── Match-day mode ─────────────────────────────────────────
     const todayKey = ['dom','lun','mar','mie','jue','vie','sab'][new Date().getDay()];
     const todayPlan = this.weekPlan?.days?.[todayKey] || {};
