@@ -226,6 +226,10 @@ RPETracker.prototype.showQuickActions = function() {
                             class="btn-primary" style="width: 100%;">
                         📄 Informe Semanal del Equipo
                     </button>
+                    <button onclick="window.rpeTracker?.showTestsReportMenu(); document.getElementById('${MODAL_ID}')?.remove();"
+                            class="btn-primary" style="width: 100%;">
+                        📊 Informe de Tests Físicos
+                    </button>
                     <button onclick="window.rpeTracker?.downloadBackup(); document.getElementById('${MODAL_ID}')?.remove();"
                             class="btn-primary" style="width: 100%;">
                         💾 Descargar Backup

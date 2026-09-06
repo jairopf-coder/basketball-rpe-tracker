@@ -1233,3 +1233,317 @@ ${notesSection}
     win.document.close();
     this.showToast(`📄 Informe de ${player.name} generado`, 'success');
 };
+
+// ========== INFORME DE TESTS FÍSICOS ==========
+// Punto de entrada único: elige alcance (jugadora/equipo), rango de fechas
+// y qué tests incluir. Los datos de tests siempre están completos en memoria
+// (this.testSessions no se pagina como this.sessions), así que no hace falta
+// ensureFullSessionHistory() aquí.
+
+RPETracker.prototype.showTestsReportMenu = function() {
+    if (!this.testSessions) this._loadStrengthData();
+
+    const dates = (this.testSessions || []).map(s => s.date).filter(Boolean).sort();
+    const today = new Date().toISOString().slice(0, 10);
+    const earliestDate = dates[0] || today;
+
+    const playerOpts = this.players.map(p =>
+        `<option value="${p.id}">${esc(p.name)}${p.number ? ' #' + esc(p.number) : ''}</option>`
+    ).join('');
+
+    const testChecks = TEST_DEFINITIONS.map(def => `
+        <label style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0;border-bottom:1px solid var(--border);cursor:pointer">
+            <input type="checkbox" class="testsReportCheck" value="${def.id}">
+            <span>${esc(def.name)} <span style="color:var(--text-muted);font-size:0.8rem">${esc(def.description)}</span></span>
+        </label>`).join('');
+
+    let modal = document.getElementById('testsReportModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'testsReportModal';
+        modal.className = 'modal';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="modal-content modal-content--wide">
+            <div class="modal-header">
+                <div class="modal-header-inner"><h2>📊 Informe de Tests Físicos</h2></div>
+                <button class="modal-close" onclick="document.getElementById('testsReportModal').classList.remove('active')">✕</button>
+            </div>
+            <div class="modal-body" style="padding:1.25rem">
+                <div style="margin-bottom:1.25rem">
+                    <label class="form-label">Alcance</label>
+                    <select id="testsReportScope" class="form-select">
+                        <option value="team">🏀 Equipo completo</option>
+                        ${playerOpts}
+                    </select>
+                </div>
+
+                <div style="margin-bottom:1.25rem">
+                    <label class="form-label">Rango de fechas</label>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.6rem">
+                        <button type="button" class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem" onclick="window.rpeTracker._setTestsReportRange(30)">Últimos 30 días</button>
+                        <button type="button" class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem" onclick="window.rpeTracker._setTestsReportRange(90)">Últimos 90 días</button>
+                        <button type="button" class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem" onclick="window.rpeTracker._setTestsReportRange(null)">Todo el historial</button>
+                    </div>
+                    <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+                        <input type="date" id="testsReportFrom" class="form-input" value="${earliestDate}" style="flex:1;min-width:130px">
+                        <span style="color:var(--text-muted)">→</span>
+                        <input type="date" id="testsReportTo" class="form-input" value="${today}" style="flex:1;min-width:130px">
+                    </div>
+                </div>
+
+                <div style="margin-bottom:0.6rem;display:flex;justify-content:space-between;align-items:center">
+                    <label class="form-label" style="margin:0">Tests a incluir</label>
+                    <div style="display:flex;gap:0.5rem">
+                        <button type="button" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.6rem" onclick="window.rpeTracker._toggleAllTestsReportChecks(true)">Marcar todos</button>
+                        <button type="button" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.6rem" onclick="window.rpeTracker._toggleAllTestsReportChecks(false)">Ninguno</button>
+                    </div>
+                </div>
+                <div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:0 0.75rem">${testChecks}</div>
+
+                <div style="margin-top:1.5rem;text-align:right">
+                    <button class="btn-secondary" onclick="document.getElementById('testsReportModal').classList.remove('active')" style="margin-right:0.5rem">Cancelar</button>
+                    <button class="btn-primary" onclick="window.rpeTracker.generateTestsReport()">📄 Generar informe</button>
+                </div>
+            </div>
+        </div>`;
+    modal.classList.add('active');
+};
+
+/** Rellena el rango de fechas del informe de tests. days=null → todo el historial. */
+RPETracker.prototype._setTestsReportRange = function(days) {
+    const to = new Date();
+    const toStr = to.toISOString().slice(0, 10);
+    let fromStr;
+    if (days == null) {
+        const dates = (this.testSessions || []).map(s => s.date).filter(Boolean).sort();
+        fromStr = dates[0] || toStr;
+    } else {
+        const from = new Date(to);
+        from.setDate(to.getDate() - days);
+        fromStr = from.toISOString().slice(0, 10);
+    }
+    const fromEl = document.getElementById('testsReportFrom');
+    const toEl = document.getElementById('testsReportTo');
+    if (fromEl) fromEl.value = fromStr;
+    if (toEl) toEl.value = toStr;
+};
+
+RPETracker.prototype._toggleAllTestsReportChecks = function(checked) {
+    document.querySelectorAll('.testsReportCheck').forEach(cb => { cb.checked = checked; });
+};
+
+/**
+ * Construye los datos del informe: para cada test seleccionado, la evolución
+ * primer valor → último valor dentro del rango, por jugadora (o por la jugadora
+ * concreta si el alcance no es 'team').
+ */
+RPETracker.prototype.buildTestsReportData = function(scope, testIds, fromDate, toDate) {
+    const sessions = (this.testSessions || []).filter(s => s.date >= fromDate && s.date <= toDate);
+    const playersInScope = scope === 'team' ? this.players : this.players.filter(p => p.id === scope);
+
+    // Para tests bilaterales, el "valor representativo" usado en la comparación
+    // es la media de izquierda/derecha (el detalle por lado se muestra en la tabla histórica).
+    const repValue = (def, result) => {
+        if (!def.bilateral) return result.value;
+        const vals = [result.left, result.right].filter(v => v != null);
+        return vals.length ? parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2)) : null;
+    };
+
+    const testsData = testIds.map(testId => {
+        const def = TEST_DEFINITIONS.find(t => t.id === testId);
+        const perPlayer = playersInScope.map(player => {
+            const playerSessions = sessions
+                .filter(s => s.playerId === player.id && s.results && s.results[testId])
+                .sort((a, b) => a.date.localeCompare(b.date))
+                .map(s => ({ date: s.date, result: s.results[testId], repValue: repValue(def, s.results[testId]) }));
+
+            if (playerSessions.length === 0) return { player, hasData: false };
+
+            const first = playerSessions[0];
+            const last = playerSessions[playerSessions.length - 1];
+            const delta = (first.repValue != null && last.repValue != null)
+                ? parseFloat((last.repValue - first.repValue).toFixed(2))
+                : null;
+            const improved = delta == null ? null : (def.lowerIsBetter ? delta < 0 : delta > 0);
+
+            return { player, hasData: true, sessions: playerSessions, first, last, delta, improved };
+        });
+        return { def, perPlayer };
+    });
+
+    return { testsData, fromDate, toDate, scope, playersInScope };
+};
+
+RPETracker.prototype.buildTestsReportHTML = function(data) {
+    const { testsData, fromDate, toDate, scope, playersInScope } = data;
+    const isTeam = scope === 'team';
+    const scopeLabelRaw = isTeam
+        ? 'Equipo completo'
+        : (playersInScope[0] ? `${playersInScope[0].name}${playersInScope[0].number ? ' #' + playersInScope[0].number : ''}` : '—');
+
+    const fmtDate = d => new Date(d).toLocaleDateString('es-ES');
+    const fmtVal = (def, v) => v != null ? `${v}${def.unit}` : '—';
+
+    const badge = (improved) => {
+        if (improved === null || improved === undefined) return `<span style="color:#999">—</span>`;
+        return improved
+            ? `<span style="color:#2e7d32;font-weight:600">▲ Mejora</span>`
+            : `<span style="color:#c62828;font-weight:600">▼ Empeora</span>`;
+    };
+
+    const sections = testsData.map(({ def, perPlayer }) => {
+        if (isTeam) {
+            const rows = perPlayer.map(p => {
+                if (!p.hasData) {
+                    return `<tr><td>${esc(p.player.name)}</td><td colspan="4" style="color:#999">Sin datos en el rango</td></tr>`;
+                }
+                return `<tr>
+                    <td>${esc(p.player.name)}</td>
+                    <td>${fmtVal(def, p.first.repValue)} <span style="color:#999;font-size:0.8em">(${fmtDate(p.first.date)})</span></td>
+                    <td>${fmtVal(def, p.last.repValue)} <span style="color:#999;font-size:0.8em">(${fmtDate(p.last.date)})</span></td>
+                    <td>${p.delta != null ? (p.delta > 0 ? '+' : '') + p.delta + def.unit : '—'}</td>
+                    <td>${badge(p.improved)}</td>
+                </tr>`;
+            }).join('');
+            return `
+            <div class="section">
+                <h2>📊 ${esc(def.name)} <span style="font-size:0.6em;color:#999;font-weight:400">${esc(def.description)}</span></h2>
+                <table class="sessions-table">
+                    <thead><tr><th>Jugadora</th><th>Primer valor</th><th>Último valor</th><th>Δ</th><th>Estado</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+        }
+
+        const p = perPlayer[0];
+        if (!p || !p.hasData) {
+            return `
+            <div class="section">
+                <h2>📊 ${esc(def.name)}</h2>
+                <p style="color:#999">Sin datos registrados en el rango seleccionado.</p>
+            </div>`;
+        }
+
+        const historyRows = p.sessions.map(s => {
+            if (def.bilateral) {
+                const asym = (s.result.left != null && s.result.right != null) ? asymmetry(s.result.left, s.result.right) : null;
+                return `<tr>
+                    <td>${fmtDate(s.date)}</td>
+                    <td>I: ${s.result.left != null ? s.result.left + def.unit : '—'}</td>
+                    <td>D: ${s.result.right != null ? s.result.right + def.unit : '—'}</td>
+                    <td>${asym !== null ? `<span style="color:${asymColorHex(asym)}">Δ ${asym}%</span>` : '—'}</td>
+                </tr>`;
+            }
+            return `<tr><td>${fmtDate(s.date)}</td><td colspan="3">${fmtVal(def, s.result.value)}</td></tr>`;
+        }).join('');
+
+        return `
+        <div class="section">
+            <h2>📊 ${esc(def.name)} <span style="font-size:0.6em;color:#999;font-weight:400">${esc(def.description)}</span></h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value">${fmtVal(def, p.first.repValue)}</div>
+                    <div class="stat-label">Primer valor · ${fmtDate(p.first.date)}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${fmtVal(def, p.last.repValue)}</div>
+                    <div class="stat-label">Último valor · ${fmtDate(p.last.date)}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${p.delta != null ? (p.delta > 0 ? '+' : '') + p.delta + def.unit : '—'}</div>
+                    <div class="stat-label">Diferencia</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" style="font-size:1.1em">${badge(p.improved)}</div>
+                    <div class="stat-label">Evolución</div>
+                </div>
+            </div>
+            <table class="sessions-table">
+                <thead><tr><th>Fecha</th><th colspan="3">Resultado</th></tr></thead>
+                <tbody>${historyRows}</tbody>
+            </table>
+        </div>`;
+    }).join('');
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe de Tests Físicos - ${esc(scopeLabelRaw)}</title>
+    <style>
+        @media print { @page { margin: 2cm; } .no-print { display: none !important; } }
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .report-toolbar { position: sticky; top: 0; background: #fff; display: flex; gap: 10px; justify-content: center; padding: 12px 0; margin: -20px -20px 20px; border-bottom: 1px solid #eee; z-index: 10; }
+        .print-btn, .close-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .print-btn { background: #ff6600; color: #fff; }
+        .close-btn { background: #eee; color: #333; }
+        .header { text-align: center; border-bottom: 3px solid #ff6600; padding-bottom: 20px; margin-bottom: 30px; }
+        .header h1 { color: #ff6600; margin: 0; }
+        .header .subtitle { color: #666; font-size: 1.2em; margin-top: 10px; }
+        .header .date-range { color: #999; font-size: 0.9em; margin-top: 5px; }
+        .section { margin-bottom: 30px; page-break-inside: avoid; }
+        .section h2 { color: #ff6600; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-box { padding: 15px; border: 2px solid #eee; border-radius: 8px; text-align: center; }
+        .stat-value { font-size: 1.6em; font-weight: bold; color: #ff6600; }
+        .stat-label { color: #666; font-size: 0.85em; margin-top: 5px; }
+        .sessions-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .sessions-table th, .sessions-table td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+        .sessions-table th { background: #f5f5f5; font-weight: bold; }
+        .footer { margin-top: 50px; padding-top: 20px; border-top: 2px solid #eee; text-align: center; color: #999; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="report-toolbar no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+    </div>
+    <div class="header">
+        <h1>🏋️ Informe de Tests Físicos</h1>
+        <div class="subtitle">${esc(scopeLabelRaw)}</div>
+        <div class="date-range">${fmtDate(fromDate)} - ${fmtDate(toDate)}</div>
+    </div>
+
+    ${testsData.length ? sections : '<p style="text-align:center;color:#999">No hay tests seleccionados.</p>'}
+
+    <div class="footer">
+        <p>Generado el ${new Date().toLocaleString('es-ES')}</p>
+        <p>Basketball RPE Tracker</p>
+    </div>
+</body>
+</html>`;
+};
+
+RPETracker.prototype.generateTestsReport = function() {
+    const scope = document.getElementById('testsReportScope')?.value;
+    const fromDate = document.getElementById('testsReportFrom')?.value;
+    const toDate = document.getElementById('testsReportTo')?.value;
+    const testIds = Array.from(document.querySelectorAll('.testsReportCheck:checked')).map(cb => cb.value);
+
+    if (!fromDate || !toDate) { this.showToast('Selecciona un rango de fechas', 'error'); return; }
+    if (fromDate > toDate) { this.showToast('La fecha "desde" no puede ser posterior a "hasta"', 'error'); return; }
+    if (testIds.length === 0) { this.showToast('Selecciona al menos un test', 'error'); return; }
+
+    // Ventana abierta de forma síncrona dentro del gesto de tap/click del usuario
+    // (mismo motivo que en generatePDFReport: evitar el bloqueo de popups en iOS Safari).
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('⚠️ El navegador ha bloqueado la ventana del informe. Permite las ventanas emergentes para esta web e inténtalo de nuevo.');
+        return;
+    }
+
+    const data = this.buildTestsReportData(scope, testIds, fromDate, toDate);
+    const html = this.buildTestsReportHTML(data);
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    setTimeout(() => printWindow.print(), 500);
+
+    document.getElementById('testsReportModal')?.classList.remove('active');
+    this.showToast('📄 Informe de tests generado');
+};
