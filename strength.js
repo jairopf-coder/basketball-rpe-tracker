@@ -1675,7 +1675,10 @@ RPETracker.prototype.renderTestsView = function() {
         <div class="str-container">
             <div class="str-header">
                 <h2>📊 Tests de Rendimiento</h2>
-                <button class="btn-primary" onclick="window.rpeTracker._openNewTest()">+ Nuevo Test</button>
+                <div class="str-header-actions">
+                    <button class="btn-secondary" onclick="window.rpeTracker.showTestsReportMenu()">📄 Informe</button>
+                    <button class="btn-primary" onclick="window.rpeTracker._openNewTest()">+ Nuevo Test</button>
+                </div>
             </div>
             <div class="str-player-list">${playerCards}</div>
         </div>
