@@ -345,35 +345,38 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
     const INTENSITY_LABEL = { none: 'Descanso', low: 'Baja', medium: 'Media', high: 'Alta', max: 'Máx.' };
     const DAY_KEYS = ['dom','lun','mar','mie','jue','vie','sab'];
 
-    // Build lookup: { "YYYY-MM-DD_morning": { intensity, rpe, type, focus, duration }, ... }
-    // Covering last 8 weeks with a sliding weekOffset per-week
-    const planLookup = {};
-    const plan = this.weekPlan?.days || {};
+    // Cada semana tiene su propio plan guardado (ya no es una única plantilla
+    // repetida): para cada sesión se busca el plan de SU semana concreta.
+    // Si esa semana no llegó a guardarse nunca, se usa la plantilla antigua
+    // (legacyTemplate) solo como referencia orientativa para no perder de
+    // golpe el histórico de comparación de semanas anteriores a esta mejora.
+    const buildPlanSlot = (dateObj, slot) => {
+        if (typeof this.getWeekPlanDays !== 'function') return null;
+        const dayKey = DAY_KEYS[dateObj.getDay()];
+        const dayPlan = this.getWeekPlanDays(dateObj)[dayKey] || {};
+        const s = dayPlan[slot];
+        if (!s || !s.enabled || s.type === 'rest') return null;
+        return {
+            intensity: s.intensity || 'none',
+            plannedRpe: INTENSITY_RPE[s.intensity] || 0,
+            intensityLabel: INTENSITY_LABEL[s.intensity] || '—',
+            type: s.type || 'training',
+            focus: s.focus || '',
+            duration: s.duration || 0
+        };
+    };
 
-    // Reconstruct each week for the last 8 weeks by re-applying weekOffset logic
-    // weekPlan.days is keyed by DAY_KEY (lun, mar…) — same plan repeats each week
-    // We map sessions to the plan by day-of-week + timeOfDay slot
-    // (The weekPlan is a template, not date-specific — same pattern each week)
-    const planByDaySlot = {}; // { "lun_morning": {...}, "lun_afternoon": {...}, ... }
-    DAY_KEYS.forEach(dk => {
-        const d = plan[dk] || {};
-        ['morning', 'afternoon'].forEach(slot => {
-            const s = d[slot];
-            if (s && s.enabled && s.type !== 'rest') {
-                planByDaySlot[`${dk}_${slot}`] = {
-                    intensity: s.intensity || 'none',
-                    plannedRpe: INTENSITY_RPE[s.intensity] || 0,
-                    intensityLabel: INTENSITY_LABEL[s.intensity] || '—',
-                    type: s.type || 'training',
-                    focus: s.focus || '',
-                    duration: s.duration || 0
-                };
-            }
-        });
-    });
-
-    // If no plan at all, show empty state
-    const hasPlan = Object.keys(planByDaySlot).length > 0;
+    // ¿Hay algún plan configurado en las últimas 8 semanas? (independiente de
+    // si hay sesiones registradas que además coincidan con él)
+    let hasPlan = false;
+    if (typeof this.getWeekPlanDays === 'function') {
+        for (let wOff = -8; wOff <= 0 && !hasPlan; wOff++) {
+            const wDate = new Date(); wDate.setDate(wDate.getDate() + wOff * 7);
+            const wDays = this.getWeekPlanDays(wDate);
+            hasPlan = Object.values(wDays).some(d =>
+                ['morning','afternoon'].some(sl => d[sl]?.enabled && d[sl]?.type !== 'rest'));
+        }
+    }
 
     // Build rows: for each session in last 8 weeks, try to match to plan slot
     const cutoff = new Date();
@@ -386,11 +389,9 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
     const rows = [];
     recentSessions.forEach(s => {
         const dateObj = new Date(s.date);
-        const dayKey  = DAY_KEYS[dateObj.getDay()];
         const slot    = s.timeOfDay || 'morning';
-        const lookupKey = `${dayKey}_${slot}`;
-        const planSlot = planByDaySlot[lookupKey];
-        if (!planSlot) return; // no plan for this slot — skip
+        const planSlot = buildPlanSlot(dateObj, slot);
+        if (!planSlot) return; // no plan para ese slot — se omite
         if (planSlot.plannedRpe === 0) return; // rest day — skip
 
         const player = this.players.find(p => p.id === s.playerId);

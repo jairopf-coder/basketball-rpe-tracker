@@ -76,8 +76,8 @@ RPETracker.prototype.renderTeamStatus = function() {
             ${entries.length ? entries.map(renderCard).join('') : `<div class="ts-empty">${emptyMsg}</div>`}
         </div>`;
 
-    // weekPlan = { weekOffset, days: { lun/mar/…: { morning: {type,…}, afternoon: {type,…} } } }
-    const _wpDays = this.weekPlan?.days ? Object.values(this.weekPlan.days) : [];
+    // weekPlan = plan de la semana en curso (cada semana tiene su propio plan guardado)
+    const _wpDays = typeof this.getWeekPlanDays === 'function' ? Object.values(this.getWeekPlanDays()) : [];
     const _wpSlots = _wpDays.flatMap(d => [d?.morning, d?.afternoon].filter(Boolean));
     const nextMatch = _wpSlots.find(s => s.type === 'match' && s.enabled) || null;
 

@@ -8,32 +8,7 @@
 RPETracker.prototype.loadWeekPlan = function() {
     try {
         const raw = localStorage.getItem('basketballWeekPlan');
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            const defaultPlan = this._defaultWeekPlan();
-            const emptySession = () => ({ type: 'rest', intensity: 'none', duration: 0, focus: '', enabled: false });
-            if (!parsed || typeof parsed !== 'object' || !parsed.days || typeof parsed.days !== 'object') {
-                this.weekPlan = defaultPlan;
-            } else {
-                // Migrar formato legacy (días sin morning/afternoon) al nuevo formato
-                const expectedDays = ['lun','mar','mie','jue','vie','sab','dom'];
-                expectedDays.forEach(day => {
-                    if (!parsed.days[day] || typeof parsed.days[day] !== 'object') {
-                        parsed.days[day] = defaultPlan.days[day];
-                    } else if (!parsed.days[day].morning) {
-                        // Migración: formato antiguo con type/intensity directo -> mañana
-                        const old = parsed.days[day];
-                        parsed.days[day] = {
-                            morning: { type: old.type||'rest', intensity: old.intensity||'none', duration: old.duration||0, focus: old.focus||'', enabled: (old.type&&old.type!=='rest') },
-                            afternoon: emptySession()
-                        };
-                    }
-                });
-                this.weekPlan = parsed;
-            }
-        } else {
-            this.weekPlan = this._defaultWeekPlan();
-        }
+        this.weekPlan = raw ? this._migrateWeekPlan(JSON.parse(raw)) : this._defaultWeekPlan();
     } catch(e) {
         this.weekPlan = this._defaultWeekPlan();
     }
@@ -46,21 +21,83 @@ RPETracker.prototype.loadWeekPlan = function() {
         window.firebaseSync.onWeekPlanChange((updatedPlan) => {
             // Ignorar el eco del propio write mientras está en vuelo
             if (this._savingWeekPlan) return;
-            this.weekPlan = updatedPlan;
+
+            const incoming = this._migrateWeekPlan(updatedPlan);
+
+            // No pisar cambios que el usuario está editando ahora mismo en
+            // este dispositivo y todavía no ha guardado (semana "sin guardar").
+            const editingMonday = this._wpMondayForOffset(this.weekPlan?.weekOffset || 0);
+            const localDraft = this.weekPlan?.weeks?.[editingMonday];
+            if (localDraft && !localDraft.savedAt) {
+                incoming.weeks[editingMonday] = localDraft;
+            }
+
+            this.weekPlan = incoming;
             if (this.currentView === 'weekplan') this.renderWeeklyPlanning();
             if (this.currentView === 'dashboard') this.renderDashboard();
             if (window._devMode) console.log('🔄 Plan semanal actualizado desde Firebase');
         });
     }
+
+    // Aviso del navegador si se intenta salir/recargar con una semana editada
+    // y sin guardar (desde que el guardado dejó de ser automático).
+    if (!this._wpBeforeUnloadSet) {
+        this._wpBeforeUnloadSet = true;
+        window.addEventListener('beforeunload', (e) => {
+            if (this._wpHasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+    }
+};
+
+// Convierte cualquier formato antiguo (una sola plantilla que se repetía cada
+// semana) al formato actual: un plan independiente por semana, guardado bajo
+// la clave del lunes de esa semana ("weeks"). La plantilla antigua se
+// conserva en "legacyTemplate" únicamente como referencia histórica para
+// gráficas/informes de semanas pasadas anteriores a esta actualización.
+RPETracker.prototype._migrateWeekPlan = function(parsed) {
+    if (!parsed || typeof parsed !== 'object') return this._defaultWeekPlan();
+
+    // Ya está en el formato nuevo
+    if (parsed.weeks && typeof parsed.weeks === 'object') {
+        return { weekOffset: parsed.weekOffset || 0, weeks: parsed.weeks, legacyTemplate: parsed.legacyTemplate || null };
+    }
+
+    // Formato antiguo: plantilla única en "days"
+    if (parsed.days && typeof parsed.days === 'object') {
+        const defaultPlan = this._defaultWeekPlan();
+        const emptySession = () => ({ type: 'rest', intensity: 'none', duration: 0, focus: '', enabled: false });
+        const expectedDays = ['lun','mar','mie','jue','vie','sab','dom'];
+        expectedDays.forEach(day => {
+            if (!parsed.days[day] || typeof parsed.days[day] !== 'object') {
+                parsed.days[day] = this._emptyWeekDays()[day];
+            } else if (!parsed.days[day].morning) {
+                // Migración: formato antiguo con type/intensity directo -> mañana
+                const old = parsed.days[day];
+                parsed.days[day] = {
+                    morning: { type: old.type||'rest', intensity: old.intensity||'none', duration: old.duration||0, focus: old.focus||'', enabled: (old.type&&old.type!=='rest') },
+                    afternoon: emptySession()
+                };
+            }
+        });
+
+        // La semana actual se marca como ya guardada (es la que el usuario
+        // ya tenía en pantalla), para no mostrar una "X" de golpe tras la
+        // actualización. El resto de semanas empiezan en blanco.
+        const currentMonday = this._wpMondayForOffset(0);
+        return {
+            weekOffset: 0,
+            weeks: { [currentMonday]: { days: parsed.days, savedAt: new Date().toISOString() } },
+            legacyTemplate: parsed.days
+        };
+    }
+
+    return this._defaultWeekPlan();
 };
 
 RPETracker.prototype.saveWeekPlan = function() {
-    // Marca la fecha en la que se ha revisado/guardado la planificación.
-    // Se usa para el aviso de "planificación pendiente" de los domingos
-    // (ver renderDashboard): si hoy es domingo y ya se ha guardado hoy,
-    // se considera que la semana que empieza ya está planificada.
-    this.weekPlan.lastSavedDate = new Date().toISOString().slice(0, 10);
-
     if (window.firebaseSync) {
         // Activar flag para que el listener reactivo no sobreescriba el
         // estado local mientras el write está en vuelo.
@@ -74,36 +111,82 @@ RPETracker.prototype.saveWeekPlan = function() {
 };
 
 RPETracker.prototype._defaultWeekPlan = function() {
+    return { weekOffset: 0, weeks: {}, legacyTemplate: null };
+};
+
+// Días de una semana totalmente en blanco (todo "Descanso")
+RPETracker.prototype._emptyWeekDays = function() {
     const emptySession = () => ({ type: 'rest', intensity: 'none', duration: 0, focus: '', enabled: false });
     return {
-        weekOffset: 0,
-        days: {
-            lun: { morning: emptySession(), afternoon: emptySession() },
-            mar: { morning: emptySession(), afternoon: emptySession() },
-            mie: { morning: emptySession(), afternoon: emptySession() },
-            jue: { morning: emptySession(), afternoon: emptySession() },
-            vie: { morning: emptySession(), afternoon: emptySession() },
-            sab: { morning: emptySession(), afternoon: emptySession() },
-            dom: { morning: emptySession(), afternoon: emptySession() }
-        }
+        lun: { morning: emptySession(), afternoon: emptySession() },
+        mar: { morning: emptySession(), afternoon: emptySession() },
+        mie: { morning: emptySession(), afternoon: emptySession() },
+        jue: { morning: emptySession(), afternoon: emptySession() },
+        vie: { morning: emptySession(), afternoon: emptySession() },
+        sab: { morning: emptySession(), afternoon: emptySession() },
+        dom: { morning: emptySession(), afternoon: emptySession() }
     };
 };
+
+// Clave (fecha ISO del lunes) de la semana a la que pertenece una fecha
+RPETracker.prototype._wpMondayKey = function(date) {
+    const d = new Date(date);
+    const dow = (d.getDay() + 6) % 7; // 0=Lun
+    d.setDate(d.getDate() - dow);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().slice(0, 10);
+};
+
+// Clave del lunes de la semana desplazada "offset" semanas desde hoy
+RPETracker.prototype._wpMondayForOffset = function(offset) {
+    const d = new Date();
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + (offset || 0) * 7);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().slice(0, 10);
+};
+
+// Lectura de solo consulta (calendario, analíticas, modo partido...): usa el
+// plan guardado de esa semana concreta y, si no existe, cae en la plantilla
+// antigua como referencia orientativa; si tampoco hay, semana en blanco.
+RPETracker.prototype.getWeekPlanDays = function(date) {
+    if (!this.weekPlan) this.loadWeekPlan();
+    const key = this._wpMondayKey(date || new Date());
+    const entry = this.weekPlan.weeks && this.weekPlan.weeks[key];
+    if (entry && entry.days) return entry.days;
+    return this.weekPlan.legacyTemplate || this._emptyWeekDays();
+};
+
+// ¿Se ha guardado explícitamente el plan de la semana del lunes "mondayKey"?
+RPETracker.prototype.isWeekPlanSaved = function(mondayKey) {
+    if (!this.weekPlan) this.loadWeekPlan();
+    const entry = this.weekPlan.weeks && this.weekPlan.weeks[mondayKey];
+    return !!(entry && entry.savedAt);
+};
+
+
 
 RPETracker.prototype.renderWeeklyPlanning = function() {
     const container = document.getElementById('weeklyPlanView');
     if (!container) return;
     if (!this.weekPlan) this.loadWeekPlan();
-    if (!this.weekPlan || !this.weekPlan.days) this.weekPlan = this._defaultWeekPlan();
+    if (!this.weekPlan || !this.weekPlan.weeks) this.weekPlan = this._defaultWeekPlan();
 
     const offset = this.weekPlan.weekOffset || 0;
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1 + offset * 7);
 
+    // Cada semana es independiente: se identifica por la fecha (ISO) de su lunes.
+    const mondayKey  = this._wpMondayForOffset(offset);
+    const weekEntry  = this.weekPlan.weeks[mondayKey] || null;
+    const isSaved    = !!(weekEntry && weekEntry.savedAt);
+    // Lo que se muestra/edita: si la semana nunca se ha guardado, empieza en blanco (todo Descanso).
+    const activeDays = weekEntry ? weekEntry.days : this._emptyWeekDays();
+
     const dayKeys   = ['lun','mar','mie','jue','vie','sab','dom'];
     const dayLabels = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
     const weekRealSessions = this._getWeekRealSessions(weekStart);
-    const plannedLoad = this._plannedWeekLoad();
+    const plannedLoad = this._plannedWeekLoad(activeDays);
 
     const typeLabel = {training:'🏀 Entreno', shooting:'🎯 Tiro', gym:'🏋️ Gym', match:'🏟️ Partido', recovery:'💪 Recuperación'};
     const typeColors = {training:'#2196f3', match:'#f44336', recovery:'#4caf50', shooting:'#9c27b0', gym:'#795548'};
@@ -156,7 +239,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     };
 
     const daysHTML = dayKeys.map((dayKey, i) => {
-        const dayData   = this.weekPlan.days[dayKey] || {};
+        const dayData   = activeDays[dayKey] || {};
         const morning   = dayData.morning   || {type:'rest',intensity:'none',duration:0,focus:'',enabled:false};
         const afternoon = dayData.afternoon || {type:'rest',intensity:'none',duration:0,focus:'',enabled:false};
 
@@ -216,6 +299,9 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     <button class="btn-secondary btn-sm" id="wpToday">Hoy</button>
                     <button class="btn-secondary btn-sm" id="wpNext">Siguiente →</button>
                     <button class="btn-primary btn-sm" id="wpSave">💾 Guardar</button>
+                    <span id="wpSaveIndicator" class="wp-save-badge ${isSaved ? 'wp-save-badge--ok' : 'wp-save-badge--pending'}" title="${isSaved ? 'Semana guardada el ' + new Date(weekEntry.savedAt).toLocaleString('es-ES') : 'Esta semana todavía no se ha guardado'}">
+                        ${isSaved ? '✅ Guardada' : '❌ Sin guardar'}
+                    </span>
                 </div>
             </div>
 
@@ -259,7 +345,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     const grid = document.getElementById('wpGrid');
     if (!grid) return;
 
-    // Checkboxes (toggle enabled)
+    // Checkboxes (toggle enabled) y selects (type/intensity)
     grid.addEventListener('change', (e) => {
         const el = e.target;
         const day   = el.dataset.wpDay;
@@ -276,16 +362,20 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
             value = el.value;
         }
 
-        if (!this.weekPlan.days[day]) this.weekPlan.days[day] = {};
-        if (!this.weekPlan.days[day][slot]) {
-            this.weekPlan.days[day][slot] = {type:'training',intensity:'medium',duration:60,focus:'',enabled:false};
+        const entry = this._wpEnsureWeekEntry(mondayKey);
+        if (!entry.days[day]) entry.days[day] = {};
+        if (!entry.days[day][slot]) {
+            entry.days[day][slot] = {type:'training',intensity:'medium',duration:60,focus:'',enabled:false};
         }
-        this.weekPlan.days[day][slot][field] = value;
-        this.saveWeekPlan();
+        entry.days[day][slot][field] = value;
+        entry.savedAt = null; // hay cambios sin guardar
+        this._wpHasUnsavedChanges = true;
 
         if (field === 'enabled') {
             // Re-render just this day card
             this.renderWeeklyPlanning();
+        } else {
+            this._wpRefreshSaveBadge(false, null);
         }
     });
 
@@ -296,13 +386,16 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
         const slot  = el.dataset.wpSlot;
         const field = el.dataset.wpField;
         if (!day || !slot || !field || el.type === 'checkbox') return;
-        if (!this.weekPlan.days[day]) this.weekPlan.days[day] = {};
-        if (!this.weekPlan.days[day][slot]) {
-            this.weekPlan.days[day][slot] = {type:'training',intensity:'medium',duration:60,focus:'',enabled:false};
+        const entry = this._wpEnsureWeekEntry(mondayKey);
+        if (!entry.days[day]) entry.days[day] = {};
+        if (!entry.days[day][slot]) {
+            entry.days[day][slot] = {type:'training',intensity:'medium',duration:60,focus:'',enabled:false};
         }
         const value = el.type === 'number' ? (parseInt(el.value)||0) : el.value;
-        this.weekPlan.days[day][slot][field] = value;
-        this.saveWeekPlan();
+        entry.days[day][slot][field] = value;
+        entry.savedAt = null; // hay cambios sin guardar
+        this._wpHasUnsavedChanges = true;
+        this._wpRefreshSaveBadge(false, null);
     }, true); // capture for blur
 
     // Navigation buttons
@@ -319,11 +412,15 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
         this.renderWeeklyPlanning();
     });
     document.getElementById('wpSave')?.addEventListener('click', () => {
+        const entry = this._wpEnsureWeekEntry(mondayKey);
+        entry.savedAt = new Date().toISOString();
         this.saveWeekPlan();
-        this.showToast('✅ Planificación guardada', 'success');
+        this._wpHasUnsavedChanges = false;
+        this._wpRefreshSaveBadge(true, entry.savedAt);
+        this.showToast('✅ Semana guardada', 'success');
     });
 
-    this._drawWpLoadChart(dayKeys, dayLabels, weekStart);
+    this._drawWpLoadChart(dayKeys, dayLabels, weekStart, activeDays);
 };
 
 
@@ -421,9 +518,9 @@ RPETracker.prototype._getWeekRealSessions = function(weekStart) {
     return { byDay, totalLoad: Math.round(totalLoad), sessions };
 };
 
-RPETracker.prototype._plannedWeekLoad = function() {
+RPETracker.prototype._plannedWeekLoad = function(days) {
     const intensityRPE = {none:0,low:4,medium:6,high:7.5,max:9};
-    const plan = this.weekPlan?.days || {};
+    const plan = days || this.getWeekPlanDays();
     let total = 0;
     Object.values(plan).forEach(d => {
         // Nuevo formato: morning/afternoon
@@ -453,37 +550,27 @@ RPETracker.prototype._wpDiffColor = function(planned, real) {
     return '#f44336';
 };
 
-RPETracker.prototype._wpUpdateField = function(day, field, value) {
+// Devuelve (creando si hace falta) la entrada de la semana "mondayKey",
+// lista para editar. No guarda nada por sí sola: eso lo hace el botón Guardar.
+RPETracker.prototype._wpEnsureWeekEntry = function(mondayKey) {
     if (!this.weekPlan) this.loadWeekPlan();
-    if (!this.weekPlan.days[day]) this.weekPlan.days[day] = {};
-    this.weekPlan.days[day][field] = value;
+    if (!this.weekPlan.weeks) this.weekPlan.weeks = {};
+    if (!this.weekPlan.weeks[mondayKey]) {
+        this.weekPlan.weeks[mondayKey] = { days: this._emptyWeekDays(), savedAt: null };
+    }
+    return this.weekPlan.weeks[mondayKey];
 };
 
-RPETracker.prototype._wpUpdateSession = function(day, slot, field, value) {
-    if (!this.weekPlan) this.loadWeekPlan();
-    if (!this.weekPlan.days[day]) this.weekPlan.days[day] = {};
-    if (!this.weekPlan.days[day][slot]) this.weekPlan.days[day][slot] = { type:'rest', intensity:'none', duration:0, focus:'', enabled:false };
-    this.weekPlan.days[day][slot][field] = value;
-    this.saveWeekPlan();
-    // Si se activa/desactiva, re-renderizar para mostrar/ocultar controles
-    if (field === 'enabled') this.renderWeeklyPlanning();
-};
-
-RPETracker.prototype._wpSaveCurrentPlan = function() {
-    this.saveWeekPlan();
-    this.showToast('✅ Planificación guardada','success');
-};
-
-RPETracker.prototype._wpChangeWeek = function(delta) {
-    if (!this.weekPlan) this.loadWeekPlan();
-    this.weekPlan.weekOffset = Math.max(-104, Math.min(52, (this.weekPlan.weekOffset||0) + delta));
-    this.renderWeeklyPlanning();
-};
-
-RPETracker.prototype._wpResetWeek = function() {
-    if (!this.weekPlan) this.loadWeekPlan();
-    this.weekPlan.weekOffset = 0;
-    this.renderWeeklyPlanning();
+// Actualiza en el sitio el badge ❌/✅ sin volver a renderizar todo el grid
+// (para no perder el foco mientras se escribe en un campo de texto).
+RPETracker.prototype._wpRefreshSaveBadge = function(isSaved, savedAt) {
+    const badge = document.getElementById('wpSaveIndicator');
+    if (!badge) return;
+    badge.className = 'wp-save-badge ' + (isSaved ? 'wp-save-badge--ok' : 'wp-save-badge--pending');
+    badge.textContent = isSaved ? '✅ Guardada' : '❌ Sin guardar';
+    badge.title = isSaved
+        ? ('Semana guardada el ' + new Date(savedAt).toLocaleString('es-ES'))
+        : 'Esta semana todavía no se ha guardado';
 };
 
 RPETracker.prototype._wpFmtDate = function(date) {
@@ -501,7 +588,7 @@ RPETracker.prototype._renderWpLoadChart = function(days, dayLabels, weekStart) {
     </div>`;
 };
 
-RPETracker.prototype._drawWpLoadChart = function(days, dayLabels, weekStart) {
+RPETracker.prototype._drawWpLoadChart = function(days, dayLabels, weekStart, planDays) {
     const canvas = document.getElementById('wpLoadCanvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -516,7 +603,7 @@ RPETracker.prototype._drawWpLoadChart = function(days, dayLabels, weekStart) {
     const n=7, bw=iW/n, gap=bw*0.15;
 
     const intensityRPE={none:0,low:4,medium:6,high:7.5,max:9};
-    const plan=this.weekPlan?.days||{};
+    const plan = planDays || this.getWeekPlanDays();
     // Fix: use morning+afternoon structure
     const planLoads=days.map(d=>{
         const dayPlan=plan[d]||{};
@@ -1588,7 +1675,6 @@ RPETracker.prototype.renderMicrociclo = function() {
     if (!container) return;
 
     if (!this.weekPlan) this.loadWeekPlan();
-    if (!this.weekPlan || !this.weekPlan.days) this.weekPlan = this._defaultWeekPlan();
 
     // ── Semana actual (siempre offset=0 en esta vista) ────────
     const weekStart = new Date();
@@ -1606,7 +1692,7 @@ RPETracker.prototype.renderMicrociclo = function() {
 
     // ── Planificado ───────────────────────────────────────────
     const intensityRPE = { none: 0, low: 4, medium: 6, high: 7.5, max: 9 };
-    const plan = this.weekPlan.days;
+    const plan = this.getWeekPlanDays(weekStart);
     const playerCount = Math.max(this.players.length, 1);
 
     // Planned sessions per day (team level = slots enabled × players)

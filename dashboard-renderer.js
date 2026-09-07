@@ -168,18 +168,21 @@ RPETracker.prototype.renderDashboard = function() {
     }
 
     // ── Aviso dominical: recordar hacer la planificación de la semana que empieza ──
-    // Solo los domingos, y solo si todavía no se ha guardado/revisado hoy.
-    const _todayStr = new Date().toISOString().slice(0, 10);
-    if (new Date().getDay() === 0 && this.weekPlan?.lastSavedDate !== _todayStr) {
-        bannerHTML += `<div class="db-alert-banner db-alert-banner--planning">
-            <div class="db-alert-item">📅 <strong>Planificación pendiente</strong> — revisa la semana que empieza mañana</div>
-            <button class="db-alert-btn-team" onclick="window.rpeTracker?.switchView('weekplan')">Planificar →</button>
-        </div>`;
+    // Solo los domingos, y solo si la semana que empieza mañana todavía no se ha guardado.
+    if (new Date().getDay() === 0) {
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+        const nextMonday = this._wpMondayKey ? this._wpMondayKey(tomorrow) : tomorrow.toISOString().slice(0, 10);
+        if (!this.isWeekPlanSaved || !this.isWeekPlanSaved(nextMonday)) {
+            bannerHTML += `<div class="db-alert-banner db-alert-banner--planning">
+                <div class="db-alert-item">📅 <strong>Planificación pendiente</strong> — revisa la semana que empieza mañana</div>
+                <button class="db-alert-btn-team" onclick="window.rpeTracker?.switchView('weekplan')">Planificar →</button>
+            </div>`;
+        }
     }
 
     // ── Match-day mode ─────────────────────────────────────────
     const todayKey = ['dom','lun','mar','mie','jue','vie','sab'][new Date().getDay()];
-    const todayPlan = this.weekPlan?.days?.[todayKey] || {};
+    const todayPlan = (this.getWeekPlanDays ? this.getWeekPlanDays() : {})[todayKey] || {};
     const isMatchDay = ['morning','afternoon'].some(s => todayPlan[s]?.type === 'match' && todayPlan[s]?.enabled);
     const matchDayBtnLabel = this._matchDayMode ? '← Vista normal' : '🏟️ Modo partido';
 
@@ -662,25 +665,27 @@ RPETracker.prototype.renderDashboardCalendar = function() {
         if (s.date) addEvent(s.date, s.type || 'training', 'real');
     });
 
-    // WeekPlan events — expand the current plan across ±8 weeks from today
-    if (this.weekPlan && this.weekPlan.days) {
-        const dayKeys   = ['lun','mar','mie','jue','vie','sab','dom'];
-        // JS getDay(): 0=Sun,1=Mon... we want Mon=0
+    // WeekPlan events — cada semana proyectada usa SU PROPIO plan guardado
+    // (antes se repetía la misma plantilla en todas las semanas)
+    if (this.weekPlan && typeof this.getWeekPlanDays === 'function') {
+        const dayKeys = ['lun','mar','mie','jue','vie','sab','dom'];
         const now = new Date();
         const todayDow = (now.getDay() + 6) % 7; // 0=Mon
-        // Find Monday of this week
         const monday = new Date(now);
         monday.setDate(now.getDate() - todayDow);
         monday.setHours(0,0,0,0);
 
         for (let wOff = -4; wOff <= 8; wOff++) {
+            const weekMonday = new Date(monday);
+            weekMonday.setDate(monday.getDate() + wOff * 7);
+            const weekDays = this.getWeekPlanDays(weekMonday);
+
             dayKeys.forEach((key, idx) => {
-                const dayData = this.weekPlan.days[key];
+                const dayData = weekDays[key];
                 if (!dayData) return;
-                const d = new Date(monday);
-                d.setDate(monday.getDate() + wOff * 7 + idx);
+                const d = new Date(weekMonday);
+                d.setDate(weekMonday.getDate() + idx);
                 const dateStr = d.toISOString().slice(0, 10);
-                // Only add planned events if no real sessions exist for that date
                 ['morning','afternoon'].forEach(slot => {
                     const s = dayData[slot];
                     if (s && s.enabled && s.type && s.type !== 'rest') {
@@ -954,10 +959,11 @@ RPETracker.prototype.showDashboardDaySummary = function(dateStr) {
     }
 
     // 3) Si no hay nada real todavía, mostrar lo planificado para ese día de la semana
-    if (entries.length === 0 && !match && this.weekPlan && this.weekPlan.days) {
+    if (entries.length === 0 && !match && typeof this.getWeekPlanDays === 'function') {
         const dayKeys = ['lun','mar','mie','jue','vie','sab','dom'];
-        const dow     = (new Date(y, mo - 1, da).getDay() + 6) % 7; // 0=Lun
-        const dayPlan = this.weekPlan.days[dayKeys[dow]] || {};
+        const dateForPlan = new Date(y, mo - 1, da);
+        const dow     = (dateForPlan.getDay() + 6) % 7; // 0=Lun
+        const dayPlan = this.getWeekPlanDays(dateForPlan)[dayKeys[dow]] || {};
         const slotLabel2 = { morning: 'Mañana', afternoon: 'Tarde' };
         const typeLabel2 = { training: 'Entreno', match: 'Partido', recovery: 'Recuperación', shooting: 'Tiro', gym: 'Gym' };
         const typeIcon2  = { training: '🏀', match: '🏟️', recovery: '💪', shooting: '🎯', gym: '🏋️' };
