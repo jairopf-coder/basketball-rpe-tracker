@@ -9733,6 +9733,26 @@ details[open] .ewma-toggle-hint { display: none; }
     border: 1px solid var(--success-soft, rgba(67,160,71,.2));
     white-space: nowrap;
 }
+.wp-save-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    font-size: .78rem;
+    font-weight: 700;
+    padding: .3rem .65rem;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+.wp-save-badge--ok {
+    background: var(--success-soft, rgba(67,160,71,.12));
+    color: var(--success, #43a047);
+    border: 1px solid var(--success-soft, rgba(67,160,71,.2));
+}
+.wp-save-badge--pending {
+    background: rgba(229,57,53,.12);
+    color: #e53935;
+    border: 1px solid rgba(229,57,53,.25);
+}
 .btn-icon-sm {
     background: none;
     border: none;
