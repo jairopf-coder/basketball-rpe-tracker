@@ -41,6 +41,22 @@
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
+    "availability": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+    "exerciseLibrary": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+    "gymTemplates": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+    "templates": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
     "strength": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"

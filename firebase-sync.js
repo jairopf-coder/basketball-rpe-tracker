@@ -344,6 +344,102 @@ FirebaseSync.prototype.onInjuriesChange = function(callback) {
     });
 };
 
+// ========== AVAILABILITY (Firebase sync) ==========
+// Estructura: { [playerId]: { [fecha YYYY-MM-DD]: 'limited' | 'unavailable' } }
+
+FirebaseSync.prototype.saveAvailability = async function(availability) {
+    try {
+        if (!this.db) { Store.set('availability', availability || {}); return; }
+        await this.db.ref('availability').set(availability || {});
+        Store.set('availability', availability || {});
+    } catch (e) {
+        console.error('Error saving availability to Firebase:', e);
+        Store.set('availability', availability || {});
+        await this._enqueueWrite('availability', availability || {});
+    }
+};
+
+FirebaseSync.prototype.onAvailabilityChange = function(callback) {
+    if (!this.db) return;
+    this.db.ref('availability').on('value', snapshot => {
+        // null explícito = el nodo no existe aún en Firebase (primer arranque),
+        // a diferencia de {} que significa "existe pero está vacío".
+        callback(snapshot.exists() ? (snapshot.val() || {}) : null);
+    });
+};
+
+// ========== EXERCISE LIBRARY (Firebase sync) ==========
+// Estructura: array de ejercicios { id, name, category, bilateral }
+
+FirebaseSync.prototype.saveExerciseLibrary = async function(exerciseLibrary) {
+    try {
+        if (!this.db) { Store.set('exerciseLibrary', exerciseLibrary || []); return; }
+        await this.db.ref('exerciseLibrary').set(exerciseLibrary || []);
+        Store.set('exerciseLibrary', exerciseLibrary || []);
+    } catch (e) {
+        console.error('Error saving exercise library to Firebase:', e);
+        Store.set('exerciseLibrary', exerciseLibrary || []);
+        await this._enqueueWrite('exerciseLibrary', exerciseLibrary || []);
+    }
+};
+
+FirebaseSync.prototype.onExerciseLibraryChange = function(callback) {
+    if (!this.db) return;
+    this.db.ref('exerciseLibrary').on('value', snapshot => {
+        const val = snapshot.val();
+        callback(Array.isArray(val) ? val : (val ? Object.values(val) : null));
+    });
+};
+
+// ========== GYM TEMPLATES (Firebase sync) ==========
+// Estructura: array de plantillas { name, exercises, createdAt }
+
+FirebaseSync.prototype.saveGymTemplates = async function(gymTemplates) {
+    try {
+        if (!this.db) { Store.set('gymTemplates', gymTemplates || []); return; }
+        await this.db.ref('gymTemplates').set(gymTemplates || []);
+        Store.set('gymTemplates', gymTemplates || []);
+    } catch (e) {
+        console.error('Error saving gym templates to Firebase:', e);
+        Store.set('gymTemplates', gymTemplates || []);
+        await this._enqueueWrite('gymTemplates', gymTemplates || []);
+    }
+};
+
+FirebaseSync.prototype.onGymTemplatesChange = function(callback) {
+    if (!this.db) return;
+    this.db.ref('gymTemplates').on('value', snapshot => {
+        if (!snapshot.exists()) { callback(null); return; }
+        const val = snapshot.val();
+        callback(Array.isArray(val) ? val : Object.values(val));
+    });
+};
+
+// ========== SESSION TEMPLATES / RPE (Firebase sync) ==========
+// Estructura: array de plantillas de entrenamiento reutilizables
+
+FirebaseSync.prototype.saveTemplates = async function(templates) {
+    try {
+        if (!this.db) { Store.set('templates', templates || []); return; }
+        await this.db.ref('templates').set(templates || []);
+        Store.set('templates', templates || []);
+    } catch (e) {
+        console.error('Error saving templates to Firebase:', e);
+        Store.set('templates', templates || []);
+        await this._enqueueWrite('templates', templates || []);
+    }
+};
+
+FirebaseSync.prototype.onTemplatesChange = function(callback) {
+    if (!this.db) return;
+    this.db.ref('templates').on('value', snapshot => {
+        if (!snapshot.exists()) { callback(null); return; }
+        const val = snapshot.val();
+        callback(Array.isArray(val) ? val : Object.values(val));
+    });
+};
+
+
 // ========== WEEK PLAN (Firebase sync) ==========
 
 FirebaseSync.prototype.saveWeekPlan = async function(weekPlan) {

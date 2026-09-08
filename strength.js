@@ -163,11 +163,49 @@ RPETracker.prototype._loadStrengthData = function() {
             if (this.currentView === 'tests') this.renderTestsView();
             console.log('🔄 TestSessions actualizadas desde Firebase');
         });
+        // fix: la biblioteca de ejercicios y las plantillas de gimnasio solo
+        // vivían en localStorage y nunca llegaban a otros dispositivos.
+        window.firebaseSync.onExerciseLibraryChange(updated => {
+            if (this._savingExercises) return;
+            if (updated === null) {
+                // Nodo inexistente en Firebase todavía: empujamos la
+                // biblioteca local (por defecto o ya personalizada) para
+                // sembrar Firebase y que llegue a los demás dispositivos.
+                this._saveExercises();
+                return;
+            }
+            this.exerciseLibrary = updated;
+            const modal = document.getElementById('exerciseLibraryModal');
+            if (modal && modal.classList.contains('active')) this._renderLibraryModal(modal);
+            if (window._devMode) console.log('🔄 Biblioteca de ejercicios actualizada desde Firebase');
+        });
+        window.firebaseSync.onGymTemplatesChange(updated => {
+            if (this._savingGymTemplates) return;
+            if (updated === null) {
+                // Nodo inexistente: si ya hay plantillas guardadas en local
+                // (aunque no se hayan cargado en memoria todavía), las
+                // subimos para que no se pierdan.
+                if (!this._gymTemplates) this._loadGymTemplates();
+                if (this._gymTemplates && this._gymTemplates.length > 0) this._saveGymTemplates();
+                return;
+            }
+            this._gymTemplates = updated || [];
+            const modal = document.getElementById('gymTemplatesModal');
+            if (modal && modal.classList.contains('active')) this._renderTemplatesModal(modal);
+            if (window._devMode) console.log('🔄 Plantillas de gimnasio actualizadas desde Firebase');
+        });
     }
 };
 
 RPETracker.prototype._saveExercises = function() {
-    localStorage.setItem('bk_exercises', JSON.stringify(this.exerciseLibrary));
+    if (window.firebaseSync) {
+        this._savingExercises = true;
+        window.firebaseSync.saveExerciseLibrary(this.exerciseLibrary).finally(() => {
+            this._savingExercises = false;
+        });
+    } else {
+        localStorage.setItem('bk_exercises', JSON.stringify(this.exerciseLibrary));
+    }
 };
 
 RPETracker.prototype._saveGymSessions = function() {
@@ -1418,7 +1456,14 @@ RPETracker.prototype._loadGymTemplates = function() {
 };
 
 RPETracker.prototype._saveGymTemplates = function() {
-    localStorage.setItem('bk_gym_templates', JSON.stringify(this._gymTemplates || []));
+    if (window.firebaseSync) {
+        this._savingGymTemplates = true;
+        window.firebaseSync.saveGymTemplates(this._gymTemplates).finally(() => {
+            this._savingGymTemplates = false;
+        });
+    } else {
+        localStorage.setItem('bk_gym_templates', JSON.stringify(this._gymTemplates || []));
+    }
 };
 
 RPETracker.prototype._openGymTemplates = function() {
