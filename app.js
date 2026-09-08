@@ -266,6 +266,11 @@ class RPETracker {
             this.initializeInjuryManagement();
         }
 
+        // Inicializar módulo de datos GPS (Oli Sports)
+        if (typeof this.initializeGpsTracking === 'function') {
+            this.initializeGpsTracking();
+        }
+
         // Inicializar planificación semanal
         if (typeof this.loadWeekPlan === 'function') {
             this.loadWeekPlan();

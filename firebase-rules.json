@@ -45,6 +45,14 @@
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
+    "gpsData": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
+    "gpsPlayerMap": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+    },
     "exerciseLibrary": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
