@@ -331,6 +331,54 @@ const PlayerView = (() => {
         `);
     }
 
+    // Comprueba en Firebase si hoy ya se registró wellness/RPE (evita que
+    // responder desde un dispositivo y luego abrir la app en otro el mismo
+    // día deje ver el formulario como si no se hubiera respondido).
+    async function _syncTodayStatus() {
+        const uid = AppAuth._currentUser?.uid;
+        if (!uid || !window.firebaseDB) return;
+        const today = _today();
+
+        try {
+            const [wellSnap, rpeSnap] = await Promise.all([
+                window.firebaseDB.ref(`wellnessPlayer/${uid}/${today}`).once('value'),
+                window.firebaseDB.ref(`playerRpeReports/${uid}/${today}`).once('value'),
+            ]);
+
+            let changed = false;
+
+            if (wellSnap.exists()) {
+                const stored = JSON.parse(localStorage.getItem('pv_wellness') || '{}');
+                if (!stored[uid]) stored[uid] = {};
+                if (!stored[uid][today]) { stored[uid][today] = wellSnap.val(); changed = true; }
+                localStorage.setItem('pv_wellness', JSON.stringify(stored));
+            }
+
+            if (rpeSnap.exists()) {
+                const stored = JSON.parse(localStorage.getItem('pv_rpe') || '{}');
+                if (!stored[uid]) stored[uid] = {};
+                const remote = rpeSnap.val() || {};
+                if (!stored[uid][today]) stored[uid][today] = {};
+                for (const sessionType of Object.keys(remote)) {
+                    if (!stored[uid][today][sessionType]) {
+                        stored[uid][today][sessionType] = remote[sessionType];
+                        changed = true;
+                    }
+                }
+                localStorage.setItem('pv_rpe', JSON.stringify(stored));
+            }
+
+            // Solo repintamos si seguimos en una pantalla afectada por el
+            // estado "ya respondido", para no interrumpir un formulario que
+            // la jugadora esté rellenando ahora mismo.
+            if (changed && (_view === 'menu' || _view === 'rpeType' || _view === 'wellness')) {
+                _render();
+            }
+        } catch (_) {
+            // Sin conexión o error puntual: nos quedamos con el estado local.
+        }
+    }
+
     // ---- Pantalla principal ----
     function show() {
         document.getElementById('app').style.display = 'none';
@@ -348,6 +396,7 @@ const PlayerView = (() => {
 
         _render();
         _drainQueue();
+        _syncTodayStatus();
     }
 
     // ---- Navegación ----
