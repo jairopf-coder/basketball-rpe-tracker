@@ -243,6 +243,7 @@ class RPETracker {
         this.exerciseLibrary = null; // se carga lazy en strength.js
         this.gymSessions     = null;
         this.testSessions    = null;
+        this.templates = this.loadTemplates(); // fix: antes nunca se cargaba
         this.init();
     }
 
@@ -1483,12 +1484,40 @@ window.migrateSessionSeasons = function(targetSeason) {
 // ========== SESSION TEMPLATES ==========
 
 RPETracker.prototype.loadTemplates = function() {
+    // Seed inmediato desde localStorage. IMPORTANTE: esta función antes no
+    // se llamaba desde ningún sitio (bug), así que this.templates nunca se
+    // recuperaba al recargar la app, ni siquiera en el mismo dispositivo.
     const stored = localStorage.getItem('basketballTemplates');
-    return stored ? JSON.parse(stored) : [];
+    const local = stored ? JSON.parse(stored) : [];
+
+    if (window.firebaseSync && !this._templatesListenerSet) {
+        this._templatesListenerSet = true;
+        window.firebaseSync.onTemplatesChange((updated) => {
+            if (this._savingTemplates) return;
+            if (updated === null) {
+                // Nodo inexistente en Firebase: subimos las plantillas que
+                // ya tuviéramos guardadas localmente para no perderlas.
+                if (this.templates && this.templates.length > 0) this.saveTemplates();
+                return;
+            }
+            this.templates = updated || [];
+            const modal = document.getElementById('templateManagerModal');
+            if (modal) this.showTemplateManager();
+            if (window._devMode) console.log('🔄 Plantillas de sesión actualizadas desde Firebase');
+        });
+    }
+    return local;
 };
 
 RPETracker.prototype.saveTemplates = function() {
-    localStorage.setItem('basketballTemplates', JSON.stringify(this.templates || []));
+    if (window.firebaseSync) {
+        this._savingTemplates = true;
+        window.firebaseSync.saveTemplates(this.templates || []).finally(() => {
+            this._savingTemplates = false;
+        });
+    } else {
+        localStorage.setItem('basketballTemplates', JSON.stringify(this.templates || []));
+    }
 };
 
 RPETracker.prototype.createTemplate = async function() {

@@ -329,31 +329,102 @@ RPETracker.prototype._renderInjuryACChart = function(injury) {
 RPETracker.prototype.initializeInjuryManagement = function() {
     this.injuries = this.loadInjuries();
     this.availability = this.loadAvailability();
+
+    // Guard: registrar el listener en tiempo real UNA sola vez. Sin esto,
+    // una lesión guardada en un dispositivo nunca llegaba a los demás (mismo
+    // bug de sincronización ya diagnosticado y corregido para el plan
+    // semanal): este módulo solo leía localStorage al arrancar.
+    if (window.firebaseSync && !this._injuriesListenerSet) {
+        this._injuriesListenerSet = true;
+        window.firebaseSync.onInjuriesChange((updatedInjuries) => {
+            // Ignorar el eco del propio write mientras está en vuelo
+            if (this._savingInjuries) return;
+
+            this.injuries = (updatedInjuries || []).map(d => new Injury(d));
+
+            if (document.getElementById('injuryManagementView') && typeof this.renderInjuryManagement === 'function') {
+                this.renderInjuryManagement();
+            }
+            if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') {
+                this.renderDashboard();
+            }
+            if (window._devMode) console.log('🔄 Lesiones actualizadas desde Firebase');
+        });
+    }
+
+    // Mismo patrón de sincronización para la disponibilidad de jugadoras
+    // (calendario de "limitada"/"no disponible"), que hasta ahora solo
+    // vivía en localStorage y nunca llegaba a otros dispositivos.
+    if (window.firebaseSync && !this._availabilityListenerSet) {
+        this._availabilityListenerSet = true;
+        window.firebaseSync.onAvailabilityChange((updatedAvailability) => {
+            if (this._savingAvailability) return;
+
+            if (updatedAvailability === null) {
+                // El nodo no existe aún en Firebase: es la primera vez que
+                // este dispositivo sincroniza. Empujamos lo que ya
+                // tuviéramos en local para no perder disponibilidad
+                // registrada antes de este arreglo.
+                if (this.availability && Object.keys(this.availability).length > 0) {
+                    this.saveAvailability();
+                }
+                return;
+            }
+
+            this.availability = updatedAvailability || {};
+
+            if (document.getElementById('injuryManagementView') && typeof this.renderInjuryManagement === 'function') {
+                this.renderInjuryManagement();
+            }
+            if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') {
+                this.renderDashboard();
+            }
+            if (window._devMode) console.log('🔄 Disponibilidad actualizada desde Firebase');
+        });
+    }
 };
 
 RPETracker.prototype.loadInjuries = function() {
+    // Seed inmediato desde localStorage para render inicial sin esperar Firebase.
+    // El listener registrado en initializeInjuryManagement() se encarga de
+    // traer después el estado real desde Firebase (incluyendo lesiones
+    // guardadas desde otros dispositivos).
     const stored = localStorage.getItem('basketballInjuries');
     if (!stored) return [];
-    
+
     const data = JSON.parse(stored);
     return data.map(d => new Injury(d));
 };
 
 RPETracker.prototype.saveInjuries = function() {
     if (window.firebaseSync) {
-        window.firebaseSync.saveInjuries(this.injuries);
+        // Evita que el listener reactivo sobreescriba el estado local
+        // mientras este write está en vuelo.
+        this._savingInjuries = true;
+        window.firebaseSync.saveInjuries(this.injuries).finally(() => {
+            this._savingInjuries = false;
+        });
     } else {
         localStorage.setItem('basketballInjuries', JSON.stringify(this.injuries));
     }
 };
 
 RPETracker.prototype.loadAvailability = function() {
+    // Seed inmediato desde localStorage; el listener registrado en
+    // initializeInjuryManagement() trae después el estado real de Firebase.
     const stored = localStorage.getItem('basketballAvailability');
     return stored ? JSON.parse(stored) : {};
 };
 
 RPETracker.prototype.saveAvailability = function() {
-    localStorage.setItem('basketballAvailability', JSON.stringify(this.availability));
+    if (window.firebaseSync) {
+        this._savingAvailability = true;
+        window.firebaseSync.saveAvailability(this.availability).finally(() => {
+            this._savingAvailability = false;
+        });
+    } else {
+        localStorage.setItem('basketballAvailability', JSON.stringify(this.availability));
+    }
 };
 
 // ========== ADD/EDIT INJURY ==========
