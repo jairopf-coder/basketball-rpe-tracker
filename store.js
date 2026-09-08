@@ -20,6 +20,8 @@ const Store = {
         gymSessions:      'bk_gym_sessions',
         gymTemplates:     'bk_gym_templates',
         testSessions:     'bk_test_sessions',
+        gpsData:          'basketballGpsData',
+        gpsPlayerMap:     'basketballGpsPlayerMap',
         darkMode:         'rpe_dark_mode',
         ewmaOpen:         'rpe_ewma_open',
         reminderTime:     'rpe_wellness_reminder_time',

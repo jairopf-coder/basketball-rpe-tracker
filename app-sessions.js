@@ -484,6 +484,7 @@ RPETracker.prototype.showSessionDetail = function(id) {
             <div class="detail-rpe-hist-title">📊 Distribución RPE — historial de ${playerName}</div>
             <canvas id="rpeHistogramCanvas" class="detail-rpe-hist-canvas"></canvas>
         </div>` : ''}
+        ${typeof this.renderGpsSummaryBlock === 'function' ? this.renderGpsSummaryBlock(session) : ''}
     `;
     
     const _dModal = document.getElementById('detailModal');

@@ -664,6 +664,53 @@ FirebaseSync.prototype.onMatchesChange = function(callback) {
     });
 };
 
+// ========== GPS DATA — Oli Sports (Firebase sync) ==========
+// Estructura: { [sessionGroupId]: { [playerId]: { ...métricas GPS... } } }
+// sessionGroupId es el id de la sesión interna a la que se vincula el CSV.
+
+FirebaseSync.prototype.saveGpsData = async function(gpsData) {
+    try {
+        if (!this.db) { Store.set('gpsData', gpsData || {}); return; }
+        await this.db.ref('gpsData').set(gpsData || {});
+        Store.set('gpsData', gpsData || {});
+    } catch (e) {
+        console.error('Error saving gpsData to Firebase:', e);
+        Store.set('gpsData', gpsData || {});
+        await this._enqueueWrite('gpsData', gpsData || {});
+    }
+};
+
+FirebaseSync.prototype.onGpsDataChange = function(callback) {
+    if (!this.db) return;
+    this.db.ref('gpsData').on('value', snapshot => {
+        callback(snapshot.exists() ? (snapshot.val() || {}) : null);
+    });
+};
+
+// ========== GPS PLAYER MAP — mapeo ID Oli -> playerId interno ==========
+// Estructura: { [oliPlayerId]: playerId }
+// Se recuerda una vez confirmado el emparejamiento para no repetirlo
+// en futuros imports de la misma jugadora.
+
+FirebaseSync.prototype.saveGpsPlayerMap = async function(gpsPlayerMap) {
+    try {
+        if (!this.db) { Store.set('gpsPlayerMap', gpsPlayerMap || {}); return; }
+        await this.db.ref('gpsPlayerMap').set(gpsPlayerMap || {});
+        Store.set('gpsPlayerMap', gpsPlayerMap || {});
+    } catch (e) {
+        console.error('Error saving gpsPlayerMap to Firebase:', e);
+        Store.set('gpsPlayerMap', gpsPlayerMap || {});
+        await this._enqueueWrite('gpsPlayerMap', gpsPlayerMap || {});
+    }
+};
+
+FirebaseSync.prototype.onGpsPlayerMapChange = function(callback) {
+    if (!this.db) return;
+    this.db.ref('gpsPlayerMap').on('value', snapshot => {
+        callback(snapshot.exists() ? (snapshot.val() || {}) : null);
+    });
+};
+
 // Verificar conexión — se llama aquí para garantizar que todos los
 // FirebaseSync.prototype.* estén definidos antes de que checkConnection
 // acceda a _drainQueue y _updatePendingCount.
