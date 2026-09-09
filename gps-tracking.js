@@ -448,16 +448,16 @@ RPETracker.prototype.renderGpsSummaryBlock = function(session) {
     const rpeWarning = rpeDiff !== null && rpeDiff >= 2;
 
     return `
-        <div class="gps-summary-card" style="margin-top:14px;padding:12px;border-radius:10px;background:var(--bg-secondary,#f5f5f5);">
-            <div style="font-weight:600;margin-bottom:8px;">📡 Datos GPS (Oli Sports)</div>
-            <div class="gps-summary-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:0.9rem;">
+        <div class="gps-summary-card" style="margin-top:14px;padding:12px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border);">
+            <div style="font-weight:600;margin-bottom:8px;color:var(--text-primary);">📡 Datos GPS (Oli Sports)</div>
+            <div class="gps-summary-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:0.9rem;color:var(--text-primary);">
                 <div>🏃 Distancia: <strong>${gps.distanceM != null ? Math.round(gps.distanceM) + ' m' : '—'}</strong></div>
                 <div>⚡ Vel. máx: <strong>${gps.maxSpeedKmh != null ? gps.maxSpeedKmh + ' km/h' : '—'}</strong></div>
                 <div>🔼 Sprints: <strong>${gps.highIntensityRuns != null ? gps.highIntensityRuns : '—'}</strong></div>
                 <div>🦘 Saltos: <strong>${gps.jumps != null ? gps.jumps : '—'}</strong></div>
             </div>
             ${gps.oliRpe !== null && gps.oliRpe !== undefined ? `
-            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border,#ddd);font-size:0.9rem;">
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.9rem;color:var(--text-primary);">
                 RPE app: <strong>${session.rpe}</strong> &nbsp;·&nbsp; RPE Oli: <strong>${gps.oliRpe}</strong>
                 ${rpeWarning ? ' <span style="color:#e67e22;">⚠️ Discrepancia notable</span>' : ''}
             </div>` : ''}
