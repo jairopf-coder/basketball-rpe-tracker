@@ -3,13 +3,13 @@
 //
 //  Qué hace este módulo:
 //   1. Nueva vista "📡 GPS" dentro del grupo "Carga" del menú.
-//   2. Selector de jugadora + rango de sesiones.
-//   3. Gráfico de evolución con dos series paralelas:
-//        - Carga interna (RPE × duración), la que ya usáis hoy.
-//        - Carga externa GPS (distancia total de cada sesión).
-//      Se muestran juntas para que el entrenador vea si divergen,
-//      NO se fusionan en un único número ni tocan el EWMA/ratio A:C.
-//   4. Tabla histórica de sesiones con detalle GPS ampliado.
+//   2. Pestaña "Evolución jugadora": selector de jugadora + rango,
+//      gráfico con dos series paralelas (carga interna vs externa)
+//      y tabla histórica con detalle GPS ampliado.
+//   3. Pestaña "Comparativa equipo": ranking de barras horizontal
+//      de todas las jugadoras para la métrica GPS elegida, en una
+//      sesión concreta o en un rango de fechas (media/acumulado),
+//      con línea de referencia de la media del equipo.
 //
 //  Qué NO hace (a propósito):
 //   - No modifica ewma-calculator.js ni injury-prediction.js.
@@ -18,6 +18,26 @@
 //     `this.gpsData` (ya guardados por gps-tracking.js, Fase 1).
 // ============================================================
 
+// Métricas GPS comparables en el ranking de equipo: clave interna
+// (igual que en OLI_FIELD_MAP de gps-tracking.js), etiqueta legible,
+// unidad para el eje, y si al acumular varias sesiones se debe sumar
+// o promediar (los conteos tiene más sentido sumarlos; velocidades
+// y similares, promediarlas).
+const GPS_COMPARISON_METRICS = [
+    { key: 'distanceM',            label: 'Distancia recorrida', unit: 'm',      agg: 'sum' },
+    { key: 'maxSpeedKmh',          label: 'Velocidad máxima',    unit: 'km/h',   agg: 'avg' },
+    { key: 'highIntensityRuns',    label: 'Sprints (alta int.)', unit: '',       agg: 'sum' },
+    { key: 'maxIntensityRuns',     label: 'Sprints (máx. int.)', unit: '',       agg: 'sum' },
+    { key: 'jumps',                label: 'Saltos',              unit: '',       agg: 'sum' },
+    { key: 'directionChanges',     label: 'Cambios de dirección',unit: '',       agg: 'sum' },
+    { key: 'highAccelerations',    label: 'Aceleraciones (alta)',unit: '',       agg: 'sum' },
+    { key: 'highDecelerations',    label: 'Deceleraciones (alta)',unit: '',      agg: 'sum' },
+    { key: 'impactsHigh',          label: 'Impactos alta int.',  unit: '',       agg: 'sum' },
+    { key: 'impactsMax',           label: 'Impactos máx. int.',  unit: '',       agg: 'sum' },
+    { key: 'caloriesTotal',        label: 'Calorías totales',    unit: 'kcal',   agg: 'sum' },
+    { key: 'playTimeMin',          label: 'Tiempo de juego',     unit: 'min',    agg: 'sum' },
+];
+
 RPETracker.prototype.renderGpsAnalyticsView = function() {
     const container = document.getElementById('gpsAnalyticsView');
     if (!container) return;
@@ -25,17 +45,46 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
     if (!this._gpsAnalyticsPlayerId && this.players.length > 0) {
         this._gpsAnalyticsPlayerId = this.players[0].id;
     }
+    if (!this._gpsAnTab) this._gpsAnTab = 'player';
 
+    container.innerHTML = `
+        <div class="an-header" style="margin-bottom:0;">
+            <h2 style="margin:0 0 4px 0;">📡 Analítica GPS (Oli Sports)</h2>
+            <p style="margin:0 0 12px 0;color:var(--text-secondary);font-size:0.9rem;">
+                Compara la carga interna (RPE × duración) con la carga externa objetiva del GPS.
+            </p>
+        </div>
+        <div class="an-tabs">
+            <button class="an-tab ${this._gpsAnTab === 'player' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('player')">👤 Evolución jugadora</button>
+            <button class="an-tab ${this._gpsAnTab === 'team' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('team')">👥 Comparativa equipo</button>
+        </div>
+        <div id="gpsAnTabContent" style="padding-top:16px;"></div>
+    `;
+
+    this._renderGpsAnTabContent();
+};
+
+RPETracker.prototype._gpsAnSwitchTab = function(tab) {
+    this._gpsAnTab = tab;
+    this.renderGpsAnalyticsView();
+};
+
+RPETracker.prototype._renderGpsAnTabContent = function() {
+    const el = document.getElementById('gpsAnTabContent');
+    if (!el) return;
+    if (this._gpsAnTab === 'team') {
+        this._renderGpsTeamComparisonTab(el);
+    } else {
+        this._renderGpsPlayerEvolutionTab(el);
+    }
+};
+
+// ========== PESTAÑA 1: Evolución individual (ya existente, Fase 2) ==========
+
+RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
     const activePlayers = this.players.filter(p => !p.archived);
 
     container.innerHTML = `
-        <div class="an-header" style="margin-bottom:16px;">
-            <h2 style="margin:0 0 4px 0;">📡 Analítica GPS (Oli Sports)</h2>
-            <p style="margin:0;color:var(--text-secondary,#666);font-size:0.9rem;">
-                Compara la carga interna (RPE × duración) con la carga externa objetiva del GPS, sesión a sesión.
-            </p>
-        </div>
-
         <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
             <select id="gpsAnPlayerSelect" onchange="window.rpeTracker._gpsAnSetPlayer(this.value)" style="min-width:200px;">
                 ${activePlayers.map(p => `<option value="${p.id}" ${p.id === this._gpsAnalyticsPlayerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
@@ -47,7 +96,7 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
             </select>
         </div>
 
-        <div class="gps-an-chart-card" style="background:var(--card-bg,#fff);border-radius:12px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+        <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
             <div style="height:320px;">
                 <canvas id="gpsAnComparisonCanvas"></canvas>
             </div>
@@ -203,14 +252,226 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
     }).join('');
 
     container.innerHTML = `
-        <div class="gps-an-table-card" style="background:var(--card-bg,#fff);border-radius:12px;padding:16px;overflow-x:auto;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+        <div class="gps-an-table-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;overflow-x:auto;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
             <table class="data-table" style="width:100%;border-collapse:collapse;">
                 <thead>
-                    <tr style="text-align:left;font-size:0.8rem;color:var(--text-secondary,#666);">
+                    <tr style="text-align:left;font-size:0.8rem;color:var(--text-secondary);">
                         <th>Fecha</th><th>Tipo</th><th>RPE app</th><th>RPE Oli</th><th>Distancia</th><th>Vel. máx</th><th>Sprints</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
             </table>
         </div>`;
+};
+
+// ========== PESTAÑA 2: Comparativa de equipo (ranking por métrica) ==========
+
+RPETracker.prototype._renderGpsTeamComparisonTab = function(container) {
+    if (!this._gpsTeamMetric) this._gpsTeamMetric = GPS_COMPARISON_METRICS[0].key;
+    if (!this._gpsTeamMode) this._gpsTeamMode = 'session';   // 'session' | 'range'
+    if (!this._gpsTeamSortDesc) this._gpsTeamSortDesc = true; // true = mayor a menor
+
+    const teamSessions = this._getTeamSessionOptions();
+
+    if (!this._gpsTeamSessionId && teamSessions.length > 0) {
+        this._gpsTeamSessionId = teamSessions[0].id;
+    }
+    if (!this._gpsTeamRange) this._gpsTeamRange = '30';
+
+    container.innerHTML = `
+        <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+            <select id="gpsTeamMetricSelect" onchange="window.rpeTracker._gpsTeamSetMetric(this.value)" style="min-width:200px;">
+                ${GPS_COMPARISON_METRICS.map(m => `<option value="${m.key}" ${m.key === this._gpsTeamMetric ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
+            </select>
+
+            <select id="gpsTeamModeSelect" onchange="window.rpeTracker._gpsTeamSetMode(this.value)">
+                <option value="session" ${this._gpsTeamMode === 'session' ? 'selected' : ''}>Una sesión</option>
+                <option value="range" ${this._gpsTeamMode === 'range' ? 'selected' : ''}>Rango de fechas</option>
+            </select>
+
+            ${this._gpsTeamMode === 'session' ? `
+                <select id="gpsTeamSessionSelect" onchange="window.rpeTracker._gpsTeamSetSession(this.value)" style="min-width:200px;">
+                    ${teamSessions.map(s => `<option value="${s.id}" ${s.id === this._gpsTeamSessionId ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
+                </select>
+            ` : `
+                <select id="gpsTeamRangeSelect" onchange="window.rpeTracker._gpsTeamSetRange(this.value)">
+                    <option value="7" ${this._gpsTeamRange === '7' ? 'selected' : ''}>Últimos 7 días</option>
+                    <option value="30" ${this._gpsTeamRange === '30' ? 'selected' : ''}>Últimos 30 días</option>
+                    <option value="90" ${this._gpsTeamRange === '90' ? 'selected' : ''}>Últimos 90 días</option>
+                    <option value="all" ${this._gpsTeamRange === 'all' ? 'selected' : ''}>Toda la temporada</option>
+                </select>
+            `}
+
+            <button class="btn-secondary" style="font-size:0.85rem;" onclick="window.rpeTracker._gpsTeamToggleSort()">
+                ${this._gpsTeamSortDesc ? '⬇️ Mayor a menor' : '⬆️ Menor a mayor'}
+            </button>
+        </div>
+
+        <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+            <div id="gpsTeamChartWrap" style="position:relative;">
+                <canvas id="gpsTeamComparisonCanvas"></canvas>
+            </div>
+        </div>
+    `;
+
+    requestAnimationFrame(() => this._drawGpsTeamComparisonChart());
+};
+
+// Sesiones de equipo disponibles para el selector "Una sesión": se
+// agrupan por fecha+tipo (todas las jugadoras de la misma sesión
+// comparten fecha), mostrando la más reciente primero.
+RPETracker.prototype._getTeamSessionOptions = function() {
+    const seen = new Map();
+    (this.sessions || []).forEach(s => {
+        const key = s.date + '|' + (s.type || '');
+        if (!seen.has(key)) {
+            seen.set(key, {
+                id: s.id, // usamos el id de la primera sesión de ese grupo como referencia
+                date: s.date,
+                type: s.type,
+                label: `${new Date(s.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })} — ${s.type || 'Sesión'}`
+            });
+        }
+    });
+    return Array.from(seen.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+};
+
+RPETracker.prototype._gpsTeamSetMetric = function(key) { this._gpsTeamMetric = key; this._drawGpsTeamComparisonChart(); };
+RPETracker.prototype._gpsTeamSetSession = function(id) { this._gpsTeamSessionId = id; this._drawGpsTeamComparisonChart(); };
+RPETracker.prototype._gpsTeamSetRange = function(range) { this._gpsTeamRange = range; this._drawGpsTeamComparisonChart(); };
+RPETracker.prototype._gpsTeamToggleSort = function() { this._gpsTeamSortDesc = !this._gpsTeamSortDesc; this._renderGpsTeamComparisonTab(document.getElementById('gpsAnTabContent')); };
+
+RPETracker.prototype._gpsTeamSetMode = function(mode) {
+    this._gpsTeamMode = mode;
+    this._renderGpsTeamComparisonTab(document.getElementById('gpsAnTabContent'));
+};
+
+// Calcula, para cada jugadora activa, el valor de la métrica elegida:
+// - modo 'session': el valor de esa jugadora en esa sesión concreta (fecha+tipo).
+// - modo 'range': suma o media (según la métrica) de sus sesiones con GPS en el rango.
+// Jugadoras sin dato GPS para ese contexto se excluyen del gráfico
+// (no se muestran como 0, para no dar una imagen falsa de "no corrió nada").
+RPETracker.prototype._getGpsTeamComparisonData = function() {
+    const metricDef = GPS_COMPARISON_METRICS.find(m => m.key === this._gpsTeamMetric) || GPS_COMPARISON_METRICS[0];
+    const activePlayers = this.players.filter(p => !p.archived);
+    const results = [];
+
+    activePlayers.forEach(player => {
+        let value = null;
+
+        if (this._gpsTeamMode === 'session') {
+            const selected = this._getTeamSessionOptions().find(s => s.id === this._gpsTeamSessionId);
+            if (!selected) return;
+            const sessionForPlayer = (this.sessions || []).find(s =>
+                s.playerId === player.id && s.date === selected.date && (s.type || '') === (selected.type || '')
+            );
+            if (sessionForPlayer && this.gpsData && this.gpsData[sessionForPlayer.id]) {
+                const gps = this.gpsData[sessionForPlayer.id][player.id];
+                if (gps && gps[metricDef.key] != null) value = gps[metricDef.key];
+            }
+        } else {
+            const range = this._gpsTeamRange || '30';
+            const cutoff = range === 'all' ? null : new Date(Date.now() - parseInt(range, 10) * 86400000);
+            const playerSessions = (this.sessions || [])
+                .filter(s => s.playerId === player.id)
+                .filter(s => !cutoff || new Date(s.date) >= cutoff);
+
+            const values = [];
+            playerSessions.forEach(s => {
+                const gps = this.gpsData && this.gpsData[s.id] ? this.gpsData[s.id][player.id] : null;
+                if (gps && gps[metricDef.key] != null) values.push(gps[metricDef.key]);
+            });
+
+            if (values.length > 0) {
+                value = metricDef.agg === 'avg'
+                    ? values.reduce((a, b) => a + b, 0) / values.length
+                    : values.reduce((a, b) => a + b, 0);
+            }
+        }
+
+        if (value !== null) results.push({ player, value });
+    });
+
+    results.sort((a, b) => this._gpsTeamSortDesc ? b.value - a.value : a.value - b.value);
+    return { data: results, metricDef };
+};
+
+RPETracker.prototype._drawGpsTeamComparisonChart = function() {
+    const canvas = document.getElementById('gpsTeamComparisonCanvas');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (canvas._ci) { canvas._ci.destroy(); canvas._ci = null; }
+
+    const { data, metricDef } = this._getGpsTeamComparisonData();
+    const wrap = document.getElementById('gpsTeamChartWrap');
+
+    if (data.length === 0) {
+        if (wrap) wrap.innerHTML = `<canvas id="gpsTeamComparisonCanvas"></canvas><div class="an-empty" style="padding:24px 0;">📭 No hay datos GPS para esta selección</div>`;
+        return;
+    }
+
+    // Altura dinámica: cada jugadora necesita su fila, para que las
+    // barras no queden apretadas con plantillas grandes.
+    if (wrap) wrap.style.height = Math.max(280, data.length * 34 + 60) + 'px';
+    canvas.style.height = '100%';
+
+    const labels = data.map(d => d.player.name);
+    const values = data.map(d => d.value);
+    const colors = data.map(d => PlayerTokens.get(d.player));
+    const teamAvg = values.reduce((a, b) => a + b, 0) / values.length;
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textC = isDark ? '#aaa' : '#555';
+    const gridC = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+
+    canvas._ci = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: metricDef.label,
+                    data: values,
+                    backgroundColor: colors,
+                    borderRadius: 4,
+                    barPercentage: 0.7,
+                },
+                {
+                    label: `Media del equipo (${teamAvg.toFixed(1)}${metricDef.unit ? ' ' + metricDef.unit : ''})`,
+                    type: 'line',
+                    data: labels.map(() => teamAvg),
+                    borderColor: isDark ? '#f0f0f4' : '#18181b',
+                    borderWidth: 2,
+                    borderDash: [6, 4],
+                    pointRadius: 0,
+                    fill: false,
+                }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: textC } },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.x?.toFixed ? ctx.parsed.x.toFixed(1) : ctx.parsed.x}${metricDef.unit ? ' ' + metricDef.unit : ''}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: metricDef.unit ? `${metricDef.label} (${metricDef.unit})` : metricDef.label, color: textC, font: { size: 11 } },
+                    ticks: { color: textC, font: { size: 10 } },
+                    grid: { color: gridC }
+                },
+                y: {
+                    ticks: { color: textC, font: { size: 11 } },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
 };
