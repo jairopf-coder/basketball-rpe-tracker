@@ -300,7 +300,7 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'gpsImportModal';
-        modal.className = 'modal';
+        modal.className = 'modal modal--top';
         document.body.appendChild(modal);
     }
 
@@ -337,7 +337,7 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
         </div>` : '';
 
     modal.innerHTML = `
-        <div class="modal-content" style="max-width:560px;">
+        <div class="modal-content" style="max-width:560px;max-height:85vh;max-height:85dvh;">
             <div class="modal-header">
                 <h2>📡 Confirmar datos GPS importados</h2>
                 <button class="modal-close" onclick="document.getElementById('gpsImportModal').classList.remove('active')">✕</button>
