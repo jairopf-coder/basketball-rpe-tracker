@@ -5,6 +5,9 @@ const NavMenu = {
         dashboard: { label: '📊 Inicio', direct: 'dashboard' },
         carga: {
             label: '🏋️ Carga',
+            // ⚠️ Si añades un item aquí, añádelo TAMBIÉN al menú "Más"
+            // de móvil en index.html (#bnMoreMenu .bn-more-grid), o
+            // esa vista no aparecerá en el iPhone/Android.
             items: [
                 { view: 'microciclo', label: '📆 Microciclo' },
                 { view: 'analytics', label: '📈 Análisis A:C' },
