@@ -10290,3 +10290,37 @@ textarea:focus-visible,
 [data-theme="dark"] .gps-summary-card {
     background: var(--bg-secondary, #2a2a2a) !important;
 }
+
+/* Scroll visible y perceptible dentro del modal de importación GPS,
+   independientemente del sistema operativo o de si el navegador
+   oculta las scrollbars por defecto (macOS, Windows con "ocultar
+   barras de desplazamiento" activado, etc). */
+#gpsImportModal .modal-body {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary, #ff6600) var(--bg-subtle, #eee);
+}
+#gpsImportModal .modal-body::-webkit-scrollbar {
+    width: 10px;
+}
+#gpsImportModal .modal-body::-webkit-scrollbar-track {
+    background: var(--bg-subtle, #eee);
+    border-radius: 8px;
+}
+#gpsImportModal .modal-body::-webkit-scrollbar-thumb {
+    background: var(--primary, #ff6600);
+    border-radius: 8px;
+    border: 2px solid var(--bg-subtle, #eee);
+}
+/* Indicador visual "hay más contenido abajo": una sombra que
+   aparece pegada al footer, se percibe incluso sin fijarse en la
+   scrollbar. Solo se ve cuando modal-body puede desplazarse. */
+#gpsImportModal .modal-body {
+    background:
+        linear-gradient(var(--card-bg, #fff) 30%, rgba(255,255,255,0)),
+        linear-gradient(rgba(255,255,255,0), var(--card-bg, #fff) 70%) 0 100%,
+        radial-gradient(farthest-side at 50% 0, rgba(0,0,0,0.12), rgba(0,0,0,0)),
+        radial-gradient(farthest-side at 50% 100%, rgba(0,0,0,0.12), rgba(0,0,0,0)) 0 100%;
+    background-repeat: no-repeat;
+    background-size: 100% 24px, 100% 24px, 100% 8px, 100% 8px;
+    background-attachment: local, local, scroll, scroll;
+}

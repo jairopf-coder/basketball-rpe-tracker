@@ -345,6 +345,7 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
             <div class="modal-body">
                 <p style="font-size:0.9rem;color:var(--text-secondary,#666);margin-bottom:12px;">
                     Revisa que cada jugadora del archivo de Oli esté bien asociada a tu plantilla. Puedes corregirlo con el desplegable.
+                    ${(matched.length + unmatched.length) > 6 ? '<br><strong>⬇ Desplázate para ver todas las jugadoras</strong>' : ''}
                 </p>
                 ${matched.map((item, idx) => rowHtml(item, idx)).join('')}
                 ${unmatchedHtml}
