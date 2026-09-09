@@ -686,13 +686,32 @@
         </button>
     </nav>
 
-    <!-- Drawer "Más" — vistas secundarias -->
+    <!-- Drawer "Más" — vistas secundarias.
+         ⚠️ Esta lista es independiente de NavMenu.groups (app.js):
+         cualquier vista añadida allí debe añadirse TAMBIÉN aquí a
+         mano, o no aparecerá en el menú de navegación móvil. -->
     <div id="bnMoreMenu" class="bn-more-menu" style="display:none" role="dialog" aria-label="Más opciones de navegación">
         <div class="bn-more-header">
             <span>Más secciones</span>
             <button class="bn-more-close" onclick="BottomNav.closeMore()" aria-label="Cerrar menú">✕</button>
         </div>
         <div class="bn-more-grid">
+            <button class="bn-more-item" onclick="BottomNav.selectMore('carga','analytics')" aria-label="Análisis carga aguda:crónica">
+                <span class="bn-more-icon">📈</span>
+                <span class="bn-more-label">Análisis A:C</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('carga','teamload')" aria-label="Carga del equipo">
+                <span class="bn-more-icon">🔥</span>
+                <span class="bn-more-label">Carga equipo</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('carga','gpsanalytics')" aria-label="Analítica GPS Oli Sports">
+                <span class="bn-more-icon">📡</span>
+                <span class="bn-more-label">GPS</span>
+            </button>
+            <button class="bn-more-item" onclick="BottomNav.selectMore('equipo','objectives')" aria-label="Próximos objetivos">
+                <span class="bn-more-icon">🎯</span>
+                <span class="bn-more-label">Objetivos</span>
+            </button>
             <button class="bn-more-item" onclick="BottomNav.selectMore('salud','wellness')" aria-label="Wellness del equipo">
                 <span class="bn-more-icon">❤️</span>
                 <span class="bn-more-label">Wellness</span>
