@@ -74,6 +74,15 @@ RPETracker.prototype.predictInjuryRisk = function(playerId) {
     riskScore += weights.recentLoad * factors.recentHighLoad;
     riskScore += weights.recovery * factors.insufficientRecovery;
 
+    // Señal adicional: divergencia sostenida entre RPE percibido y datos
+    // GPS objetivos (Fase 3, gps-injury-signal.js). Ajuste puramente
+    // aditivo: si no hay GPS o no hay patrón sostenido, gpsSignal.adjustment
+    // es 0 y el resultado es idéntico al cálculo original de siempre.
+    const gpsSignal = typeof this.calculateGpsDivergenceSignal === 'function'
+        ? this.calculateGpsDivergenceSignal(playerId)
+        : { adjustment: 0, applied: false };
+    riskScore += gpsSignal.adjustment;
+
     let riskLevel, confidence, message, colorHex;
 
     if (riskScore >= 70) {
@@ -136,9 +145,15 @@ RPETracker.prototype.predictInjuryRisk = function(playerId) {
                 value: factors.insufficientRecovery > 50 ? 'Insuficiente' : 'Adecuada',
                 impact: factors.insufficientRecovery > 50 ? 'Moderado' : 'Bajo',
                 status: factors.insufficientRecovery > 50 ? 'warning' : 'ok'
-            }
+            },
+            ...(gpsSignal.applied ? [{
+                name: 'Divergencia RPE/GPS',
+                value: `${gpsSignal.discrepantCount}/${gpsSignal.gpsSessionCount} sesiones`,
+                impact: 'Moderado',
+                status: 'warning'
+            }] : [])
         ],
-        recommendations: this.getInjuryPreventionRecommendations(riskLevel, factors, ratio, playerId)
+        recommendations: this.getInjuryPreventionRecommendations(riskLevel, factors, ratio, playerId, gpsSignal)
     };
 };
 
@@ -187,7 +202,7 @@ RPETracker.prototype.calculateRiskFactors = function(playerId, playerSessions) {
     return { spikeLoad: spikeRisk, recentHighLoad, insufficientRecovery };
 };
 
-RPETracker.prototype.getInjuryPreventionRecommendations = function(riskLevel, factors, ratio, playerId) {
+RPETracker.prototype.getInjuryPreventionRecommendations = function(riskLevel, factors, ratio, playerId, gpsSignal) {
     const recommendations = [];
 
     switch (riskLevel) {
@@ -220,6 +235,7 @@ RPETracker.prototype.getInjuryPreventionRecommendations = function(riskLevel, fa
     const _tRec = this.getPlayerThresholds(playerId); if (r > _tRec.high) recommendations.push('🚨 Ratio A:C crítico: reducir carga ya');
     if (factors.spikeLoad > 50)            recommendations.push('📊 Detectado pico de carga: evitar aumentos bruscos');
     if (factors.insufficientRecovery > 50) recommendations.push('⏰ Aumentar tiempo entre sesiones (48h mínimo)');
+    if (gpsSignal && gpsSignal.applied)    recommendations.push('📡 RPE percibido y datos GPS discrepan de forma sostenida: revisar si hay fatiga no física (sueño, estrés) o infravaloración del esfuerzo real');
 
     return recommendations;
 };
