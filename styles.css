@@ -2274,6 +2274,10 @@ header h1 {
 /* Detail Content */
 .detail-content {
     padding: 1.5rem;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .detail-row {
