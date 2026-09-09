@@ -186,10 +186,16 @@ const OLI_FIELD_MAP = {
     'Carreras de Máx. Int. (m)':             'maxIntensityRunsM',
     'Carreras de Alta Int. (#)':             'highIntensityRuns',
     'Carreras de Alta Int. (m)':             'highIntensityRunsM',
+    'Trote (m)':                             'jogM',
+    'Caminata (m)':                          'walkM',
     'Ace. Máx. Int. (#)':                    'maxAccelerations',
+    'Ace. Máx. Int. (m)':                    'maxAccelerationsM',
     'Desac. Máx. Int. (#)':                  'maxDecelerations',
+    'Desac. Máx. Int. (m)':                  'maxDecelerationsM',
     'Ace. Alta Int. (#)':                    'highAccelerations',
+    'Ace. Alta Int. (m)':                    'highAccelerationsM',
     'Desac. Alta Int. (#)':                  'highDecelerations',
+    'Desac. Alta Int. (m)':                  'highDecelerationsM',
     'Impactos baja intensidad (#)':          'impactsLow',
     'Impactos media intensidad (#)':         'impactsMedium',
     'Impactos alta intensidad (#)':          'impactsHigh',
@@ -461,6 +467,51 @@ RPETracker.prototype.renderGpsSummaryBlock = function(session) {
                 RPE app: <strong>${session.rpe}</strong> &nbsp;·&nbsp; RPE Oli: <strong>${gps.oliRpe}</strong>
                 ${rpeWarning ? ' <span style="color:#e67e22;">⚠️ Discrepancia notable</span>' : ''}
             </div>` : ''}
+            ${this._renderIioBlock(session)}
         </div>
         ${importButton}`;
+};
+
+// Bloque del Índice de Intensidad Objetiva (IIO), comparado con el
+// s-RPE que reporta la propia Oli (esfuerzo percibido × duración,
+// calculado por ellos). Se muestra solo si hay datos suficientes;
+// nunca bloquea ni sustituye el resto del resumen GPS.
+RPETracker.prototype._renderIioBlock = function(session) {
+    if (typeof this.calculateGpsIntensityIndex !== 'function') return '';
+    const iio = this.calculateGpsIntensityIndex(session.playerId, session.id);
+    if (!iio) return '';
+
+    const gps = this._getGpsForSession(session);
+    const srpe = gps && gps.oliSrpe != null ? gps.oliSrpe : null;
+
+    // El IIO es 0-100, el s-RPE de Oli suele ser RPE(0-10) × duración,
+    // en una escala distinta. Se muestran ambos valores, no se
+    // fusionan — el objetivo es ver si divergen, no crear un tercer
+    // número. Como referencia rápida se normaliza el s-RPE contra el
+    // máximo histórico de s-RPE de la jugadora, igual criterio que el IIO.
+    let srpeNormalized = null;
+    if (srpe != null) {
+        const history = (this.sessions || [])
+            .filter(s => s.playerId === session.playerId)
+            .filter(s => new Date(s.date) <= new Date(session.date))
+            .map(s => this.gpsData && this.gpsData[s.id] && this.gpsData[s.id][session.playerId] ? this.gpsData[s.id][session.playerId].oliSrpe : null)
+            .filter(v => v != null);
+        const maxSrpe = history.length > 0 ? Math.max(...history) : srpe;
+        srpeNormalized = maxSrpe > 0 ? Math.min(100, Math.round((srpe / maxSrpe) * 100)) : null;
+    }
+
+    const diff = srpeNormalized != null ? Math.abs(iio.score - srpeNormalized) : null;
+    const warn = diff !== null && diff >= 25; // divergencia notable en escala 0-100
+
+    return `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.9rem;color:var(--text-primary);">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>📐 Intensidad objetiva (IIO): <strong>${iio.score}/100</strong> ${iio.confidence === 'preliminar' ? '<span style="font-size:0.75rem;color:var(--text-secondary);">(preliminar, pocas sesiones aún)</span>' : ''}</span>
+            </div>
+            ${srpeNormalized != null ? `
+            <div style="margin-top:4px;">
+                vs. s-RPE percibido (normalizado): <strong>${srpeNormalized}/100</strong>
+                ${warn ? ' <span style="color:#e67e22;">⚠️ Divergencia notable entre esfuerzo objetivo y percibido</span>' : ''}
+            </div>` : ''}
+        </div>`;
 };

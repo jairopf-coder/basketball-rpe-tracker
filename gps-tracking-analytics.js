@@ -24,6 +24,7 @@
 // o promediar (los conteos tiene más sentido sumarlos; velocidades
 // y similares, promediarlas).
 const GPS_COMPARISON_METRICS = [
+    { key: 'iio',                   label: '📐 Intensidad Objetiva (IIO)', unit: '', agg: 'avg', special: 'iio' },
     { key: 'distanceM',            label: 'Distancia recorrida', unit: 'm',      agg: 'sum' },
     { key: 'maxSpeedKmh',          label: 'Velocidad máxima',    unit: 'km/h',   agg: 'avg' },
     { key: 'highIntensityRuns',    label: 'Sprints (alta int.)', unit: '',       agg: 'sum' },
@@ -238,6 +239,9 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
         const dateStr = new Date(session.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const rpeDiff = gps && gps.oliRpe != null ? Math.abs(session.rpe - gps.oliRpe) : null;
         const warn = rpeDiff !== null && rpeDiff >= 2;
+        const iio = typeof this.calculateGpsIntensityIndex === 'function'
+            ? this.calculateGpsIntensityIndex(session.playerId, session.id)
+            : null;
 
         return `
         <tr onclick="window.rpeTracker.showSessionDetail('${session.id}')" style="cursor:pointer;">
@@ -245,6 +249,7 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
             <td>${session.type || '—'}</td>
             <td>${session.rpe ?? '—'}</td>
             <td>${gps && gps.oliRpe != null ? gps.oliRpe : '—'} ${warn ? '⚠️' : ''}</td>
+            <td>${iio ? iio.score + '/100' : '—'}</td>
             <td>${gps && gps.distanceM != null ? Math.round(gps.distanceM) + ' m' : '—'}</td>
             <td>${gps && gps.maxSpeedKmh != null ? gps.maxSpeedKmh + ' km/h' : '—'}</td>
             <td>${gps && gps.highIntensityRuns != null ? gps.highIntensityRuns : '—'}</td>
@@ -256,7 +261,7 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
             <table class="data-table" style="width:100%;border-collapse:collapse;">
                 <thead>
                     <tr style="text-align:left;font-size:0.8rem;color:var(--text-secondary);">
-                        <th>Fecha</th><th>Tipo</th><th>RPE app</th><th>RPE Oli</th><th>Distancia</th><th>Vel. máx</th><th>Sprints</th>
+                        <th>Fecha</th><th>Tipo</th><th>RPE app</th><th>RPE Oli</th><th>IIO</th><th>Distancia</th><th>Vel. máx</th><th>Sprints</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
@@ -358,6 +363,37 @@ RPETracker.prototype._getGpsTeamComparisonData = function() {
 
     activePlayers.forEach(player => {
         let value = null;
+
+        if (metricDef.special === 'iio') {
+            if (this._gpsTeamMode === 'session') {
+                const selected = this._getTeamSessionOptions().find(s => s.id === this._gpsTeamSessionId);
+                if (!selected) return;
+                const sessionForPlayer = (this.sessions || []).find(s =>
+                    s.playerId === player.id && s.date === selected.date && (s.type || '') === (selected.type || '')
+                );
+                if (sessionForPlayer && typeof this.calculateGpsIntensityIndex === 'function') {
+                    const iio = this.calculateGpsIntensityIndex(player.id, sessionForPlayer.id);
+                    if (iio) value = iio.score;
+                }
+            } else {
+                const range = this._gpsTeamRange || '30';
+                const cutoff = range === 'all' ? null : new Date(Date.now() - parseInt(range, 10) * 86400000);
+                const playerSessions = (this.sessions || [])
+                    .filter(s => s.playerId === player.id)
+                    .filter(s => !cutoff || new Date(s.date) >= cutoff);
+
+                const values = [];
+                playerSessions.forEach(s => {
+                    if (typeof this.calculateGpsIntensityIndex === 'function') {
+                        const iio = this.calculateGpsIntensityIndex(player.id, s.id);
+                        if (iio) values.push(iio.score);
+                    }
+                });
+                if (values.length > 0) value = values.reduce((a, b) => a + b, 0) / values.length;
+            }
+            if (value !== null) results.push({ player, value });
+            return;
+        }
 
         if (this._gpsTeamMode === 'session') {
             const selected = this._getTeamSessionOptions().find(s => s.id === this._gpsTeamSessionId);
