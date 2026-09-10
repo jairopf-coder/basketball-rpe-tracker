@@ -23,6 +23,7 @@ const Store = {
         gpsData:          'basketballGpsData',
         gpsPlayerMap:     'basketballGpsPlayerMap',
         gpsRadarPrefs:    'basketballGpsRadarPrefs',
+        gpsTableColumns:  'basketballGpsTableColumns',
         darkMode:         'rpe_dark_mode',
         ewmaOpen:         'rpe_ewma_open',
         reminderTime:     'rpe_wellness_reminder_time',
