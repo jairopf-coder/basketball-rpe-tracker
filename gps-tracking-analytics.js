@@ -316,6 +316,7 @@ RPETracker.prototype._renderGpsTeamComparisonTab = function(container) {
             <div id="gpsTeamChartWrap" style="position:relative;">
                 <canvas id="gpsTeamComparisonCanvas"></canvas>
             </div>
+            <div id="gpsTeamScrollHint" style="display:none;text-align:center;font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">↔ Desliza para ver a todas las jugadoras</div>
         </div>
     `;
 
@@ -445,10 +446,19 @@ RPETracker.prototype._drawGpsTeamComparisonChart = function() {
         return;
     }
 
-    // Altura dinámica: cada jugadora necesita su fila, para que las
-    // barras no queden apretadas con plantillas grandes.
-    if (wrap) wrap.style.height = Math.max(280, data.length * 34 + 60) + 'px';
+    // Ancho dinámico: cada jugadora necesita su columna, para que las
+    // barras no queden apretadas con plantillas grandes. Con barras
+    // verticales el contenedor scrollea horizontalmente si hace falta.
+    const minWidth = Math.max(320, data.length * 70);
+    if (wrap) {
+        wrap.style.height = '360px';
+        wrap.style.overflowX = data.length > 8 ? 'auto' : 'visible';
+    }
     canvas.style.height = '100%';
+    canvas.style.minWidth = minWidth + 'px';
+
+    const scrollHint = document.getElementById('gpsTeamScrollHint');
+    if (scrollHint) scrollHint.style.display = data.length > 8 ? 'block' : 'none';
 
     const labels = data.map(d => d.player.name);
     const values = data.map(d => d.value);
@@ -484,7 +494,6 @@ RPETracker.prototype._drawGpsTeamComparisonChart = function() {
             ]
         },
         options: {
-            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 300 },
@@ -492,20 +501,20 @@ RPETracker.prototype._drawGpsTeamComparisonChart = function() {
                 legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: textC } },
                 tooltip: {
                     callbacks: {
-                        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.x?.toFixed ? ctx.parsed.x.toFixed(1) : ctx.parsed.x}${metricDef.unit ? ' ' + metricDef.unit : ''}`
+                        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed ? ctx.parsed.y.toFixed(1) : ctx.parsed.y}${metricDef.unit ? ' ' + metricDef.unit : ''}`
                     }
                 }
             },
             scales: {
                 x: {
+                    ticks: { color: textC, font: { size: 10 }, maxRotation: 45, minRotation: 45 },
+                    grid: { display: false }
+                },
+                y: {
                     beginAtZero: true,
                     title: { display: true, text: metricDef.unit ? `${metricDef.label} (${metricDef.unit})` : metricDef.label, color: textC, font: { size: 11 } },
                     ticks: { color: textC, font: { size: 10 } },
                     grid: { color: gridC }
-                },
-                y: {
-                    ticks: { color: textC, font: { size: 11 } },
-                    grid: { display: false }
                 }
             }
         }
