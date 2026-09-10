@@ -22,6 +22,7 @@ const Store = {
         testSessions:     'bk_test_sessions',
         gpsData:          'basketballGpsData',
         gpsPlayerMap:     'basketballGpsPlayerMap',
+        gpsRadarPrefs:    'basketballGpsRadarPrefs',
         darkMode:         'rpe_dark_mode',
         ewmaOpen:         'rpe_ewma_open',
         reminderTime:     'rpe_wellness_reminder_time',
