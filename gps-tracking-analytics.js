@@ -27,6 +27,10 @@ const GPS_COMPARISON_METRICS = [
     { key: 'iio',                   label: '📐 Intensidad Objetiva (IIO)', unit: '', agg: 'avg', special: 'iio' },
     { key: 'distanceM',            label: 'Distancia recorrida', unit: 'm',      agg: 'sum' },
     { key: 'maxSpeedKmh',          label: 'Velocidad máxima',    unit: 'km/h',   agg: 'avg' },
+    { key: 'walkM',                label: 'Caminata',            unit: 'm',      agg: 'sum' },
+    { key: 'jogM',                 label: 'Trote',                unit: 'm',      agg: 'sum' },
+    { key: 'highIntensityRunsM',   label: 'Carreras alta int.',  unit: 'm',      agg: 'sum' },
+    { key: 'maxIntensityRunsM',    label: 'Carreras máx. int.',  unit: 'm',      agg: 'sum' },
     { key: 'highIntensityRuns',    label: 'Sprints (alta int.)', unit: '',       agg: 'sum' },
     { key: 'maxIntensityRuns',     label: 'Sprints (máx. int.)', unit: '',       agg: 'sum' },
     { key: 'jumps',                label: 'Saltos',              unit: '',       agg: 'sum' },
@@ -38,6 +42,84 @@ const GPS_COMPARISON_METRICS = [
     { key: 'caloriesTotal',        label: 'Calorías totales',    unit: 'kcal',   agg: 'sum' },
     { key: 'playTimeMin',          label: 'Tiempo de juego',     unit: 'min',    agg: 'sum' },
 ];
+
+// Detecta jugadoras con señales de carga inusual, reutilizando la
+// lógica de divergencia RPE/GPS ya validada (Fase 3, gps-injury-signal.js)
+// más un chequeo simple de IIO muy alto en la sesión más reciente
+// (cerca de su propio máximo histórico = esfuerzo puntual elevado).
+// Es solo informativo aquí — no toca injury-prediction.js.
+RPETracker.prototype._getGpsAlertPlayers = function() {
+    if (!this.gpsData) return [];
+    const alerts = [];
+    const activePlayers = this.players.filter(p => !p.archived);
+
+    activePlayers.forEach(player => {
+        const reasons = [];
+
+        if (typeof this.calculateGpsDivergenceSignal === 'function') {
+            const signal = this.calculateGpsDivergenceSignal(player.id);
+            if (signal.applied) reasons.push('divergencia RPE/GPS sostenida');
+        }
+
+        if (typeof this.calculateGpsIntensityIndex === 'function') {
+            const lastSession = (this.sessions || [])
+                .filter(s => s.playerId === player.id)
+                .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+            if (lastSession) {
+                const iio = this.calculateGpsIntensityIndex(player.id, lastSession.id);
+                if (iio && iio.confidence === 'normal' && iio.score >= 90) {
+                    reasons.push(`IIO ${iio.score}/100 en su última sesión`);
+                }
+            }
+        }
+
+        if (reasons.length > 0) alerts.push({ player, reasons });
+    });
+
+    return alerts;
+};
+
+RPETracker.prototype._renderGpsAlertBanner = function() {
+    const alerts = this._getGpsAlertPlayers();
+    if (alerts.length === 0) return '';
+
+    const shown = alerts.slice(0, 3);
+    const extra = alerts.length - shown.length;
+
+    return `
+        <div style="background:var(--warning-soft);border:1px solid var(--warning);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:0.88rem;color:var(--text-primary);">
+            <div style="font-weight:600;margin-bottom:4px;color:var(--warning);">⚠️ ${alerts.length} jugadora${alerts.length > 1 ? 's' : ''} con carga a revisar</div>
+            ${shown.map(a => `
+                <div style="cursor:pointer;text-decoration:underline;" onclick="window.rpeTracker._gpsAnSwitchTab('player'); window.rpeTracker._gpsAnSetPlayer('${a.player.id}');">
+                    ${esc(a.player.name)} — ${esc(a.reasons.join(', '))}
+                </div>`).join('')}
+            ${extra > 0 ? `<div style="margin-top:2px;">y ${extra} más…</div>` : ''}
+        </div>`;
+};
+
+// Descarga el gráfico Chart.js activo en el canvas indicado como PNG.
+// Genérica: funciona con cualquier gráfico ya dibujado (usa su propio
+// fondo, que Chart.js deja transparente por defecto, así que se
+// compone sobre blanco para que se vea bien al abrir la imagen).
+RPETracker.prototype._downloadGpsChart = function(canvasId, filename) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !canvas._ci) {
+        this.showToast('⚠️ No hay gráfico para descargar todavía', 'warning');
+        return;
+    }
+    const composed = document.createElement('canvas');
+    composed.width = canvas.width;
+    composed.height = canvas.height;
+    const ctx = composed.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, composed.width, composed.height);
+    ctx.drawImage(canvas, 0, 0);
+
+    const link = document.createElement('a');
+    link.download = filename + '.png';
+    link.href = composed.toDataURL('image/png');
+    link.click();
+};
 
 RPETracker.prototype.renderGpsAnalyticsView = function() {
     const container = document.getElementById('gpsAnalyticsView');
@@ -55,12 +137,16 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
                 Compara la carga interna (RPE × duración) con la carga externa objetiva del GPS.
             </p>
         </div>
+        ${this._renderGpsAlertBanner()}
         <div class="an-tabs">
             <button class="an-tab ${this._gpsAnTab === 'player' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('player')">👤 Evolución jugadora</button>
             <button class="an-tab ${this._gpsAnTab === 'team' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('team')">👥 Comparativa equipo</button>
             <button class="an-tab ${this._gpsAnTab === 'radar' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('radar')">🕸️ Comparar jugadoras</button>
         </div>
-        <div id="gpsAnTabContent" style="padding-top:16px;"></div>
+        <div style="display:flex;justify-content:flex-end;padding-top:10px;">
+            ${this._renderGpsTypeFilterSelect()}
+        </div>
+        <div id="gpsAnTabContent" style="padding-top:10px;"></div>
     `;
 
     this._renderGpsAnTabContent();
@@ -101,6 +187,9 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
         </div>
 
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
+                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsAnComparisonCanvas', 'evolucion-gps')">📥 Descargar</button>
+            </div>
             <div style="height:320px;">
                 <canvas id="gpsAnComparisonCanvas"></canvas>
             </div>
@@ -136,7 +225,7 @@ RPETracker.prototype._getGpsAnalyticsData = function() {
     const range = this._gpsAnalyticsRange || '90';
     const cutoff = range === 'all' ? null : new Date(Date.now() - parseInt(range, 10) * 86400000);
 
-    return (this.sessions || [])
+    return this._applyGpsTypeFilter(this.sessions || [])
         .filter(s => s.playerId === playerId)
         .filter(s => !cutoff || new Date(s.date) >= cutoff)
         .sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -313,6 +402,8 @@ RPETracker.prototype._renderGpsTeamComparisonTab = function(container) {
             <button class="btn-secondary" style="font-size:0.85rem;" onclick="window.rpeTracker._gpsTeamToggleSort()">
                 ${this._gpsTeamSortDesc ? '⬇️ Mayor a menor' : '⬆️ Menor a mayor'}
             </button>
+
+            <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsTeamComparisonCanvas', 'comparativa-equipo-gps')">📥 Descargar</button>
         </div>
 
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
@@ -331,18 +422,47 @@ RPETracker.prototype._renderGpsTeamComparisonTab = function(container) {
 // comparten fecha), mostrando la más reciente primero.
 RPETracker.prototype._getTeamSessionOptions = function() {
     const seen = new Map();
-    (this.sessions || []).forEach(s => {
-        const key = s.date + '|' + (s.type || '');
-        if (!seen.has(key)) {
-            seen.set(key, {
-                id: s.id, // usamos el id de la primera sesión de ese grupo como referencia
-                date: s.date,
-                type: s.type,
-                label: `${new Date(s.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })} — ${s.type || 'Sesión'}`
-            });
-        }
-    });
+    this._applyGpsTypeFilter(this.sessions || [])
+        .forEach(s => {
+            const key = s.date + '|' + (s.type || '');
+            if (!seen.has(key)) {
+                seen.set(key, {
+                    id: s.id, // usamos el id de la primera sesión de ese grupo como referencia
+                    date: s.date,
+                    type: s.type,
+                    label: `${new Date(s.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })} — ${s.type || 'Sesión'}`
+                });
+            }
+        });
     return Array.from(seen.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+};
+
+RPETracker.prototype._gpsSetTypeFilter = function(val) {
+    this._gpsTypeFilter = val;
+    // Reset de selección de sesión: la lista disponible puede cambiar.
+    this._gpsTeamSessionId = null;
+    this._gpsRadarSessionId = null;
+    this._renderGpsAnTabContent();
+};
+
+// Filtro de tipo de sesión (Todos/Partidos/Entrenos), compartido por
+// las 3 pestañas de la vista GPS. Se aplica sobre CUALQUIER lista de
+// sesiones antes de calcular rangos, medias o el ranking de equipo.
+RPETracker.prototype._applyGpsTypeFilter = function(sessionsArr) {
+    const typeFilter = this._gpsTypeFilter || 'all';
+    if (typeFilter === 'all') return sessionsArr;
+    return sessionsArr.filter(s => typeFilter === 'match' ? s.type === 'match' : s.type !== 'match');
+};
+
+// HTML del selector de filtro de tipo, para insertar en cada pestaña.
+RPETracker.prototype._renderGpsTypeFilterSelect = function() {
+    const val = this._gpsTypeFilter || 'all';
+    return `
+        <select id="gpsTypeFilterSelect" onchange="window.rpeTracker._gpsSetTypeFilter(this.value)">
+            <option value="all" ${val === 'all' ? 'selected' : ''}>Todas las sesiones</option>
+            <option value="match" ${val === 'match' ? 'selected' : ''}>🏀 Solo partidos</option>
+            <option value="training" ${val === 'training' ? 'selected' : ''}>💪 Solo entrenos</option>
+        </select>`;
 };
 
 RPETracker.prototype._gpsTeamSetMetric = function(key) { this._gpsTeamMetric = key; this._drawGpsTeamComparisonChart(); };
@@ -382,7 +502,7 @@ RPETracker.prototype._getGpsTeamComparisonData = function() {
             } else {
                 const range = this._gpsTeamRange || '30';
                 const cutoff = range === 'all' ? null : new Date(Date.now() - parseInt(range, 10) * 86400000);
-                const playerSessions = (this.sessions || [])
+                const playerSessions = this._applyGpsTypeFilter(this.sessions || [])
                     .filter(s => s.playerId === player.id)
                     .filter(s => !cutoff || new Date(s.date) >= cutoff);
 
@@ -412,7 +532,7 @@ RPETracker.prototype._getGpsTeamComparisonData = function() {
         } else {
             const range = this._gpsTeamRange || '30';
             const cutoff = range === 'all' ? null : new Date(Date.now() - parseInt(range, 10) * 86400000);
-            const playerSessions = (this.sessions || [])
+            const playerSessions = this._applyGpsTypeFilter(this.sessions || [])
                 .filter(s => s.playerId === player.id)
                 .filter(s => !cutoff || new Date(s.date) >= cutoff);
 
@@ -531,7 +651,13 @@ const GPS_RADAR_MAX_METRICS = 8;
 
 RPETracker.prototype._renderGpsRadarTab = function(container) {
     if (!this._gpsRadarMode) this._gpsRadarMode = 'vs'; // 'vs' | 'solo' | 'vsTeam'
-    if (!this._gpsRadarMetrics) this._gpsRadarMetrics = [...GPS_RADAR_DEFAULT_METRICS];
+    if (!this._gpsRadarMetrics) {
+        const saved = typeof Store !== 'undefined' ? Store.get('gpsRadarPrefs', null) : null;
+        this._gpsRadarMetrics = (Array.isArray(saved) && saved.length >= 3)
+            ? saved.filter(k => GPS_COMPARISON_METRICS.some(m => m.key === k))
+            : [...GPS_RADAR_DEFAULT_METRICS];
+        if (this._gpsRadarMetrics.length < 3) this._gpsRadarMetrics = [...GPS_RADAR_DEFAULT_METRICS];
+    }
     if (!this._gpsRadarModeCtx) this._gpsRadarModeCtx = 'session'; // 'session' | 'range'
     if (!this._gpsRadarRange) this._gpsRadarRange = '30';
 
@@ -602,6 +728,9 @@ RPETracker.prototype._renderGpsRadarTab = function(container) {
         </div>
 
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
+                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsRadarCanvas', 'radar-comparativo-gps')">📥 Descargar</button>
+            </div>
             <div style="height:400px;">
                 <canvas id="gpsRadarCanvas"></canvas>
             </div>
@@ -649,6 +778,7 @@ RPETracker.prototype._gpsRadarToggleMetric = function(key, checked) {
     }
     const btn = document.querySelector('[onclick="window.rpeTracker._gpsRadarToggleMetricsPanel()"]');
     if (btn) btn.textContent = `⚙️ Parámetros (${this._gpsRadarMetrics.length})`;
+    if (typeof Store !== 'undefined') Store.set('gpsRadarPrefs', this._gpsRadarMetrics);
     this._drawGpsRadarChart();
 };
 
@@ -683,7 +813,7 @@ RPETracker.prototype._getGpsRadarValue = function(metricDef, playerId) {
         } else {
             const range = this._gpsRadarRange || '30';
             const cutoff = range === 'all' ? null : new Date(Date.now() - parseInt(range, 10) * 86400000);
-            const playerSessions = (this.sessions || [])
+            const playerSessions = this._applyGpsTypeFilter(this.sessions || [])
                 .filter(s => s.playerId === pid)
                 .filter(s => !cutoff || new Date(s.date) >= cutoff);
 
