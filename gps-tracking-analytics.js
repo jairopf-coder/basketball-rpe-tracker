@@ -58,6 +58,7 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
         <div class="an-tabs">
             <button class="an-tab ${this._gpsAnTab === 'player' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('player')">👤 Evolución jugadora</button>
             <button class="an-tab ${this._gpsAnTab === 'team' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('team')">👥 Comparativa equipo</button>
+            <button class="an-tab ${this._gpsAnTab === 'radar' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('radar')">🕸️ Comparar jugadoras</button>
         </div>
         <div id="gpsAnTabContent" style="padding-top:16px;"></div>
     `;
@@ -75,6 +76,8 @@ RPETracker.prototype._renderGpsAnTabContent = function() {
     if (!el) return;
     if (this._gpsAnTab === 'team') {
         this._renderGpsTeamComparisonTab(el);
+    } else if (this._gpsAnTab === 'radar') {
+        this._renderGpsRadarTab(el);
     } else {
         this._renderGpsPlayerEvolutionTab(el);
     }
@@ -515,6 +518,293 @@ RPETracker.prototype._drawGpsTeamComparisonChart = function() {
                     title: { display: true, text: metricDef.unit ? `${metricDef.label} (${metricDef.unit})` : metricDef.label, color: textC, font: { size: 11 } },
                     ticks: { color: textC, font: { size: 10 } },
                     grid: { color: gridC }
+                }
+            }
+        }
+    });
+};
+
+// ========== PESTAÑA 3: Radar comparativo (1 jugadora / vs jugadora / vs equipo) ==========
+
+const GPS_RADAR_DEFAULT_METRICS = ['iio', 'distanceM', 'maxSpeedKmh', 'highIntensityRuns', 'jumps', 'directionChanges'];
+const GPS_RADAR_MAX_METRICS = 8;
+
+RPETracker.prototype._renderGpsRadarTab = function(container) {
+    if (!this._gpsRadarMode) this._gpsRadarMode = 'vs'; // 'vs' | 'solo' | 'vsTeam'
+    if (!this._gpsRadarMetrics) this._gpsRadarMetrics = [...GPS_RADAR_DEFAULT_METRICS];
+    if (!this._gpsRadarModeCtx) this._gpsRadarModeCtx = 'session'; // 'session' | 'range'
+    if (!this._gpsRadarRange) this._gpsRadarRange = '30';
+
+    const activePlayers = this.players.filter(p => !p.archived);
+    const teamSessions = this._getTeamSessionOptions();
+
+    if (!this._gpsRadarPlayerA && activePlayers.length > 0) this._gpsRadarPlayerA = activePlayers[0].id;
+    if (!this._gpsRadarPlayerB && activePlayers.length > 1) this._gpsRadarPlayerB = activePlayers[1].id;
+    if (!this._gpsRadarSessionId && teamSessions.length > 0) this._gpsRadarSessionId = teamSessions[0].id;
+
+    container.innerHTML = `
+        <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <select id="gpsRadarModeSelect" onchange="window.rpeTracker._gpsRadarSetMode(this.value)">
+                <option value="vs" ${this._gpsRadarMode === 'vs' ? 'selected' : ''}>👥 Jugadora vs jugadora</option>
+                <option value="solo" ${this._gpsRadarMode === 'solo' ? 'selected' : ''}>👤 Una jugadora</option>
+                <option value="vsTeam" ${this._gpsRadarMode === 'vsTeam' ? 'selected' : ''}>📊 Jugadora vs media del equipo</option>
+            </select>
+
+            <select id="gpsRadarModeCtxSelect" onchange="window.rpeTracker._gpsRadarSetModeCtx(this.value)">
+                <option value="session" ${this._gpsRadarModeCtx === 'session' ? 'selected' : ''}>Una sesión</option>
+                <option value="range" ${this._gpsRadarModeCtx === 'range' ? 'selected' : ''}>Rango de fechas</option>
+            </select>
+
+            ${this._gpsRadarModeCtx === 'session' ? `
+                <select id="gpsRadarSessionSelect" onchange="window.rpeTracker._gpsRadarSetSession(this.value)" style="min-width:200px;">
+                    ${teamSessions.map(s => `<option value="${s.id}" ${s.id === this._gpsRadarSessionId ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
+                </select>
+            ` : `
+                <select id="gpsRadarRangeSelect" onchange="window.rpeTracker._gpsRadarSetRange(this.value)">
+                    <option value="7" ${this._gpsRadarRange === '7' ? 'selected' : ''}>Últimos 7 días</option>
+                    <option value="30" ${this._gpsRadarRange === '30' ? 'selected' : ''}>Últimos 30 días</option>
+                    <option value="90" ${this._gpsRadarRange === '90' ? 'selected' : ''}>Últimos 90 días</option>
+                    <option value="all" ${this._gpsRadarRange === 'all' ? 'selected' : ''}>Toda la temporada</option>
+                </select>
+            `}
+        </div>
+
+        <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+            <select id="gpsRadarPlayerASelect" onchange="window.rpeTracker._gpsRadarSetPlayer('A', this.value)" style="min-width:180px;">
+                ${activePlayers.map(p => `<option value="${p.id}" ${p.id === this._gpsRadarPlayerA ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+            </select>
+
+            ${this._gpsRadarMode === 'vs' ? `
+                <span style="color:var(--text-secondary);font-size:0.85rem;">vs</span>
+                <select id="gpsRadarPlayerBSelect" onchange="window.rpeTracker._gpsRadarSetPlayer('B', this.value)" style="min-width:180px;">
+                    ${activePlayers.map(p => `<option value="${p.id}" ${p.id === this._gpsRadarPlayerB ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+                </select>
+            ` : ''}
+
+            <button class="btn-secondary" style="font-size:0.85rem;" onclick="window.rpeTracker._gpsRadarToggleMetricsPanel()">
+                ⚙️ Parámetros (${this._gpsRadarMetrics.length})
+            </button>
+        </div>
+
+        <div id="gpsRadarMetricsPanel" style="display:none;margin-bottom:16px;padding:12px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border);">
+            <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px;">
+                Elige hasta ${GPS_RADAR_MAX_METRICS} parámetros para el radar:
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;">
+                ${GPS_COMPARISON_METRICS.map(m => `
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;">
+                        <input type="checkbox" value="${m.key}" ${this._gpsRadarMetrics.includes(m.key) ? 'checked' : ''}
+                            onchange="window.rpeTracker._gpsRadarToggleMetric('${m.key}', this.checked)">
+                        ${esc(m.label)}
+                    </label>
+                `).join('')}
+            </div>
+        </div>
+
+        <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+            <div style="height:400px;">
+                <canvas id="gpsRadarCanvas"></canvas>
+            </div>
+        </div>
+    `;
+
+    requestAnimationFrame(() => this._drawGpsRadarChart());
+};
+
+RPETracker.prototype._gpsRadarSetMode = function(mode) {
+    this._gpsRadarMode = mode;
+    this._renderGpsRadarTab(document.getElementById('gpsAnTabContent'));
+};
+RPETracker.prototype._gpsRadarSetModeCtx = function(ctx) {
+    this._gpsRadarModeCtx = ctx;
+    this._renderGpsRadarTab(document.getElementById('gpsAnTabContent'));
+};
+RPETracker.prototype._gpsRadarSetSession = function(id) { this._gpsRadarSessionId = id; this._drawGpsRadarChart(); };
+RPETracker.prototype._gpsRadarSetRange = function(range) { this._gpsRadarRange = range; this._drawGpsRadarChart(); };
+RPETracker.prototype._gpsRadarSetPlayer = function(slot, id) {
+    if (slot === 'A') this._gpsRadarPlayerA = id; else this._gpsRadarPlayerB = id;
+    this._drawGpsRadarChart();
+};
+RPETracker.prototype._gpsRadarToggleMetricsPanel = function() {
+    const panel = document.getElementById('gpsRadarMetricsPanel');
+    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+};
+RPETracker.prototype._gpsRadarToggleMetric = function(key, checked) {
+    if (checked) {
+        if (this._gpsRadarMetrics.length >= GPS_RADAR_MAX_METRICS) {
+            this.showToast(`⚠️ Máximo ${GPS_RADAR_MAX_METRICS} parámetros en el radar`, 'warning');
+            const cb = document.querySelector(`#gpsRadarMetricsPanel input[value="${key}"]`);
+            if (cb) cb.checked = false;
+            return;
+        }
+        this._gpsRadarMetrics.push(key);
+    } else {
+        if (this._gpsRadarMetrics.length <= 3) {
+            this.showToast('⚠️ El radar necesita al menos 3 parámetros', 'warning');
+            const cb = document.querySelector(`#gpsRadarMetricsPanel input[value="${key}"]`);
+            if (cb) cb.checked = true;
+            return;
+        }
+        this._gpsRadarMetrics = this._gpsRadarMetrics.filter(k => k !== key);
+    }
+    const btn = document.querySelector('[onclick="window.rpeTracker._gpsRadarToggleMetricsPanel()"]');
+    if (btn) btn.textContent = `⚙️ Parámetros (${this._gpsRadarMetrics.length})`;
+    this._drawGpsRadarChart();
+};
+
+// Calcula el valor de UNA métrica para UNA jugadora (o la media del
+// equipo si playerId es null), en el contexto elegido (sesión o
+// rango). Reutiliza calculateGpsIntensityIndex para el caso especial
+// IIO, e igual lógica sum/avg que la pestaña de barras para el resto.
+RPETracker.prototype._getGpsRadarValue = function(metricDef, playerId) {
+    const targetPlayers = playerId ? [playerId] : this.players.filter(p => !p.archived).map(p => p.id);
+    const perPlayerValues = [];
+
+    targetPlayers.forEach(pid => {
+        let value = null;
+
+        if (this._gpsRadarModeCtx === 'session') {
+            const selected = this._getTeamSessionOptions().find(s => s.id === this._gpsRadarSessionId);
+            if (!selected) return;
+            const sessionForPlayer = (this.sessions || []).find(s =>
+                s.playerId === pid && s.date === selected.date && (s.type || '') === (selected.type || '')
+            );
+            if (!sessionForPlayer) return;
+
+            if (metricDef.special === 'iio') {
+                if (typeof this.calculateGpsIntensityIndex === 'function') {
+                    const iio = this.calculateGpsIntensityIndex(pid, sessionForPlayer.id);
+                    if (iio) value = iio.score;
+                }
+            } else if (this.gpsData && this.gpsData[sessionForPlayer.id]) {
+                const gps = this.gpsData[sessionForPlayer.id][pid];
+                if (gps && gps[metricDef.key] != null) value = gps[metricDef.key];
+            }
+        } else {
+            const range = this._gpsRadarRange || '30';
+            const cutoff = range === 'all' ? null : new Date(Date.now() - parseInt(range, 10) * 86400000);
+            const playerSessions = (this.sessions || [])
+                .filter(s => s.playerId === pid)
+                .filter(s => !cutoff || new Date(s.date) >= cutoff);
+
+            const values = [];
+            playerSessions.forEach(s => {
+                if (metricDef.special === 'iio') {
+                    if (typeof this.calculateGpsIntensityIndex === 'function') {
+                        const iio = this.calculateGpsIntensityIndex(pid, s.id);
+                        if (iio) values.push(iio.score);
+                    }
+                } else {
+                    const gps = this.gpsData && this.gpsData[s.id] ? this.gpsData[s.id][pid] : null;
+                    if (gps && gps[metricDef.key] != null) values.push(gps[metricDef.key]);
+                }
+            });
+            if (values.length > 0) {
+                value = metricDef.agg === 'avg'
+                    ? values.reduce((a, b) => a + b, 0) / values.length
+                    : values.reduce((a, b) => a + b, 0);
+            }
+        }
+
+        if (value !== null) perPlayerValues.push(value);
+    });
+
+    if (perPlayerValues.length === 0) return null;
+    return perPlayerValues.reduce((a, b) => a + b, 0) / perPlayerValues.length;
+};
+
+RPETracker.prototype._drawGpsRadarChart = function() {
+    const canvas = document.getElementById('gpsRadarCanvas');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (canvas._ci) { canvas._ci.destroy(); canvas._ci = null; }
+
+    const metrics = this._gpsRadarMetrics.map(key => GPS_COMPARISON_METRICS.find(m => m.key === key)).filter(Boolean);
+    if (metrics.length < 3) return;
+
+    const playerA = this.players.find(p => p.id === this._gpsRadarPlayerA);
+    const playerB = this._gpsRadarMode === 'vs' ? this.players.find(p => p.id === this._gpsRadarPlayerB) : null;
+
+    const rawA = [];
+    const rawB = [];
+    const labels = [];
+
+    metrics.forEach(m => {
+        const teamValues = this.players.filter(p => !p.archived)
+            .map(p => this._getGpsRadarValue(m, p.id))
+            .filter(v => v != null);
+        const teamMax = teamValues.length > 0 ? Math.max(...teamValues, 0.0001) : null;
+
+        const valA = this._getGpsRadarValue(m, playerA ? playerA.id : null);
+        const normA = (valA != null && teamMax) ? Math.min(100, (valA / teamMax) * 100) : 0;
+
+        let normB = null;
+        if (this._gpsRadarMode === 'vs' && playerB) {
+            const valB = this._getGpsRadarValue(m, playerB.id);
+            normB = (valB != null && teamMax) ? Math.min(100, (valB / teamMax) * 100) : 0;
+        } else if (this._gpsRadarMode === 'vsTeam') {
+            const teamAvgRaw = this._getGpsRadarValue(m, null);
+            normB = (teamAvgRaw != null && teamMax) ? Math.min(100, (teamAvgRaw / teamMax) * 100) : 0;
+        }
+
+        labels.push(m.label);
+        rawA.push(normA);
+        if (normB !== null) rawB.push(normB);
+    });
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textC = isDark ? '#aaa' : '#555';
+    const gridC = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)';
+    const colorA = playerA ? PlayerTokens.get(playerA) : '#ff6600';
+    const colorB = this._gpsRadarMode === 'vs' && playerB ? PlayerTokens.get(playerB) : '#888';
+
+    const datasets = [{
+        label: playerA ? playerA.name : 'Jugadora',
+        data: rawA,
+        borderColor: colorA,
+        backgroundColor: colorA + '33',
+        borderWidth: 2,
+        pointBackgroundColor: colorA,
+    }];
+
+    if (this._gpsRadarMode === 'vs' && playerB) {
+        datasets.push({
+            label: playerB.name,
+            data: rawB,
+            borderColor: colorB,
+            backgroundColor: colorB + '33',
+            borderWidth: 2,
+            pointBackgroundColor: colorB,
+        });
+    } else if (this._gpsRadarMode === 'vsTeam') {
+        datasets.push({
+            label: 'Media del equipo',
+            data: rawB,
+            borderColor: colorB,
+            backgroundColor: colorB + '22',
+            borderWidth: 2,
+            borderDash: [6, 4],
+            pointBackgroundColor: colorB,
+        });
+    }
+
+    canvas._ci = new Chart(canvas.getContext('2d'), {
+        type: 'radar',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: textC } },
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { color: textC, backdropColor: 'transparent', font: { size: 9 } },
+                    grid: { color: gridC },
+                    angleLines: { color: gridC },
+                    pointLabels: { color: textC, font: { size: 11 } }
                 }
             }
         }
