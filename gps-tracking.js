@@ -171,6 +171,18 @@ RPETracker.prototype._parseCsvText = function(text) {
 // Columnas del CSV de Oli que nos interesa guardar. El resto del CSV
 // se ignora a propósito (Fase 1: solo lo necesario para el resumen
 // y el detalle ampliado, ver README de la conversación de diseño).
+//
+// IMPORTANTE (a partir del CSV del 10/09/2026): Oli añadió un nuevo
+// bloque de "zonas de velocidad" (Caminata/Trote/MSR/HSR/Sprint, cada
+// una con conteo (#) y distancia (m)) que sustituye a las columnas
+// antiguas de trote/caminata y a "Carreras de Alta/Máx. Int.".
+//
+// Estas columnas nuevas tienen EXACTAMENTE EL MISMO NOMBRE que las
+// viejas que sustituyen ('Trote (m)', 'Caminata (m)'), así que un CSV
+// con ambos bloques a la vez tiene columnas de cabecera duplicadas.
+// Por eso este mapeo va por POSICIÓN (índice) para esas columnas
+// concretas en vez de por nombre — ver `OLI_FIELD_MAP_BY_POSITION`
+// más abajo y `_resolveOliColumnIndexes()`.
 const OLI_FIELD_MAP = {
     'Nombre del Jugador':                    'oliPlayerName',
     'ID del Jugador':                        'oliPlayerId',
@@ -182,12 +194,6 @@ const OLI_FIELD_MAP = {
     'Dist. Recorrida (m)':                   'distanceM',
     'Saltos (#)':                            'jumps',
     'Cambios de Dirección (#)':              'directionChanges',
-    'Carreras de Máx. Int. (#)':             'maxIntensityRuns',
-    'Carreras de Máx. Int. (m)':             'maxIntensityRunsM',
-    'Carreras de Alta Int. (#)':             'highIntensityRuns',
-    'Carreras de Alta Int. (m)':             'highIntensityRunsM',
-    'Trote (m)':                             'jogM',
-    'Caminata (m)':                          'walkM',
     'Ace. Máx. Int. (#)':                    'maxAccelerations',
     'Ace. Máx. Int. (m)':                    'maxAccelerationsM',
     'Desac. Máx. Int. (#)':                  'maxDecelerations',
@@ -208,6 +214,51 @@ const OLI_FIELD_MAP = {
     's-RPE':                                  'oliSrpe',
 };
 
+// Columnas del nuevo bloque de "zonas de velocidad" (# y m). Estas
+// SUSTITUYEN a las columnas antiguas 'Trote (m)' / 'Caminata (m)' (que
+// ya no se usan) y a 'Carreras de Alta Int.' / 'Carreras de Máx. Int.'
+// (High Speed Running sustituye a "Alta Int.", Sprint sustituye a
+// "Máx. Int."). Si el CSV NO trae este bloque (formato viejo, antes
+// del 10/09/2026), estos campos simplemente quedan a null y la UI
+// los muestra como "—", sin romper nada.
+const OLI_SPEED_ZONE_COLUMNS = [
+    { name: 'Caminata(#)',                   key: 'walkCount' },
+    { name: 'Caminata (m)',                  key: 'walkM' },
+    { name: 'Trote(#)',                      key: 'jogCount' },
+    { name: 'Trote (m)',                     key: 'jogM' },
+    { name: 'Moderate Speed Running(#)',     key: 'moderateRunCount' },
+    { name: 'Moderate Speed Running (m)',    key: 'moderateRunM' },
+    { name: 'High Speed Running(#)',         key: 'highIntensityRuns' },
+    { name: 'High Speed Running (m)',        key: 'highIntensityRunsM' },
+    { name: 'Sprint(#)',                     key: 'maxIntensityRuns' },
+    { name: 'Sprint (m)',                    key: 'maxIntensityRunsM' },
+];
+
+// Nombres de columna que además de existir en OLI_SPEED_ZONE_COLUMNS
+// pueden aparecer DUPLICADOS en la cabecera (por el bloque viejo).
+// Cuando busquemos estas columnas del bloque nuevo, tenemos que coger
+// la ÚLTIMA aparición (el bloque nuevo va siempre al final del CSV,
+// después del bloque viejo de aceleraciones/desaceleraciones).
+const OLI_DUPLICATE_COLUMN_NAMES = new Set(['Trote (m)', 'Caminata (m)']);
+
+// Localiza, para cada columna del bloque de zonas de velocidad, su
+// índice correcto en la cabecera — usando la ÚLTIMA aparición del
+// nombre cuando hay duplicados, y la única aparición en caso
+// contrario. Devuelve { key: index|undefined }.
+function _resolveSpeedZoneIndexes(header) {
+    const indexes = {};
+    OLI_SPEED_ZONE_COLUMNS.forEach(col => {
+        let idx;
+        if (OLI_DUPLICATE_COLUMN_NAMES.has(col.name)) {
+            idx = header.lastIndexOf(col.name); // última aparición = bloque nuevo
+        } else {
+            idx = header.indexOf(col.name);
+        }
+        indexes[col.key] = idx >= 0 ? idx : undefined;
+    });
+    return indexes;
+}
+
 // Convierte el texto crudo del CSV en un array de objetos con las
 // columnas relevantes ya traducidas a nombres internos y números.
 RPETracker.prototype.parseOliGpsCsv = function(text) {
@@ -215,8 +266,14 @@ RPETracker.prototype.parseOliGpsCsv = function(text) {
     if (rows.length < 2) return [];
 
     const header = rows[0].map(h => h.trim());
+
+    // Columnas "normales" (sin duplicados): por nombre, primera aparición.
     const colIndex = {};
-    header.forEach((h, i) => { colIndex[h] = i; });
+    header.forEach((h, i) => { if (colIndex[h] === undefined) colIndex[h] = i; });
+
+    // Columnas del bloque de zonas de velocidad: resueltas aparte,
+    // por posición, para no chocar con nombres duplicados.
+    const speedZoneIndex = _resolveSpeedZoneIndexes(header);
 
     const records = [];
     for (let r = 1; r < rows.length; r++) {
@@ -231,6 +288,13 @@ RPETracker.prototype.parseOliGpsCsv = function(text) {
             const value = raw[idx] !== undefined ? raw[idx].trim() : '';
             const isNumeric = !['oliPlayerName', 'oliPlayerId', 'oliDate', 'oliSessionType', 'oliMdTag'].includes(internalKey);
             record[internalKey] = isNumeric ? (value === '' ? null : parseFloat(value)) : value;
+        });
+
+        OLI_SPEED_ZONE_COLUMNS.forEach(col => {
+            const idx = speedZoneIndex[col.key];
+            if (idx === undefined) { record[col.key] = null; return; }
+            const value = raw[idx] !== undefined ? raw[idx].trim() : '';
+            record[col.key] = value === '' ? null : parseFloat(value);
         });
 
         if (record.oliPlayerName) records.push(record);

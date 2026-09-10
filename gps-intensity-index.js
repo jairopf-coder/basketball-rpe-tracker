@@ -17,7 +17,7 @@
 //      cada uno con un peso fijo sobre el total:
 //        - Volumen                    25%
 //        - Intensidad de carrera      30%  (caminata×1, trote×2,
-//                                            alta×3, máxima×4)
+//                                            moderada×3, alta×4, sprint×5)
 //        - Esfuerzos explosivos       30%  (acel/decel alta×3 y
 //                                            máx×4, cambios dir.×2,
 //                                            saltos×2)
@@ -54,11 +54,15 @@ const GPS_IIO_CONFIG = {
             key: 'runIntensity',
             label: 'Intensidad de carrera',
             weight: 0.30,
+            // A partir del CSV con las nuevas zonas de velocidad de Oli
+            // (10/09/2026) hay 5 bandas en vez de 4: caminata, trote,
+            // carrera moderada, carrera de alta intensidad y sprint.
             metrics: [
-                { key: 'walkM',              factor: 1 }, // caminata = baja
-                { key: 'jogM',               factor: 2 }, // trote = media
-                { key: 'highIntensityRunsM', factor: 3 }, // alta
-                { key: 'maxIntensityRunsM',  factor: 4 }, // máxima
+                { key: 'walkM',              factor: 1 }, // caminata = muy baja
+                { key: 'jogM',               factor: 2 }, // trote = baja/media
+                { key: 'moderateRunM',       factor: 3 }, // carrera moderada
+                { key: 'highIntensityRunsM', factor: 4 }, // alta (antes "Carreras Alta Int.")
+                { key: 'maxIntensityRunsM',  factor: 5 }, // sprint (antes "Carreras Máx. Int.")
             ]
         },
         {
