@@ -433,6 +433,20 @@ RPETracker.prototype.showSessionDetail = function(id) {
         .sort((a, b) => new Date(a.date) - new Date(b.date));
     const sessionIdx = playerSessions.findIndex(s => s.id === session.id) + 1;
     const totalSessions = playerSessions.length;
+
+    // Fase 3A: grupo de sesiones "hermanas" (misma sesión de equipo: fecha+turno+tipo),
+    // para poder navegar Anterior/Siguiente editando minutos jugadora a jugadora.
+    // Mismo criterio de agrupación que countUniqueSessions/getUniqueSessions.
+    const groupKey = `${session.date.slice(0,10)}_${session.timeOfDay || 'unknown'}_${session.type || 'training'}`;
+    const siblingSessions = this.sessions
+        .filter(s => `${s.date.slice(0,10)}_${s.timeOfDay || 'unknown'}_${s.type || 'training'}` === groupKey)
+        .map(s => {
+            const p = this.players.find(pl => pl.id === s.playerId);
+            return { id: s.id, name: p ? p.name : 'Desconocida' };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+    this._sessionGroup = siblingSessions.map(s => s.id);
+    const groupIdx = this._sessionGroup.indexOf(id);
     
     const content = document.getElementById('detailContent');
     content.innerHTML = `
@@ -463,7 +477,12 @@ RPETracker.prototype.showSessionDetail = function(id) {
         </div>
         <div class="detail-row">
             <span class="detail-label">Duración</span>
-            <span>⏱️ ${session.duration || 60} minutos</span>
+            <span class="sd-duration-edit">
+                <input type="number" id="detailDurationInput" class="sd-duration-input"
+                    min="1" max="300" value="${session.duration || 60}"
+                    onblur="window.rpeTracker?._saveDetailDuration()">
+                <span class="sd-duration-unit">min</span>
+            </span>
         </div>
         <div class="detail-rpe-display">
             <span class="detail-rpe-number" style="color: ${this.getRPEColor(session.rpe)}">${session.rpe}</span>
@@ -471,7 +490,7 @@ RPETracker.prototype.showSessionDetail = function(id) {
         </div>
         <div class="detail-row sd-load-row">
             <span class="detail-label">Carga Total (sRPE)</span>
-            <span style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${session.load || (session.rpe * (session.duration || 60))}</span>
+            <span id="detailLoadValue" style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${session.load || (session.rpe * (session.duration || 60))}</span>
         </div>
         ${session.notes ? `
             <div class="detail-row">
@@ -486,6 +505,26 @@ RPETracker.prototype.showSessionDetail = function(id) {
         </div>` : ''}
         ${typeof this.renderGpsSummaryBlock === 'function' ? this.renderGpsSummaryBlock(session) : ''}
     `;
+
+    // Fase 3A: navegación Anterior/Siguiente entre jugadoras de la misma sesión de equipo
+    const navEl = document.getElementById('detailGroupNav');
+    if (navEl) {
+        if (siblingSessions.length > 1) {
+            navEl.style.display = '';
+            navEl.innerHTML = `
+                <button type="button" class="btn-secondary sd-nav-btn" id="detailPrevBtn"
+                    ${groupIdx <= 0 ? 'disabled' : ''}
+                    onclick="window.rpeTracker?._gotoDetailSibling(-1)">◀ Anterior</button>
+                <span class="sd-nav-count">${groupIdx + 1} de ${siblingSessions.length}</span>
+                <button type="button" class="btn-secondary sd-nav-btn" id="detailNextBtn"
+                    ${groupIdx >= siblingSessions.length - 1 ? 'disabled' : ''}
+                    onclick="window.rpeTracker?._gotoDetailSibling(1)">Siguiente ▶</button>
+            `;
+        } else {
+            navEl.style.display = 'none';
+            navEl.innerHTML = '';
+        }
+    }
     
     const _dModal = document.getElementById('detailModal');
     _dModal.classList.add('active');
@@ -495,6 +534,52 @@ RPETracker.prototype.showSessionDetail = function(id) {
     if (playerSessions.length >= 2) {
         requestAnimationFrame(() => this._renderRPEHistogram(playerSessions, session.rpe));
     }
+};
+
+// Fase 3A: guarda solo la duración editada desde el detalle de sesión (sin abrir
+// el modal completo de edición). Recalcula load y refresca listas/dashboard.
+RPETracker.prototype._saveDetailDuration = function() {
+    if (!this.currentSessionId) return;
+    const input = document.getElementById('detailDurationInput');
+    if (!input) return;
+    const session = this.sessions.find(s => s.id === this.currentSessionId);
+    if (!session) return;
+
+    const newDuration = parseInt(input.value);
+    if (isNaN(newDuration) || newDuration < 1 || newDuration > 300) {
+        // Valor inválido: revertir al valor guardado, sin tocar datos
+        input.value = session.duration || 60;
+        return;
+    }
+    if (newDuration === session.duration) return; // sin cambios reales
+
+    session.duration = newDuration;
+    session.load = session.rpe * newDuration;
+
+    this.saveSessions();
+
+    // Refrescar el número de carga en el propio modal sin re-renderizar todo
+    // (evita perder el foco/valor del input mientras el usuario navega)
+    const loadEl = document.getElementById('detailLoadValue');
+    if (loadEl) loadEl.textContent = session.load;
+
+    this.renderSessions();
+    if (this.currentView === 'dashboard') this.renderDashboard();
+    this.showToast('✅ Minutos actualizados', 'success');
+};
+
+// Fase 3A: navega a la sesión anterior/siguiente dentro del mismo grupo
+// (misma sesión de equipo: fecha+turno+tipo), guardando antes cualquier cambio pendiente.
+RPETracker.prototype._gotoDetailSibling = function(direction) {
+    if (!this._sessionGroup || !this.currentSessionId) return;
+    // Asegurar que un cambio de minutos sin "blur" (p.ej. Enter) no se pierde al navegar
+    this._saveDetailDuration();
+
+    const idx = this._sessionGroup.indexOf(this.currentSessionId);
+    const nextIdx = idx + direction;
+    if (nextIdx < 0 || nextIdx >= this._sessionGroup.length) return;
+
+    this.showSessionDetail(this._sessionGroup[nextIdx]);
 };
 
 RPETracker.prototype._renderRPEHistogram = function(playerSessions, currentRpe) {

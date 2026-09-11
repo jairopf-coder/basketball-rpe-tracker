@@ -664,6 +664,7 @@ class RPETracker {
         }
         if (modalId === 'addPlayerModal'    && this._ftRelease2) { this._ftRelease2(); this._ftRelease2 = null; }
         if (modalId === 'detailModal'       && this._ftRelease3) { this._ftRelease3(); this._ftRelease3 = null; }
+        if (modalId === 'detailModal') { this._sessionGroup = null; }
         if (modalId === 'editSessionModal'  && this._ftRelease4) { this._ftRelease4(); this._ftRelease4 = null; }
         if (modalId === 'editPlayerModal'   && this._ftRelease5) { this._ftRelease5(); this._ftRelease5 = null; }
         document.getElementById(modalId)?.classList.remove('active');
