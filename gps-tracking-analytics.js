@@ -166,7 +166,10 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
             <button class="an-tab ${this._gpsAnTab === 'team' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('team')">👥 Comparativa equipo</button>
             <button class="an-tab ${this._gpsAnTab === 'radar' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('radar')">📊 Comparar jugadoras</button>
         </div>
-        <div style="display:flex;justify-content:flex-end;padding-top:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;flex-wrap:wrap;gap:8px;">
+            <button class="btn-primary" style="font-size:0.85rem;" onclick="window.rpeTracker.openGpsImportFromTab()">
+                📤 Importar CSV
+            </button>
             ${this._renderGpsTypeFilterSelect()}
         </div>
         <div id="gpsAnTabContent" style="padding-top:10px;"></div>
