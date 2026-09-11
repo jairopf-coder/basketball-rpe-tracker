@@ -154,11 +154,16 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
     if (!this._gpsAnTab) this._gpsAnTab = 'player';
 
     container.innerHTML = `
-        <div class="an-header" style="margin-bottom:0;">
-            <h2 style="margin:0 0 4px 0;">📡 Analítica GPS (Oli Sports)</h2>
-            <p style="margin:0 0 12px 0;color:var(--text-secondary);font-size:0.9rem;">
-                Compara la carga interna (RPE × duración) con la carga externa objetiva del GPS.
-            </p>
+        <div class="an-header" style="margin-bottom:0;display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+            <div>
+                <h2 style="margin:0 0 4px 0;">📡 Analítica GPS (Oli Sports)</h2>
+                <p style="margin:0 0 12px 0;color:var(--text-secondary);font-size:0.9rem;">
+                    Compara la carga interna (RPE × duración) con la carga externa objetiva del GPS.
+                </p>
+            </div>
+            <button class="btn-primary" style="font-size:0.85rem;white-space:nowrap;" onclick="window.rpeTracker.openGpsImportFromTab()">
+                📤 Importar CSV
+            </button>
         </div>
         ${this._renderGpsAlertBanner()}
         <div class="an-tabs">
@@ -166,10 +171,7 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
             <button class="an-tab ${this._gpsAnTab === 'team' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('team')">👥 Comparativa equipo</button>
             <button class="an-tab ${this._gpsAnTab === 'radar' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('radar')">📊 Comparar jugadoras</button>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;flex-wrap:wrap;gap:8px;">
-            <button class="btn-primary" style="font-size:0.85rem;" onclick="window.rpeTracker.openGpsImportFromTab()">
-                📤 Importar CSV
-            </button>
+        <div style="display:flex;justify-content:flex-end;padding-top:10px;">
             ${this._renderGpsTypeFilterSelect()}
         </div>
         <div id="gpsAnTabContent" style="padding-top:10px;"></div>
