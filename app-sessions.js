@@ -17,6 +17,10 @@ RPETracker.prototype.openNewSessionModal = function() {
     document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('selected'));
     const d60 = document.querySelector('[data-duration="60"]');
     if (d60) d60.classList.add('selected');
+    // Fase 3B: reset del modo "minutos individuales" — cada sesión nueva empieza sin personalizar
+    const indivCheck = document.getElementById('individualizeMinutes');
+    if (indivCheck) indivCheck.checked = false;
+    this._individualDurations = {};
     this.goToStep1();
 };
 
@@ -162,10 +166,20 @@ RPETracker.prototype.goToStep2 = function() {
 RPETracker.prototype.renderPlayerRpeList = function() {
     const container = document.getElementById('playerRpeList');
     if (!container) return;
+    // Fase 3B: si el checkbox "Individualizar minutos" está activo, cada jugadora
+    // tiene su propio campo de minutos (precargado con la duración general del Paso 1
+    // solo la PRIMERA vez; si ya se personalizó antes, se respeta ese valor).
+    const individualize = document.getElementById('individualizeMinutes')?.checked || false;
+    const generalDuration = parseInt(document.getElementById('sessionDuration')?.value) || 60;
+    if (!this._individualDurations) this._individualDurations = {};
+
     container.innerHTML = this.selectedPlayerIds.map(playerId => {
         const player = this.players.find(p => p.id === playerId);
         if (!player) return '';
         const color = PlayerTokens.get(player);
+        const playerDuration = this._individualDurations[playerId] != null
+            ? this._individualDurations[playerId]
+            : generalDuration;
         return `
             <div class="player-rpe-item" id="rpe-item-${player.id}" style="border-left:3px solid ${color}">
                 <div class="player-rpe-header">
@@ -175,6 +189,13 @@ RPETracker.prototype.renderPlayerRpeList = function() {
                         <div class="player-rpe-label-text" id="rpeLbl-${player.id}" style="text-align:right">${this.getRPELabel(5)}</div>
                     </div>
                 </div>
+                ${individualize ? `
+                <div class="player-rpe-duration">
+                    <span class="player-rpe-duration-label">⏱️ Minutos:</span>
+                    <input type="number" class="sd-duration-input" id="playerDuration-${player.id}"
+                        min="1" max="300" value="${playerDuration}"
+                        onchange="window.rpeTracker?._updateIndividualDuration('${player.id}', this.value)">
+                </div>` : ''}
                 <div class="rpe-btn-grid" id="rpeBtns-${player.id}">
                     ${[1,2,3,4,5,6,7,8,9,10].map(v => `
                         <button type="button" class="rpe-num-btn"
@@ -188,6 +209,15 @@ RPETracker.prototype.renderPlayerRpeList = function() {
                     placeholder="Incidencias de ${player.name} (opcional)..."></textarea>
             </div>`;
     }).join('');
+};
+
+// Fase 3B: guarda en memoria el minuto personalizado de una jugadora mientras
+// dura la creación de la sesión (se resetea en openNewSessionModal).
+RPETracker.prototype._updateIndividualDuration = function(playerId, value) {
+    if (!this._individualDurations) this._individualDurations = {};
+    const n = parseInt(value);
+    if (isNaN(n) || n < 1 || n > 300) return; // valor inválido: se ignora, el input HTML ya limita min/max
+    this._individualDurations[playerId] = n;
 };
 
 RPETracker.prototype.updateIndividualRPE = function(playerId, value) {
@@ -235,6 +265,7 @@ RPETracker.prototype.saveTeamSession = function() {
     const timeString = timeOfDay === 'morning' ? 'T10:00:00' : 'T18:00:00';
     const fullDateTime = dateValue + timeString;
     const duration = parseInt(document.getElementById('sessionDuration').value) || 60;
+    const individualize = document.getElementById('individualizeMinutes')?.checked || false;
     const type = document.querySelector('input[name="sessionType"]:checked').value;
     const season = this._getSelectedSeason();
     if (season === null) return; // error ya mostrado
@@ -263,6 +294,17 @@ RPETracker.prototype.saveTeamSession = function() {
         const notesEl = document.getElementById(`notes-${playerId}`);
         const rpe = hidden ? parseInt(hidden.value) || 0 : 0;
         const notes = notesEl ? notesEl.value : '';
+        // Fase 3B: con "Individualizar minutos" activo, cada jugadora usa su propia
+        // duración (leída del input visible o, si no está, de lo guardado en memoria);
+        // si algo falla, cae de vuelta a la duración general — nunca se guarda sin valor.
+        let playerDuration = duration;
+        if (individualize) {
+            const durInput = document.getElementById(`playerDuration-${playerId}`);
+            const fromInput = durInput ? parseInt(durInput.value) : NaN;
+            const fromMemory = this._individualDurations ? this._individualDurations[playerId] : undefined;
+            playerDuration = !isNaN(fromInput) && fromInput > 0 ? fromInput
+                : (fromMemory != null ? fromMemory : duration);
+        }
         const session = {
             id: (baseId + i).toString(),
             playerId,
@@ -270,8 +312,8 @@ RPETracker.prototype.saveTeamSession = function() {
             timeOfDay,
             type,
             rpe,
-            duration,
-            load: rpe * duration,
+            duration: playerDuration,
+            load: rpe * playerDuration,
             notes,
             season
         };
