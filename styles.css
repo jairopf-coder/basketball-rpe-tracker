@@ -2956,6 +2956,22 @@ header h1 {
     border-color: var(--primary);
 }
 
+/* ===== Minutos individuales por jugadora (Fase 3B) ===== */
+.player-rpe-duration {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.player-rpe-duration-label {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+.player-rpe-duration .sd-duration-input {
+    width: 70px;
+}
+
 
 /* ===== DISEÑO DESKTOP LIMPIO ===== */
 @media (min-width: 769px) {
