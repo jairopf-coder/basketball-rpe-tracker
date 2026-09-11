@@ -304,6 +304,71 @@ RPETracker.prototype.parseOliGpsCsv = function(text) {
 
 // ========== Flujo de importación (UI) ==========
 
+// ---- NUEVO punto de entrada: botón "📤 Importar CSV" en la pestaña
+// GPS (fuera de la ficha de sesión). Permite subir el CSV de Oli UNA
+// SOLA VEZ para todo el equipo, en vez de entrar jugadora por
+// jugadora desde el historial. Reutiliza el mismo parser, el mismo
+// emparejamiento de nombres y el mismo modal de confirmación que ya
+// usaba `openGpsImportForSession` — no se toca ni se duplica esa
+// lógica, solo se añade una forma más cómoda de llegar a ella.
+//
+// Paso 1: elegir a qué "entreno" ya registrado en la app corresponde
+//         el CSV (mismo agrupador fecha+tipo que usa la Comparativa
+//         equipo, vía _getTeamSessionOptions).
+// Paso 2: elegir el archivo CSV; si su fecha no coincide con la del
+//         entreno elegido, se avisa pero se deja continuar.
+// Paso 3: el modal de verificación de jugadoras ya existente.
+RPETracker.prototype.openGpsImportFromTab = function() {
+    const teamSessions = this._getTeamSessionOptions();
+    if (teamSessions.length === 0) {
+        this.showToast('⚠️ Todavía no hay ningún entreno o partido registrado', 'warning');
+        return;
+    }
+
+    let modal = document.getElementById('gpsImportPickSessionModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'gpsImportPickSessionModal';
+        modal.className = 'modal modal--top';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:480px;">
+            <div class="modal-header">
+                <h2>📤 Importar CSV de Oli</h2>
+                <button class="modal-close" onclick="document.getElementById('gpsImportPickSessionModal').classList.remove('active')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.9rem;color:var(--text-secondary,#666);margin-bottom:12px;">
+                    Elige a qué entreno o partido ya registrado en la app corresponde este archivo. Después podrás verificar que cada jugadora del CSV coincide con la de tu plantilla.
+                </p>
+                <select id="gpsImportPickSessionSelect" style="width:100%;">
+                    ${teamSessions.map(s => `<option value="${s.id}" data-date="${s.date}">${esc(s.label)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="document.getElementById('gpsImportPickSessionModal').classList.remove('active')">Cancelar</button>
+                <button class="btn-primary" onclick="window.rpeTracker._gpsImportPickSessionContinue()">Siguiente: elegir CSV →</button>
+            </div>
+        </div>`;
+
+    modal.classList.add('active');
+};
+
+RPETracker.prototype._gpsImportPickSessionContinue = function() {
+    const select = document.getElementById('gpsImportPickSessionSelect');
+    if (!select) return;
+    const sessionGroupId = select.value;
+    const sessionDate = select.selectedOptions[0] ? select.selectedOptions[0].getAttribute('data-date') : null;
+
+    const modal = document.getElementById('gpsImportPickSessionModal');
+    if (modal) modal.classList.remove('active');
+
+    this._gpsImportExpectedDate = sessionDate;
+    this.openGpsImportForSession(sessionGroupId);
+};
+
 // Punto de entrada: botón "Importar datos GPS" en la ficha de sesión.
 RPETracker.prototype.openGpsImportForSession = function(sessionGroupId) {
     this._gpsImportSessionGroupId = sessionGroupId;
@@ -406,6 +471,22 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
             `).join('')}
         </div>` : '';
 
+    // Aviso no bloqueante: si este import viene del botón "📤 Importar CSV"
+    // de la pestaña GPS (que ya sabe qué entreno se eligió), comprobamos
+    // que la fecha del CSV coincide con la del entreno. Si no coincide,
+    // se avisa pero se deja continuar (el entrenador decide).
+    let dateWarningHtml = '';
+    if (this._gpsImportExpectedDate) {
+        const csvDate = (matched[0] && matched[0].record.oliDate) || (unmatched[0] && unmatched[0].oliDate) || null;
+        if (csvDate && csvDate !== this._gpsImportExpectedDate) {
+            dateWarningHtml = `
+                <div style="background:var(--warning-soft);color:var(--warning);border:1px solid var(--warning);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:0.85rem;">
+                    ⚠️ La fecha del CSV (<strong>${esc(csvDate)}</strong>) no coincide con la del entreno que elegiste (<strong>${esc(this._gpsImportExpectedDate)}</strong>). Comprueba que es el archivo correcto antes de guardar.
+                </div>`;
+        }
+        this._gpsImportExpectedDate = null; // solo se usa una vez
+    }
+
     modal.innerHTML = `
         <div class="modal-content" style="max-width:560px;max-height:85vh;max-height:85dvh;">
             <div class="modal-header">
@@ -413,6 +494,7 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
                 <button class="modal-close" onclick="document.getElementById('gpsImportModal').classList.remove('active')">✕</button>
             </div>
             <div class="modal-body">
+                ${dateWarningHtml}
                 <p style="font-size:0.9rem;color:var(--text-secondary,#666);margin-bottom:12px;">
                     Revisa que cada jugadora del archivo de Oli esté bien asociada a tu plantilla. Puedes corregirlo con el desplegable.
                     ${(matched.length + unmatched.length) > 6 ? '<br><strong>⬇ Desplázate para ver todas las jugadoras</strong>' : ''}
