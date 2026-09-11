@@ -475,13 +475,19 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
     // de la pestaña GPS (que ya sabe qué entreno se eligió), comprobamos
     // que la fecha del CSV coincide con la del entreno. Si no coincide,
     // se avisa pero se deja continuar (el entrenador decide).
+    //
+    // OJO: session.date guarda fecha+hora ("2026-09-10T18:00:00"), pero
+    // oliDate del CSV solo trae la fecha ("2026-09-10"). Comparamos
+    // únicamente los primeros 10 caracteres (YYYY-MM-DD) de ambos.
     let dateWarningHtml = '';
     if (this._gpsImportExpectedDate) {
         const csvDate = (matched[0] && matched[0].record.oliDate) || (unmatched[0] && unmatched[0].oliDate) || null;
-        if (csvDate && csvDate !== this._gpsImportExpectedDate) {
+        const expectedDateOnly = String(this._gpsImportExpectedDate).slice(0, 10);
+        const csvDateOnly = csvDate ? String(csvDate).slice(0, 10) : null;
+        if (csvDateOnly && csvDateOnly !== expectedDateOnly) {
             dateWarningHtml = `
                 <div style="background:var(--warning-soft);color:var(--warning);border:1px solid var(--warning);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:0.85rem;">
-                    ⚠️ La fecha del CSV (<strong>${esc(csvDate)}</strong>) no coincide con la del entreno que elegiste (<strong>${esc(this._gpsImportExpectedDate)}</strong>). Comprueba que es el archivo correcto antes de guardar.
+                    ⚠️ La fecha del CSV (<strong>${esc(csvDateOnly)}</strong>) no coincide con la del entreno que elegiste (<strong>${esc(expectedDateOnly)}</strong>). Comprueba que es el archivo correcto antes de guardar.
                 </div>`;
         }
         this._gpsImportExpectedDate = null; // solo se usa una vez
