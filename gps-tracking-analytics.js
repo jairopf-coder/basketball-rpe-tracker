@@ -517,19 +517,29 @@ RPETracker.prototype._renderGpsTeamComparisonTab = function(container) {
 };
 
 // Sesiones de equipo disponibles para el selector "Una sesión": se
-// agrupan por fecha+tipo (todas las jugadoras de la misma sesión
-// comparten fecha), mostrando la más reciente primero.
+// agrupan por fecha+franja horaria+tipo (todas las jugadoras de la
+// misma sesión comparten fecha), mostrando la más reciente primero.
+//
+// IMPORTANTE: si hay dos entrenos el mismo día (mañana y tarde), hay
+// que distinguirlos en la etiqueta — si no, aparecerían dos opciones
+// idénticas en el selector y sería imposible saber cuál es cuál al
+// importar un CSV. Por eso se agrupa por `timeOfDay` (campo explícito
+// que ya guarda cada sesión) y se muestra en la etiqueta.
 RPETracker.prototype._getTeamSessionOptions = function() {
     const seen = new Map();
     this._applyGpsTypeFilter(this.sessions || [])
         .forEach(s => {
-            const key = s.date + '|' + (s.type || '');
+            const key = s.date + '|' + (s.timeOfDay || '') + '|' + (s.type || '');
             if (!seen.has(key)) {
+                const dateLabel = new Date(s.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const timeLabel = s.timeOfDay === 'morning' ? '☀️ Mañana'
+                    : s.timeOfDay === 'evening' ? '🌙 Tarde'
+                    : ''; // sesiones antiguas sin timeOfDay: no se añade nada
                 seen.set(key, {
                     id: s.id, // usamos el id de la primera sesión de ese grupo como referencia
                     date: s.date,
                     type: s.type,
-                    label: `${new Date(s.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })} — ${s.type || 'Sesión'}`
+                    label: `${dateLabel}${timeLabel ? ' ' + timeLabel : ''} — ${s.type || 'Sesión'}`
                 });
             }
         });
