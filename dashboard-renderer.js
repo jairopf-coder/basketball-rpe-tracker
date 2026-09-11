@@ -214,6 +214,15 @@ RPETracker.prototype.renderDashboard = function() {
             <span class="db-matchday-badge">🏟️ DÍA DE PARTIDO</span>
             <button class="db-matchday-toggle" onclick="window.rpeTracker?._toggleMatchDayMode()">${matchDayBtnLabel}</button>
         </div>` : ''}
+
+        <!-- Acción permanente: Nueva Sesión (siempre visible en Inicio, con o sin modo día de partido) -->
+        <div class="dashboard-quick-actions">
+            <button type="button" class="dqa-btn" onclick="window.rpeTracker?.openNewSessionModal()">
+                <span class="dqa-icon">➕</span>
+                <span class="dqa-label">Nueva Sesión</span>
+            </button>
+        </div>
+
         ${this._matchDayMode ? this._renderMatchDayView(availGroups, players) : `
 
 

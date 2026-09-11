@@ -2365,11 +2365,8 @@ header h1 {
         display: none;
     }
 
-    #addBtn {
-        padding: 0.6rem 1rem;
-        font-size: 0.9rem;
-        border-radius: 20px;
-    }
+    /* #addBtn ya hereda display:none de .header-action-btn (regla arriba) —
+       en móvil "Nueva Sesión" vive en el dashboard (dqa-btn) y en el FAB. */
 
     /* Pestañas: solo icono en móvil, sin texto */
     .tabs {
@@ -3013,11 +3010,8 @@ header h1 {
         box-shadow: none;
     }
 
-    #addBtn {
-        padding: 0.5rem 1.1rem;
-        font-size: 0.9rem;
-        border-radius: 8px;
-    }
+    /* #addBtn ya usa el estilo estándar de .header-action-btn
+       (mismo aspecto que Pre-sesión/Wellness). */
 
     /* Pestañas más limpias */
     .tabs {
@@ -9170,9 +9164,10 @@ details[open] .ewma-toggle-hint { display: none; }
         font-weight: 500;
     }
 
-    /* Desktop: hide bottom-nav FAB and drawer */
+    /* Desktop: hide bottom-nav FAB and drawer (el botón de acción del
+       dashboard SÍ debe verse en desktop — ver .dashboard-quick-actions abajo) */
     #bnMoreBtn, #bnMoreMenu, #bnMoreOverlay,
-    .view-fab, .dashboard-quick-actions { display: none !important; }
+    .view-fab { display: none !important; }
 }
 
 /* ── Quick-action buttons (dashboard, desktop) ── */
