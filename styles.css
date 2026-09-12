@@ -4602,7 +4602,11 @@ header h1 {
     overflow: visible;
     outline: 1px solid var(--border);
 }
-.db-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+.db-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
 
 .db-bar-lo, .db-bar-hi {
     position: absolute;
@@ -4615,9 +4619,10 @@ header h1 {
 .db-bar-lo { left: 40%; }
 .db-bar-hi { left: 65%; }
 
-[data-theme="dark"] .db-player-bar  { background: #2a2a32; outline-color: #3e3e4a; }
+/* Fondo más claro en modo oscuro para que el relleno de color (verde/naranja/rojo/azul) destaque */
+[data-theme="dark"] .db-player-bar  { background: #4a4a56; outline-color: #5c5c6a; }
 [data-theme="dark"] .db-bar-lo,
-[data-theme="dark"] .db-bar-hi      { background: #666; }
+[data-theme="dark"] .db-bar-hi      { background: #999; }
 
 .db-player-ratio { font-size: 0.88rem; font-weight: 700; text-align: right; }
 .db-player-icon  { font-size: 13px; text-align: center; }
@@ -5112,7 +5117,7 @@ header h1 {
 [data-theme="dark"] .session-info { background: var(--bg-subtle); }
 
 /* Dashboard */
-[data-theme="dark"] .db-player-bar { background: var(--bg-subtle); }
+/* (fondo de .db-player-bar en modo oscuro definido más abajo, junto al resto de reglas del ratio A:C) */
 [data-theme="dark"] .db-metric-row { border-color: var(--border); }
 
 /* Player cards */
