@@ -1026,19 +1026,6 @@ header h1 {
     font-size: 0.9rem;
 }
 
-.stat-trend {
-    font-size: 0.85rem;
-    margin-top: 0.5rem;
-}
-
-.trend-up {
-    color: var(--success);
-}
-
-.trend-down {
-    color: var(--danger);
-}
-
 /* Players Management */
 .players-header {
     display: flex;
@@ -4094,7 +4081,7 @@ header h1 {
     background: var(--border); color: var(--text-faint);
     flex-shrink: 0; transition: background 0.2s, color 0.2s;
 }
-.pv-rpe-desc   { font-size: 0.88rem; font-weight: 600; text-align: center; margin-bottom: 0.5rem; transition: color 0.2s; }
+.pv-rpe-desc   { font-size: 0.95rem; font-weight: 700; text-align: center; margin-bottom: 0.5rem; min-height: 1.3rem; transition: color 0.2s; }
 .pv-rpe-ticks  { display: flex; justify-content: space-between; padding: 0 2px; }
 .pv-rpe-ticks span { font-size: 0.7rem; font-weight: 700; }
 
@@ -4149,7 +4136,6 @@ header h1 {
     transition: transform 0.1s; touch-action: manipulation;
 }
 .pv-rpe-btn:active { transform: scale(0.9); }
-.pv-rpe-desc { text-align: center; font-weight: 700; font-size: 0.95rem; min-height: 1.3rem; }
 
 /* Campo fecha */
 .pv-date-row   { display: flex; align-items: center; gap: 0.75rem; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border); padding: 0.85rem 1rem; margin-bottom: 1rem; }
@@ -4621,8 +4607,6 @@ header h1 {
 
 /* Fondo más claro en modo oscuro para que el relleno de color (verde/naranja/rojo/azul) destaque */
 [data-theme="dark"] .db-player-bar  { background: #4a4a56; outline-color: #5c5c6a; }
-[data-theme="dark"] .db-bar-lo,
-[data-theme="dark"] .db-bar-hi      { background: #999; }
 
 .db-player-ratio { font-size: 0.88rem; font-weight: 700; text-align: right; }
 .db-player-icon  { font-size: 13px; text-align: center; }
@@ -6285,39 +6269,7 @@ details[open] .ewma-toggle-hint { display: none; }
     }
 }
 
-/* Bottom nav — menú "Más" (Rendimiento en móvil) */
-.bn-more-menu {
-    position: fixed;
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-    right: 0.75rem;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-    z-index: 1100;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 180px;
-}
-
-.bn-more-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0.75rem 1rem;
-    font-size: 0.875rem;
-    color: var(--text-primary);
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    text-align: left;
-    min-height: 44px;
-    touch-action: manipulation;
-    width: 100%;
-}
-.bn-more-item:last-child { border-bottom: none; }
-.bn-more-item:active { background: var(--bg-subtle); }
+/* Bottom nav — menú "Más" (drawer deslizante, ver definición completa más abajo junto a .bn-more-overlay) */
 
 /* Ocultar menú Más en desktop */
 @media (min-width: 641px) {
@@ -6515,7 +6467,7 @@ details[open] .ewma-toggle-hint { display: none; }
     color: var(--text-muted);
     font-size: 0.95rem;
 }
-.inj-history-grid { display: grid; gap: 0.75rem; }
+/* .inj-history-grid: ver definición completa junto a Pre/Post Injury Comparison, más abajo */
 
 /* Tarjeta de lesión modernizada */
 .inj-card {
@@ -7535,7 +7487,7 @@ details[open] .ewma-toggle-hint { display: none; }
 .pvr-rpe  { color: var(--text-muted); font-size: 0.75rem; }
 .pvr-1rm  { color: var(--text-faint); font-size: 0.72rem; margin-left: auto; }
 .pvr-delta { font-size: 0.75rem; font-weight: 700; margin-left: auto; }
-.pvr-empty { color: var(--text-faint); font-size: 0.8rem; font-style: italic; }
+.pvr-empty-inline { color: var(--text-faint); font-size: 0.8rem; font-style: italic; }
 
 /* Tonnage plan vs real summary bar */
 .pvr-tonnage-bar {
