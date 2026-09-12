@@ -615,7 +615,7 @@ RPETracker.prototype._openGymSessionDetail = function(sessionId) {
                     ${deltaRpe !== null ? `<span class="pvr-delta" style="color:${deltaCol(-deltaRpe)}">RPE${deltaRpe>0?'+':''}${deltaRpe}</span>` : ''}
                 </div>`;
             }).join('')
-            : isPlan ? '' : '<span class="pvr-empty">Sin ejecución registrada</span>';
+            : isPlan ? '' : '<span class="pvr-empty-inline">Sin ejecución registrada</span>';
 
         return `
         <div class="pvr-ex-block">
