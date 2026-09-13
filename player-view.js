@@ -27,12 +27,24 @@ const PlayerView = (() => {
     // ---- Estado interno ----
     let _view = 'menu'; // 'menu' | 'wellness' | 'wellnessDone' | 'rpeType' | 'rpeValue' | 'rpeDone'
     let _screenEl = null;
+    // Modo vista previa: activado por el staff para ver/testear la pantalla
+    // de jugadora sin escribir datos reales en Firebase ni mezclarlos con
+    // su propia cuenta. Mientras está activo, todo lo que normalmente
+    // usaría el uid real de AppAuth se sustituye por un uid de prueba,
+    // y el guardado real hacia Firebase/localStorage queda desactivado.
+    let _previewMode = false;
     let _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0 };
     let _rpeState = { date: _today(), sessionType: null, value: 0 };
 
     // ---- Helpers ----
     function _today() {
         return toLocalISODate(new Date());
+    }
+
+    // uid a usar en todas las lecturas/escrituras de esta pantalla. En modo
+    // vista previa se usa uno de prueba, aislado de cualquier jugadora real.
+    function _getUid() {
+        return _previewMode ? '__preview__' : AppAuth._currentUser?.uid;
     }
 
     function _esc(str) {
@@ -74,6 +86,13 @@ const PlayerView = (() => {
     }
 
     async function _writeToFirebase(path, entry) {
+        if (_previewMode) {
+            // Modo vista previa: no se escribe nada real. Se simula un
+            // pequeño delay para que el flujo (spinner, confirmación) se
+            // sienta igual que en producción.
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return;
+        }
         if (window.firebaseDB) {
             try { await window.firebaseDB.ref(path).set(entry); return; }
             catch (e) { /* cae a offline */ }
@@ -95,7 +114,13 @@ const PlayerView = (() => {
     }
 
     async function _saveWellness() {
-        const uid = AppAuth._currentUser?.uid;
+        if (_previewMode) {
+            // Sandbox puro: no se lee ni se escribe nada real, solo se
+            // simula el tiempo de guardado para que el flujo se sienta igual.
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return;
+        }
+        const uid = _getUid();
         if (!uid) throw new Error('Usuario no autenticado');
         const playerId = await _getLinkedPlayerId(uid);
 
@@ -116,7 +141,11 @@ const PlayerView = (() => {
     }
 
     async function _saveRpe() {
-        const uid = AppAuth._currentUser?.uid;
+        if (_previewMode) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return;
+        }
+        const uid = _getUid();
         if (!uid) throw new Error('Usuario no autenticado');
         const playerId = await _getLinkedPlayerId(uid);
         const date = _rpeState.date;
@@ -138,14 +167,14 @@ const PlayerView = (() => {
     }
 
     function _hasAnsweredWellnessToday() {
-        const uid = AppAuth._currentUser?.uid;
+        const uid = _getUid();
         if (!uid) return false;
         const stored = JSON.parse(localStorage.getItem('pv_wellness') || '{}');
         return !!(stored[uid] && stored[uid][_today()]);
     }
 
     function _hasAnsweredRpeToday(sessionType) {
-        const uid = AppAuth._currentUser?.uid;
+        const uid = _getUid();
         if (!uid) return false;
         const stored = JSON.parse(localStorage.getItem('pv_rpe') || '{}');
         return !!(stored[uid] && stored[uid][_today()] && stored[uid][_today()][sessionType]);
@@ -163,9 +192,15 @@ const PlayerView = (() => {
 
     // ---- Render: piezas reutilizables ----
     function _shell(inner) {
-        const name = AppAuth._currentUser?.displayName || PlayerI18n.t('pvDefaultName');
+        const name = _previewMode
+            ? '👁️ Vista previa (staff)'
+            : (AppAuth._currentUser?.displayName || PlayerI18n.t('pvDefaultName'));
+        const exitBtn = _previewMode
+            ? `<button class="pv-logout" onclick="PlayerView.exitPreview()">← Volver al panel de staff</button>`
+            : `<button class="pv-logout" onclick="AppAuth.logout()">${_esc(PlayerI18n.t('pvLogout'))}</button>`;
         return `
         <div class="pv-container">
+            ${_previewMode ? '<div class="pv-preview-banner">👁️ Vista previa — nada de lo que hagas aquí se guarda de verdad</div>' : ''}
             <div class="pv-lang-row">${PlayerI18n.toggleHTML('PlayerView._onLangChange')}</div>
             <div class="pv-header">
                 <div class="pv-logo">🏀</div>
@@ -173,7 +208,7 @@ const PlayerView = (() => {
                 <p class="pv-subtitle">${_fmtDate(_today())}</p>
             </div>
             ${inner}
-            <button class="pv-logout" onclick="AppAuth.logout()">${_esc(PlayerI18n.t('pvLogout'))}</button>
+            ${exitBtn}
         </div>`;
     }
 
@@ -335,7 +370,7 @@ const PlayerView = (() => {
     // responder desde un dispositivo y luego abrir la app en otro el mismo
     // día deje ver el formulario como si no se hubiera respondido).
     async function _syncTodayStatus() {
-        const uid = AppAuth._currentUser?.uid;
+        const uid = _getUid();
         if (!uid || !window.firebaseDB) return;
         const today = _today();
 
@@ -397,6 +432,34 @@ const PlayerView = (() => {
         _render();
         _drainQueue();
         _syncTodayStatus();
+    }
+
+    // Vista previa para el staff: igual que show(), pero en modo aislado
+    // (sin escritura real, uid de prueba). No se llama a _drainQueue()
+    // porque no debe intentar sincronizar nada real al entrar.
+    function showPreview() {
+        _previewMode = true;
+        document.getElementById('app').style.display = 'none';
+
+        const existing = document.getElementById('player-view-screen');
+        if (existing) existing.remove();
+
+        _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0 };
+        _rpeState = { date: _today(), sessionType: null, value: 0 };
+        _view = 'menu';
+
+        _screenEl = document.createElement('div');
+        _screenEl.id = 'player-view-screen';
+        document.body.appendChild(_screenEl);
+
+        _render();
+    }
+
+    // Vuelve al panel de staff y desactiva el modo vista previa.
+    function exitPreview() {
+        _previewMode = false;
+        document.getElementById('player-view-screen')?.remove();
+        document.getElementById('app').style.display = '';
     }
 
     // ---- Navegación ----
@@ -472,6 +535,8 @@ const PlayerView = (() => {
     // ---- API pública ----
     return {
         show,
+        showPreview,
+        exitPreview,
         _onWellness,
         _onDate,
         _onRpeValue,

@@ -47,6 +47,9 @@ RPETracker.prototype.showGearMenu = function() {
             <button class="gear-item" onclick="AppAuth.showPinSettings();document.getElementById('gearMenuOverlay').remove()">
                 <span class="gear-icon">🔑</span><span>Gestionar PINs</span>
             </button>
+            <button class="gear-item" onclick="AppAuth.enterPlayerPreview();document.getElementById('gearMenuOverlay').remove()">
+                <span class="gear-icon">👁️</span><span>Vista previa jugadora</span>
+            </button>
             <button class="gear-item gear-item--danger" onclick="AppAuth.logout();document.getElementById('gearMenuOverlay').remove()">
                 <span class="gear-icon">🔒</span><span>Salir / Bloquear</span>
             </button>

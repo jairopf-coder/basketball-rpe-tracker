@@ -1010,6 +1010,16 @@ const AppAuth = {
     showPinSettings()  { this.showUserManagement(); },
     showPinScreen()    { this.showLoginScreen(); },
     getPin()           { return ''; },
+
+    // ---- Vista previa de jugadora (solo staff) ----
+    // Muestra la pantalla real de jugadora sin cerrar la sesión de staff y
+    // sin escribir ningún dato real: PlayerView entra en modo preview y
+    // usa un uid de prueba aislado. Útil para comprobar diseño y flujo.
+    enterPlayerPreview() {
+        if (typeof PlayerView === 'undefined') return;
+        document.getElementById('app').style.display = 'none';
+        PlayerView.showPreview();
+    },
     getCoachPin()      { return ''; },
     getPlayerPin()     { return ''; },
     savePins()         {},
