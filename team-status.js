@@ -130,7 +130,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
     const now      = new Date();
     const monday   = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7)); monday.setHours(0,0,0,0);
     const sunday   = new Date(monday); sunday.setDate(monday.getDate() + 6);
-    const todayKey = now.toISOString().slice(0,10);
+    const todayKey = toLocalISODate(now);
     const dateRange = `${monday.toLocaleDateString('es-ES',{day:'numeric',month:'long'})} – ${sunday.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}`;
 
     const wData    = this.wellnessData || [];

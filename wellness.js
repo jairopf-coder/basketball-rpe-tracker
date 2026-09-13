@@ -136,7 +136,7 @@ RPETracker.prototype.renderWellnessDashboard = function() {
     const container = document.getElementById('wellnessDashboardView');
     if (!container) return;
 
-    const today = new Date().toISOString().slice(0,10);
+    const today = toLocalISODate(new Date());
     const filledIds = new Set((this.wellnessData||[]).filter(w=>w.date===today).map(w=>w.playerId));
     const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-6);
 
@@ -386,7 +386,7 @@ RPETracker.prototype._drawWellnessTrendChart = function() {
     const pad={t:10,r:20,b:28,l:32};
     const iW=W-pad.l-pad.r, iH=H-pad.t-pad.b;
     const days=14, dates=[];
-    for(let i=days-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);dates.push(d.toISOString().slice(0,10));}
+    for(let i=days-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);dates.push(toLocalISODate(d));}
 
     // fix P-08: leer colores adaptativos según tema activo
     const isDark = document.documentElement.classList.contains('dark') ||
@@ -832,7 +832,7 @@ RPETracker.prototype.openWellnessBulk = function() {
     if (!this.players.length) { this.showToast('Sin jugadoras registradas', 'warning'); return; }
     if (!this.wellnessData) this.wellnessData = this.loadWellnessData();
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
     // Order: pending first, then already filled
     const pending = this.players.filter(p => !this.wellnessData.some(w => w.playerId === p.id && w.date === today));
     const done    = this.players.filter(p =>  this.wellnessData.some(w => w.playerId === p.id && w.date === today));
@@ -1014,7 +1014,7 @@ RPETracker.prototype.openWellnessQuick = function() {
     if (!this.players.length) { this.showToast('Sin jugadoras registradas', 'warning'); return; }
     if (!this.wellnessData) this.wellnessData = this.loadWellnessData();
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
 
     // Remove any existing instance
     const existing = document.getElementById('wellnessQuickOverlay');
@@ -1129,7 +1129,7 @@ RPETracker.prototype.openWellnessQuick = function() {
 
 RPETracker.prototype.saveWellnessQuick = function() {
     if (!this.wellnessData) this.wellnessData = [];
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
     const overlay = document.getElementById('wellnessQuickOverlay');
     if (!overlay) return;
 

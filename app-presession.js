@@ -1,7 +1,7 @@
 // app-presession.js — Módulo de pre-sesión: readiness, calendario, semáforo (extraído de app.js V26)
 
 RPETracker.prototype.calculateReadiness = function(playerId) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
     const wellnessKey = `wellness_${playerId}_${today}`;
 
     // Try localStorage first (wellness.js stores here before Firebase sync)
@@ -66,7 +66,7 @@ RPETracker.prototype.openPreSessionModal = function() {
 };
 
 RPETracker.prototype._renderPreSessionModal = function() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
     const dateLabel = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
     const wData = this.wellnessData || [];
     const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];

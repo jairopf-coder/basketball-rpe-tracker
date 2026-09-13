@@ -32,7 +32,7 @@ const PlayerView = (() => {
 
     // ---- Helpers ----
     function _today() {
-        return new Date().toISOString().slice(0, 10);
+        return toLocalISODate(new Date());
     }
 
     function _esc(str) {

@@ -922,7 +922,7 @@ RPETracker.prototype._openNewGymSession = function(preselectedPlayerId) {
     if (!this.exerciseLibrary) this._loadStrengthData();
     this._migrateExerciseLibrary();
 
-    this._gymDate         = new Date().toISOString().slice(0, 10);
+    this._gymDate         = toLocalISODate(new Date());
     this._gymExFilter     = 'all';
     this._gymStep         = 1;
     this._gymSharedRows   = [];
@@ -2029,7 +2029,7 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId, editSessionId)
     const playerOpts = this.players.map(p =>
         `<option value="${p.id}" ${p.id === (editSession ? editSession.playerId : preselectedPlayerId) ? 'selected' : ''}>${esc(p.name)}${p.number ? ' #'+p.number : ''}</option>`
     ).join('');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
     const dateVal = editSession ? editSession.date : today;
     const bodyWeightVal = editSession && editSession.bodyWeight != null ? editSession.bodyWeight : '';
 

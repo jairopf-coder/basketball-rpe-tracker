@@ -671,7 +671,7 @@ const AppAuth = {
             playerId,
             userId: this._currentUser?.uid || null,
             timestamp: new Date().toISOString(),
-            date: new Date().toISOString().slice(0, 10),
+            date: toLocalISODate(new Date()),
             sleep:   answers.sleep,
             fatigue: answers.fatigue,
             pain:    answers.pain,
@@ -697,7 +697,7 @@ const AppAuth = {
     },
 
     hasAnsweredToday(playerId) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = toLocalISODate(new Date());
         return this.loadWellnessData().some(w => w.playerId === playerId && w.date === today);
     },
 

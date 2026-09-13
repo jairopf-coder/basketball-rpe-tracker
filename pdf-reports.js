@@ -703,7 +703,7 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
     monday.setHours(0, 0, 0, 0);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-    const todayKey  = now.toISOString().slice(0, 10);
+    const todayKey  = toLocalISODate(now);
     const dateRange = `${monday.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })} – ${sunday.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
     const wData   = this.wellnessData || [];
@@ -1244,7 +1244,7 @@ RPETracker.prototype.showTestsReportMenu = function() {
     if (!this.testSessions) this._loadStrengthData();
 
     const dates = (this.testSessions || []).map(s => s.date).filter(Boolean).sort();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
     const earliestDate = dates[0] || today;
 
     const playerOpts = this.players.map(p =>
@@ -1315,7 +1315,7 @@ RPETracker.prototype.showTestsReportMenu = function() {
 /** Rellena el rango de fechas del informe de tests. days=null → todo el historial. */
 RPETracker.prototype._setTestsReportRange = function(days) {
     const to = new Date();
-    const toStr = to.toISOString().slice(0, 10);
+    const toStr = toLocalISODate(to);
     let fromStr;
     if (days == null) {
         const dates = (this.testSessions || []).map(s => s.date).filter(Boolean).sort();
@@ -1323,7 +1323,7 @@ RPETracker.prototype._setTestsReportRange = function(days) {
     } else {
         const from = new Date(to);
         from.setDate(to.getDate() - days);
-        fromStr = from.toISOString().slice(0, 10);
+        fromStr = toLocalISODate(from);
     }
     const fromEl = document.getElementById('testsReportFrom');
     const toEl = document.getElementById('testsReportTo');
