@@ -741,8 +741,7 @@ RPETracker.prototype.editSession = function(sessionId) {
     document.getElementById('editSessionId').value = session.id;
     document.getElementById('editSessionPlayer').value = session.playerId;
     
-    const date = new Date(session.date);
-    const dateStr = date.toISOString().slice(0, 10);
+    const dateStr = toLocalISODate(session.date);
     document.getElementById('editSessionDate').value = dateStr;
     
     // Set time of day

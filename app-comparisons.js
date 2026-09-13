@@ -302,8 +302,8 @@ RPETracker.prototype.renderComparisonModule = function() {
 
     this._compMode = 'pvp';
     // Initialise date range to last 4 weeks
-    this._compRangeStart = (() => { const d = new Date(); d.setDate(d.getDate() - 28); return d.toISOString().slice(0,10); })();
-    this._compRangeEnd   = new Date().toISOString().slice(0,10);
+    this._compRangeStart = (() => { const d = new Date(); d.setDate(d.getDate() - 28); return toLocalISODate(d); })();
+    this._compRangeEnd   = toLocalISODate(new Date());
     this._injectCompDatePicker();
     this.updateComparison();
 };
@@ -506,8 +506,8 @@ RPETracker.prototype.setCompDatePreset = function(preset) {
         const y = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
         start = new Date(y, 8, 1); // 1 Sep
     }
-    this._compRangeStart = start.toISOString().slice(0,10);
-    this._compRangeEnd   = now.toISOString().slice(0,10);
+    this._compRangeStart = toLocalISODate(start);
+    this._compRangeEnd   = toLocalISODate(now);
 
     const fromEl = document.getElementById('compDateFrom');
     const toEl   = document.getElementById('compDateTo');
@@ -638,7 +638,7 @@ RPETracker.prototype.getWeekKey = function(date) {
     const d = new Date(date);
     d.setHours(0,0,0,0);
     d.setDate(d.getDate() - d.getDay() + 1); // Monday
-    return d.toISOString().slice(0,10);
+    return toLocalISODate(d);
 };
 
 RPETracker.prototype._drawSparkline = function(canvas, data, color) {

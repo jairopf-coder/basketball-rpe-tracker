@@ -134,7 +134,7 @@ RPETracker.prototype._wpMondayKey = function(date) {
     const dow = (d.getDay() + 6) % 7; // 0=Lun
     d.setDate(d.getDate() - dow);
     d.setHours(0, 0, 0, 0);
-    return d.toISOString().slice(0, 10);
+    return toLocalISODate(d);
 };
 
 // Clave del lunes de la semana desplazada "offset" semanas desde hoy
@@ -142,7 +142,7 @@ RPETracker.prototype._wpMondayForOffset = function(offset) {
     const d = new Date();
     d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + (offset || 0) * 7);
     d.setHours(0, 0, 0, 0);
-    return d.toISOString().slice(0, 10);
+    return toLocalISODate(d);
 };
 
 // Lectura de solo consulta (calendario, analíticas, modo partido...): usa el
@@ -244,8 +244,8 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
         const afternoon = dayData.afternoon || {type:'rest',intensity:'none',duration:0,focus:'',enabled:false};
 
         const date = new Date(weekStart); date.setDate(date.getDate() + i);
-        const dateStr = date.toISOString().slice(0,10);
-        const isToday = dateStr === new Date().toISOString().slice(0,10);
+        const dateStr = toLocalISODate(date);
+        const isToday = dateStr === toLocalISODate(new Date());
 
         const topColor = morning.enabled
             ? (typeColors[morning.type]||'#ccc')
@@ -453,17 +453,17 @@ RPETracker.prototype._projectedACRatio = function(playerId, extraLoad) {
     let ewmaChronic = seedLoad;
 
     const now = new Date();
-    const todayStr = now.toISOString().slice(0,10);
+    const todayStr = toLocalISODate(now);
     const maxDaysBack = 56;
 
     for (let i = maxDaysBack; i >= 0; i--) {
         const cur = new Date(now);
         cur.setDate(cur.getDate() - i);
         cur.setHours(0,0,0,0);
-        const curStr = cur.toISOString().slice(0,10);
+        const curStr = toLocalISODate(cur);
 
         const sessLoad = playerSessions
-            .filter(s => s.date.toISOString().slice(0,10) === curStr)
+            .filter(s => toLocalISODate(s.date) === curStr)
             .reduce((sum, s) => sum + s.load, 0);
 
         // On today's day, add the projected extra load
@@ -509,7 +509,7 @@ RPETracker.prototype._getWeekRealSessions = function(weekStart) {
     let totalLoad = 0, sessions = 0;
     for (let i=0;i<7;i++) {
         const d = new Date(weekStart); d.setDate(d.getDate()+i);
-        const dateStr = d.toISOString().slice(0,10);
+        const dateStr = toLocalISODate(d);
         byDay[dateStr] = this.sessions.filter(s => s.date && s.date.slice(0,10)===dateStr);
         const dayLoad = byDay[dateStr].reduce((sum,s)=>sum+(s.load||0),0);
         totalLoad += dayLoad;
@@ -617,7 +617,7 @@ RPETracker.prototype._drawWpLoadChart = function(days, dayLabels, weekStart, pla
 
     const realLoads=days.map((_,i)=>{
         const d=new Date(weekStart); d.setDate(d.getDate()+i);
-        const dateStr=d.toISOString().slice(0,10);
+        const dateStr=toLocalISODate(d);
         return this.sessions.filter(s=>s.date?.slice(0,10)===dateStr).reduce((sum,s)=>sum+(s.load||0),0);
     });
 
@@ -1797,7 +1797,7 @@ RPETracker.prototype.renderMicrociclo = function() {
             <th class="mc-th-player">Jugadora</th>
             ${dayLabels.map((lbl, i) => {
                 const d = dayDates[i];
-                const isToday = d.toISOString().slice(0,10) === new Date().toISOString().slice(0,10);
+                const isToday = toLocalISODate(d) === toLocalISODate(new Date());
                 return `<th class="mc-th-day${isToday ? ' mc-th-today' : ''}">${lbl}<br><span class="mc-th-date">${d.getDate()}/${d.getMonth()+1}</span></th>`;
             }).join('')}
             <th class="mc-th-total">Total</th>
@@ -1940,7 +1940,7 @@ RPETracker.prototype.renderMicrociclo = function() {
     const prevDayDateStrs = dayKeys.map((_, i) => {
         const d = new Date(prevWeekStart);
         d.setDate(d.getDate() + i);
-        return d.toISOString().slice(0, 10);
+        return toLocalISODate(d);
     });
     const prevUAPerDay = prevDayDateStrs.map(ds =>
         Math.round(this.sessions.filter(s => s.date && s.date.slice(0, 10) === ds)

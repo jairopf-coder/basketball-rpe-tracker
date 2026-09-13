@@ -289,7 +289,7 @@ function calcTeamFatigueIndex(players, getACRatio, wellnessData = []) {
     }
     const acScore = acCount ? (acSum / acCount) * 40 : 20;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
     const recent = wellnessData.filter(w => w.date >= today.slice(0, 7));
     let wellScore = 20;
     if (recent.length) {

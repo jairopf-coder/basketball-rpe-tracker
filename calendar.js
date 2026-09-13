@@ -341,7 +341,7 @@ RPETracker.prototype.saveSeasonBlocks = function() {
 
 RPETracker.prototype.getActiveSeasonBlock = function() {
     if (!this.seasonBlocks) return null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
     return this.seasonBlocks.find(b => b.start <= today && b.end >= today) || null;
 };
 
@@ -353,7 +353,7 @@ RPETracker.prototype.renderSeasonBlocksManager = function() {
     const types = this._seasonBlockTypes;
     const blocks = (this.seasonBlocks || []).slice().sort((a, b) => a.start.localeCompare(b.start));
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
 
     const blocksHTML = blocks.length === 0
         ? `<div class="an-empty" style="padding:2rem;text-align:center;color:var(--text-secondary)">Sin bloques de temporada definidos</div>`

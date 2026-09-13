@@ -45,7 +45,7 @@ RPETracker.prototype.renderDashboard = function() {
     const activeInjuries = (this.injuries || []).filter(i => i.status === 'active').length;
 
     // Wellness data — hoy
-    const _wToday = new Date().toISOString().slice(0, 10);
+    const _wToday = toLocalISODate(new Date());
     const _wData  = this.wellnessData || [];
     const _pendingW = this.players.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
 
@@ -171,7 +171,7 @@ RPETracker.prototype.renderDashboard = function() {
     // Solo los domingos, y solo si la semana que empieza mañana todavía no se ha guardado.
     if (new Date().getDay() === 0) {
         const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-        const nextMonday = this._wpMondayKey ? this._wpMondayKey(tomorrow) : tomorrow.toISOString().slice(0, 10);
+        const nextMonday = this._wpMondayKey ? this._wpMondayKey(tomorrow) : toLocalISODate(tomorrow);
         if (!this.isWeekPlanSaved || !this.isWeekPlanSaved(nextMonday)) {
             bannerHTML += `<div class="db-alert-banner db-alert-banner--planning">
                 <div class="db-alert-item">📅 <strong>Planificación pendiente</strong> — revisa la semana que empieza mañana</div>
@@ -457,7 +457,7 @@ RPETracker.prototype._toggleMatchDayMode = function() {
 
 // ── _renderMatchDayView ──────────────────────────────────────────────
 RPETracker.prototype._renderMatchDayView = function(availGroups, players) {
-    const today  = new Date().toISOString().slice(0, 10);
+    const today  = toLocalISODate(new Date());
     const wData  = this.wellnessData || [];
 
     const playerCard = ({ player, ratio, icon, r }) => {
@@ -521,7 +521,7 @@ RPETracker.prototype.cycleDashSort = function() {
 
 // ── copyWellnessPendingWA ────────────────────────────────────────────
 RPETracker.prototype.copyWellnessPendingWA = function() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
     const wData = this.wellnessData || [];
     const pending = this.players.filter(p => !wData.some(e => e.playerId === p.id && e.date === today));
     if (!pending.length) { this.showToast('✅ Todas han rellenado el wellness hoy', 'info'); return; }
@@ -555,7 +555,7 @@ RPETracker.prototype._renderRightWidgets = function() {
     const col = document.getElementById('dbRightWidgets');
     if (!col) return;
 
-    const _wToday = new Date().toISOString().slice(0, 10);
+    const _wToday = toLocalISODate(new Date());
     const _wData  = this.wellnessData || [];
     const _pendingW = this.players.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
 
@@ -694,7 +694,7 @@ RPETracker.prototype.renderDashboardCalendar = function() {
                 if (!dayData) return;
                 const d = new Date(weekMonday);
                 d.setDate(weekMonday.getDate() + idx);
-                const dateStr = d.toISOString().slice(0, 10);
+                const dateStr = toLocalISODate(d);
                 ['morning','afternoon'].forEach(slot => {
                     const s = dayData[slot];
                     if (s && s.enabled && s.type && s.type !== 'rest') {
@@ -746,7 +746,7 @@ RPETracker.prototype.renderDashboardCalendar = function() {
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         // start on Monday: JS getDay 0=Sun → convert to Mon-based
         let startDow = (firstDay.getDay() + 6) % 7; // 0=Mon
-        const today = new Date().toISOString().slice(0, 10);
+        const today = toLocalISODate(new Date());
 
         bodyHTML += `<div class="db-mini-cal">
             <div class="db-mini-cal-grid">
@@ -827,13 +827,13 @@ RPETracker.prototype.renderDashboardCalendar = function() {
         const mon   = new Date(now3);
         mon.setDate(now3.getDate() - dow3 + weekOffset * 7);
         mon.setHours(0,0,0,0);
-        const today3 = new Date().toISOString().slice(0,10);
+        const today3 = toLocalISODate(new Date());
         const dayShort = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
         for (let i = 0; i < 7; i++) {
             const d = new Date(mon);
             d.setDate(mon.getDate() + i);
-            const dateStr = d.toISOString().slice(0,10);
+            const dateStr = toLocalISODate(d);
             const isToday = dateStr === today3;
             const events  = eventMap[dateStr] || [];
 
@@ -905,7 +905,7 @@ RPETracker.prototype.renderDashboardCalendar = function() {
 RPETracker.prototype.showDashboardDaySummary = function(dateStr) {
     const [y, mo, da] = dateStr.split('-').map(Number);
     const { day, month, weekday } = _formatDate(dateStr);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
 
     const match   = (this.matches || []).find(m => m.date === dateStr) || null;
     const entries = this.sessions.filter(s => s.date === dateStr);

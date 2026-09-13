@@ -1012,9 +1012,9 @@ class RPETracker {
         const existing = document.getElementById('csvExportModal');
         if (existing) existing.remove();
 
-        const today = new Date().toISOString().slice(0, 10);
+        const today = toLocalISODate(new Date());
         const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const thirtyAgo = thirtyDaysAgo.toISOString().slice(0, 10);
+        const thirtyAgo = toLocalISODate(thirtyDaysAgo);
 
         const modal = document.createElement('div');
         modal.id = 'csvExportModal';
@@ -1060,13 +1060,13 @@ class RPETracker {
         modal.querySelectorAll('.csv-preset').forEach(btn => {
             btn.addEventListener('click', () => {
                 const days = parseInt(btn.dataset.days);
-                const toDate = new Date().toISOString().slice(0, 10);
+                const toDate = toLocalISODate(new Date());
                 if (days === 0) {
                     document.getElementById('csvFrom').value = '';
                     document.getElementById('csvTo').value = toDate;
                 } else {
                     const from = new Date(); from.setDate(from.getDate() - days);
-                    document.getElementById('csvFrom').value = from.toISOString().slice(0, 10);
+                    document.getElementById('csvFrom').value = toLocalISODate(from);
                     document.getElementById('csvTo').value = toDate;
                 }
             });
@@ -1410,7 +1410,7 @@ const WellnessReminder = {
         const [rHour, rMin] = reminderTime.split(':').map(Number);
         if (now.getHours() !== rHour || now.getMinutes() !== rMin) return;
 
-        const today = now.toISOString().slice(0, 10);
+        const today = toLocalISODate(now);
         const lastSent = Store.getString('reminderSent');
         if (lastSent === today) return; // already sent today
 
