@@ -59,29 +59,54 @@ RPETracker.prototype.loadWeekPlan = function() {
 // correcta es sumarle 1 día. El desfase de este bug concreto nunca supera
 // 1 día en ninguna zona horaria real, así que esta corrección es exacta.
 // No se pierden datos: la entrada completa (days + savedAt) se traslada a
-// la clave correcta.
+// la clave correcta. Si dos claves antiguas corrigen a la misma semana
+// (por ejemplo, se guardó la misma semana antes y después del fix), se
+// conserva la de savedAt más reciente y se avisa por consola.
 RPETracker.prototype._fixWeekKeysTimezoneBug = function(weeks) {
     if (!weeks || typeof weeks !== 'object') return weeks;
-    const fixed = {};
+
+    // 1ª pasada: agrupar todas las entradas por su clave CORRECTA final.
+    const candidatesByKey = {};
     Object.keys(weeks).forEach(key => {
         const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
-        if (!m) { fixed[key] = weeks[key]; return; } // clave con formato inesperado: no tocar
-        const asLocalDate = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-        if (asLocalDate.getDay() === 1) {
-            // Ya es lunes: clave correcta
-            fixed[key] = weeks[key];
-        } else {
-            // No es lunes (debería ser domingo si viene del bug antiguo):
-            // la semana real empezaba un día después.
-            asLocalDate.setDate(asLocalDate.getDate() + 1);
-            const correctKey = toLocalISODate(asLocalDate);
-            // Si la clave correcta ya existiera (caso muy raro), no pisar
-            // datos: se prioriza la entrada que ya tenga savedAt.
-            if (!fixed[correctKey] || (!fixed[correctKey].savedAt && weeks[key]?.savedAt)) {
-                fixed[correctKey] = weeks[key];
-            }
+        if (!m) { // clave con formato inesperado: se conserva tal cual, sin agrupar
+            candidatesByKey[key] = [{ originalKey: key, entry: weeks[key] }];
+            return;
         }
+        const asLocalDate = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        let correctKey = key;
+        if (asLocalDate.getDay() !== 1) {
+            // No es lunes: viene del bug antiguo, la semana real es un día después.
+            asLocalDate.setDate(asLocalDate.getDate() + 1);
+            correctKey = toLocalISODate(asLocalDate);
+        }
+        if (!candidatesByKey[correctKey]) candidatesByKey[correctKey] = [];
+        candidatesByKey[correctKey].push({ originalKey: key, entry: weeks[key] });
     });
+
+    // 2ª pasada: si varias claves antiguas apuntan a la misma semana,
+    // quedarse con la de savedAt más reciente (una entrada sin savedAt
+    // nunca se guardó de verdad, así que pierde frente a cualquier otra).
+    const fixed = {};
+    Object.keys(candidatesByKey).forEach(correctKey => {
+        const candidates = candidatesByKey[correctKey];
+        if (candidates.length === 1) {
+            fixed[correctKey] = candidates[0].entry;
+            return;
+        }
+        candidates.sort((a, b) => {
+            const dateA = a.entry?.savedAt ? new Date(a.entry.savedAt).getTime() : -Infinity;
+            const dateB = b.entry?.savedAt ? new Date(b.entry.savedAt).getTime() : -Infinity;
+            return dateB - dateA; // más reciente primero
+        });
+        fixed[correctKey] = candidates[0].entry;
+        console.warn(
+            `[weekPlan] Semana ${correctKey}: se encontraron ${candidates.length} versiones guardadas ` +
+            `(claves: ${candidates.map(c => c.originalKey).join(', ')}). Se conserva la más reciente ` +
+            `(${candidates[0].originalKey}, savedAt: ${candidates[0].entry?.savedAt || 'sin guardar'}).`
+        );
+    });
+
     return fixed;
 };
 
@@ -179,14 +204,16 @@ RPETracker.prototype._wpMondayForOffset = function(offset) {
 };
 
 // Lectura de solo consulta (calendario, analíticas, modo partido...): usa el
-// plan guardado de esa semana concreta y, si no existe, cae en la plantilla
-// antigua como referencia orientativa; si tampoco hay, semana en blanco.
+// plan guardado de esa semana concreta; si no existe, semana en blanco
+// (todo Descanso). No se usa "legacyTemplate" como fallback: una semana
+// sin guardar debe reflejarse como descanso, tanto en esta función como en
+// renderWeeklyPlanning, para que el mini-calendario y el editor coincidan.
 RPETracker.prototype.getWeekPlanDays = function(date) {
     if (!this.weekPlan) this.loadWeekPlan();
     const key = this._wpMondayKey(date || new Date());
     const entry = this.weekPlan.weeks && this.weekPlan.weeks[key];
     if (entry && entry.days) return entry.days;
-    return this.weekPlan.legacyTemplate || this._emptyWeekDays();
+    return this._emptyWeekDays();
 };
 
 // ¿Se ha guardado explícitamente el plan de la semana del lunes "mondayKey"?
