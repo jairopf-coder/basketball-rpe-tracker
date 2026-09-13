@@ -52,6 +52,39 @@ RPETracker.prototype.loadWeekPlan = function() {
     }
 };
 
+// Corrige claves de "weeks" guardadas con el bug de zona horaria anterior
+// (se usaba toISOString(), que en husos UTC+ desplaza la fecha 1 día hacia
+// atrás). Cada clave DEBE ser la fecha de un lunes: si al interpretarla como
+// fecha local no cae en lunes, es que el bug la desplazó, y la clave
+// correcta es sumarle 1 día. El desfase de este bug concreto nunca supera
+// 1 día en ninguna zona horaria real, así que esta corrección es exacta.
+// No se pierden datos: la entrada completa (days + savedAt) se traslada a
+// la clave correcta.
+RPETracker.prototype._fixWeekKeysTimezoneBug = function(weeks) {
+    if (!weeks || typeof weeks !== 'object') return weeks;
+    const fixed = {};
+    Object.keys(weeks).forEach(key => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+        if (!m) { fixed[key] = weeks[key]; return; } // clave con formato inesperado: no tocar
+        const asLocalDate = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        if (asLocalDate.getDay() === 1) {
+            // Ya es lunes: clave correcta
+            fixed[key] = weeks[key];
+        } else {
+            // No es lunes (debería ser domingo si viene del bug antiguo):
+            // la semana real empezaba un día después.
+            asLocalDate.setDate(asLocalDate.getDate() + 1);
+            const correctKey = toLocalISODate(asLocalDate);
+            // Si la clave correcta ya existiera (caso muy raro), no pisar
+            // datos: se prioriza la entrada que ya tenga savedAt.
+            if (!fixed[correctKey] || (!fixed[correctKey].savedAt && weeks[key]?.savedAt)) {
+                fixed[correctKey] = weeks[key];
+            }
+        }
+    });
+    return fixed;
+};
+
 // Convierte cualquier formato antiguo (una sola plantilla que se repetía cada
 // semana) al formato actual: un plan independiente por semana, guardado bajo
 // la clave del lunes de esa semana ("weeks"). La plantilla antigua se
@@ -62,7 +95,7 @@ RPETracker.prototype._migrateWeekPlan = function(parsed) {
 
     // Ya está en el formato nuevo
     if (parsed.weeks && typeof parsed.weeks === 'object') {
-        return { weekOffset: parsed.weekOffset || 0, weeks: parsed.weeks, legacyTemplate: parsed.legacyTemplate || null };
+        return { weekOffset: parsed.weekOffset || 0, weeks: this._fixWeekKeysTimezoneBug(parsed.weeks), legacyTemplate: parsed.legacyTemplate || null };
     }
 
     // Formato antiguo: plantilla única en "days"
