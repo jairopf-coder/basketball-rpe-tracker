@@ -9221,6 +9221,16 @@ details[open] .ewma-toggle-hint { display: none; }
     flex-wrap: wrap;
 }
 
+/* En PC e iPad (≥641px) el botón "+ Nueva Sesión" del header/nav ya cubre
+   esta función, así que el botón duplicado bajo la barra de navegación
+   se oculta. En iPhone (≤640px) se mantiene y se centra. */
+@media (min-width: 641px) {
+    .dashboard-quick-actions { display: none; }
+}
+@media (max-width: 640px) {
+    .dashboard-quick-actions { justify-content: center; }
+}
+
 .dqa-btn {
     display: flex;
     align-items: center;
@@ -9248,9 +9258,10 @@ details[open] .ewma-toggle-hint { display: none; }
 .dqa-icon { font-size: 1.1rem; line-height: 1; }
 .dqa-label { white-space: nowrap; }
 
-/* ── In-view FAB (solo dashboard móvil) ── */
+/* ── In-view FAB (desactivado: sustituido por el botón centrado
+   .dashboard-quick-actions, que ya cumple la misma función sin tapar datos) ── */
 .view-fab {
-    display: none; /* controlled by BottomNav.syncToView */
+    display: none !important;
     position: fixed;
     bottom: calc(68px + env(safe-area-inset-bottom, 0px) + 12px);
     right: 1rem;
