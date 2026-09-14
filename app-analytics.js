@@ -431,17 +431,13 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
     const mismatches = rows.filter(r => r.isMismatch).length;
     const highMismatches = rows.filter(r => r.isHighMismatch).length;
 
-    const fmtDateShort = d => {
+    const fmtDate = d => {
         const dateOnly = String(d).slice(0, 10);
         const obj = new Date(dateOnly + 'T12:00:00');
         if (isNaN(obj.getTime())) return d;
-        const wd = obj.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '').charAt(0).toUpperCase();
-        const dd = String(obj.getDate()).padStart(2, '0');
-        const mm = String(obj.getMonth() + 1).padStart(2, '0');
-        return `${wd}, ${dd}/${mm}`;
+        return obj.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
     };
     const fmtSlot = s => s === 'morning' ? '🌅 Mañana' : '🌆 Tarde';
-    const fmtSlotShort = s => s === 'morning' ? 'M' : 'T';
 
     // Player filter state (stored on instance)
     const filterPlayer = this._pvr_playerFilter || 'all';
@@ -459,15 +455,12 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
         ? `<tr><td colspan="6" class="pvr-empty">Sin sesiones con plan asignado en el período seleccionado</td></tr>`
         : filteredRows.map(r => `
         <tr class="pvr-row${r.isMismatch ? ' pvr-row--mismatch' : ''}${r.isHighMismatch ? ' pvr-row--high' : ''}">
-            <td class="pvr-date">${fmtDateShort(r.date)}</td>
+            <td class="pvr-date">${fmtDate(r.date)}</td>
             <td class="pvr-player">
                 ${PlayerTokens.avatar(r.player, 20, '0.6rem')}
                 <span>${r.player.name.split(' ')[0]}</span>
             </td>
-            <td class="pvr-slot">
-                <span class="pvr-slot-full">${fmtSlot(r.slot)}</span>
-                <span class="pvr-slot-short">${fmtSlotShort(r.slot)}</span>
-            </td>
+            <td class="pvr-slot">${fmtSlot(r.slot)}</td>
             <td class="pvr-plan">
                 <span class="pvr-intensity pvr-intensity--${r.planSlot.intensity}">${r.planSlot.intensityLabel}</span>
                 <span class="pvr-rpe-val">${r.planSlot.plannedRpe}</span>
@@ -514,7 +507,7 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
                 <tr>
                     <th>Fecha</th>
                     <th>Jugadora</th>
-                    <th><span class="pvr-slot-full">Sesión</span><span class="pvr-slot-short">S.</span></th>
+                    <th>Sesión</th>
                     <th>RPE Plan</th>
                     <th>RPE Real</th>
                     <th>Δ</th>
