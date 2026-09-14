@@ -1,12 +1,12 @@
 {
-  "name": "RPE Basketball Tracker",
-  "short_name": "RPE Basketball",
+  "name": "Load Ctrl",
+  "short_name": "Load Ctrl",
   "description": "Registro de RPE para entrenamientos de baloncesto",
   "start_url": "/basketball-rpe-tracker/",
   "scope": "/basketball-rpe-tracker/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#ff6600",
+  "theme_color": "#f55a00",
   "orientation": "any",
   "icons": [
     {

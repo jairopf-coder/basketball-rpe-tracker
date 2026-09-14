@@ -11,7 +11,7 @@ const PlayerI18n = (() => {
     const DICT = {
         es: {
             // Login
-            loginTitle: 'RPE Baloncesto',
+            loginTitle: 'Load Ctrl',
             loginSubtitle: 'Accede con tu cuenta',
             loginEmail: 'Email',
             loginPassword: 'Contraseña',
@@ -79,7 +79,7 @@ const PlayerI18n = (() => {
             },
         },
         en: {
-            loginTitle: 'RPE Basketball',
+            loginTitle: 'Load Ctrl',
             loginSubtitle: 'Sign in to your account',
             loginEmail: 'Email',
             loginPassword: 'Password',

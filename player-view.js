@@ -203,7 +203,7 @@ const PlayerView = (() => {
             ${_previewMode ? '<div class="pv-preview-banner">👁️ Vista previa — nada de lo que hagas aquí se guarda de verdad</div>' : ''}
             <div class="pv-lang-row">${PlayerI18n.toggleHTML('PlayerView._onLangChange')}</div>
             <div class="pv-header">
-                <div class="pv-logo">🏀</div>
+                <div class="pv-logo"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="1.5" x2="14" y2="1.5" stroke-width="1.6"/><line x1="12" y1="1.5" x2="12" y2="4" stroke-width="1.6"/><line x1="18.5" y1="4.5" x2="20" y2="3" stroke-width="1.4"/><circle cx="12" cy="13" r="9.5" stroke-width="1.4"/><polyline points="6,13 8.3,13 9.5,9.5 11,16.5 12.3,11 13.3,13 18,13" stroke-width="1.4"/></svg></div>
                 <h1 class="pv-title">${_esc(PlayerI18n.t('pvGreeting'))} ${_esc(name)}!</h1>
                 <p class="pv-subtitle">${_fmtDate(_today())}</p>
             </div>
