@@ -8973,6 +8973,9 @@ details[open] .ewma-toggle-hint { display: none; }
     .pvr-table { font-size: 0.75rem; }
     .pvr-table thead th,
     .pvr-table tbody td { padding: 0.4rem 0.5rem; }
+    /* Ocultar la columna "Sesión" en iPhone: cabecera (3er <th>) y celda
+       (.pvr-slot) se ocultan juntas para que no se desalineen entre sí. */
+    .pvr-table thead th:nth-child(3),
     .pvr-slot { display: none; }
     .db-presession-btn { font-size: 0.72rem; padding: 0.35rem 0.65rem; }
 }
