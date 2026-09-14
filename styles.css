@@ -1001,6 +1001,27 @@ header h1 {
     margin: 0 auto;
 }
 
+/* Fila del título "Análisis Agudo:Crónico" + botón "Exportar Todos los Gráficos"
+   en la misma línea (título izq, botón der). En pantallas estrechas (iPhone)
+   el botón baja debajo del título en vez de apretarse. */
+.analytics-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.analytics-header-row h2 {
+    margin: 0;
+}
+@media (max-width: 480px) {
+    .analytics-header-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
