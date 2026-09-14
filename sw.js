@@ -1,6 +1,6 @@
 // Service Worker — BasketballRPE-Web
 // Bump CACHE_VERSION whenever you deploy new code to invalidate stale caches.
-const CACHE_VERSION = 'v45';
+const CACHE_VERSION = 'v46';
 const CACHE_NAME = `rpe-basketball-${CACHE_VERSION}`;
 
 const urlsToCache = [
@@ -8,6 +8,10 @@ const urlsToCache = [
   '/index.html',
   '/styles.css',
   '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/favicon.ico',
+  '/apple-touch-icon.png',
   '/app.js',
   '/app-sessions.js',
   '/app-players.js',
@@ -96,9 +100,9 @@ self.addEventListener('fetch', event => {
 self.addEventListener('push', event => {
     if (!event.data) return;
     let payload;
-    try { payload = event.data.json(); } catch(e) { payload = { title: 'RPE Basketball', body: event.data.text() }; }
+    try { payload = event.data.json(); } catch(e) { payload = { title: 'Load Ctrl', body: event.data.text() }; }
     event.waitUntil(
-        self.registration.showNotification(payload.title || 'RPE Basketball', {
+        self.registration.showNotification(payload.title || 'Load Ctrl', {
             body: payload.body || '',
             icon: '/icon-192.png',
             badge: '/icon-192.png',
@@ -124,7 +128,7 @@ self.addEventListener('notificationclick', event => {
 self.addEventListener('message', event => {
     const data = event.data;
     if (!data || data.type !== 'SHOW_NOTIFICATION') return;
-    self.registration.showNotification(data.title || 'RPE Basketball', {
+    self.registration.showNotification(data.title || 'Load Ctrl', {
         body: data.body || '',
         icon: '/icon-192.png',
         badge: '/icon-192.png',
