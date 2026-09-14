@@ -8927,6 +8927,12 @@ details[open] .ewma-toggle-hint { display: none; }
     border-bottom: 1px solid var(--border-color);
     white-space: nowrap;
 }
+/* Columnas numéricas (RPE Plan, RPE Real, Δ): cabecera y datos centrados */
+.pvr-table thead th:nth-child(4),
+.pvr-table thead th:nth-child(5),
+.pvr-table thead th:nth-child(6) {
+    text-align: center;
+}
 .pvr-table tbody tr { border-bottom: 1px solid var(--border-color); }
 .pvr-table tbody tr:last-child { border-bottom: none; }
 .pvr-table tbody td { padding: 0.45rem 0.75rem; vertical-align: middle; }
@@ -8939,12 +8945,18 @@ details[open] .ewma-toggle-hint { display: none; }
 .pvr-date   { white-space: nowrap; color: var(--text-secondary); font-size: 0.75rem; }
 .pvr-player { display: flex; align-items: center; gap: 0.35rem; font-weight: 500; white-space: nowrap; }
 .pvr-slot   { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
-.pvr-plan   { display: flex; align-items: center; gap: 0.4rem; }
-.pvr-real   {}
-.pvr-delta  { display: flex; align-items: center; gap: 0.25rem; font-weight: 700; white-space: nowrap; }
+.pvr-plan   { display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
+.pvr-real   { display: flex; align-items: center; justify-content: center; }
+.pvr-delta  { display: flex; align-items: center; justify-content: center; gap: 0.25rem; font-weight: 700; white-space: nowrap; }
 .pvr-delta-icon { font-size: 0.65rem; }
 .pvr-rpe-val     { font-weight: 600; color: var(--text-primary); }
 .pvr-rpe-real    {}
+
+/* Sesión: versión larga ("🌅 Mañana") en pantallas anchas,
+   versión corta ("M"/"T") en iPhone — ver media query abajo.
+   Ambos <span> existen siempre en el DOM; solo alternamos su visibilidad,
+   así cabecera y celda nunca se desalinean. */
+.pvr-slot-short { display: none; }
 
 .pvr-intensity {
     font-size: 0.68rem;
@@ -8973,7 +8985,11 @@ details[open] .ewma-toggle-hint { display: none; }
     .pvr-table { font-size: 0.75rem; }
     .pvr-table thead th,
     .pvr-table tbody td { padding: 0.4rem 0.5rem; }
-    .pvr-slot { display: none; }
+    /* iPhone: versión corta de "Sesión" (M/T) en vez de la versión larga,
+       para ganar espacio horizontal. La columna sigue existiendo siempre,
+       así que cabecera y celda no se desalinean. */
+    .pvr-slot-full  { display: none; }
+    .pvr-slot-short { display: inline; }
     .db-presession-btn { font-size: 0.72rem; padding: 0.35rem 0.65rem; }
 }
 
