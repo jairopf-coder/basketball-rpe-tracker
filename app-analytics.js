@@ -154,7 +154,11 @@ RPETracker.prototype._drawACCurveChart = function() {
 
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const gridC  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
-    const textC  = isDark ? '#888' : '#999';
+    // Se lee el color real ya calculado por el CSS (--text-secondary) en vez de
+    // un valor fijo, para que la leyenda y los ejes siempre tengan buen contraste
+    // en el tema activo, sin depender de mantener dos colores sincronizados a mano.
+    const textC = getComputedStyle(document.documentElement)
+        .getPropertyValue('--text-secondary').trim() || (isDark ? '#c4c4cc' : '#3f3f46');
 
     canvas._ci = new Chart(canvas.getContext('2d'), {
         type: 'line',
