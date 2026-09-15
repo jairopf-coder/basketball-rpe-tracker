@@ -35,6 +35,21 @@
         })();
     </script>
 
+    <!-- TEMPORAL: captura el stack trace real de warnings de consola para
+         diagnosticar el error "Expected color but found 'undefined'".
+         Quitar este bloque en cuanto se identifique la causa. -->
+    <script>
+        (function() {
+            var origWarn = console.warn;
+            console.warn = function() {
+                if (String(arguments[0]).indexOf('Expected color') !== -1) {
+                    console.log('%c[DEBUG stack trace]', 'color:red;font-weight:bold', new Error().stack);
+                }
+                return origWarn.apply(console, arguments);
+            };
+        })();
+    </script>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
