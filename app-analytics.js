@@ -156,9 +156,11 @@ RPETracker.prototype._drawACCurveChart = function() {
     const gridC  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
     // Se lee el color real ya calculado por el CSS (--text-secondary) en vez de
     // un valor fijo, para que los ejes siempre tengan buen contraste en el tema
-    // activo, sin depender de mantener dos colores sincronizados a mano.
-    const textC = getComputedStyle(document.documentElement)
-        .getPropertyValue('--text-secondary').trim() || (isDark ? '#c4c4cc' : '#3f3f46');
+    // activo. Si por lo que sea el navegador aún no tiene el valor calculado
+    // (string vacío), se usa un color de reserva fijo — nunca queda "undefined".
+    const cssTextSecondary = getComputedStyle(document.documentElement)
+        .getPropertyValue('--text-secondary').trim();
+    const textC = cssTextSecondary || (isDark ? '#c4c4cc' : '#3f3f46');
     // Nombres de jugadoras en la leyenda: blanco en modo oscuro para que
     // destaquen más; en modo claro se mantiene el mismo color que los ejes.
     const legendTextC = isDark ? '#ffffff' : textC;
@@ -177,8 +179,8 @@ RPETracker.prototype._drawACCurveChart = function() {
                         boxWidth: 12, font: { size: 11 }, color: legendTextC,
                         generateLabels: chart => chart.data.datasets.map((ds, i) => ({
                             text: ds.label,
-                            fillStyle: ds.borderColor,
-                            strokeStyle: ds.borderColor,
+                            fillStyle: ds.borderColor || '#999',
+                            strokeStyle: ds.borderColor || '#999',
                             lineDash: ds.borderDash || [],
                             lineWidth: 2,
                             hidden: !chart.isDatasetVisible(i),
