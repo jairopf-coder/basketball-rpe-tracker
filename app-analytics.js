@@ -181,6 +181,7 @@ RPETracker.prototype._drawACCurveChart = function() {
                             text: ds.label,
                             fillStyle: ds.borderColor || '#999',
                             strokeStyle: ds.borderColor || '#999',
+                            fontColor: legendTextC,
                             lineDash: ds.borderDash || [],
                             lineWidth: 2,
                             hidden: !chart.isDatasetVisible(i),
