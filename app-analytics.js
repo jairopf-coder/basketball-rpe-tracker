@@ -155,10 +155,13 @@ RPETracker.prototype._drawACCurveChart = function() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const gridC  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
     // Se lee el color real ya calculado por el CSS (--text-secondary) en vez de
-    // un valor fijo, para que la leyenda y los ejes siempre tengan buen contraste
-    // en el tema activo, sin depender de mantener dos colores sincronizados a mano.
+    // un valor fijo, para que los ejes siempre tengan buen contraste en el tema
+    // activo, sin depender de mantener dos colores sincronizados a mano.
     const textC = getComputedStyle(document.documentElement)
         .getPropertyValue('--text-secondary').trim() || (isDark ? '#c4c4cc' : '#3f3f46');
+    // Nombres de jugadoras en la leyenda: blanco en modo oscuro para que
+    // destaquen más; en modo claro se mantiene el mismo color que los ejes.
+    const legendTextC = isDark ? '#ffffff' : textC;
 
     canvas._ci = new Chart(canvas.getContext('2d'), {
         type: 'line',
@@ -171,7 +174,7 @@ RPETracker.prototype._drawACCurveChart = function() {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        boxWidth: 12, font: { size: 11 }, color: textC,
+                        boxWidth: 12, font: { size: 11 }, color: legendTextC,
                         generateLabels: chart => chart.data.datasets.map((ds, i) => ({
                             text: ds.label,
                             fillStyle: ds.borderColor,
