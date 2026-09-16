@@ -445,7 +445,9 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
         const dateOnly = String(d).slice(0, 10);
         const obj = new Date(dateOnly + 'T12:00:00');
         if (isNaN(obj.getTime())) return d;
-        return obj.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+        const dd = String(obj.getDate()).padStart(2, '0');
+        const mm = String(obj.getMonth() + 1).padStart(2, '0');
+        return `${dd}/${mm}`;
     };
     const fmtSlot = s => s === 'morning' ? '🌅 Mañana' : '🌆 Tarde';
 
