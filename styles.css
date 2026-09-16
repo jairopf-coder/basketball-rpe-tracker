@@ -5927,6 +5927,33 @@ details[open] .ewma-toggle-hint { display: none; }
     text-align: right;
 }
 
+/* Selector m / IIO — chip toggle compacto para la métrica externa
+   en el modo multi-jugadora del gráfico de evolución GPS */
+.gps-metric-toggle {
+    display: flex;
+    gap: 4px;
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+    background: var(--bg-subtle);
+}
+.gps-metric-chip {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.gps-metric-chip:hover { background: var(--bg-elevated); }
+.gps-metric-chip.active {
+    background: var(--primary);
+    color: #fff;
+}
+
 /* Charts grid 2-column */
 .charts-grid {
     display: grid;
