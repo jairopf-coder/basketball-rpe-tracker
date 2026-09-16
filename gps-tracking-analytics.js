@@ -207,16 +207,44 @@ RPETracker.prototype._renderGpsAnTabContent = function() {
 RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
     const activePlayers = this.players.filter(p => !p.archived);
 
+    // Estado inicial: todas las jugadoras seleccionadas, métrica externa
+    // en distancia (m), rango 30 días — solo se inicializa la primera vez.
+    if (!(this._gpsAnPlayerIds instanceof Set)) {
+        this._gpsAnPlayerIds = new Set(activePlayers.map(p => p.id));
+    }
+    if (!this._gpsAnExternalMetric) this._gpsAnExternalMetric = 'm';
+    if (!this._gpsAnalyticsRange) this._gpsAnalyticsRange = '30';
+
+    const chips = activePlayers.map(p => {
+        const color = PlayerTokens.get(p);
+        const checked = this._gpsAnPlayerIds.has(p.id);
+        return `<label class="ac-curve-check" style="--chk-color:${color}">
+            <input type="checkbox" value="${p.id}" ${checked ? 'checked' : ''}
+                onchange="window.rpeTracker._gpsAnTogglePlayer('${p.id}', this.checked)">
+            <span class="ac-chk-dot" style="background:${color}"></span>
+            ${esc(p.name)}
+        </label>`;
+    }).join('');
+
+    const selectedCount = this._gpsAnPlayerIds.size;
+
     container.innerHTML = `
-        <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-            <select id="gpsAnPlayerSelect" onchange="window.rpeTracker._gpsAnSetPlayer(this.value)" style="min-width:200px;">
-                ${activePlayers.map(p => `<option value="${p.id}" ${p.id === this._gpsAnalyticsPlayerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
-            </select>
+        <div class="ac-curve-controls" style="margin-bottom:10px;">
+            <div class="ac-curve-players">${chips}</div>
+        </div>
+
+        <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
             <select id="gpsAnRangeSelect" onchange="window.rpeTracker._gpsAnSetRange(this.value)">
                 <option value="30" ${this._gpsAnalyticsRange === '30' ? 'selected' : ''}>Últimos 30 días</option>
-                <option value="90" ${this._gpsAnalyticsRange === '90' || !this._gpsAnalyticsRange ? 'selected' : ''}>Últimos 90 días</option>
+                <option value="90" ${this._gpsAnalyticsRange === '90' ? 'selected' : ''}>Últimos 90 días</option>
                 <option value="all" ${this._gpsAnalyticsRange === 'all' ? 'selected' : ''}>Toda la temporada</option>
             </select>
+            ${selectedCount > 1 ? `
+                <div class="gps-metric-toggle">
+                    <button class="gps-metric-chip ${this._gpsAnExternalMetric === 'm' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSetExternalMetric('m')">m</button>
+                    <button class="gps-metric-chip ${this._gpsAnExternalMetric === 'iio' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSetExternalMetric('iio')">IIO</button>
+                </div>
+            ` : ''}
         </div>
 
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
@@ -226,6 +254,11 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
             <div style="height:320px;">
                 <canvas id="gpsAnComparisonCanvas"></canvas>
             </div>
+            ${selectedCount === 0 ? `
+                <p style="text-align:center;color:var(--text-secondary);font-size:0.85rem;margin-top:12px;">
+                    Elige al menos una jugadora para ver su evolución.
+                </p>
+            ` : ''}
         </div>
 
         <div id="gpsAnTableContainer"></div>
@@ -237,10 +270,43 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
     });
 };
 
+RPETracker.prototype._gpsAnTogglePlayer = function(playerId, checked) {
+    if (!(this._gpsAnPlayerIds instanceof Set)) this._gpsAnPlayerIds = new Set();
+    if (checked) this._gpsAnPlayerIds.add(playerId);
+    else this._gpsAnPlayerIds.delete(playerId);
+
+    // Mantenemos _gpsAnalyticsPlayerId (usado por la tabla) apuntando a
+    // la única jugadora seleccionada cuando hay exactamente una; si hay
+    // varias o ninguna, la tabla se oculta y este valor deja de usarse
+    // para pintar pero lo dejamos con la última tocada por si vuelve a 1.
+    if (this._gpsAnPlayerIds.size === 1) {
+        this._gpsAnalyticsPlayerId = [...this._gpsAnPlayerIds][0];
+    }
+
+    // El selector de métrica externa (m / IIO) solo tiene sentido con
+    // 2+ jugadoras; re-renderizamos los controles para mostrarlo/ocultarlo.
+    const container = document.getElementById('gpsAnTabContent');
+    if (container) this._renderGpsPlayerEvolutionTab(container);
+};
+
+RPETracker.prototype._gpsAnSetExternalMetric = function(metric) {
+    this._gpsAnExternalMetric = metric;
+    this._drawGpsComparisonChart();
+};
+
+// Selecciona UNA jugadora en exclusiva (usado desde el aviso de
+// "carga a revisar" y otros enlaces directos): deja el gráfico en
+// modo 1 jugadora, ignorando cualquier selección múltiple previa.
 RPETracker.prototype._gpsAnSetPlayer = function(playerId) {
     this._gpsAnalyticsPlayerId = playerId;
-    this._drawGpsComparisonChart();
-    this._renderGpsSessionsTable();
+    this._gpsAnPlayerIds = new Set([playerId]);
+    const container = document.getElementById('gpsAnTabContent');
+    if (container) {
+        this._renderGpsPlayerEvolutionTab(container);
+    } else {
+        this._drawGpsComparisonChart();
+        this._renderGpsSessionsTable();
+    }
 };
 
 RPETracker.prototype._gpsAnSetRange = function(range) {
@@ -249,13 +315,34 @@ RPETracker.prototype._gpsAnSetRange = function(range) {
     this._renderGpsSessionsTable();
 };
 
-// Devuelve las sesiones de la jugadora seleccionada, dentro del rango
-// elegido, ordenadas por fecha ascendente, con su dato GPS si existe.
+// Devuelve las sesiones de la jugadora seleccionada para la TABLA
+// (this._gpsAnalyticsPlayerId), dentro del rango elegido, ordenadas
+// por fecha ascendente, con su dato GPS si existe. Comportamiento
+// original sin cambios — la tabla solo se muestra con 1 jugadora.
 RPETracker.prototype._getGpsAnalyticsData = function() {
     const playerId = this._gpsAnalyticsPlayerId;
     if (!playerId) return [];
 
-    const range = this._gpsAnalyticsRange || '90';
+    const range = this._gpsAnalyticsRange || '30';
+    const cutoff = range === 'all' ? null : new Date(Date.now() - parseInt(range, 10) * 86400000);
+
+    return this._applyGpsTypeFilter(this.sessions || [])
+        .filter(s => s.playerId === playerId)
+        .filter(s => !cutoff || new Date(s.date) >= cutoff)
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .map(s => {
+            const gpsGroup = this.gpsData ? this.gpsData[s.id] : null;
+            const gps = gpsGroup ? gpsGroup[playerId] : null;
+            return { session: s, gps };
+        });
+};
+
+// Devuelve las sesiones de UNA jugadora concreta (parámetro explícito),
+// dentro del rango elegido, ordenadas por fecha, con su dato GPS si
+// existe. Usada por el modo multi-jugadora del gráfico.
+RPETracker.prototype._getGpsAnalyticsDataForPlayer = function(playerId) {
+    if (!playerId) return [];
+    const range = this._gpsAnalyticsRange || '30';
     const cutoff = range === 'all' ? null : new Date(Date.now() - parseInt(range, 10) * 86400000);
 
     return this._applyGpsTypeFilter(this.sessions || [])
@@ -275,74 +362,159 @@ RPETracker.prototype._drawGpsComparisonChart = function() {
 
     if (canvas._ci) { canvas._ci.destroy(); canvas._ci = null; }
 
-    const data = this._getGpsAnalyticsData();
-    const player = this.players.find(p => p.id === this._gpsAnalyticsPlayerId);
-    const color = player ? PlayerTokens.get(player) : '#ff6600';
+    const selectedIds = this._gpsAnPlayerIds instanceof Set ? [...this._gpsAnPlayerIds] : [];
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const gridC = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+    const textC = isDark ? '#888' : '#999';
 
-    if (data.length === 0) {
+    if (selectedIds.length === 0) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         return;
     }
 
-    const labels = data.map(d => new Date(d.session.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }));
-    const internalLoad = data.map(d => d.session.load ?? null);
-    const externalLoad = data.map(d => d.gps && d.gps.distanceM != null ? d.gps.distanceM : null);
+    // ----- Modo 1 jugadora: comportamiento original (interna vs externa en m) -----
+    if (selectedIds.length === 1) {
+        this._gpsAnalyticsPlayerId = selectedIds[0];
+        const data = this._getGpsAnalyticsDataForPlayer(selectedIds[0]);
+        const player = this.players.find(p => p.id === selectedIds[0]);
+        const color = player ? PlayerTokens.get(player) : '#ff6600';
 
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const gridC = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
-    const textC = isDark ? '#888' : '#999';
+        if (data.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        const labels = data.map(d => new Date(d.session.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }));
+        const internalLoad = data.map(d => d.session.load ?? null);
+        const externalLoad = data.map(d => d.gps && d.gps.distanceM != null ? d.gps.distanceM : null);
+
+        canvas._ci = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Carga interna (RPE × duración)',
+                        data: internalLoad,
+                        borderColor: color,
+                        backgroundColor: color + '18',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        tension: 0.3,
+                        spanGaps: true,
+                        yAxisID: 'yInternal'
+                    },
+                    {
+                        label: 'Carga externa GPS (distancia m)',
+                        data: externalLoad,
+                        borderColor: color,
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [6, 4],
+                        pointRadius: 3,
+                        pointStyle: 'triangle',
+                        tension: 0.3,
+                        spanGaps: true,
+                        yAxisID: 'yExternal'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 300 },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: textC } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { ticks: { color: textC, maxTicksLimit: 8, font: { size: 10 } }, grid: { color: gridC } },
+                    yInternal: {
+                        type: 'linear', position: 'left',
+                        title: { display: true, text: 'Carga interna (UA)', color: textC, font: { size: 10 } },
+                        ticks: { color: textC, font: { size: 10 } }, grid: { color: gridC }
+                    },
+                    yExternal: {
+                        type: 'linear', position: 'right',
+                        title: { display: true, text: 'Distancia GPS (m)', color: textC, font: { size: 10 } },
+                        ticks: { color: textC, font: { size: 10 } }, grid: { drawOnChartArea: false }
+                    }
+                }
+            }
+        });
+        return;
+    }
+
+    // ----- Modo 2+ jugadoras: una línea por jugadora, métrica externa elegida (m / IIO) -----
+    const metric = this._gpsAnExternalMetric === 'iio' ? 'iio' : 'm';
+    const perPlayerData = selectedIds.map(id => ({
+        player: this.players.find(p => p.id === id),
+        data: this._getGpsAnalyticsDataForPlayer(id)
+    })).filter(p => p.player);
+
+    // Eje X común: todas las fechas de sesión de cualquiera de las
+    // jugadoras seleccionadas, en orden cronológico, sin duplicados.
+    const allDatesSet = new Set();
+    perPlayerData.forEach(p => p.data.forEach(d => allDatesSet.add(d.session.date)));
+    const allDates = [...allDatesSet].sort((a, b) => new Date(a) - new Date(b));
+
+    if (allDates.length === 0) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+
+    const labels = allDates.map(d => new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }));
+
+    const datasets = perPlayerData.map(({ player, data }) => {
+        const color = PlayerTokens.get(player);
+        const byDate = {};
+        data.forEach(d => { byDate[d.session.date] = d; });
+
+        const values = allDates.map(date => {
+            const d = byDate[date];
+            if (!d) return null;
+            if (metric === 'iio') {
+                if (typeof this.calculateGpsIntensityIndex !== 'function') return null;
+                const iio = this.calculateGpsIntensityIndex(d.session.playerId, d.session.id);
+                return iio ? iio.score : null;
+            }
+            return d.gps && d.gps.distanceM != null ? d.gps.distanceM : null;
+        });
+
+        return {
+            label: player.name,
+            data: values,
+            borderColor: color,
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 2,
+            tension: 0.3,
+            spanGaps: true
+        };
+    });
+
+    const yTitle = metric === 'iio' ? 'IIO (0-100)' : 'Distancia GPS (m)';
 
     canvas._ci = new Chart(canvas.getContext('2d'), {
         type: 'line',
-        data: {
-            labels,
-            datasets: [
-                {
-                    label: 'Carga interna (RPE × duración)',
-                    data: internalLoad,
-                    borderColor: color,
-                    backgroundColor: color + '18',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    tension: 0.3,
-                    spanGaps: true,
-                    yAxisID: 'yInternal'
-                },
-                {
-                    label: 'Carga externa GPS (distancia m)',
-                    data: externalLoad,
-                    borderColor: color,
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    borderDash: [6, 4],
-                    pointRadius: 3,
-                    pointStyle: 'triangle',
-                    tension: 0.3,
-                    spanGaps: true,
-                    yAxisID: 'yExternal'
-                }
-            ]
-        },
+        data: { labels, datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 300 },
             plugins: {
-                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: textC } },
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 }, color: textC } },
                 tooltip: { mode: 'index', intersect: false }
             },
             scales: {
                 x: { ticks: { color: textC, maxTicksLimit: 8, font: { size: 10 } }, grid: { color: gridC } },
-                yInternal: {
-                    type: 'linear', position: 'left',
-                    title: { display: true, text: 'Carga interna (UA)', color: textC, font: { size: 10 } },
+                y: {
+                    type: 'linear',
+                    title: { display: true, text: yTitle, color: textC, font: { size: 10 } },
                     ticks: { color: textC, font: { size: 10 } }, grid: { color: gridC }
-                },
-                yExternal: {
-                    type: 'linear', position: 'right',
-                    title: { display: true, text: 'Distancia GPS (m)', color: textC, font: { size: 10 } },
-                    ticks: { color: textC, font: { size: 10 } }, grid: { drawOnChartArea: false }
                 }
             }
         }
@@ -365,6 +537,18 @@ RPETracker.prototype._gpsSessionTypeLetter = function(type) {
 RPETracker.prototype._renderGpsSessionsTable = function() {
     const container = document.getElementById('gpsAnTableContainer');
     if (!container) return;
+
+    // La tabla de detalle solo tiene sentido para UNA jugadora a la
+    // vez; con 2+ seleccionadas en el gráfico, se oculta para no
+    // mezclar sesiones de varias jugadoras en las mismas filas.
+    const selectedCount = this._gpsAnPlayerIds instanceof Set ? this._gpsAnPlayerIds.size : 1;
+    if (selectedCount > 1) {
+        container.innerHTML = `
+            <div class="an-empty" style="text-align:center;color:var(--text-secondary);font-size:0.85rem;padding:16px;">
+                📊 Selecciona una sola jugadora en el gráfico para ver su tabla de detalle sesión a sesión.
+            </div>`;
+        return;
+    }
 
     if (!this._gpsTableColumns) {
         const saved = typeof Store !== 'undefined' ? Store.get('gpsTableColumns', null) : null;
