@@ -5977,28 +5977,28 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 
 /* Botones de acción junto a los chips de jugadora (selección
-   múltiple, todas/ninguna) — mismo look que los chips de jugadora
-   (borde + fondo sutil), pero como botón en vez de checkbox */
+   múltiple, todas/ninguna) — solo icono, compactos, mismo borde
+   sutil que el resto de chips de jugadora */
 .gps-player-select-actions {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     flex-wrap: wrap;
     align-items: center;
 }
 .gps-player-select-actions .gps-metric-chip {
     border: 0.5px solid var(--border);
     background: var(--bg-subtle);
-    border-radius: 20px;
-    padding: 3px 10px;
-    font-size: 0.8rem;
-    font-weight: 500;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 0.85rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .gps-player-select-actions .gps-metric-chip:hover { background: var(--bg-elevated); }
-.gps-player-select-actions .gps-metric-chip.active {
-    background: var(--primary);
-    color: #fff;
-    border-color: var(--primary);
-}
 
 /* Charts grid 2-column */
 .charts-grid {

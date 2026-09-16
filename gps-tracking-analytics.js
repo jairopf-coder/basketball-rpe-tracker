@@ -231,13 +231,14 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
         <div class="ac-curve-controls" style="margin-bottom:10px;">
             <div class="ac-curve-players">${chips}</div>
             <div class="gps-player-select-actions">
-                <button class="gps-metric-chip ${multi ? 'active' : ''}" title="Activar/desactivar selección múltiple"
+                <button class="gps-metric-chip" title="${multi ? 'Desactivar selección múltiple' : 'Activar selección múltiple'}"
                     onclick="window.rpeTracker._gpsAnToggleMultiSelect()">
-                    ${multi ? '☑️ Selección múltiple' : '◻️ Selección múltiple'}
+                    ${multi ? '☑️' : '◻️'}
                 </button>
                 ${multi ? `
-                    <button class="gps-metric-chip" onclick="window.rpeTracker._gpsAnSelectAllPlayers()">
-                        ${selectedCount === activePlayers.length ? 'Ninguna' : 'Todas'}
+                    <button class="gps-metric-chip" title="${selectedCount === activePlayers.length ? 'Deseleccionar todas' : 'Seleccionar todas'}"
+                        onclick="window.rpeTracker._gpsAnSelectAllPlayers()">
+                        ${selectedCount === activePlayers.length ? '👥❌' : '👥✅'}
                     </button>
                 ` : ''}
             </div>
