@@ -5891,6 +5891,42 @@ details[open] .ewma-toggle-hint { display: none; }
     padding: 0 1.5rem 1.5rem;
 }
 
+/* GPS alert box — mismo patrón que ewma-info-box, tono warning en vez de info */
+.gps-alert-box {
+    background: var(--warning-soft);
+    border-color: var(--warning);
+    margin-bottom: 12px;
+}
+.gps-alert-box .ewma-summary {
+    padding: 10px 14px;
+    font-size: 0.88rem;
+    color: var(--warning);
+}
+.gps-alert-box .ewma-summary:hover { background: rgba(245,166,35,0.08); }
+.gps-alert-list {
+    padding: 0 14px 12px;
+}
+.gps-alert-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 0;
+    border-top: 1px solid rgba(245,166,35,0.2);
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+.gps-alert-row:hover .gps-alert-name { text-decoration: underline; }
+.gps-alert-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.gps-alert-reason {
+    color: var(--text-secondary);
+    text-align: right;
+}
+
 /* Charts grid 2-column */
 .charts-grid {
     display: grid;

@@ -106,18 +106,23 @@ RPETracker.prototype._renderGpsAlertBanner = function() {
     const alerts = this._getGpsAlertPlayers();
     if (alerts.length === 0) return '';
 
-    const shown = alerts.slice(0, 3);
-    const extra = alerts.length - shown.length;
+    const alertOpen = typeof Store !== 'undefined' && Store.getString('gpsAlertOpen') === 'true';
 
     return `
-        <div style="background:var(--warning-soft);border:1px solid var(--warning);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:0.88rem;color:var(--text-primary);">
-            <div style="font-weight:600;margin-bottom:4px;color:var(--warning);">⚠️ ${alerts.length} jugadora${alerts.length > 1 ? 's' : ''} con carga a revisar</div>
-            ${shown.map(a => `
-                <div style="cursor:pointer;text-decoration:underline;" onclick="window.rpeTracker._gpsAnSwitchTab('player'); window.rpeTracker._gpsAnSetPlayer('${a.player.id}');">
-                    ${esc(a.player.name)} — ${esc(a.reasons.join(', '))}
-                </div>`).join('')}
-            ${extra > 0 ? `<div style="margin-top:2px;">y ${extra} más…</div>` : ''}
-        </div>`;
+        <details class="ewma-info-box gps-alert-box" id="gpsAlertDetails" ${alertOpen ? 'open' : ''}
+            ontoggle="if(typeof Store!=='undefined') Store.set('gpsAlertOpen', this.open)">
+            <summary class="ewma-summary">
+                <span>⚠️ ${alerts.length} jugadora${alerts.length > 1 ? 's' : ''} con carga a revisar</span>
+                <span class="ewma-toggle-hint">ver quiénes</span>
+            </summary>
+            <div class="ewma-body gps-alert-list">
+                ${alerts.map(a => `
+                    <div class="gps-alert-row" onclick="window.rpeTracker._gpsAnSwitchTab('player'); window.rpeTracker._gpsAnSetPlayer('${a.player.id}');">
+                        <span class="gps-alert-name">${esc(a.player.name)}</span>
+                        <span class="gps-alert-reason">${esc(a.reasons.join(', '))}</span>
+                    </div>`).join('')}
+            </div>
+        </details>`;
 };
 
 // Descarga el gráfico Chart.js activo en el canvas indicado como PNG.
