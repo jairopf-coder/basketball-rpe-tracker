@@ -262,6 +262,7 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
         </div>
 
         <div id="gpsAnTableContainer"></div>
+        <div id="gpsIioInfoContainer" style="margin-top:12px;">${this._renderGpsIioInfoBox()}</div>
     `;
 
     requestAnimationFrame(() => {
@@ -532,6 +533,45 @@ RPETracker.prototype._gpsSessionTypeLetter = function(type) {
     if (type === 'training') return 'T';
     if (type === 'match') return 'P';
     return 'O';
+};
+
+// Desplegable explicativo del IIO (Índice de Intensidad Objetiva),
+// mismo patrón visual que el de EWMA en Análisis A:C.
+RPETracker.prototype._renderGpsIioInfoBox = function() {
+    const iioOpen = typeof Store !== 'undefined' && Store.getString('gpsIioOpen') === 'true';
+
+    return `
+        <details class="ewma-info-box" id="gpsIioDetails" ${iioOpen ? 'open' : ''}
+            ontoggle="if(typeof Store!=='undefined') Store.set('gpsIioOpen', this.open)">
+            <summary class="ewma-summary">
+                <span>ℹ️ ¿Qué es el IIO y cómo se calcula?</span>
+                <span class="ewma-toggle-hint">ver más</span>
+            </summary>
+            <div class="ewma-body">
+                <p style="margin-bottom:0.5rem"><strong>IIO = Índice de Intensidad Objetiva</strong> (0-100%)</p>
+                <p style="margin-bottom:0.5rem">
+                    Resume el esfuerzo físico <strong>objetivo</strong> de una jugadora en una sesión, medido por el GPS,
+                    en una única escala comparable con el RPE (esfuerzo <strong>percibido</strong>). Así puedes ver de un
+                    vistazo si ambos coinciden o divergen.
+                </p>
+                <p style="margin-bottom:0.5rem"><strong>Se calcula combinando 4 bloques:</strong></p>
+                <ul style="margin-left:1.5rem;color:var(--gray)">
+                    <li><strong>Volumen (25%):</strong> distancia total y minutos jugados</li>
+                    <li><strong>Intensidad de carrera (30%):</strong> metros en cada banda de velocidad (caminata, trote, moderada, alta, sprint), dando más peso a las más exigentes</li>
+                    <li><strong>Esfuerzos explosivos (30%):</strong> aceleraciones/deceleraciones, cambios de dirección y saltos</li>
+                    <li><strong>Impacto/contacto (15%):</strong> impactos recibidos, de baja a máxima intensidad</li>
+                </ul>
+                <p style="margin:0.5rem 0">
+                    Cada métrica se normaliza sobre el <strong>máximo histórico de esa misma jugadora</strong> en la temporada
+                    (su valor más alto registrado = 100%), no se compara entre jugadoras. Es el mismo criterio que usa el
+                    RPE: una escala individual, para que la comparación entre "lo que siente" y "lo que hizo" tenga sentido.
+                </p>
+                <p style="margin:0.5rem 0;color:var(--text-secondary);font-size:0.85em">
+                    Con pocas sesiones registradas todavía, ese máximo histórico es menos fiable (puede ser un único día
+                    atípico) — el IIO se muestra igual, pero conviene interpretarlo con cautela hasta tener más datos.
+                </p>
+            </div>
+        </details>`;
 };
 
 RPETracker.prototype._renderGpsSessionsTable = function() {
