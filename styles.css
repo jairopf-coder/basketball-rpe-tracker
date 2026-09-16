@@ -8943,11 +8943,14 @@ details[open] .ewma-toggle-hint { display: none; }
 [data-theme="dark"] .pvr-row--high     { background: rgba(244,67,54,0.10); }
 
 .pvr-date   { white-space: nowrap; color: var(--text-secondary); font-size: 0.75rem; }
-.pvr-player { display: flex; align-items: center; gap: 0.35rem; font-weight: 500; white-space: nowrap; }
+.pvr-player { font-weight: 500; white-space: nowrap; }
+.pvr-player .player-token-avatar { display: inline-flex; vertical-align: middle; margin-right: 0.35rem; }
 .pvr-slot   { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
-.pvr-plan   { display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
-.pvr-real   { display: flex; align-items: center; justify-content: center; }
-.pvr-delta  { display: flex; align-items: center; justify-content: center; gap: 0.25rem; font-weight: 700; white-space: nowrap; }
+.pvr-plan   { text-align: center; }
+.pvr-plan .pvr-intensity { margin-right: 0.4rem; }
+.pvr-real   { text-align: center; }
+.pvr-delta  { text-align: center; font-weight: 700; white-space: nowrap; }
+.pvr-delta .pvr-delta-icon { margin-right: 0.25rem; }
 .pvr-delta-icon { font-size: 0.65rem; }
 .pvr-rpe-val     { font-weight: 600; color: var(--text-primary); }
 .pvr-rpe-real    {}
