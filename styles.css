@@ -5954,6 +5954,28 @@ details[open] .ewma-toggle-hint { display: none; }
     color: #fff;
 }
 
+/* Tabla de detalle GPS: centrado y formato compacto */
+.gps-an-table-card table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.gps-an-table-card table.data-table th,
+.gps-an-table-card table.data-table td {
+    text-align: center;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+.gps-an-table-card table.data-table thead tr {
+    border-bottom: 1px solid var(--border);
+}
+.gps-an-table-card table.data-table tbody tr {
+    border-bottom: 1px solid var(--border);
+}
+.gps-an-table-card table.data-table tbody tr:hover {
+    background: var(--bg-elevated);
+}
+
 /* Charts grid 2-column */
 .charts-grid {
     display: grid;

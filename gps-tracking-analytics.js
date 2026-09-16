@@ -603,19 +603,19 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
         return `
         <tr onclick="window.rpeTracker.showSessionDetail('${session.id}')" style="cursor:pointer;">
             <td>${dateStr}</td>
-            <td style="text-align:center;font-weight:600;" title="${esc(session.type || '')}">${this._gpsSessionTypeLetter(session.type)}</td>
+            <td style="font-weight:600;" title="${esc(session.type || '')}">${this._gpsSessionTypeLetter(session.type)}</td>
             <td>${session.rpe ?? '—'}</td>
-            <td>${iio ? iio.score + '/100' : '—'}</td>
+            <td>${iio ? iio.score + '%' : '—'}</td>
             ${dynamicCells}
         </tr>`;
     }).join('');
 
     container.innerHTML = columnsPicker + `
         <div class="gps-an-table-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;overflow-x:auto;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
-            <table class="data-table" style="width:100%;border-collapse:collapse;">
+            <table class="data-table">
                 <thead>
-                    <tr style="text-align:left;font-size:0.8rem;color:var(--text-secondary);">
-                        <th>Fecha</th><th style="text-align:center;">Tipo</th><th>RPE app</th><th>IIO</th>
+                    <tr style="font-size:0.8rem;color:var(--text-secondary);">
+                        <th>Fecha</th><th>Tipo</th><th>RPE app</th><th>IIO</th>
                         ${columns.map(m => `<th>${esc(m.label)}</th>`).join('')}
                     </tr>
                 </thead>
