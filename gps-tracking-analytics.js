@@ -176,9 +176,6 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
             <button class="an-tab ${this._gpsAnTab === 'team' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('team')">👥 Comparativa equipo</button>
             <button class="an-tab ${this._gpsAnTab === 'radar' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSwitchTab('radar')">📊 Comparar jugadoras</button>
         </div>
-        <div style="display:flex;justify-content:flex-end;padding-top:10px;">
-            ${this._renderGpsTypeFilterSelect()}
-        </div>
         <div id="gpsAnTabContent" style="padding-top:10px;"></div>
     `;
 
@@ -207,13 +204,15 @@ RPETracker.prototype._renderGpsAnTabContent = function() {
 RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
     const activePlayers = this.players.filter(p => !p.archived);
 
-    // Estado inicial: todas las jugadoras seleccionadas, métrica externa
-    // en distancia (m), rango 30 días — solo se inicializa la primera vez.
-    if (!(this._gpsAnPlayerIds instanceof Set)) {
-        this._gpsAnPlayerIds = new Set(activePlayers.map(p => p.id));
-    }
+    // Estado inicial: ninguna jugadora seleccionada, selección múltiple
+    // desactivada (se va de una en una salvo que el usuario active el
+    // modo múltiple), métrica externa en distancia (m), rango 30 días.
+    if (!(this._gpsAnPlayerIds instanceof Set)) this._gpsAnPlayerIds = new Set();
+    if (this._gpsAnMultiSelect === undefined) this._gpsAnMultiSelect = false;
     if (!this._gpsAnExternalMetric) this._gpsAnExternalMetric = 'm';
     if (!this._gpsAnalyticsRange) this._gpsAnalyticsRange = '30';
+
+    const multi = this._gpsAnMultiSelect;
 
     const chips = activePlayers.map(p => {
         const color = PlayerTokens.get(p);
@@ -231,6 +230,17 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
     container.innerHTML = `
         <div class="ac-curve-controls" style="margin-bottom:10px;">
             <div class="ac-curve-players">${chips}</div>
+            <div class="gps-player-select-actions">
+                <button class="gps-metric-chip ${multi ? 'active' : ''}" title="Activar/desactivar selección múltiple"
+                    onclick="window.rpeTracker._gpsAnToggleMultiSelect()">
+                    ${multi ? '☑️ Selección múltiple' : '◻️ Selección múltiple'}
+                </button>
+                ${multi ? `
+                    <button class="gps-metric-chip" onclick="window.rpeTracker._gpsAnSelectAllPlayers()">
+                        ${selectedCount === activePlayers.length ? 'Ninguna' : 'Todas'}
+                    </button>
+                ` : ''}
+            </div>
         </div>
 
         <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
@@ -239,12 +249,15 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
                 <option value="90" ${this._gpsAnalyticsRange === '90' ? 'selected' : ''}>Últimos 90 días</option>
                 <option value="all" ${this._gpsAnalyticsRange === 'all' ? 'selected' : ''}>Toda la temporada</option>
             </select>
-            ${selectedCount > 1 ? `
-                <div class="gps-metric-toggle">
-                    <button class="gps-metric-chip ${this._gpsAnExternalMetric === 'm' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSetExternalMetric('m')">m</button>
-                    <button class="gps-metric-chip ${this._gpsAnExternalMetric === 'iio' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSetExternalMetric('iio')">IIO</button>
-                </div>
-            ` : ''}
+            <div style="margin-left:auto;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+                ${this._renderGpsTypeFilterSelect()}
+                ${selectedCount > 1 ? `
+                    <div class="gps-metric-toggle">
+                        <button class="gps-metric-chip ${this._gpsAnExternalMetric === 'm' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSetExternalMetric('m')">m</button>
+                        <button class="gps-metric-chip ${this._gpsAnExternalMetric === 'iio' ? 'active' : ''}" onclick="window.rpeTracker._gpsAnSetExternalMetric('iio')">IIO</button>
+                    </div>
+                ` : ''}
+            </div>
         </div>
 
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
@@ -273,8 +286,18 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
 
 RPETracker.prototype._gpsAnTogglePlayer = function(playerId, checked) {
     if (!(this._gpsAnPlayerIds instanceof Set)) this._gpsAnPlayerIds = new Set();
-    if (checked) this._gpsAnPlayerIds.add(playerId);
-    else this._gpsAnPlayerIds.delete(playerId);
+
+    if (this._gpsAnMultiSelect) {
+        // Modo múltiple: cada chip es independiente, como un checkbox normal.
+        if (checked) this._gpsAnPlayerIds.add(playerId);
+        else this._gpsAnPlayerIds.delete(playerId);
+    } else {
+        // Modo simple (por defecto): solo puede haber 0 o 1 jugadora
+        // seleccionada. Marcar una desmarca automáticamente cualquier
+        // otra; desmarcar la única activa la deja vacía.
+        if (checked) this._gpsAnPlayerIds = new Set([playerId]);
+        else this._gpsAnPlayerIds.delete(playerId);
+    }
 
     // Mantenemos _gpsAnalyticsPlayerId (usado por la tabla) apuntando a
     // la única jugadora seleccionada cuando hay exactamente una; si hay
@@ -290,6 +313,36 @@ RPETracker.prototype._gpsAnTogglePlayer = function(playerId, checked) {
     if (container) this._renderGpsPlayerEvolutionTab(container);
 };
 
+// Activa/desactiva el modo de selección múltiple. Al desactivarlo con
+// 2+ jugadoras marcadas, nos quedamos solo con la primera (del orden
+// del roster activo) para no dejar el gráfico en un estado ambiguo.
+RPETracker.prototype._gpsAnToggleMultiSelect = function() {
+    this._gpsAnMultiSelect = !this._gpsAnMultiSelect;
+
+    if (!this._gpsAnMultiSelect && this._gpsAnPlayerIds instanceof Set && this._gpsAnPlayerIds.size > 1) {
+        const activePlayers = this.players.filter(p => !p.archived);
+        const first = activePlayers.find(p => this._gpsAnPlayerIds.has(p.id));
+        this._gpsAnPlayerIds = first ? new Set([first.id]) : new Set();
+        if (first) this._gpsAnalyticsPlayerId = first.id;
+    }
+
+    const container = document.getElementById('gpsAnTabContent');
+    if (container) this._renderGpsPlayerEvolutionTab(container);
+};
+
+// Selecciona todas las jugadoras activas, o ninguna si ya estaban
+// todas seleccionadas. Solo se usa (y solo se ve el botón) con
+// selección múltiple activada.
+RPETracker.prototype._gpsAnSelectAllPlayers = function() {
+    const activePlayers = this.players.filter(p => !p.archived);
+    const allSelected = this._gpsAnPlayerIds instanceof Set && this._gpsAnPlayerIds.size === activePlayers.length;
+
+    this._gpsAnPlayerIds = allSelected ? new Set() : new Set(activePlayers.map(p => p.id));
+
+    const container = document.getElementById('gpsAnTabContent');
+    if (container) this._renderGpsPlayerEvolutionTab(container);
+};
+
 RPETracker.prototype._gpsAnSetExternalMetric = function(metric) {
     this._gpsAnExternalMetric = metric;
     this._drawGpsComparisonChart();
@@ -301,6 +354,7 @@ RPETracker.prototype._gpsAnSetExternalMetric = function(metric) {
 RPETracker.prototype._gpsAnSetPlayer = function(playerId) {
     this._gpsAnalyticsPlayerId = playerId;
     this._gpsAnPlayerIds = new Set([playerId]);
+    this._gpsAnMultiSelect = false;
     const container = document.getElementById('gpsAnTabContent');
     if (container) {
         this._renderGpsPlayerEvolutionTab(container);
@@ -628,7 +682,7 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
     }
 
     const rows = data.map(({ session, gps }) => {
-        const dateStr = new Date(session.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const dateStr = new Date(session.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
         const iio = typeof this.calculateGpsIntensityIndex === 'function'
             ? this.calculateGpsIntensityIndex(session.playerId, session.id)
             : null;
@@ -734,6 +788,8 @@ RPETracker.prototype._renderGpsTeamComparisonTab = function(container) {
             </button>
 
             <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsTeamComparisonCanvas', 'comparativa-equipo-gps')">📥 Descargar</button>
+
+            <div style="margin-left:auto;">${this._renderGpsTypeFilterSelect()}</div>
         </div>
 
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
@@ -1038,6 +1094,8 @@ RPETracker.prototype._renderGpsRadarTab = function(container) {
                     <option value="all" ${this._gpsBarsRange === 'all' ? 'selected' : ''}>Toda la temporada</option>
                 </select>
             `}
+
+            <div style="margin-left:auto;">${this._renderGpsTypeFilterSelect()}</div>
         </div>
 
         <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
