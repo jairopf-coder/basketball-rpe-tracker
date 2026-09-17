@@ -1001,6 +1001,14 @@ header h1 {
     margin: 0 auto;
 }
 
+/* Título estándar de cabecera de vista — mismo tamaño/peso en toda la app */
+.view-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--text-primary);
+}
+
 /* Fila del título "Análisis Agudo:Crónico" + botón "Exportar Todos los Gráficos"
    en la misma línea (título izq, botón der). En pantallas estrechas (iPhone)
    el botón baja debajo del título en vez de apretarse. */
@@ -1424,7 +1432,8 @@ header h1 {
 
 .pred-page-header h2 {
     margin: 0 0 1.25rem;
-    font-size: 1.4rem;
+    font-size: 1.35rem;
+    font-weight: 700;
     color: var(--text-primary);
 }
 
@@ -3770,7 +3779,7 @@ header h1 {
 
 /* ===== TEAM STATUS VIEW ===== */
 .ts-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem; }
-.ts-title { font-size:1.3rem; font-weight:700; margin:0 0 4px; }
+.ts-title { font-size:1.35rem; font-weight:700; margin:0 0 4px; }
 .ts-subtitle { font-size:0.85rem; color:var(--text-muted); }
 .ts-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:0.75rem; margin-bottom:1.5rem; }
 .ts-summary-item { border-radius:12px; padding:1rem; text-align:center; }
@@ -6889,7 +6898,7 @@ details[open] .ewma-toggle-hint { display: none; }
     margin-bottom: 1.5rem;
     flex-wrap: wrap;
 }
-.str-header h2 { margin: 0; flex: 1; font-size: 1.25rem; }
+.str-header h2 { margin: 0; flex: 1; font-size: 1.35rem; font-weight: 700; }
 .str-header-actions { display: flex; gap: 0.5rem; }
 
 .str-back-btn {
