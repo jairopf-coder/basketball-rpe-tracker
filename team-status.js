@@ -84,7 +84,7 @@ RPETracker.prototype.renderTeamStatus = function() {
     container.innerHTML = `
         <div class="ts-header">
             <div>
-                <h2 class="ts-title">Estado del equipo</h2>
+                <h2 class="ts-title">📊 Estado del equipo</h2>
                 <div class="ts-subtitle">Disponibilidad para el próximo partido</div>
             </div>
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">

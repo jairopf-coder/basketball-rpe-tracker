@@ -342,7 +342,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
         <div class="weekplan-wrap">
             <div class="weekplan-header">
                 <div>
-                    <h2 style="margin:0 0 .25rem">📅 Planificación Semanal</h2>
+                    <h2 class="view-title" style="margin:0 0 .25rem">📅 Planificación Semanal</h2>
                     <p style="margin:0;color:var(--text-secondary);font-size:.85rem">
                         Semana del ${this._wpFmtDate(weekStart)}
                         ${(() => {
@@ -735,7 +735,7 @@ RPETracker.prototype.renderMedicalHistory = function() {
         <div class="weekplan-wrap">
             <div class="weekplan-header">
                 <div>
-                    <h2 style="margin:0 0 .25rem">📋 Historial Médico</h2>
+                    <h2 class="view-title" style="margin:0 0 .25rem">📋 Historial Médico</h2>
                     <p style="margin:0;color:var(--text-secondary);font-size:.85rem">${allInjuries.length} lesiones registradas</p>
                 </div>
                 <button class="btn-primary" onclick="window.rpeTracker?.switchView('injury')">➕ Nueva lesión</button>
@@ -894,7 +894,7 @@ RPETracker.prototype.renderRehabLoad = function() {
 
     if (!activeInjuries.length) {
         container.innerHTML = `<div class="weekplan-wrap">
-            <div class="weekplan-header"><h2 style="margin:0">💪 Carga de Readaptación</h2></div>
+            <div class="weekplan-header"><h2 class="view-title" style="margin:0">💪 Carga de Readaptación</h2></div>
             <div class="wellness-card" style="text-align:center;padding:3rem;color:var(--text-secondary)">
                 <p style="font-size:3rem">💪</p>
                 <h3 style="margin:.5rem 0">No hay jugadoras en readaptación</h3>
@@ -991,7 +991,7 @@ RPETracker.prototype.renderRehabLoad = function() {
     container.innerHTML = `<div class="weekplan-wrap">
         <div class="weekplan-header">
             <div>
-                <h2 style="margin:0 0 .25rem">💪 Carga de Readaptación</h2>
+                <h2 class="view-title" style="margin:0 0 .25rem">💪 Carga de Readaptación</h2>
                 <p style="margin:0;color:var(--text-secondary);font-size:.85rem">${activeInjuries.length} jugadora${activeInjuries.length!==1?'s':''} en readaptación</p>
             </div>
         </div>
@@ -1039,7 +1039,7 @@ RPETracker.prototype.renderLoadInjuryCorrelation = function() {
 
     if (!injuries.length) {
         el.innerHTML = `<div class="weekplan-wrap">
-            <div class="weekplan-header"><h2 style="margin:0">🔗 Correlación Carga-Lesión</h2></div>
+            <div class="weekplan-header"><h2 class="view-title" style="margin:0">🔗 Correlación Carga-Lesión</h2></div>
             <div class="wellness-card" style="text-align:center;padding:3rem;color:var(--text-secondary)">
                 <p style="font-size:3rem">🔗</p>
                 <h3 style="margin:.5rem 0">Sin datos suficientes</h3>
@@ -1055,7 +1055,7 @@ RPETracker.prototype.renderLoadInjuryCorrelation = function() {
     el.innerHTML = `<div class="weekplan-wrap">
         <div class="weekplan-header">
             <div>
-                <h2 style="margin:0 0 .25rem">🔗 Correlación Carga-Lesión</h2>
+                <h2 class="view-title" style="margin:0 0 .25rem">🔗 Correlación Carga-Lesión</h2>
                 <p style="margin:0;color:var(--text-secondary);font-size:.85rem">Análisis de carga previa a lesiones</p>
             </div>
         </div>
@@ -2016,7 +2016,7 @@ RPETracker.prototype.renderMicrociclo = function() {
     container.innerHTML = `
         ${styles}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:.4rem">
-            <h2 style="margin:0;font-size:1.1rem;font-weight:700;color:var(--text-primary)">📆 Dashboard Microciclo</h2>
+            <h2 class="view-title" style="margin:0">📆 Dashboard Microciclo</h2>
             <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
                 <span style="font-size:.78rem;color:var(--text-secondary)">${weekLabel}</span>
                 <button class="btn-secondary" style="font-size:.8rem;padding:.4rem .85rem" onclick="window.rpeTracker?.generateTeamWeeklyReport()">📊 Informe de equipo</button>

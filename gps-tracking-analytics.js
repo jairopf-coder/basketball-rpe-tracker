@@ -161,7 +161,7 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
     container.innerHTML = `
         <div class="an-header" style="margin-bottom:0;display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
             <div>
-                <h2 style="margin:0 0 4px 0;">📡 Analítica GPS (Oli Sports)</h2>
+                <h2 class="view-title" style="margin:0 0 4px 0;">📡 Analítica GPS (Oli Sports)</h2>
                 <p style="margin:0 0 12px 0;color:var(--text-secondary);font-size:0.9rem;">
                     Compara la carga interna (RPE × duración) con la carga externa objetiva del GPS.
                 </p>

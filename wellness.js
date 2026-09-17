@@ -144,7 +144,7 @@ RPETracker.prototype.renderWellnessDashboard = function() {
         <div class="wellness-wrap">
             <div class="wellness-header">
                 <div>
-                    <h2 style="margin:0 0 .25rem">❤️ Wellness del Equipo</h2>
+                    <h2 class="view-title" style="margin:0 0 .25rem">❤️ Wellness del Equipo</h2>
                     <p style="margin:0;color:var(--text-secondary);font-size:.85rem">${this._wFmtDate(today)}</p>
                 </div>
                 <div style="display:flex;gap:.5rem;flex-wrap:wrap">

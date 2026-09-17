@@ -376,7 +376,7 @@ RPETracker.prototype.renderSeasonBlocksManager = function() {
     container.innerHTML = `
         <div class="weekplan-header">
             <div>
-                <h2 style="margin:0 0 .25rem">📆 Bloques de Temporada</h2>
+                <h2 class="view-title" style="margin:0 0 .25rem">📆 Bloques de Temporada</h2>
                 <p style="margin:0;color:var(--text-secondary);font-size:.85rem">Gestión de fases: pretemporada, competición, taper</p>
             </div>
             <button class="btn-primary btn-sm" onclick="window.rpeTracker?.openSeasonBlockModal()">+ Nuevo bloque</button>
