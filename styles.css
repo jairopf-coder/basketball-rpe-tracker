@@ -8588,7 +8588,8 @@ details[open] .ewma-toggle-hint { display: none; }
 .sv-number { color: var(--text-faint); font-size: 11px; }
 
 /* ===== INJURY HUB ===== */
-.ijh-wrap { padding: 1rem; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: .75rem; }
+.ijh-wrap { padding: 1.5rem; max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: .75rem; }
+@media (max-width: 640px) { .ijh-wrap { padding: 1rem 0.75rem; } }
 .ijh-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .ijh-title { margin: 0 0 .2rem; font-size: 1.35rem; font-weight: 700; color: var(--text-primary); }
 .ijh-sub { margin: 0; font-size: .85rem; color: var(--text-secondary); }

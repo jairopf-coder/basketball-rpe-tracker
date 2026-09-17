@@ -9,9 +9,6 @@
     s.id = '__objectivesStyles';
     s.textContent = `
         .obj-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 1.5rem;
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
@@ -234,7 +231,6 @@
             margin-bottom: 0.25rem;
         }
         @media (max-width: 600px) {
-            .obj-container { padding: 0.75rem; }
             .obj-form-grid { grid-template-columns: 1fr; }
             .obj-form-grid .obj-field-full { grid-column: 1; }
         }
