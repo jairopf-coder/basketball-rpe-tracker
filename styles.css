@@ -414,7 +414,7 @@ header h1 {
 /* Advanced Filters */
 .advanced-filters {
     padding: 1rem 1.5rem;
-    max-width: 1200px;
+    max-width: 1168px;
     margin: 0 auto;
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
@@ -697,6 +697,17 @@ header h1 {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+}
+
+/* El <form> de Editar Sesión envuelve su propio .modal-body — debe
+   participar del layout flex de .modal-content para que el scroll
+   interno funcione (por defecto <form> es un bloque normal). */
+#editSessionForm {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .modal-footer {
@@ -3088,7 +3099,7 @@ header h1 {
 
     .advanced-filters {
         padding: 0.85rem 2rem;
-        max-width: 1200px;
+        max-width: 1168px;
         margin: 0 auto;
         background: var(--bg-surface);
         border-bottom: 1px solid var(--border);
