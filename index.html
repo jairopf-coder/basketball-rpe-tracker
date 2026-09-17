@@ -462,7 +462,8 @@
                 
                 <form id="editSessionForm">
                     <input type="hidden" id="editSessionId">
-                    
+
+                    <div class="modal-body">
                     <div class="form-group">
                         <label>👤 Jugadora</label>
                         <select id="editSessionPlayer" required disabled style="opacity: 0.6;">
@@ -524,6 +525,7 @@
                         <label>📝 Incidencias</label>
                         <textarea id="editSessionNotes" rows="5" placeholder="Lesiones, observaciones, etc..."></textarea>
                     </div>
+                    </div><!-- /modal-body -->
 
                     <div class="modal-footer">
                         <button type="button" id="cancelEditSessionBtn" class="btn-secondary">Cancelar</button>
