@@ -518,37 +518,77 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
     modal.classList.add('active');
 };
 
+// Misma clave de agrupación "sesión de equipo" que usa showSessionDetail
+// (app-sessions.js) para las hermanas ◀ Anterior · Siguiente ▶: mismo
+// día + turno + tipo. La reutilizamos aquí para saber, para cada
+// jugadora, cuál es SU sesión individual dentro de ese mismo entreno.
+RPETracker.prototype._gpsGroupKeyForSession = function(session) {
+    return `${String(session.date).slice(0, 10)}_${session.timeOfDay || 'unknown'}_${session.type || 'training'}`;
+};
+
+// Busca, dentro del mismo entreno/partido que sessionGroupId (misma
+// fecha+turno+tipo), la sesión individual de una jugadora concreta.
+RPETracker.prototype._findPlayerSessionInGroup = function(sessionGroupId, playerId) {
+    const refSession = (this.sessions || []).find(s => s.id === sessionGroupId);
+    if (!refSession) return null;
+    const groupKey = this._gpsGroupKeyForSession(refSession);
+    return (this.sessions || []).find(s =>
+        s.playerId === playerId && this._gpsGroupKeyForSession(s) === groupKey
+    ) || null;
+};
+
 RPETracker.prototype._confirmGpsImport = function(sessionGroupId) {
     const pending = this._pendingGpsImport;
     if (!pending) return;
 
-    const toSave = {};
-    const newMappings = {};
-
+    // FIX importación múltiple: antes se guardaba TODO bajo la clave
+    // sessionGroupId (el id de UNA sola jugadora), pero el resto de la
+    // app lee el GPS de cada jugadora con SU PROPIO session.id. Por eso
+    // solo la jugadora cuyo id coincidía con sessionGroupId veía datos.
+    // Ahora resolvemos, para cada fila del CSV, la sesión individual
+    // real de esa jugadora dentro del mismo entreno (mismo día+turno+
+    // tipo) y guardamos ahí. Si una jugadora no tiene sesión ese día
+    // (no se le creó RPE), se avisa en vez de perder el dato en silencio.
+    const rowsToProcess = [];
     pending.matched.forEach((item, idx) => {
         const sel = document.getElementById(`gpsMatchSelect-${idx}`);
         const playerId = sel ? sel.value : item.player.id;
         if (!playerId) return; // ignorada
-        toSave[playerId] = item.record;
-        newMappings[item.record.oliPlayerId] = playerId;
+        rowsToProcess.push({ playerId, record: item.record, oliPlayerId: item.record.oliPlayerId });
     });
-
     pending.unmatched.forEach((rec, idx) => {
         const sel = document.getElementById(`gpsMatchSelect-u${idx}`);
         const playerId = sel ? sel.value : '';
         if (!playerId) return;
-        toSave[playerId] = rec;
-        newMappings[rec.oliPlayerId] = playerId;
+        rowsToProcess.push({ playerId, record: rec, oliPlayerId: rec.oliPlayerId });
     });
 
-    if (Object.keys(toSave).length === 0) {
+    if (rowsToProcess.length === 0) {
         this.showToast('⚠️ No se guardó ninguna fila', 'warning');
         return;
     }
 
     if (!this.gpsData) this.gpsData = {};
-    this.gpsData[sessionGroupId] = { ...(this.gpsData[sessionGroupId] || {}), ...toSave };
-    this.saveGpsData();
+    const newMappings = {};
+    const savedPlayerNames = [];
+    const skippedPlayerNames = [];
+
+    rowsToProcess.forEach(({ playerId, record, oliPlayerId }) => {
+        const targetSession = this._findPlayerSessionInGroup(sessionGroupId, playerId);
+        const player = this.players.find(p => p.id === playerId);
+        if (!targetSession) {
+            skippedPlayerNames.push(player ? player.name : playerId);
+            return;
+        }
+        if (!this.gpsData[targetSession.id]) this.gpsData[targetSession.id] = {};
+        this.gpsData[targetSession.id][playerId] = record;
+        newMappings[oliPlayerId] = playerId;
+        savedPlayerNames.push(player ? player.name : playerId);
+    });
+
+    if (savedPlayerNames.length > 0) {
+        this.saveGpsData();
+    }
 
     if (!this.gpsPlayerMap) this.gpsPlayerMap = {};
     Object.assign(this.gpsPlayerMap, newMappings);
@@ -558,7 +598,12 @@ RPETracker.prototype._confirmGpsImport = function(sessionGroupId) {
     if (modal) modal.classList.remove('active');
     this._pendingGpsImport = null;
 
-    this.showToast(`✅ Datos GPS guardados para ${Object.keys(toSave).length} jugadora(s)`, 'success');
+    if (savedPlayerNames.length > 0) {
+        this.showToast(`✅ Datos GPS guardados para ${savedPlayerNames.length} jugadora(s)`, 'success');
+    }
+    if (skippedPlayerNames.length > 0) {
+        this.showToast(`⚠️ Sin sesión registrada ese día para: ${skippedPlayerNames.join(', ')}. Créales primero la sesión de RPE y vuelve a importar.`, 'warning');
+    }
 
     // Refrescar la ficha de sesión si sigue abierta
     if (this.currentSessionId && typeof this.showSessionDetail === 'function') {
