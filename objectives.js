@@ -21,8 +21,8 @@
             gap: 0.75rem;
         }
         .obj-title {
-            font-size: 1.1rem;
-            font-weight: 600;
+            font-size: 1.35rem;
+            font-weight: 700;
             color: var(--text-primary);
         }
         /* ── Formulario ── */
