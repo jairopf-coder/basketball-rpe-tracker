@@ -4516,6 +4516,20 @@ header h1 {
     /* La leyenda ya no está aquí — está entre db-players y db-comparison */
 }
 
+/* .db-right-sticky + .db-players + .db-right-legend forman UNA sola tarjeta
+   visual (cabecera + lista + leyenda). Quitamos el gap del flex de .db-right
+   solo entre estos tres, para que se vean unidos como antes. */
+.db-right-sticky + .db-players,
+.db-players + .db-right-legend {
+    margin-top: -1.5rem;
+}
+@media (max-width: 768px) {
+    .db-right-sticky + .db-players,
+    .db-players + .db-right-legend {
+        margin-top: -0.75rem;
+    }
+}
+
 /* Header interno de la tarjeta ratio A:C */
 .db-right-header {
     display: flex;
