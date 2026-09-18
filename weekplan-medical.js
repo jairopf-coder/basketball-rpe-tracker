@@ -472,6 +472,14 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
         this.renderWeeklyPlanning();
     });
     document.getElementById('wpSave')?.addEventListener('click', () => {
+        // Antes de guardar, releer directamente los <select>/<input> visibles
+        // del grid y volcarlos a memoria. Esto evita perder el último cambio
+        // (p.ej. el tipo de sesión tras activar el interruptor) si el usuario
+        // guarda muy rápido, antes de que el evento 'change'/'blur' del campo
+        // terminase de procesarse — bug diagnosticado: el minicalendario de
+        // Inicio no mostraba sesiones planificadas porque quedaban guardadas
+        // con enabled:true pero type:'rest' (valor por defecto sin actualizar).
+        this._wpSyncFromDOM(mondayKey);
         const entry = this._wpEnsureWeekEntry(mondayKey);
         entry.savedAt = new Date().toISOString();
         this.saveWeekPlan();
@@ -481,6 +489,29 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     });
 
     this._drawWpLoadChart(dayKeys, dayLabels, weekStart, activeDays);
+};
+
+// Vuelca a this.weekPlan el estado ACTUAL de todos los campos visibles del
+// grid de planificación (checkboxes, selects, inputs), por si algún cambio
+// reciente no llegó a disparar su evento 'change'/'blur' antes de guardar.
+RPETracker.prototype._wpSyncFromDOM = function(mondayKey) {
+    const grid = document.getElementById('wpGrid');
+    if (!grid) return;
+    const entry = this._wpEnsureWeekEntry(mondayKey);
+
+    grid.querySelectorAll('[data-wp-day][data-wp-slot][data-wp-field]').forEach(el => {
+        const day   = el.dataset.wpDay;
+        const slot  = el.dataset.wpSlot;
+        const field = el.dataset.wpField;
+        if (!entry.days[day]) entry.days[day] = {};
+        if (!entry.days[day][slot]) {
+            entry.days[day][slot] = {type:'training',intensity:'medium',duration:60,focus:'',enabled:false};
+        }
+        const value = el.type === 'checkbox' ? el.checked
+                    : el.type === 'number'   ? (parseInt(el.value) || 0)
+                    : el.value;
+        entry.days[day][slot][field] = value;
+    });
 };
 
 
