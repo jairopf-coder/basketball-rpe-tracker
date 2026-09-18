@@ -5,42 +5,15 @@ RPETracker.prototype._setAnalyticsTab = function(tab) {
 };
 
 RPETracker.prototype._renderACCurveTab = function() {
-    // Player selector checkboxes
-    const checks = this.players.map((p, i) => {
-        const color = PlayerTokens.get(p);
-        const checked = !this._acExcluded?.has(p.id);
-        return `<label class="ac-curve-check" style="--chk-color:${color}">
-            <input type="checkbox" value="${p.id}" ${checked?'checked':''}
-                onchange="window.rpeTracker?._acTogglePlayer('${p.id}',this.checked)">
-            <span class="ac-chk-dot" style="background:${color}"></span>
-            ${p.name}${p.number?` <small>#${p.number}</small>`:''}
-        </label>`;
-    }).join('');
-
-    // Window selector
-    const win = this._acWindow || 28;
-
-    // Season comparison selectors
-    const allSeasons = Store.getSeasonsFromSessions(this.sessions);
-    const activeSeason = Store.getActiveSeason();
-    const selA = this._acSeasonA || activeSeason;
-    const selB = this._acSeasonB || '';
-
-    const seasonOpts = (current, allowEmpty) =>
-        (allowEmpty ? `<option value="">— sin comparar —</option>` : '') +
-        allSeasons.map(s =>
-            `<option value="${s}" ${s === current ? 'selected' : ''}>${s}</option>`
-        ).join('');
-
     return `<div class="ac-curve-wrap">
         <div class="ac-curve-controls">
-            <div class="ac-curve-players">${checks}</div>
+            <div class="player-filter-chips" id="acCurvePlayerChips" style="margin:0;">${this._renderACPlayerChips()}</div>
             <div class="ac-curve-right">
                 <label class="ac-win-label">Ventana</label>
                 <select class="ac-win-sel" onchange="window.rpeTracker?._acSetWindow(+this.value)">
-                    <option value="14" ${win===14?'selected':''}>14 días</option>
-                    <option value="28" ${win===28?'selected':''}>28 días</option>
-                    <option value="56" ${win===56?'selected':''}>56 días</option>
+                    <option value="14" ${(this._acWindow||28)===14?'selected':''}>14 días</option>
+                    <option value="28" ${(this._acWindow||28)===28?'selected':''}>28 días</option>
+                    <option value="56" ${(this._acWindow||28)===56?'selected':''}>56 días</option>
                 </select>
             </div>
         </div>
@@ -48,13 +21,13 @@ RPETracker.prototype._renderACCurveTab = function() {
             <span class="ac-season-label">🗓️ Temporada A</span>
             <select class="ac-season-sel" id="acSeasonSelA"
                 onchange="window.rpeTracker?._acSetSeasonA(this.value)">
-                ${seasonOpts(selA, false)}
+                ${this._acSeasonOpts(this._acSeasonA || Store.getActiveSeason(), false)}
             </select>
             <span class="ac-season-sep">vs</span>
             <span class="ac-season-label">Temporada B</span>
             <select class="ac-season-sel" id="acSeasonSelB"
                 onchange="window.rpeTracker?._acSetSeasonB(this.value)">
-                ${seasonOpts(selB, true)}
+                ${this._acSeasonOpts(this._acSeasonB || '', true)}
             </select>
         </div>
         <div class="ac-curve-chart-wrap">
@@ -69,6 +42,33 @@ RPETracker.prototype._renderACCurveTab = function() {
         </div>
     </div>`;
 };
+
+// Chips de jugadora del gráfico A:C (incluir/excluir del gráfico; por
+// defecto todas incluidas). Extraído a su propia función para poder
+// re-renderizar solo este trozo desde _acTogglePlayer sin redibujar
+// toda la pestaña de Análisis.
+RPETracker.prototype._renderACPlayerChips = function() {
+    return this.players.map(p => {
+        const color = PlayerTokens.get(p);
+        const included = !this._acExcluded?.has(p.id);
+        return `<button type="button" class="player-filter-chip ${included ? 'player-filter-chip--selected' : ''}"
+                style="--chip-color:${color}"
+                title="${esc(p.name)}${p.number ? ' #' + esc(p.number) : ''}"
+                onclick="window.rpeTracker?._acTogglePlayer('${p.id}', ${!included})">
+                ${esc(p.name.split(' ')[0])}
+                ${included ? '<span class="player-filter-chip-check">✓</span>' : ''}
+            </button>`;
+    }).join('');
+};
+
+RPETracker.prototype._acSeasonOpts = function(current, allowEmpty) {
+    const allSeasons = Store.getSeasonsFromSessions(this.sessions);
+    return (allowEmpty ? `<option value="">— sin comparar —</option>` : '') +
+        allSeasons.map(s =>
+            `<option value="${s}" ${s === current ? 'selected' : ''}>${s}</option>`
+        ).join('');
+};
+
 
 RPETracker.prototype._drawACCurveChart = function() {
     const canvas = document.getElementById('acCurveCanvas');
@@ -209,6 +209,8 @@ RPETracker.prototype._drawACCurveChart = function() {
 RPETracker.prototype._acTogglePlayer = function(id, checked) {
     if (!this._acExcluded) this._acExcluded = new Set();
     if (checked) this._acExcluded.delete(id); else this._acExcluded.add(id);
+    const chipsWrap = document.getElementById('acCurvePlayerChips');
+    if (chipsWrap) chipsWrap.innerHTML = this._renderACPlayerChips();
     requestAnimationFrame(() => this._drawACCurveChart());
 };
 
