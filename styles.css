@@ -4620,7 +4620,7 @@ header h1 {
     font-size: 0.68rem;
     color: var(--text-muted);
     padding: 0.35rem 1.1rem;
-    background: var(--bg-subtle);
+    background: var(--bg-surface); /* antes --bg-subtle: igualado a la tarjeta para que el borde inferior no "cierre" más fuerte que el resto de tarjetas */
     border: 1px solid var(--border);
     border-top: 1px solid var(--border);
     border-radius: 0 0 12px 12px;
@@ -5051,7 +5051,7 @@ header h1 {
 [data-theme="dark"] .db-left-section  { background: var(--bg-surface); border-color: var(--border); }
 [data-theme="dark"] .db-right-sticky  { background: var(--bg-surface); border-color: var(--border); }
 [data-theme="dark"] .db-right-header  { background: var(--bg-surface); border-color: var(--border); }
-[data-theme="dark"] .db-right-legend  { background: var(--bg-subtle); border-color: var(--border); }
+[data-theme="dark"] .db-right-legend  { background: var(--bg-surface); border-color: var(--border); }
 [data-theme="dark"] .db-players       { background: var(--bg-surface); border-color: var(--border); }
 [data-theme="dark"] .db-rw-card       { background: var(--bg-surface); border-color: var(--border); }
 [data-theme="dark"] .db-comparison    { background: var(--bg-surface); border-color: var(--border); }
