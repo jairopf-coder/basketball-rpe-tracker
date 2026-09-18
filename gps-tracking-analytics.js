@@ -1020,7 +1020,7 @@ RPETracker.prototype._drawGpsTeamComparisonChart = function() {
 // barra de referencia más, junto a las jugadoras elegidas.
 
 const GPS_BARS_DEFAULT_METRIC = 'distanceM';
-const GPS_BARS_MAX_PLAYERS = 8; // límite razonable para que las barras no se aplasten
+const GPS_BARS_MAX_PLAYERS = 11; // equipo completo; la paleta de colores tiene 12 tonos, cubre 11 jugadoras sin repetir
 
 RPETracker.prototype._renderGpsRadarTab = function(container) {
     if (!this._gpsBarsMetric) this._gpsBarsMetric = GPS_BARS_DEFAULT_METRIC;
@@ -1069,28 +1069,26 @@ RPETracker.prototype._renderGpsRadarTab = function(container) {
             <div style="margin-left:auto;">${this._renderGpsTypeFilterSelect()}</div>
         </div>
 
-        <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-            <button class="btn-secondary" style="font-size:0.85rem;" onclick="window.rpeTracker._gpsBarsTogglePlayersPanel()">
-                👥 Jugadoras (${this._gpsBarsPlayerIds.length})
-            </button>
-            <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;color:var(--text-secondary);">
-                <input type="checkbox" ${this._gpsBarsShowTeamAvg ? 'checked' : ''} onchange="window.rpeTracker._gpsBarsToggleTeamAvg(this.checked)">
-                Añadir media del equipo
-            </label>
-        </div>
-
-        <div id="gpsBarsPlayersPanel" style="display:none;margin-bottom:16px;padding:12px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border);">
-            <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px;">
-                Elige hasta ${GPS_BARS_MAX_PLAYERS} jugadoras a comparar:
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;">
-                ${activePlayers.map(p => `
-                    <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;">
-                        <input type="checkbox" value="${p.id}" ${this._gpsBarsPlayerIds.includes(p.id) ? 'checked' : ''}
-                            onchange="window.rpeTracker._gpsBarsTogglePlayer('${p.id}', this.checked)">
-                        ${esc(p.name)}
-                    </label>
-                `).join('')}
+        <div class="gps-an-controls" style="margin-bottom:16px;">
+            <div class="player-filter-chips" style="margin:0;">
+                ${activePlayers.map(p => {
+                    const color = PlayerTokens.get(p);
+                    const checked = this._gpsBarsPlayerIds.includes(p.id);
+                    return `<button type="button" class="player-filter-chip ${checked ? 'player-filter-chip--selected' : ''}"
+                            style="--chip-color:${color}"
+                            title="${esc(p.name)}"
+                            onclick="window.rpeTracker._gpsBarsTogglePlayer('${p.id}', ${!checked})">
+                            ${esc(p.name.split(' ')[0])}
+                            ${checked ? '<span class="player-filter-chip-check">✓</span>' : ''}
+                        </button>`;
+                }).join('')}
+                <button type="button" class="player-filter-chip ${this._gpsBarsShowTeamAvg ? 'player-filter-chip--selected' : ''}"
+                    style="--chip-color:#888"
+                    title="Media del equipo"
+                    onclick="window.rpeTracker._gpsBarsToggleTeamAvg(${!this._gpsBarsShowTeamAvg})">
+                    📊 Media del equipo
+                    ${this._gpsBarsShowTeamAvg ? '<span class="player-filter-chip-check">✓</span>' : ''}
+                </button>
             </div>
         </div>
 
@@ -1101,9 +1099,9 @@ RPETracker.prototype._renderGpsRadarTab = function(container) {
             <div style="height:400px;">
                 <canvas id="gpsBarsCanvas"></canvas>
             </div>
-            ${this._gpsBarsPlayerIds.length === 0 ? `
+            ${this._gpsBarsPlayerIds.length === 0 && !this._gpsBarsShowTeamAvg ? `
                 <p style="text-align:center;color:var(--text-secondary);font-size:0.85rem;margin-top:12px;">
-                    Elige al menos una jugadora para ver la comparativa.
+                    Elige al menos una jugadora o la media del equipo para ver la comparativa.
                 </p>
             ` : ''}
         </div>
@@ -1122,29 +1120,23 @@ RPETracker.prototype._gpsBarsSetModeCtx = function(ctx) {
 };
 RPETracker.prototype._gpsBarsSetSession = function(id) { this._gpsBarsSessionId = id; this._drawGpsBarsChart(); };
 RPETracker.prototype._gpsBarsSetRange = function(range) { this._gpsBarsRange = range; this._drawGpsBarsChart(); };
-RPETracker.prototype._gpsBarsTogglePlayersPanel = function() {
-    const panel = document.getElementById('gpsBarsPlayersPanel');
-    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-};
 RPETracker.prototype._gpsBarsTogglePlayer = function(id, checked) {
     if (checked) {
         if (this._gpsBarsPlayerIds.length >= GPS_BARS_MAX_PLAYERS) {
             this.showToast(`⚠️ Máximo ${GPS_BARS_MAX_PLAYERS} jugadoras en la comparativa`, 'warning');
-            const cb = document.querySelector(`#gpsBarsPlayersPanel input[value="${id}"]`);
-            if (cb) cb.checked = false;
             return;
         }
         this._gpsBarsPlayerIds.push(id);
     } else {
         this._gpsBarsPlayerIds = this._gpsBarsPlayerIds.filter(pid => pid !== id);
     }
-    const btn = document.querySelector('[onclick="window.rpeTracker._gpsBarsTogglePlayersPanel()"]');
-    if (btn) btn.textContent = `👥 Jugadoras (${this._gpsBarsPlayerIds.length})`;
-    this._drawGpsBarsChart();
+    const container = document.getElementById('gpsAnTabContent');
+    if (container) this._renderGpsRadarTab(container);
 };
 RPETracker.prototype._gpsBarsToggleTeamAvg = function(checked) {
     this._gpsBarsShowTeamAvg = checked;
-    this._drawGpsBarsChart();
+    const container = document.getElementById('gpsAnTabContent');
+    if (container) this._renderGpsRadarTab(container);
 };
 
 // Calcula el valor de UNA métrica para UNA jugadora (o la media del
@@ -1224,7 +1216,7 @@ RPETracker.prototype._drawGpsBarsChart = function() {
         .map(id => this.players.find(p => p.id === id))
         .filter(Boolean);
 
-    if (selectedPlayers.length === 0) return;
+    if (selectedPlayers.length === 0 && !this._gpsBarsShowTeamAvg) return;
 
     const labels = selectedPlayers.map(p => p.name);
     const values = selectedPlayers.map(p => this._getGpsBarsValue(metricDef, p.id));
