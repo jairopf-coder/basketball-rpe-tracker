@@ -5339,7 +5339,10 @@ header h1 {
 }
 .player-filter-chip--selected {
     background: color-mix(in srgb, var(--chip-color) 30%, transparent);
-    box-shadow: 0 0 0 1px var(--chip-color);
+    /* El borde de 2px de .player-filter-chip ya marca la selección;
+       el box-shadow extra creaba un efecto de "doble borde" muy visible
+       cuando muchos chips están seleccionados a la vez (p.ej. Análisis A:C,
+       donde por defecto casi todas las jugadoras están incluidas). */
 }
 .player-filter-chip-check {
     font-size: 0.7rem;
