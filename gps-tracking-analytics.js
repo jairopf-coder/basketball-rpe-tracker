@@ -204,43 +204,38 @@ RPETracker.prototype._renderGpsAnTabContent = function() {
 RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
     const activePlayers = this.players.filter(p => !p.archived);
 
-    // Estado inicial: ninguna jugadora seleccionada, selección múltiple
-    // desactivada (se va de una en una salvo que el usuario active el
-    // modo múltiple), métrica externa en distancia (m), rango 30 días.
+    // Estado inicial: ninguna jugadora seleccionada, métrica externa
+    // en distancia (m), rango 30 días. La selección múltiple es
+    // siempre directa (tocar un chip la añade/quita), sin modo previo
+    // que activar — igual que el filtro de chips de Equipo > Jugadoras.
     if (!(this._gpsAnPlayerIds instanceof Set)) this._gpsAnPlayerIds = new Set();
-    if (this._gpsAnMultiSelect === undefined) this._gpsAnMultiSelect = false;
     if (!this._gpsAnExternalMetric) this._gpsAnExternalMetric = 'm';
     if (!this._gpsAnalyticsRange) this._gpsAnalyticsRange = '30';
 
-    const multi = this._gpsAnMultiSelect;
+    const selectedCount = this._gpsAnPlayerIds.size;
+    const allSelected = selectedCount > 0 && selectedCount === activePlayers.length;
 
     const chips = activePlayers.map(p => {
         const color = PlayerTokens.get(p);
         const checked = this._gpsAnPlayerIds.has(p.id);
-        return `<label class="ac-curve-check" style="--chk-color:${color}">
-            <input type="checkbox" value="${p.id}" ${checked ? 'checked' : ''}
-                onchange="window.rpeTracker._gpsAnTogglePlayer('${p.id}', this.checked)">
-            <span class="ac-chk-dot" style="background:${color}"></span>
-            ${esc(p.name)}
-        </label>`;
+        return `<button type="button" class="player-filter-chip ${checked ? 'player-filter-chip--selected' : ''}"
+                style="--chip-color:${color}"
+                title="${esc(p.name)}"
+                onclick="window.rpeTracker._gpsAnTogglePlayer('${p.id}', ${!checked})">
+                ${esc(p.name.split(' ')[0])}
+                ${checked ? '<span class="player-filter-chip-check">✓</span>' : ''}
+            </button>`;
     }).join('');
-
-    const selectedCount = this._gpsAnPlayerIds.size;
 
     container.innerHTML = `
         <div class="ac-curve-controls" style="margin-bottom:10px;">
-            <div class="ac-curve-players">${chips}</div>
-            <div class="gps-player-select-actions">
-                <button class="gps-metric-chip" title="${multi ? 'Desactivar selección múltiple' : 'Activar selección múltiple'}"
-                    onclick="window.rpeTracker._gpsAnToggleMultiSelect()">
-                    ${multi ? '☑️' : '◻️'}
+            <div class="player-filter-chips" style="margin:0;">
+                <button type="button" class="player-filter-all-btn ${allSelected ? 'player-filter-all-btn--active' : ''}"
+                    title="${allSelected ? 'Deseleccionar todas' : 'Seleccionar todas'}"
+                    onclick="window.rpeTracker._gpsAnSelectAllPlayers()">
+                    ${allSelected ? '✓ Todas' : 'Todas'}
                 </button>
-                ${multi ? `
-                    <button class="gps-metric-chip" title="${selectedCount === activePlayers.length ? 'Deseleccionar todas' : 'Seleccionar todas'}"
-                        onclick="window.rpeTracker._gpsAnSelectAllPlayers()">
-                        ${selectedCount === activePlayers.length ? '👥❌' : '👥✅'}
-                    </button>
-                ` : ''}
+                ${chips}
             </div>
         </div>
 
@@ -288,17 +283,11 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
 RPETracker.prototype._gpsAnTogglePlayer = function(playerId, checked) {
     if (!(this._gpsAnPlayerIds instanceof Set)) this._gpsAnPlayerIds = new Set();
 
-    if (this._gpsAnMultiSelect) {
-        // Modo múltiple: cada chip es independiente, como un checkbox normal.
-        if (checked) this._gpsAnPlayerIds.add(playerId);
-        else this._gpsAnPlayerIds.delete(playerId);
-    } else {
-        // Modo simple (por defecto): solo puede haber 0 o 1 jugadora
-        // seleccionada. Marcar una desmarca automáticamente cualquier
-        // otra; desmarcar la única activa la deja vacía.
-        if (checked) this._gpsAnPlayerIds = new Set([playerId]);
-        else this._gpsAnPlayerIds.delete(playerId);
-    }
+    // Selección múltiple directa: cada chip es independiente, sin
+    // necesidad de activar antes ningún "modo" (igual que el filtro
+    // de chips de Equipo > Jugadoras).
+    if (checked) this._gpsAnPlayerIds.add(playerId);
+    else this._gpsAnPlayerIds.delete(playerId);
 
     // Mantenemos _gpsAnalyticsPlayerId (usado por la tabla) apuntando a
     // la única jugadora seleccionada cuando hay exactamente una; si hay
@@ -314,26 +303,8 @@ RPETracker.prototype._gpsAnTogglePlayer = function(playerId, checked) {
     if (container) this._renderGpsPlayerEvolutionTab(container);
 };
 
-// Activa/desactiva el modo de selección múltiple. Al desactivarlo con
-// 2+ jugadoras marcadas, nos quedamos solo con la primera (del orden
-// del roster activo) para no dejar el gráfico en un estado ambiguo.
-RPETracker.prototype._gpsAnToggleMultiSelect = function() {
-    this._gpsAnMultiSelect = !this._gpsAnMultiSelect;
-
-    if (!this._gpsAnMultiSelect && this._gpsAnPlayerIds instanceof Set && this._gpsAnPlayerIds.size > 1) {
-        const activePlayers = this.players.filter(p => !p.archived);
-        const first = activePlayers.find(p => this._gpsAnPlayerIds.has(p.id));
-        this._gpsAnPlayerIds = first ? new Set([first.id]) : new Set();
-        if (first) this._gpsAnalyticsPlayerId = first.id;
-    }
-
-    const container = document.getElementById('gpsAnTabContent');
-    if (container) this._renderGpsPlayerEvolutionTab(container);
-};
-
 // Selecciona todas las jugadoras activas, o ninguna si ya estaban
-// todas seleccionadas. Solo se usa (y solo se ve el botón) con
-// selección múltiple activada.
+// todas seleccionadas. Botón "Todas" siempre visible junto a los chips.
 RPETracker.prototype._gpsAnSelectAllPlayers = function() {
     const activePlayers = this.players.filter(p => !p.archived);
     const allSelected = this._gpsAnPlayerIds instanceof Set && this._gpsAnPlayerIds.size === activePlayers.length;
@@ -351,11 +322,10 @@ RPETracker.prototype._gpsAnSetExternalMetric = function(metric) {
 
 // Selecciona UNA jugadora en exclusiva (usado desde el aviso de
 // "carga a revisar" y otros enlaces directos): deja el gráfico en
-// modo 1 jugadora, ignorando cualquier selección múltiple previa.
+// modo 1 jugadora, ignorando cualquier selección previa.
 RPETracker.prototype._gpsAnSetPlayer = function(playerId) {
     this._gpsAnalyticsPlayerId = playerId;
     this._gpsAnPlayerIds = new Set([playerId]);
-    this._gpsAnMultiSelect = false;
     const container = document.getElementById('gpsAnTabContent');
     if (container) {
         this._renderGpsPlayerEvolutionTab(container);
