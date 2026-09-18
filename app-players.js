@@ -142,14 +142,27 @@ RPETracker.prototype.renderPlayers = function() {
         return;
     }
 
-    // Batch 2: apply search filter
+    // Batch 2 (legacy, ahora sin input visible pero se mantiene por compatibilidad
+    // si el buscador de texto se restaura en el futuro): filtro por texto
     const searchTerm = (document.getElementById('playerSearchInput')?.value || '').toLowerCase().trim();
-    const playersToShow = searchTerm
-        ? this.players.filter(p => p.name.toLowerCase().includes(searchTerm) || (p.number && String(p.number).includes(searchTerm)))
-        : this.players;
+
+    // Filtro por chips de jugadora (sustituye al buscador de texto en la UI)
+    this._renderPlayerFilterChips();
+    const chipFilterActive = this._playerFilterSelected && this._playerFilterSelected.size > 0;
+
+    let playersToShow = this.players;
+    if (chipFilterActive) {
+        playersToShow = this.players.filter(p => this._playerFilterSelected.has(p.id));
+    } else if (searchTerm) {
+        playersToShow = this.players.filter(p => p.name.toLowerCase().includes(searchTerm) || (p.number && String(p.number).includes(searchTerm)));
+    }
 
     if (playersToShow.length === 0 && searchTerm) {
         container.innerHTML = `<div class="empty-state active"><div class="empty-icon">🔍</div><h3>Sin resultados</h3><p>No hay jugadoras que coincidan con "${searchTerm}"</p></div>`;
+        return;
+    }
+    if (playersToShow.length === 0 && chipFilterActive) {
+        container.innerHTML = `<div class="empty-state active"><div class="empty-icon">🔍</div><h3>Sin resultados</h3><p>No hay jugadoras seleccionadas</p></div>`;
         return;
     }
 
@@ -260,8 +273,56 @@ RPETracker.prototype.renderPlayers = function() {
         });
     });
 
-    // Batch 2: init drag-and-drop on roster
-    if (!searchTerm) this._initRosterDragAndDrop(container);
+    // Batch 2: init drag-and-drop on roster (desactivado si hay un filtro activo,
+    // por texto o por chips, igual que antes)
+    if (!searchTerm && !chipFilterActive) this._initRosterDragAndDrop(container);
+};
+
+// ── Filtro de jugadoras por chips (sustituye al buscador de texto) ───────────
+// Estado: this._playerFilterSelected es un Set<playerId>. Vacío = "Todas".
+RPETracker.prototype._renderPlayerFilterChips = function() {
+    const wrap = document.getElementById('playerFilterChips');
+    if (!wrap) return; // si el contenedor no existe en el HTML, no hacemos nada (seguro)
+
+    if (!this._playerFilterSelected) this._playerFilterSelected = new Set();
+
+    const allSelected = this._playerFilterSelected.size === 0;
+
+    wrap.innerHTML = `
+        <button type="button" class="player-filter-all-btn ${allSelected ? 'player-filter-all-btn--active' : ''}"
+            onclick="window.rpeTracker?._playerFilterSelectAll()"
+            title="Mostrar todas las jugadoras">
+            ${allSelected ? '✓ Todas' : 'Todas'}
+        </button>
+        ${this.players.map(player => {
+            const isSel = this._playerFilterSelected.has(player.id);
+            const color = PlayerTokens.get(player);
+            return `
+            <button type="button" class="player-filter-chip ${isSel ? 'player-filter-chip--selected' : ''}"
+                style="--chip-color:${color}"
+                title="${esc(player.name)}${player.number ? ' #' + esc(player.number) : ''}"
+                onclick="window.rpeTracker?._playerFilterToggle('${player.id}')">
+                ${esc(player.name.split(' ')[0])}
+                ${isSel ? '<span class="player-filter-chip-check">✓</span>' : ''}
+            </button>`;
+        }).join('')}
+    `;
+};
+
+RPETracker.prototype._playerFilterToggle = function(playerId) {
+    if (!this._playerFilterSelected) this._playerFilterSelected = new Set();
+    if (this._playerFilterSelected.has(playerId)) {
+        this._playerFilterSelected.delete(playerId);
+    } else {
+        this._playerFilterSelected.add(playerId);
+    }
+    this.renderPlayers();
+};
+
+RPETracker.prototype._playerFilterSelectAll = function() {
+    if (!this._playerFilterSelected) this._playerFilterSelected = new Set();
+    this._playerFilterSelected.clear();
+    this.renderPlayers();
 };
 
 RPETracker.prototype.populatePlayerSelects = function() {

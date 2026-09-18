@@ -189,12 +189,16 @@
                         <button id="addPlayerBtn" class="btn-primary">+ Añadir Jugadora</button>
                     </div>
                 </div>
-                <!-- Batch 2: search bar -->
-                <div class="players-search-bar">
+                <!-- Batch 2: search bar (oculto — sustituido por chips de filtro debajo.
+                     Se deja en el DOM por seguridad: si hace falta revertir, basta con
+                     quitar el display:none de este div y borrar el de chips. -->
+                <div class="players-search-bar" style="display:none">
                     <span class="players-search-icon">🔍</span>
                     <input type="text" id="playerSearchInput" placeholder="Buscar jugadora…" oninput="window.rpeTracker?.filterPlayersList(this.value)" autocomplete="off">
                     <button class="players-search-clear" id="playerSearchClear" onclick="window.rpeTracker?.clearPlayerSearch()" title="Limpiar">✕</button>
                 </div>
+                <!-- Filtro de jugadoras por chips (reemplaza al buscador de texto) -->
+                <div class="player-filter-chips" id="playerFilterChips"></div>
                 <div id="playersList"></div>
             </div>
         </div>

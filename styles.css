@@ -5285,6 +5285,68 @@ header h1 {
 }
 .players-search-clear:hover { background: var(--text-muted); }
 
+/* ===== PLAYER FILTER CHIPS (sustituye al buscador de texto) ===== */
+.player-filter-chips {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin: 0 0 1.5rem;
+}
+
+.player-filter-all-btn {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    border: 2px dashed var(--border-input);
+    color: var(--text-muted);
+    background: transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    user-select: none;
+}
+.player-filter-all-btn:hover {
+    background: var(--bg-subtle);
+    border-color: var(--text-muted);
+}
+.player-filter-all-btn--active {
+    border-style: solid;
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(255,102,0,0.10);
+}
+
+.player-filter-chip {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    border: 2px solid var(--chip-color);
+    color: var(--chip-color);
+    background: color-mix(in srgb, var(--chip-color) 10%, transparent);
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: background 0.15s, transform 0.1s;
+    user-select: none;
+}
+.player-filter-chip:hover {
+    background: color-mix(in srgb, var(--chip-color) 22%, transparent);
+    transform: scale(1.05);
+}
+.player-filter-chip--selected {
+    background: color-mix(in srgb, var(--chip-color) 30%, transparent);
+    box-shadow: 0 0 0 1px var(--chip-color);
+}
+.player-filter-chip-check {
+    font-size: 0.7rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
 /* ===== PLAYER TREND BADGE ===== */
 .player-trend {
     display: inline-block;
