@@ -14,7 +14,9 @@ const NavMenu = {
                 { view: 'teamload',  label: '🔥 Carga equipo' },
                 { view: 'gpsanalytics', label: '📡 GPS' },
                 { view: 'weekplan',  label: '📅 Planificación' },
+                { view: 'seasonblocks', label: '📆 Temporada' },
                 { view: 'sessions',  label: '📋 Historial' },
+                { view: 'calendar',  label: '🗓️ Calendario' },
             ],
             default: 'microciclo'
         },
