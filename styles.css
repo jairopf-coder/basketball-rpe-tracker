@@ -4060,6 +4060,8 @@ header h1 {
 .um-role-player { background: rgba(76,175,80,0.15);  color: #4caf50; }
 .um-edit-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 0.2rem; border-radius: 4px; transition: color 0.15s; }
 .um-edit-btn:hover { color: var(--accent, #2196f3); }
+.um-reset-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 0.2rem; border-radius: 4px; transition: color 0.15s; }
+.um-reset-btn:hover { color: var(--warning, #f5a623); }
 .um-delete-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 0.2rem; border-radius: 4px; transition: color 0.15s; }
 .um-delete-btn:hover { color: var(--danger, #f44336); }
 

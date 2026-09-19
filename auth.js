@@ -520,6 +520,7 @@ const AppAuth = {
                     </div>
                     <span class="um-user-role um-role-${u.role}">${roleLabel[u.role] || u.role}</span>
                     <button class="um-edit-btn" onclick="AppAuth.editUser('${uid}', '${(u.displayName || '').replace(/'/g, "\\'")}')" title="Editar usuario">✏️</button>
+                    <button class="um-reset-btn" onclick="AppAuth.openFirebaseUserReset('${(u.email || '').replace(/'/g, "\\'")}')" title="Resetear contraseña en Firebase Console">🔒</button>
                     <button class="um-delete-btn" onclick="AppAuth.deleteUser('${uid}', '${(u.displayName || u.email || uid).replace(/'/g, "\\'")}')" title="Eliminar usuario">🗑</button>
                 </div>
             `).join('');
@@ -527,6 +528,23 @@ const AppAuth = {
             container.innerHTML = rows;
         } catch (e) {
             container.innerHTML = `<div style="color:var(--danger)">Error cargando usuarios: ${esc(e.message)}</div>`;
+        }
+    },
+
+    // Abre la lista de usuarios de Firebase Authentication en una pestaña
+    // nueva y copia el email al portapapeles, para pegarlo en el buscador
+    // de Firebase Console y resetear la contraseña manualmente desde ahí.
+    // Firebase no permite cambiar la contraseña de OTRA persona desde el
+    // navegador de la app (solo la propia, vía showChangePasswordModal) —
+    // esto es solo un atajo para llegar más rápido a la pantalla correcta.
+    openFirebaseUserReset(email) {
+        const projectId = (typeof firebaseConfig !== 'undefined' && firebaseConfig.projectId) || 'basketball-rpe-tracker';
+        if (email) {
+            navigator.clipboard?.writeText(email).catch(() => {});
+        }
+        window.open(`https://console.firebase.google.com/project/${projectId}/authentication/users`, '_blank', 'noopener');
+        if (window.rpeTracker?.showToast) {
+            window.rpeTracker.showToast(email ? `📋 Email copiado: ${email}` : '🔗 Abriendo Firebase Console…', 'success');
         }
     },
 
