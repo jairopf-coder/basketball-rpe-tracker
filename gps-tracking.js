@@ -645,7 +645,11 @@ RPETracker.prototype.renderGpsSummaryBlock = function(session) {
         ${importButton}`;
     }
 
-    const rpeDiff = (gps.oliRpe !== null && gps.oliRpe !== undefined && session.rpe)
+    // Oli exporta 0 en RPE cuando no se ha rellenado, no deja la celda
+    // vacía de verdad (confirmado con datos reales) — se trata como
+    // "sin dato", igual que en gps-injury-signal.js.
+    const hasOliRpe = gps.oliRpe !== null && gps.oliRpe !== undefined && gps.oliRpe !== 0;
+    const rpeDiff = (hasOliRpe && session.rpe)
         ? Math.abs(session.rpe - gps.oliRpe)
         : null;
     const rpeWarning = rpeDiff !== null && rpeDiff >= 2;
@@ -659,7 +663,7 @@ RPETracker.prototype.renderGpsSummaryBlock = function(session) {
                 <div>🔼 Sprints: <strong>${gps.highIntensityRuns != null ? gps.highIntensityRuns : '—'}</strong></div>
                 <div>🦘 Saltos: <strong>${gps.jumps != null ? gps.jumps : '—'}</strong></div>
             </div>
-            ${gps.oliRpe !== null && gps.oliRpe !== undefined ? `
+            ${hasOliRpe ? `
             <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.9rem;color:var(--text-primary);">
                 RPE app: <strong>${session.rpe}</strong> &nbsp;·&nbsp; RPE Oli: <strong>${gps.oliRpe}</strong>
                 ${rpeWarning ? ' <span style="color:#e67e22;">⚠️ Discrepancia notable</span>' : ''}
@@ -679,7 +683,11 @@ RPETracker.prototype._renderIioBlock = function(session) {
     if (!iio) return '';
 
     const gps = this._getGpsForSession(session);
-    const srpe = gps && gps.oliSrpe != null ? gps.oliSrpe : null;
+    // Mismo criterio que en el RPE: Oli exporta 0 cuando no se ha
+    // rellenado, no deja la celda vacía de verdad — se trata como
+    // "sin dato" (un s-RPE real de 0 no es posible en una sesión
+    // registrada, ya que implicaría duración o esfuerzo nulos).
+    const srpe = gps && gps.oliSrpe != null && gps.oliSrpe !== 0 ? gps.oliSrpe : null;
 
     // El IIO es 0-100, el s-RPE de Oli suele ser RPE(0-10) × duración,
     // en una escala distinta. Se muestran ambos valores, no se
@@ -692,7 +700,7 @@ RPETracker.prototype._renderIioBlock = function(session) {
             .filter(s => s.playerId === session.playerId)
             .filter(s => new Date(s.date) <= new Date(session.date))
             .map(s => this.gpsData && this.gpsData[s.id] && this.gpsData[s.id][session.playerId] ? this.gpsData[s.id][session.playerId].oliSrpe : null)
-            .filter(v => v != null);
+            .filter(v => v != null && v !== 0);
         const maxSrpe = history.length > 0 ? Math.max(...history) : srpe;
         srpeNormalized = maxSrpe > 0 ? Math.min(100, Math.round((srpe / maxSrpe) * 100)) : null;
     }
