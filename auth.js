@@ -520,7 +520,7 @@ const AppAuth = {
                     </div>
                     <span class="um-user-role um-role-${u.role}">${roleLabel[u.role] || u.role}</span>
                     <button class="um-edit-btn" onclick="AppAuth.editUser('${uid}', '${(u.displayName || '').replace(/'/g, "\\'")}')" title="Editar usuario">✏️</button>
-                    <button class="um-reset-btn" onclick="AppAuth.openFirebaseUserReset('${(u.email || '').replace(/'/g, "\\'")}')" title="Resetear contraseña en Firebase Console">🔒</button>
+                    <button class="um-reset-btn" onclick="AppAuth.openFirebaseUserReset('${(u.email || '').replace(/'/g, "\\'")}')" title="Cambiar email o resetear contraseña en Firebase Console">🔒</button>
                     <button class="um-delete-btn" onclick="AppAuth.deleteUser('${uid}', '${(u.displayName || u.email || uid).replace(/'/g, "\\'")}')" title="Eliminar usuario">🗑</button>
                 </div>
             `).join('');
@@ -533,10 +533,14 @@ const AppAuth = {
 
     // Abre la lista de usuarios de Firebase Authentication en una pestaña
     // nueva y copia el email al portapapeles, para pegarlo en el buscador
-    // de Firebase Console y resetear la contraseña manualmente desde ahí.
-    // Firebase no permite cambiar la contraseña de OTRA persona desde el
-    // navegador de la app (solo la propia, vía showChangePasswordModal) —
-    // esto es solo un atajo para llegar más rápido a la pantalla correcta.
+    // de Firebase Console y desde ahí cambiar el email real de login o
+    // resetear la contraseña manualmente. Firebase no permite hacer ninguna
+    // de las dos cosas sobre OTRA persona desde el navegador de la app
+    // (solo sobre la propia sesión, vía showChangePasswordModal) — esto es
+    // solo un atajo para llegar más rápido a la pantalla correcta.
+    // Importante: el botón ✏️ "Editar usuario" solo cambia el email
+    // MOSTRADO en esta lista (copia en Realtime Database) — no cambia el
+    // email real con el que esa persona inicia sesión en Firebase Auth.
     openFirebaseUserReset(email) {
         const projectId = (typeof firebaseConfig !== 'undefined' && firebaseConfig.projectId) || 'basketball-rpe-tracker';
         if (email) {
@@ -606,6 +610,7 @@ const AppAuth = {
                         <div class="form-group">
                             <label>Email</label>
                             <input type="text" id="ue-email" class="form-input" value="${(u.email || '').replace(/"/g, '&quot;')}">
+                            <small style="color:var(--text-secondary)">Esto solo actualiza el email mostrado en esta lista. Para cambiar el email con el que esta persona inicia sesión, hazlo en Firebase Console → Authentication (botón 🔒).</small>
                         </div>
                         <div class="form-group">
                             <label>Rol</label>
