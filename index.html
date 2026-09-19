@@ -102,6 +102,9 @@
 
         <!-- Sesiones View -->
         <div id="sessionsView" class="view">
+            <!-- Navegación por chips: Mes → Semana → Jugadora(s) -->
+            <div id="sessionsNavChips" class="sessions-nav-chips"></div>
+
             <!-- Advanced Filters -->
             <div class="advanced-filters">
                 <div class="filter-row filter-row--always">
@@ -120,7 +123,9 @@
 
                 <div id="advancedFiltersPanel" class="advanced-filters-panel" style="display:none">
                     <div class="filter-row">
-                        <select id="playerFilter" class="filter-select">
+                        <!-- Batch: sustituido por chips arriba (#sessionsPlayerChips). Se
+                             mantiene oculto por compatibilidad/reversión rápida. -->
+                        <select id="playerFilter" class="filter-select" style="display:none">
                             <option value="all">Todas las jugadoras</option>
                         </select>
                         <select id="typeFilter" class="filter-select">

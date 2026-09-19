@@ -457,6 +457,9 @@ class RPETracker {
             this.currentTypeFilter = 'all';
             document.getElementById('playerFilter').value = 'all';
             document.getElementById('typeFilter').value = 'all';
+            this._sessionsMonthFilter = null;
+            this._sessionsWeekFilter = null;
+            if (this._sessionsPlayerFilter) this._sessionsPlayerFilter.clear();
             this.renderSessions();
         });
         
