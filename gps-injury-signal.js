@@ -61,7 +61,11 @@ RPETracker.prototype.calculateGpsDivergenceSignal = function(playerId) {
     recentSessions.forEach(s => {
         const gpsGroup = this.gpsData[s.id];
         const gps = gpsGroup ? gpsGroup[playerId] : null;
-        if (!gps || gps.oliRpe === null || gps.oliRpe === undefined) return;
+        // Oli exporta 0 en la columna RPE cuando no se ha rellenado
+        // (confirmado con datos reales), no la deja vacía de verdad —
+        // así que 0 se trata igual que "sin dato", para no comparar el
+        // RPE real de la app contra un cero que no significa nada.
+        if (!gps || gps.oliRpe === null || gps.oliRpe === undefined || gps.oliRpe === 0) return;
 
         gpsSessionCount++;
         const diff = Math.abs((s.rpe || 0) - gps.oliRpe);
