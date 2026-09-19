@@ -1333,6 +1333,77 @@ header h1 {
     margin-top: 0.15rem;
 }
 
+/* Agenda vertical del calendario (móvil): una fila por día en vez de
+   la rejilla de 7 columnas, para evitar celdas de alto desigual y el
+   ancho excesivo en pantallas estrechas. Reutiliza .session-count,
+   .cal-rpe-avg, .cal-slot-line y .ratio-badge tal cual. */
+.calendar-agenda {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--bg-app);
+    padding: 4px;
+    border-radius: 8px;
+}
+
+.cal-agenda-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg-surface);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.cal-agenda-row:active { background: var(--bg-subtle); }
+
+.cal-agenda-row.today { border: 2px solid var(--primary); }
+
+.cal-agenda-row.has-sessions { font-weight: 600; }
+
+.cal-agenda-daycol {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    flex-shrink: 0;
+}
+
+.cal-agenda-daynum {
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+
+.cal-agenda-dow {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+}
+
+.cal-agenda-sessions {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8rem;
+    color: var(--gray);
+}
+
+.cal-agenda-sessions .cal-slot-line {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: initial;
+}
+
+.cal-agenda-empty {
+    color: var(--text-faint);
+    font-size: 0.85rem;
+}
+
 /* Calendar day modal */
 .cal-modal-content {
     max-width: 680px;
@@ -5162,6 +5233,9 @@ header h1 {
 [data-theme="dark"] .calendar-day { background: var(--bg-surface); border-color: var(--border); color: var(--text-primary); }
 [data-theme="dark"] .calendar-day.other-month { background: var(--bg-subtle); opacity: 0.5; }
 [data-theme="dark"] .calendar-day.today { border-color: var(--primary); }
+[data-theme="dark"] .cal-agenda-row { background: var(--bg-surface); color: var(--text-primary); }
+[data-theme="dark"] .cal-agenda-row.today { border-color: var(--primary); }
+[data-theme="dark"] .cal-agenda-row:active { background: var(--bg-subtle); }
 [data-theme="dark"] .cal-modal-content { background: var(--bg-surface); }
 
 /* Session cards */
