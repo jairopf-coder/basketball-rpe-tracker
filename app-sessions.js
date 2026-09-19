@@ -382,9 +382,156 @@ RPETracker.prototype.getBasicFilteredSessions = function() {
     return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
 };
 
+// ── Navegación por chips: Mes → Semana → Jugadora(s) ──────────────────────
+
+// Devuelve, de más reciente a más antiguo, solo los meses que tienen
+// al menos una sesión guardada (nunca un mes vacío).
+RPETracker.prototype._getSessionMonthsWithData = function() {
+    const seen = new Map(); // key "YYYY-M" -> {year, month, count}
+    this.sessions.forEach(s => {
+        const d = new Date(s.date);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        if (!seen.has(key)) seen.set(key, { year: d.getFullYear(), month: d.getMonth() });
+    });
+    return [...seen.values()].sort((a, b) => (b.year - a.year) || (b.month - a.month));
+};
+
+// Devuelve las semanas (lunes a domingo) de un mes concreto que tienen
+// al menos una sesión, ordenadas cronológicamente. Una semana puede
+// empezar en el mes anterior o terminar en el siguiente; se muestra
+// igualmente si algún día de esa semana cae dentro del mes filtrado.
+RPETracker.prototype._getSessionWeeksInMonth = function(year, month) {
+    const monthSessions = this.sessions.filter(s => {
+        const d = new Date(s.date);
+        return d.getFullYear() === year && d.getMonth() === month;
+    });
+    const seen = new Map(); // key = lunes en formato ISO -> {start, end}
+    monthSessions.forEach(s => {
+        const d = new Date(s.date);
+        const dow = (d.getDay() + 6) % 7; // 0=lunes..6=domingo
+        const monday = new Date(d);
+        monday.setHours(0, 0, 0, 0);
+        monday.setDate(d.getDate() - dow);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+        const key = toLocalISODate(monday);
+        if (!seen.has(key)) seen.set(key, { start: monday, end: sunday });
+    });
+    return [...seen.values()].sort((a, b) => a.start - b.start);
+};
+
+RPETracker.prototype._sessionsSelectMonth = function(year, month) {
+    if (this._sessionsMonthFilter && this._sessionsMonthFilter.year === year && this._sessionsMonthFilter.month === month) {
+        // Ya estaba seleccionado: deseleccionar (vuelve a "últimos 7 días")
+        this._sessionsMonthFilter = null;
+    } else {
+        this._sessionsMonthFilter = { year, month };
+    }
+    this._sessionsWeekFilter = null; // cambiar de mes limpia la semana elegida
+    this.renderSessions();
+};
+
+RPETracker.prototype._sessionsSelectWeek = function(startISO) {
+    const weeks = this._getSessionWeeksInMonth(this._sessionsMonthFilter.year, this._sessionsMonthFilter.month);
+    const match = weeks.find(w => toLocalISODate(w.start) === startISO);
+    if (!match) return;
+    if (this._sessionsWeekFilter && toLocalISODate(this._sessionsWeekFilter.start) === startISO) {
+        this._sessionsWeekFilter = null; // deseleccionar: vuelve a ver el mes completo
+    } else {
+        this._sessionsWeekFilter = match;
+    }
+    this.renderSessions();
+};
+
+RPETracker.prototype._sessionsToggleChipPlayer = function(playerId) {
+    if (!this._sessionsPlayerFilter) this._sessionsPlayerFilter = new Set();
+    if (this._sessionsPlayerFilter.has(playerId)) this._sessionsPlayerFilter.delete(playerId);
+    else this._sessionsPlayerFilter.add(playerId);
+    this.renderSessions();
+};
+
+RPETracker.prototype._sessionsSelectAllPlayers = function() {
+    if (!this._sessionsPlayerFilter) this._sessionsPlayerFilter = new Set();
+    this._sessionsPlayerFilter.clear();
+    this.renderSessions();
+};
+
+// Atajo mostrado en el mensaje de "sin sesiones recientes": abre el chip
+// del mes más reciente con datos, para ver el histórico completo.
+RPETracker.prototype._sessionsJumpToLatestMonth = function() {
+    const months = this._getSessionMonthsWithData();
+    if (months.length === 0) return;
+    this._sessionsSelectMonth(months[0].year, months[0].month);
+};
+
+const MONTH_NAMES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+RPETracker.prototype._renderSessionsNavChips = function() {
+    const wrap = document.getElementById('sessionsNavChips');
+    if (!wrap) return;
+
+    const months = this._getSessionMonthsWithData();
+    const monthChips = months.map(({ year, month }) => {
+        const active = this._sessionsMonthFilter && this._sessionsMonthFilter.year === year && this._sessionsMonthFilter.month === month;
+        return `<button type="button" class="player-filter-chip ${active ? 'player-filter-chip--selected' : ''}"
+                style="--chip-color:var(--primary)"
+                onclick="window.rpeTracker._sessionsSelectMonth(${year},${month})">
+                ${MONTH_NAMES_ES[month]} ${year}
+                ${active ? '<span class="player-filter-chip-check">✓</span>' : ''}
+            </button>`;
+    }).join('');
+
+    let weekChipsHTML = '';
+    if (this._sessionsMonthFilter) {
+        const weeks = this._getSessionWeeksInMonth(this._sessionsMonthFilter.year, this._sessionsMonthFilter.month);
+        const weekChips = weeks.map(w => {
+            const iso = toLocalISODate(w.start);
+            const active = this._sessionsWeekFilter && toLocalISODate(this._sessionsWeekFilter.start) === iso;
+            const label = `${w.start.getDate()}-${w.end.getDate()} ${MONTH_NAMES_ES[w.end.getMonth()].slice(0,3).toLowerCase()}`;
+            return `<button type="button" class="player-filter-chip ${active ? 'player-filter-chip--selected' : ''}"
+                    style="--chip-color:var(--secondary,#1a6fff)"
+                    onclick="window.rpeTracker._sessionsSelectWeek('${iso}')">
+                    ${label}
+                    ${active ? '<span class="player-filter-chip-check">✓</span>' : ''}
+                </button>`;
+        }).join('');
+        weekChipsHTML = `<div class="player-filter-chips" id="sessionsWeekChips" style="margin:0.5rem 0 0;">${weekChips}</div>`;
+    }
+
+    const activePlayers = this.players.filter(p => !p.archived);
+    const selectedCount = this._sessionsPlayerFilter ? this._sessionsPlayerFilter.size : 0;
+    const allSelected = selectedCount === 0;
+    const playerChips = activePlayers.map(p => {
+        const color = PlayerTokens.get(p);
+        const checked = this._sessionsPlayerFilter && this._sessionsPlayerFilter.has(p.id);
+        return `<button type="button" class="player-filter-chip ${checked ? 'player-filter-chip--selected' : ''}"
+                style="--chip-color:${color}"
+                title="${esc(p.name)}"
+                onclick="window.rpeTracker._sessionsToggleChipPlayer('${p.id}')">
+                ${esc(p.name.split(' ')[0])}
+                ${checked ? '<span class="player-filter-chip-check">✓</span>' : ''}
+            </button>`;
+    }).join('');
+
+    wrap.innerHTML = `
+        <div class="player-filter-chips" id="sessionsMonthChips" style="margin:0;">${monthChips}</div>
+        ${weekChipsHTML}
+        <div class="player-filter-chips" id="sessionsPlayerChips" style="margin:0.5rem 0 0;">
+            <button type="button" class="player-filter-all-btn ${allSelected ? 'player-filter-all-btn--active' : ''}"
+                onclick="window.rpeTracker._sessionsSelectAllPlayers()">
+                ${allSelected ? '✓ Todas' : 'Todas'}
+            </button>
+            ${playerChips}
+        </div>
+    `;
+};
+
 RPETracker.prototype.renderSessions = function() {
     const listContainer = document.getElementById('sessionList');
     const emptyState = document.getElementById('emptyState');
+
+    this._renderSessionsNavChips();
     
     // Use advanced filtering if available
     const filteredSessions = typeof this.getFilteredAndSortedSessions === 'function' 
@@ -394,6 +541,26 @@ RPETracker.prototype.renderSessions = function() {
     if (filteredSessions.length === 0) {
         listContainer.innerHTML = '';
         emptyState.classList.add('active');
+        // Mensaje distinto si está vacío solo por el límite de "últimos 7
+        // días" (sin ningún otro filtro activo) y sí hay historial más atrás.
+        const noFiltersActive = !this._sessionsMonthFilter && !this._sessionsWeekFilter
+            && !document.getElementById('dateFrom')?.value && !document.getElementById('dateTo')?.value
+            && (!this._sessionsPlayerFilter || this._sessionsPlayerFilter.size === 0)
+            && this.currentPlayerFilter === 'all' && this.currentTypeFilter === 'all'
+            && !document.getElementById('searchSessions')?.value;
+        const hasOlderHistory = noFiltersActive && this.sessions.length > 0;
+        const emptyIcon = emptyState.querySelector('.empty-icon');
+        const emptyTitle = emptyState.querySelector('h3');
+        const emptyText = emptyState.querySelector('p');
+        if (hasOlderHistory) {
+            if (emptyIcon) emptyIcon.textContent = '🏀';
+            if (emptyTitle) emptyTitle.textContent = 'Sin sesiones en los últimos 7 días';
+            if (emptyText) emptyText.innerHTML = 'Hay historial más antiguo — <a href="#" onclick="window.rpeTracker._sessionsJumpToLatestMonth();return false;">míralo por mes</a>.';
+        } else {
+            if (emptyIcon) emptyIcon.textContent = '🏀';
+            if (emptyTitle) emptyTitle.textContent = 'No hay sesiones registradas';
+            if (emptyText) emptyText.textContent = 'Pulsa el botón "+" para registrar tu primer entrenamiento';
+        }
         return;
     }
     
@@ -864,9 +1031,16 @@ RPETracker.prototype.setupSearchAndFilters = function() {
 RPETracker.prototype.getFilteredAndSortedSessions = function() {
     let filtered = [...this.sessions];
     
-    // Player filter
+    // Player filter (select clásico, oculto — se mantiene por compatibilidad)
     if (this.currentPlayerFilter !== 'all') {
         filtered = filtered.filter(s => s.playerId === this.currentPlayerFilter);
+    }
+
+    // Player filter (chips nuevos, multi-selección). Si hay chips
+    // seleccionados, se combinan con el filtro anterior (ambos deben
+    // cumplirse, pero en la práctica solo se usa uno de los dos a la vez).
+    if (this._sessionsPlayerFilter && this._sessionsPlayerFilter.size > 0) {
+        filtered = filtered.filter(s => this._sessionsPlayerFilter.has(s.playerId));
     }
     
     // Type filter
@@ -885,7 +1059,7 @@ RPETracker.prototype.getFilteredAndSortedSessions = function() {
         });
     }
     
-    // Date range
+    // Date range (filtro manual "Desde/Hasta" del panel avanzado)
     const dateFrom = document.getElementById('dateFrom')?.value;
     const dateTo = document.getElementById('dateTo')?.value;
     
@@ -898,6 +1072,25 @@ RPETracker.prototype.getFilteredAndSortedSessions = function() {
         const toDate = new Date(dateTo);
         toDate.setHours(23, 59, 59);
         filtered = filtered.filter(s => new Date(s.date) <= toDate);
+    }
+
+    // Chips de mes/semana. Si hay una semana seleccionada, filtra a esos
+    // 7 días exactos; si solo hay un mes (sin semana), filtra a ese mes
+    // completo. Se ignoran si el usuario ya está usando Desde/Hasta manual.
+    if (!dateFrom && !dateTo && this._sessionsWeekFilter) {
+        const { start, end } = this._sessionsWeekFilter;
+        filtered = filtered.filter(s => { const d = new Date(s.date); return d >= start && d <= end; });
+    } else if (!dateFrom && !dateTo && this._sessionsMonthFilter) {
+        const { year, month } = this._sessionsMonthFilter;
+        filtered = filtered.filter(s => { const d = new Date(s.date); return d.getFullYear() === year && d.getMonth() === month; });
+    } else if (!dateFrom && !dateTo && !this._sessionsMonthFilter && !this._sessionsWeekFilter) {
+        // Sin ningún filtro de fecha activo: por defecto solo los últimos
+        // 7 días, para no cargar cientos de tarjetas de golpe. El usuario
+        // navega al historial completo eligiendo un mes.
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+        filtered = filtered.filter(s => new Date(s.date) >= sevenDaysAgo);
     }
     
     // RPE range
