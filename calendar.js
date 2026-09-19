@@ -22,31 +22,27 @@ RPETracker.prototype.renderCalendar = function(year, month) {
     const firstDay           = new Date(year, month, 1);
     const lastDay            = new Date(year, month + 1, 0);
     const daysInMonth        = lastDay.getDate();
-    const startingDayOfWeek  = firstDay.getDay();
+    // Semana empezando en lunes: getDay() da 0=domingo..6=sábado; lo
+    // convertimos a 0=lunes..6=domingo para el offset de la rejilla.
+    const startingDayOfWeek  = (firstDay.getDay() + 6) % 7;
 
     const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                         'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-    let html = `
+    const header = `
         <div class="calendar-header">
             <button onclick="window.rpeTracker?.previousMonth()" class="btn-secondary">← Anterior</button>
             <h2>${monthNames[month]} ${year}</h2>
             <button onclick="window.rpeTracker?.nextMonth()" class="btn-secondary">Siguiente →</button>
         </div>
-        <div class="calendar-grid">
-            <div class="calendar-day-header">Dom</div>
-            <div class="calendar-day-header">Lun</div>
-            <div class="calendar-day-header">Mar</div>
-            <div class="calendar-day-header">Mié</div>
-            <div class="calendar-day-header">Jue</div>
-            <div class="calendar-day-header">Vie</div>
-            <div class="calendar-day-header">Sáb</div>
     `;
 
-    for (let i = 0; i < startingDayOfWeek; i++) {
-        html += '<div class="calendar-day empty"></div>';
-    }
-
+    // Recopila y calcula, para cada día del mes, exactamente los mismos
+    // datos que antes (slots, RPE medio, ratio, color) — se usan igual
+    // tanto para la rejilla de escritorio como para la agenda de móvil,
+    // así que solo se calculan una vez.
+    const slotLabel = { morning: 'Mañana', afternoon: 'Tarde', evening: 'Noche' };
+    const dayData = [];
     for (let day = 1; day <= daysInMonth; day++) {
         const currentDate = new Date(year, month, day);
         const dayEntries  = this.sessions.filter(s => {
@@ -54,12 +50,9 @@ RPETracker.prototype.renderCalendar = function(year, month) {
             return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
         });
 
-        const isToday  = new Date().toDateString() === currentDate.toDateString();
-        let dayClass   = 'calendar-day' + (isToday ? ' today' : '') + (dayEntries.length > 0 ? ' has-sessions' : '');
+        const isToday = new Date().toDateString() === currentDate.toDateString();
+        const slots   = this.groupSessionsBySlot(dayEntries);
 
-        const slots = this.groupSessionsBySlot(dayEntries);
-
-        // Color ratio medio del día
         let avgRatio = 0, ratioColor = '#eee';
         if (dayEntries.length > 0) {
             const ratios = dayEntries.map(s => {
@@ -72,9 +65,52 @@ RPETracker.prototype.renderCalendar = function(year, month) {
             }
         }
 
-        const slotLabel = { morning: 'Mañana', afternoon: 'Tarde', evening: 'Noche' };
-        let sessionHTML = '';
+        dayData.push({ day, isToday, slots, avgRatio, ratioColor });
+    }
 
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    container.innerHTML = header + (isMobile
+        ? this._renderCalendarAgenda(year, month, dayData, slotLabel)
+        : this._renderCalendarGrid(year, month, dayData, slotLabel, startingDayOfWeek));
+
+    // Repintar si el ancho de pantalla cruza el breakpoint móvil/escritorio
+    // (p.ej. al girar el móvil), para cambiar entre agenda y rejilla sin
+    // tener que cambiar de mes. Se registra una sola vez.
+    if (!this._calendarResizeBound) {
+        this._calendarResizeBound = true;
+        let lastIsMobile = isMobile;
+        window.addEventListener('resize', () => {
+            const nowMobile = window.matchMedia('(max-width: 768px)').matches;
+            if (nowMobile !== lastIsMobile) {
+                lastIsMobile = nowMobile;
+                if (this.currentView === 'calendar') this.renderCalendar(this.calendarYear, this.calendarMonth);
+            }
+        });
+    }
+};
+
+// Rejilla de escritorio (7 columnas, semana de lunes a domingo) — mismo
+// aspecto que siempre ha tenido esta vista.
+RPETracker.prototype._renderCalendarGrid = function(year, month, dayData, slotLabel, startingDayOfWeek) {
+    let html = `
+        <div class="calendar-grid">
+            <div class="calendar-day-header">Lun</div>
+            <div class="calendar-day-header">Mar</div>
+            <div class="calendar-day-header">Mié</div>
+            <div class="calendar-day-header">Jue</div>
+            <div class="calendar-day-header">Vie</div>
+            <div class="calendar-day-header">Sáb</div>
+            <div class="calendar-day-header">Dom</div>
+    `;
+
+    for (let i = 0; i < startingDayOfWeek; i++) {
+        html += '<div class="calendar-day empty"></div>';
+    }
+
+    dayData.forEach(({ day, isToday, slots, avgRatio, ratioColor }) => {
+        const dayClass = 'calendar-day' + (isToday ? ' today' : '') + (slots.length > 0 ? ' has-sessions' : '');
+
+        let sessionHTML = '';
         if (slots.length === 1) {
             const slot   = slots[0];
             const avgRPE = (slot.entries.reduce((s, x) => s + x.rpe, 0) / slot.entries.length).toFixed(1);
@@ -104,10 +140,65 @@ RPETracker.prototype.renderCalendar = function(year, month) {
                 <div class="calendar-day-sessions">${sessionHTML}</div>
             </div>
         `;
-    }
+    });
 
     html += '</div>';
-    container.innerHTML = html;
+    return html;
+};
+
+// Agenda vertical para móvil: una fila por día, con el número de día a
+// la izquierda y el resumen de sesiones a la derecha (mismos datos,
+// colores e iconos que la rejilla; mismo modal al pulsar). Evita las
+// celdas de tamaño desigual y el ancho excesivo de la rejilla de 7
+// columnas en pantallas estrechas.
+RPETracker.prototype._renderCalendarAgenda = function(year, month, dayData, slotLabel) {
+    const dowNames = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+    let html = '<div class="calendar-agenda">';
+
+    dayData.forEach(({ day, isToday, slots, avgRatio, ratioColor }) => {
+        const dow = (new Date(year, month, day).getDay() + 6) % 7;
+        const rowClass = 'cal-agenda-row' + (isToday ? ' today' : '') + (slots.length > 0 ? ' has-sessions' : '');
+
+        let sessionHTML = '';
+        if (slots.length === 0) {
+            sessionHTML = '<span class="cal-agenda-empty">—</span>';
+        } else if (slots.length === 1) {
+            const slot   = slots[0];
+            const avgRPE = (slot.entries.reduce((s, x) => s + x.rpe, 0) / slot.entries.length).toFixed(1);
+            const icon   = slot.type === 'match' ? '🏟️' : '🏀';
+            sessionHTML  = `
+                <span class="session-count">${icon} ${slot.entries.length} jugadora${slot.entries.length !== 1 ? 's' : ''}</span>
+                <span class="cal-rpe-avg">RPE ${avgRPE}</span>
+            `;
+        } else {
+            sessionHTML = `<span class="session-count">${slots.length} sesiones</span>`;
+            slots.forEach(slot => {
+                const avgRPE = (slot.entries.reduce((s, x) => s + x.rpe, 0) / slot.entries.length).toFixed(1);
+                const icon   = slot.type === 'match' ? '🏟️' : '🏀';
+                const label  = slotLabel[slot.timeOfDay] || slot.timeOfDay;
+                sessionHTML += `<span class="cal-slot-line">${icon} ${label} · RPE ${avgRPE}</span>`;
+            });
+        }
+
+        if (avgRatio > 0 && slots.length > 0) {
+            sessionHTML += `<span class="ratio-badge" style="background:${ratioColor};color:white;">${avgRatio.toFixed(1)}</span>`;
+        }
+
+        html += `
+            <div class="${rowClass}" onclick="window.rpeTracker?.showDaySessions(${year},${month},${day})"
+                 style="background:${avgRatio > 0 ? ratioColor + '18' : 'transparent'};">
+                <div class="cal-agenda-daycol">
+                    <span class="cal-agenda-daynum">${day}</span>
+                    <span class="cal-agenda-dow">${dowNames[dow]}</span>
+                </div>
+                <div class="cal-agenda-sessions">${sessionHTML}</div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    return html;
 };
 
 // ========== DAY MODAL ==========
