@@ -769,6 +769,7 @@ const AppAuth = {
                     <button class="wl-btn-secondary" onclick="AppAuth.resetWellness()">Responder de nuevo</button>
                 </div>
 
+                <button class="wl-btn-secondary" onclick="AppAuth.showChangePasswordModal()">🔐 Cambiar mi contraseña</button>
                 <button class="wl-logout" onclick="AppAuth.logout()">🔒 Salir</button>
             </div>
         `;
@@ -1003,6 +1004,94 @@ const AppAuth = {
             <circle cx="24" cy="24" r="2.5" fill="#666"/>
             <circle cx="24" cy="32" r="2.5" fill="#666"/>
         </svg>`;
+    },
+
+    // ---- Cambiar mi propia contraseña (cualquier rol: staff, fisio, player) ----
+    // Pide la contraseña actual para reautenticar (Firebase lo exige si la
+    // sesión lleva tiempo abierta, y es buena práctica en dispositivos
+    // compartidos del club) y luego la nueva contraseña, repetida.
+    showChangePasswordModal() {
+        document.getElementById('changePwdModal')?.remove();
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.id = 'changePwdModal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'changePwdModalTitle');
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:420px">
+                <div class="modal-header">
+                    <h2 id="changePwdModalTitle">🔑 Cambiar mi contraseña</h2>
+                    <button class="btn-close" aria-label="Cerrar" onclick="document.getElementById('changePwdModal').remove()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Contraseña actual</label>
+                        <input type="password" id="cp-current" class="form-input" autocomplete="current-password">
+                    </div>
+                    <div class="form-group">
+                        <label>Nueva contraseña</label>
+                        <input type="password" id="cp-new" class="form-input" placeholder="Mín. 6 caracteres" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label>Repite la nueva contraseña</label>
+                        <input type="password" id="cp-new2" class="form-input" autocomplete="new-password">
+                    </div>
+                    <div id="cp-error" class="login-error" style="display:none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="document.getElementById('changePwdModal').remove()">Cancelar</button>
+                    <button class="btn-primary" id="cp-submit-btn" onclick="AppAuth._submitPasswordChange()">Guardar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        this._cpFtRelease = trapFocus(modal);
+        modal.addEventListener('click', e => {
+            if (e.target === modal) { this._cpFtRelease?.(); modal.remove(); }
+        });
+        modal.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { this._cpFtRelease?.(); modal.remove(); }
+        });
+        document.getElementById('cp-current')?.focus();
+    },
+
+    async _submitPasswordChange() {
+        const current = document.getElementById('cp-current')?.value || '';
+        const next    = document.getElementById('cp-new')?.value || '';
+        const next2   = document.getElementById('cp-new2')?.value || '';
+        const errorEl = document.getElementById('cp-error');
+        const btn     = document.getElementById('cp-submit-btn');
+        const showErr = msg => { if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; } };
+        if (errorEl) errorEl.style.display = 'none';
+
+        if (!current || !next || !next2) { showErr('Rellena los tres campos.'); return; }
+        if (next.length < 6) { showErr('La nueva contraseña debe tener al menos 6 caracteres.'); return; }
+        if (next !== next2) { showErr('Las contraseñas nuevas no coinciden.'); return; }
+
+        const user = this._currentUser || window.firebaseAuth?.currentUser;
+        if (!user || !user.email) { showErr('No se pudo identificar tu sesión. Vuelve a entrar e inténtalo de nuevo.'); return; }
+        if (!window.firebase?.auth?.EmailAuthProvider) { showErr('No se pudo cargar el módulo de seguridad. Recarga la página e inténtalo de nuevo.'); return; }
+
+        if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+        try {
+            const credential = window.firebase.auth.EmailAuthProvider.credential(user.email, current);
+            await user.reauthenticateWithCredential(credential);
+            await user.updatePassword(next);
+            document.getElementById('changePwdModal')?.remove();
+            if (window.rpeTracker?.showToast) window.rpeTracker.showToast('✅ Contraseña actualizada', 'success');
+            else alert('Contraseña actualizada correctamente.');
+        } catch (e) {
+            const map = {
+                'auth/wrong-password':     'La contraseña actual no es correcta.',
+                'auth/invalid-credential': 'La contraseña actual no es correcta.',
+                'auth/too-many-requests':  'Demasiados intentos. Espera unos minutos.',
+                'auth/weak-password':      'La nueva contraseña es demasiado débil.',
+                'auth/network-request-failed': 'Sin conexión. Comprueba tu red.',
+            };
+            showErr(map[e.code] || `No se pudo cambiar la contraseña (${e.code || e.message}).`);
+            if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+        }
     },
 
     // ---- Legacy stubs (por si algún módulo viejo los llama) ----

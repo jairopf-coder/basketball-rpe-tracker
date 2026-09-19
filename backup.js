@@ -44,6 +44,9 @@ RPETracker.prototype.showGearMenu = function() {
             </button>
             <div class="gear-divider"></div>
             <div class="gear-section-label">Acceso</div>
+            <button class="gear-item" onclick="AppAuth.showChangePasswordModal();document.getElementById('gearMenuOverlay').remove()">
+                <span class="gear-icon">🔐</span><span>Cambiar mi contraseña</span>
+            </button>
             <button class="gear-item" onclick="AppAuth.showPinSettings();document.getElementById('gearMenuOverlay').remove()">
                 <span class="gear-icon">🔑</span><span>Gestionar PINs</span>
             </button>
