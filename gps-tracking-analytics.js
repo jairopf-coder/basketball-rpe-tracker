@@ -64,6 +64,8 @@ const GPS_COMPARISON_METRICS = [
     { key: 'impactsMax',           label: 'Impactos máx. int.',   unit: '',       unitType: GPS_UNIT_TYPES.COUNT,    agg: 'sum' },
     { key: 'caloriesTotal',        label: 'Calorías totales',     unit: 'kcal',   unitType: GPS_UNIT_TYPES.ENERGY,   agg: 'sum' },
     { key: 'playTimeMin',          label: 'Tiempo de juego',      unit: 'min',    unitType: GPS_UNIT_TYPES.TIME,     agg: 'sum' },
+    { key: 'maxAccelerations',     label: 'Aceleraciones (máx.)', unit: '',       unitType: GPS_UNIT_TYPES.COUNT,    agg: 'sum' },
+    { key: 'maxDecelerations',     label: 'Deceleraciones (máx.)',unit: '',       unitType: GPS_UNIT_TYPES.COUNT,    agg: 'sum' },
 ];
 
 // Detecta jugadoras con señales de carga inusual, reutilizando la
@@ -1094,35 +1096,88 @@ RPETracker.prototype._drawGpsTeamComparisonChart = function() {
 // verticales agrupadas. "Media del equipo" se puede añadir como una
 // barra de referencia más, junto a las jugadoras elegidas.
 
-const GPS_BARS_DEFAULT_METRIC = 'distanceM';
-const GPS_BARS_MAX_PLAYERS = 11; // equipo completo; la paleta de colores tiene 12 tonos, cubre 11 jugadoras sin repetir
+const GPS_BARS_MAX_PLAYERS = 2; // comparativa cara a cara: jugadora o media del equipo, máximo 2
+
+// Los 6 ejes del radar son siempre los mismos (no elegibles). Cada uno usa
+// una o varias métricas de GPS_COMPARISON_METRICS ya existentes, sumadas
+// cuando el eje combina "alta + máxima intensidad" en un único valor.
+const GPS_RADAR_AXES = [
+    { label: 'Distancia Recorrida',   keys: ['distanceM'] },
+    { label: 'Velocidad Máxima',      keys: ['maxSpeedKmh'] },
+    { label: 'Carreras de Alta Intensidad',    keys: ['highIntensityRunsM'] },
+    { label: 'Carreras de Máx. Intensidad',    keys: ['maxIntensityRunsM'] },
+    { label: 'Acel. de Alta y Máx. Intensidad', keys: ['highAccelerations', 'maxAccelerations'] },
+    { label: 'Desac. de Alta y Máx. Intensidad', keys: ['highDecelerations', 'maxDecelerations'] },
+];
+
+// Tarjetas de comparación numérica (debajo del radar): elegibles con el
+// botón "⚙️ Comparar", mismo patrón que "Columnas" en Evolución jugadora.
+// 'calc' señala una métrica derivada (no es una columna directa del CSV);
+// se calcula aparte en _getGpsCompareCardValue.
+const GPS_COMPARE_CARDS = [
+    { key: 'playTimeMin',   label: 'Tiempo de actividad', unit: 'min',   decimals: 1 },
+    { key: 'distPerMin',    label: 'Dist. por minuto de actividad', unit: 'm/min', decimals: 1, calc: true },
+    { key: 'distanceM',     label: 'Distancia recorrida', unit: 'm',    decimals: 0 },
+    { key: 'maxSpeedKmh',   label: 'Velocidad máxima',    unit: 'km/h', decimals: 1 },
+    { key: 'iio',           label: 'Intensidad Objetiva (IIO)', unit: '%', decimals: 0, special: 'iio' },
+    { key: 'jumps',         label: 'Saltos',              unit: '',     decimals: 0 },
+    { key: 'maxIntensityRuns', label: 'Sprints (episodios)', unit: '',  decimals: 0 },
+    { key: 'caloriesTotal', label: 'Calorías totales',    unit: 'kcal', decimals: 0 },
+];
+const GPS_COMPARE_CARDS_DEFAULT = ['playTimeMin', 'distPerMin'];
+const GPS_COMPARE_CARDS_MAX = 6;
 
 RPETracker.prototype._renderGpsRadarTab = function(container) {
-    if (!this._gpsBarsMetric) this._gpsBarsMetric = GPS_BARS_DEFAULT_METRIC;
     if (!this._gpsBarsModeCtx) this._gpsBarsModeCtx = 'session'; // 'session' | 'range'
     if (!this._gpsBarsRange) this._gpsBarsRange = '30';
     if (!Array.isArray(this._gpsBarsPlayerIds)) this._gpsBarsPlayerIds = [];
-    if (this._gpsBarsShowTeamAvg === undefined) this._gpsBarsShowTeamAvg = true;
+    if (this._gpsBarsShowTeamAvg === undefined) this._gpsBarsShowTeamAvg = false;
+    if (!Array.isArray(this._gpsCompareCards)) {
+        const saved = typeof Store !== 'undefined' ? Store.get('gpsCompareCards', null) : null;
+        this._gpsCompareCards = (Array.isArray(saved) && saved.length > 0)
+            ? saved.filter(k => GPS_COMPARE_CARDS.some(c => c.key === k)).slice(0, GPS_COMPARE_CARDS_MAX)
+            : [...GPS_COMPARE_CARDS_DEFAULT];
+        if (this._gpsCompareCards.length === 0) this._gpsCompareCards = [...GPS_COMPARE_CARDS_DEFAULT];
+    }
 
     const activePlayers = this.players.filter(p => !p.archived);
     const teamSessions = this._getTeamSessionOptions();
 
-    // Selección inicial: si no hay ninguna jugadora elegida aún,
-    // arrancamos con las 3 primeras del roster activo para que la
-    // gráfica no aparezca vacía la primera vez que se abre la pestaña.
-    if (this._gpsBarsPlayerIds.length === 0 && activePlayers.length > 0) {
-        this._gpsBarsPlayerIds = activePlayers.slice(0, 3).map(p => p.id);
+    // Selección inicial: si no hay nadie elegido, arrancamos con las 2
+    // primeras del roster activo para que la comparativa no aparezca
+    // vacía la primera vez que se abre la pestaña.
+    if (this._gpsBarsPlayerIds.length === 0 && !this._gpsBarsShowTeamAvg && activePlayers.length > 0) {
+        this._gpsBarsPlayerIds = activePlayers.slice(0, 2).map(p => p.id);
     }
     if (!this._gpsBarsSessionId && teamSessions.length > 0) this._gpsBarsSessionId = teamSessions[0].id;
 
-    const metricDef = GPS_COMPARISON_METRICS.find(m => m.key === this._gpsBarsMetric) || GPS_COMPARISON_METRICS[0];
+    const columnsPicker = `
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+            <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._gpsCompareToggleCardsPanel()">
+                ⚙️ Comparar (${this._gpsCompareCards.length}/${GPS_COMPARE_CARDS_MAX})
+            </button>
+        </div>
+        <div id="gpsCompareCardsPanel" style="display:none;margin-bottom:12px;padding:12px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border);">
+            <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px;">
+                Elige hasta ${GPS_COMPARE_CARDS_MAX} datos a comparar debajo del radar:
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;">
+                ${GPS_COMPARE_CARDS.map(c => `
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;">
+                        <input type="checkbox" value="${c.key}" ${this._gpsCompareCards.includes(c.key) ? 'checked' : ''}
+                            onchange="window.rpeTracker._gpsCompareToggleCard('${c.key}', this.checked)">
+                        ${esc(c.label)}
+                    </label>
+                `).join('')}
+            </div>
+        </div>`;
+
+    const selectedPlayers = this._gpsBarsPlayerIds.map(id => this.players.find(p => p.id === id)).filter(Boolean);
+    const sides = [...selectedPlayers.map(p => ({ id: p.id, name: p.name, position: p.position || '', color: PlayerTokens.get(p) }))];
+    if (this._gpsBarsShowTeamAvg) sides.push({ id: null, name: 'Media del equipo', position: '', color: '#888' });
 
     container.innerHTML = `
         <div class="gps-an-controls" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-            <select id="gpsBarsMetricSelect" onchange="window.rpeTracker._gpsBarsSetMetric(this.value)" style="min-width:220px;">
-                ${GPS_COMPARISON_METRICS.map(m => `<option value="${m.key}" ${m.key === this._gpsBarsMetric ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
-            </select>
-
             <select id="gpsBarsModeCtxSelect" onchange="window.rpeTracker._gpsBarsSetModeCtx(this.value)">
                 <option value="session" ${this._gpsBarsModeCtx === 'session' ? 'selected' : ''}>Una sesión</option>
                 <option value="range" ${this._gpsBarsModeCtx === 'range' ? 'selected' : ''}>Rango de fechas</option>
@@ -1167,38 +1222,70 @@ RPETracker.prototype._renderGpsRadarTab = function(container) {
             </div>
         </div>
 
-        <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
-            <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
-                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsBarsCanvas', 'comparativa-jugadoras-gps')">📥 Descargar</button>
-            </div>
-            <div style="height:400px;">
-                <canvas id="gpsBarsCanvas"></canvas>
-            </div>
-            ${this._gpsBarsPlayerIds.length === 0 && !this._gpsBarsShowTeamAvg ? `
-                <p style="text-align:center;color:var(--text-secondary);font-size:0.85rem;margin-top:12px;">
-                    Elige al menos una jugadora o la media del equipo para ver la comparativa.
+        ${sides.length < 2 ? `
+            <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:24px;text-align:center;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+                <p style="color:var(--text-secondary);font-size:0.9rem;margin:0;">
+                    Elige 2 jugadoras (o una jugadora y la media del equipo) para compararlas.
                 </p>
-            ` : ''}
-        </div>
+            </div>
+        ` : this._renderGpsCompareHead(sides) + columnsPicker + this._renderGpsCompareCards(sides)}
     `;
 
-    requestAnimationFrame(() => this._drawGpsBarsChart());
+    if (sides.length >= 2) requestAnimationFrame(() => this._drawGpsRadarChart(sides));
 };
 
-RPETracker.prototype._gpsBarsSetMetric = function(key) {
-    this._gpsBarsMetric = key;
-    this._drawGpsBarsChart();
+RPETracker.prototype._gpsCompareToggleCardsPanel = function() {
+    const panel = document.getElementById('gpsCompareCardsPanel');
+    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 };
+
+RPETracker.prototype._gpsCompareToggleCard = function(key, checked) {
+    if (checked) {
+        if (this._gpsCompareCards.length >= GPS_COMPARE_CARDS_MAX) {
+            this.showToast(`⚠️ Máximo ${GPS_COMPARE_CARDS_MAX} datos en la comparativa`, 'warning');
+            const cb = document.querySelector(`#gpsCompareCardsPanel input[value="${key}"]`);
+            if (cb) cb.checked = false;
+            return;
+        }
+        this._gpsCompareCards.push(key);
+    } else {
+        if (this._gpsCompareCards.length <= 1) {
+            this.showToast('⚠️ Debe quedar al menos 1 dato seleccionado', 'warning');
+            const cb = document.querySelector(`#gpsCompareCardsPanel input[value="${key}"]`);
+            if (cb) cb.checked = true;
+            return;
+        }
+        this._gpsCompareCards = this._gpsCompareCards.filter(k => k !== key);
+    }
+    if (typeof Store !== 'undefined') Store.set('gpsCompareCards', this._gpsCompareCards);
+    const container = document.getElementById('gpsAnTabContent');
+    if (container) this._renderGpsRadarTab(container);
+};
+
 RPETracker.prototype._gpsBarsSetModeCtx = function(ctx) {
     this._gpsBarsModeCtx = ctx;
     this._renderGpsRadarTab(document.getElementById('gpsAnTabContent'));
 };
-RPETracker.prototype._gpsBarsSetSession = function(id) { this._gpsBarsSessionId = id; this._drawGpsBarsChart(); };
-RPETracker.prototype._gpsBarsSetRange = function(range) { this._gpsBarsRange = range; this._drawGpsBarsChart(); };
+RPETracker.prototype._gpsBarsSetSession = function(id) {
+    this._gpsBarsSessionId = id;
+    this._renderGpsRadarTab(document.getElementById('gpsAnTabContent'));
+};
+RPETracker.prototype._gpsBarsSetRange = function(range) {
+    this._gpsBarsRange = range;
+    this._renderGpsRadarTab(document.getElementById('gpsAnTabContent'));
+};
+
+// Cuenta cuántos "lados" hay elegidos ahora mismo (jugadoras + media del
+// equipo si está activada), para respetar el máximo de 2 (comparativa
+// siempre cara a cara).
+RPETracker.prototype._gpsCompareSelectedCount = function() {
+    return this._gpsBarsPlayerIds.length + (this._gpsBarsShowTeamAvg ? 1 : 0);
+};
+
 RPETracker.prototype._gpsBarsTogglePlayer = function(id, checked) {
     if (checked) {
-        if (this._gpsBarsPlayerIds.length >= GPS_BARS_MAX_PLAYERS) {
-            this.showToast(`⚠️ Máximo ${GPS_BARS_MAX_PLAYERS} jugadoras en la comparativa`, 'warning');
+        if (this._gpsCompareSelectedCount() >= GPS_BARS_MAX_PLAYERS) {
+            this.showToast(`⚠️ Máximo ${GPS_BARS_MAX_PLAYERS} elementos en la comparativa — quita uno antes de añadir otro`, 'warning');
             return;
         }
         this._gpsBarsPlayerIds.push(id);
@@ -1209,6 +1296,10 @@ RPETracker.prototype._gpsBarsTogglePlayer = function(id, checked) {
     if (container) this._renderGpsRadarTab(container);
 };
 RPETracker.prototype._gpsBarsToggleTeamAvg = function(checked) {
+    if (checked && this._gpsCompareSelectedCount() >= GPS_BARS_MAX_PLAYERS) {
+        this.showToast(`⚠️ Máximo ${GPS_BARS_MAX_PLAYERS} elementos en la comparativa — quita uno antes de añadir otro`, 'warning');
+        return;
+    }
     this._gpsBarsShowTeamAvg = checked;
     const container = document.getElementById('gpsAnTabContent');
     if (container) this._renderGpsRadarTab(container);
@@ -1276,51 +1367,63 @@ RPETracker.prototype._getGpsBarsValue = function(metricDef, playerId) {
     return perPlayerValues.reduce((a, b) => a + b, 0) / perPlayerValues.length;
 };
 
-// Dibuja las barras verticales agrupadas: una barra por jugadora
-// elegida (+ una barra extra de "Media del equipo" si está activada),
-// para la métrica seleccionada. El eje Y se adapta automáticamente al
-// tipo de unidad de esa métrica (metros, conteos, km/h, etc.) porque
-// solo se representa una métrica a la vez.
-RPETracker.prototype._drawGpsBarsChart = function() {
-    const canvas = document.getElementById('gpsBarsCanvas');
+// Cabecera de la comparativa: nombre + posición de cada lado, con su
+// color propio (PlayerTokens, o gris para "Media del equipo").
+RPETracker.prototype._renderGpsCompareHead = function(sides) {
+    return `
+        <div class="gps-compare-head" style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px;">
+            ${sides.map((side, i) => `
+                <div style="flex:1;text-align:${i === 0 ? 'left' : 'right'};min-width:0;">
+                    <div style="font-weight:700;font-size:1rem;color:${side.color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(side.name)}</div>
+                    ${side.position ? `<div style="font-size:0.8rem;color:var(--text-secondary);">${esc(side.position)}</div>` : ''}
+                </div>
+            `).join('')}
+        </div>`;
+};
+
+// Suma los valores de una o varias claves de GPS_COMPARISON_METRICS para
+// un "lado" (jugadora o media del equipo), en el contexto sesión/rango
+// ya elegido. Se apoya en _getGpsBarsValue (misma lógica de siempre).
+RPETracker.prototype._getGpsRadarAxisValue = function(axisKeys, playerId) {
+    let total = 0, any = false;
+    axisKeys.forEach(key => {
+        const metricDef = GPS_COMPARISON_METRICS.find(m => m.key === key);
+        if (!metricDef) return;
+        const v = this._getGpsBarsValue(metricDef, playerId);
+        if (v != null) { total += v; any = true; }
+    });
+    return any ? total : null;
+};
+
+// Dibuja el radar de 6 ejes fijos, uno por "lado" (máximo 2: jugadora o
+// media del equipo). Cada eje se normaliza 0-100% sobre el mayor de los
+// dos valores comparados, para que el radar siempre se vea proporcionado
+// sea cual sea el par elegido.
+RPETracker.prototype._drawGpsRadarChart = function(sides) {
+    const canvas = document.getElementById('gpsRadarCanvas');
     if (!canvas || typeof Chart === 'undefined') return;
     if (canvas._ci) { canvas._ci.destroy(); canvas._ci = null; }
 
-    const metricDef = GPS_COMPARISON_METRICS.find(m => m.key === this._gpsBarsMetric) || GPS_COMPARISON_METRICS[0];
-    const selectedPlayers = this._gpsBarsPlayerIds
-        .map(id => this.players.find(p => p.id === id))
-        .filter(Boolean);
-
-    if (selectedPlayers.length === 0 && !this._gpsBarsShowTeamAvg) return;
-
-    const labels = selectedPlayers.map(p => p.name);
-    const values = selectedPlayers.map(p => this._getGpsBarsValue(metricDef, p.id));
-    const colors = selectedPlayers.map(p => PlayerTokens.get(p));
-
-    if (this._gpsBarsShowTeamAvg) {
-        const teamAvg = this._getGpsBarsValue(metricDef, null);
-        labels.push('Media del equipo');
-        values.push(teamAvg);
-        colors.push('#888');
-    }
+    const rawValues = sides.map(side => GPS_RADAR_AXES.map(axis => this._getGpsRadarAxisValue(axis.keys, side.id)));
+    const axisMax = GPS_RADAR_AXES.map((axis, i) => Math.max(...rawValues.map(vals => vals[i] || 0), 0.0001));
 
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const textC = isDark ? '#aaa' : '#555';
-    const gridC = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)';
+    const gridC = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)';
+
+    const datasets = sides.map((side, i) => ({
+        label: side.name,
+        data: rawValues[i].map((v, ax) => v == null ? 0 : Math.round((v / axisMax[ax]) * 100)),
+        backgroundColor: side.color + '33',
+        borderColor: side.color,
+        borderWidth: 2,
+        pointBackgroundColor: side.color,
+        pointRadius: 3,
+    }));
 
     canvas._ci = new Chart(canvas.getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                label: metricDef.label,
-                data: values.map(v => v == null ? 0 : Math.round(v * 10) / 10),
-                backgroundColor: colors.map(c => c + 'cc'),
-                borderColor: colors,
-                borderWidth: 1.5,
-                borderRadius: 6,
-            }]
-        },
+        type: 'radar',
+        data: { labels: GPS_RADAR_AXES.map(a => a.label), datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -1329,22 +1432,93 @@ RPETracker.prototype._drawGpsBarsChart = function() {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: (ctx) => `${ctx.parsed.y?.toFixed ? ctx.parsed.y.toFixed(1) : ctx.parsed.y}${metricDef.unit ? ' ' + metricDef.unit : ''}`
+                        label: (ctx) => {
+                            const raw = rawValues[ctx.datasetIndex][ctx.dataIndex];
+                            return `${ctx.dataset.label}: ${raw != null ? Math.round(raw * 10) / 10 : '—'} (${ctx.parsed.r}% del máx. comparado)`;
+                        }
                     }
                 }
             },
             scales: {
-                x: {
-                    ticks: { color: textC, font: { size: 10 }, maxRotation: 45, minRotation: 0 },
-                    grid: { display: false }
-                },
-                y: {
+                r: {
                     beginAtZero: true,
-                    title: { display: true, text: metricDef.unit ? `${metricDef.label} (${metricDef.unit})` : metricDef.label, color: textC, font: { size: 11 } },
-                    ticks: { color: textC, font: { size: 10 } },
-                    grid: { color: gridC }
+                    max: 100,
+                    ticks: { display: false, stepSize: 25 },
+                    grid: { color: gridC },
+                    angleLines: { color: gridC },
+                    pointLabels: { color: textC, font: { size: 10.5 } }
                 }
             }
         }
     });
+};
+
+// Valor de una tarjeta de comparación para un "lado". Las claves 'calc'
+// (como distPerMin) no son una columna directa del CSV, se derivan de
+// otras dos métricas ya calculables con _getGpsBarsValue.
+RPETracker.prototype._getGpsCompareCardValue = function(cardDef, playerId) {
+    if (cardDef.key === 'distPerMin') {
+        const dist = this._getGpsBarsValue(GPS_COMPARISON_METRICS.find(m => m.key === 'distanceM'), playerId);
+        const min = this._getGpsBarsValue(GPS_COMPARISON_METRICS.find(m => m.key === 'playTimeMin'), playerId);
+        return (dist != null && min > 0) ? dist / min : null;
+    }
+    // El resto de tarjetas (incluido IIO) usan directamente la definición
+    // ya existente en GPS_COMPARISON_METRICS, que ya trae special:'iio'
+    // cuando corresponde.
+    const metricDef = GPS_COMPARISON_METRICS.find(m => m.key === cardDef.key);
+    return metricDef ? this._getGpsBarsValue(metricDef, playerId) : null;
+};
+
+// Tarjetas de comparación cara a cara: valor grande a cada lado y un
+// círculo dual en el centro con el % de diferencia (lado derecho vs
+// izquierdo), igual patrón visual para las 2-6 tarjetas elegidas.
+RPETracker.prototype._renderGpsCompareCards = function(sides) {
+    const cards = this._gpsCompareCards.map(key => GPS_COMPARE_CARDS.find(c => c.key === key)).filter(Boolean);
+
+    const cardsHTML = cards.map(cardDef => {
+        const values = sides.map(side => this._getGpsCompareCardValue(cardDef, side.id));
+        const [vLeft, vRight] = values;
+        const fmt = v => v == null ? '—' : v.toFixed(cardDef.decimals).replace(/\.0+$/, cardDef.decimals > 0 ? '' : '');
+        const [intLeft, decLeft] = fmt(vLeft).split('.');
+        const [intRight, decRight] = fmt(vRight).split('.');
+
+        let diffLabel = '—';
+        if (vLeft != null && vRight != null && vLeft !== 0) {
+            const diffPct = Math.round(((vRight - vLeft) / Math.abs(vLeft)) * 100);
+            diffLabel = (diffPct > 0 ? '+' : '') + diffPct + '%';
+        }
+
+        return `
+            <div class="gps-compare-card" style="margin-bottom:1.25rem;">
+                <div style="text-align:center;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-secondary);margin-bottom:0.6rem;">
+                    ${esc(cardDef.label)}
+                </div>
+                <div style="display:flex;align-items:center;justify-content:center;gap:20px;">
+                    <div style="text-align:right;font-size:1.6rem;font-weight:800;color:var(--text-primary);min-width:70px;">
+                        ${intLeft}${decLeft ? `<span style="font-size:0.9rem;font-weight:600;">.${decLeft}</span>` : ''}
+                        ${cardDef.unit ? `<div style="font-size:0.68rem;font-weight:600;color:var(--text-secondary);">${esc(cardDef.unit)}</div>` : ''}
+                    </div>
+                    <div style="width:64px;height:64px;flex-shrink:0;border-radius:50%;border:4px solid ${sides[0].color};border-right-color:${sides[1].color};border-bottom-color:${sides[1].color};display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:var(--text-primary);">
+                        ${diffLabel}
+                    </div>
+                    <div style="text-align:left;font-size:1.6rem;font-weight:800;color:var(--text-primary);min-width:70px;">
+                        ${intRight}${decRight ? `<span style="font-size:0.9rem;font-weight:600;">.${decRight}</span>` : ''}
+                        ${cardDef.unit ? `<div style="font-size:0.68rem;font-weight:600;color:var(--text-secondary);">${esc(cardDef.unit)}</div>` : ''}
+                    </div>
+                </div>
+            </div>`;
+    }).join('<hr style="border:none;border-top:1px solid var(--border);margin:0 0 1.25rem;">');
+
+    return `
+        <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));margin-bottom:16px;">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
+                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsRadarCanvas', 'comparativa-jugadoras-gps')">📥 Descargar radar</button>
+            </div>
+            <div style="height:340px;">
+                <canvas id="gpsRadarCanvas"></canvas>
+            </div>
+        </div>
+        <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:20px 16px 8px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+            ${cardsHTML}
+        </div>`;
 };
