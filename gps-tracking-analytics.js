@@ -581,11 +581,15 @@ RPETracker.prototype._renderGpsIioInfoBox = function() {
                 </p>
                 <p style="margin-bottom:0.5rem"><strong>Se calcula combinando 4 bloques:</strong></p>
                 <ul style="margin-left:1.5rem;color:var(--gray)">
-                    <li><strong>Volumen (25%):</strong> distancia total y minutos jugados</li>
-                    <li><strong>Intensidad de carrera (30%):</strong> metros en cada banda de velocidad (caminata, trote, moderada, alta, sprint), dando más peso a las más exigentes</li>
-                    <li><strong>Esfuerzos explosivos (30%):</strong> aceleraciones/deceleraciones, cambios de dirección y saltos</li>
-                    <li><strong>Impacto/contacto (15%):</strong> impactos recibidos, de baja a máxima intensidad</li>
+                    <li><strong>Volumen (25%):</strong> distancia total ×1 y minutos jugados ×1</li>
+                    <li><strong>Intensidad de carrera (30%):</strong> caminata ×1, trote ×2, carrera moderada ×3, carrera de alta intensidad ×4, sprint ×5</li>
+                    <li><strong>Esfuerzos explosivos (30%):</strong> cambios de dirección ×2, saltos ×2, aceleración/deceleración alta ×3, aceleración/deceleración máxima ×4</li>
+                    <li><strong>Impacto/contacto (15%):</strong> impacto bajo ×1, medio ×2, alto ×3, máximo ×4</li>
                 </ul>
+                <p style="margin:0.25rem 0 0.5rem;color:var(--text-secondary);font-size:0.85em">
+                    Dentro de cada bloque, ese multiplicador (×1 a ×5) determina cuánto pesa esa métrica frente a las
+                    demás del mismo bloque — a mayor exigencia física de la banda, mayor multiplicador.
+                </p>
                 <p style="margin:0.5rem 0">
                     Cada métrica se normaliza sobre el <strong>máximo histórico de esa misma jugadora</strong> en la temporada
                     (su valor más alto registrado = 100%), no se compara entre jugadoras. Es el mismo criterio que usa el
@@ -594,6 +598,13 @@ RPETracker.prototype._renderGpsIioInfoBox = function() {
                 <p style="margin:0.5rem 0;color:var(--text-secondary);font-size:0.85em">
                     Con pocas sesiones registradas todavía, ese máximo histórico es menos fiable (puede ser un único día
                     atípico) — el IIO se muestra igual, pero conviene interpretarlo con cautela hasta tener más datos.
+                </p>
+                <p style="margin:0.5rem 0;color:var(--text-secondary);font-size:0.85em">
+                    <strong>Nota:</strong> los pesos de cada bloque (25/30/30/15%) y los multiplicadores de cada banda son
+                    una aproximación razonable basada en la exigencia fisiológica de cada tipo de esfuerzo, no una fórmula
+                    científica exacta — es una entre varias formas defendibles de ponderar estos datos. Además, el máximo
+                    histórico no "olvida" sesiones antiguas con el tiempo, así que una marca muy atípica de hace meses
+                    puede seguir marcando el 100% de referencia hoy.
                 </p>
             </div>
         </details>`;
