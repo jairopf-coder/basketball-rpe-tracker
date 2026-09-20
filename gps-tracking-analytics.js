@@ -599,6 +599,35 @@ RPETracker.prototype._renderGpsIioInfoBox = function() {
         </details>`;
 };
 
+// Máximo histórico ABSOLUTO de una jugadora para una métrica GPS,
+// recorriendo TODAS sus sesiones con dato GPS (sin límite de rango de
+// fechas). No se cachea ni se guarda en ningún sitio: se recalcula cada
+// vez que se llama, así que si aparece una marca nueva más alta, el
+// resto de la tabla se recalcula sola la próxima vez que se pinte —
+// nunca queda un máximo "congelado" desactualizado.
+RPETracker.prototype._getGpsPlayerMaxEver = function(playerId, metricKey) {
+    let max = 0;
+    (this.sessions || []).forEach(s => {
+        if (s.playerId !== playerId) return;
+        const gpsGroup = this.gpsData ? this.gpsData[s.id] : null;
+        const gps = gpsGroup ? gpsGroup[playerId] : null;
+        const val = gps && gps[metricKey] != null ? gps[metricKey] : null;
+        if (val != null && val > max) max = val;
+    });
+    return max;
+};
+
+// Color según el % de la marca histórica máxima de la jugadora. >100%
+// (nueva mejor marca) se distingue con negrita, aplicada aparte en el HTML.
+RPETracker.prototype._getGpsIntensityColor = function(pct) {
+    if (pct > 100) return '#c0392b';  // rojo intenso — nueva mejor marca
+    if (pct >= 90)  return '#e74c3c'; // rojo
+    if (pct >= 75)  return '#e67e22'; // naranja fuerte
+    if (pct >= 50)  return '#f5a623'; // naranja/amarillo
+    if (pct >= 20)  return 'var(--text-primary)'; // color normal de texto
+    return '#27ae60'; // verde — sesión suave para esa jugadora
+};
+
 RPETracker.prototype._renderGpsSessionsTable = function() {
     const container = document.getElementById('gpsAnTableContainer');
     if (!container) return;
@@ -662,7 +691,20 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
             const val = gps && gps[m.key] != null ? gps[m.key] : null;
             if (val == null) return '<td>—</td>';
             const display = m.key.endsWith('M') || m.key === 'distanceM' ? Math.round(val) : val;
-            return `<td>${display}${m.unit ? ' ' + m.unit : ''}</td>`;
+
+            const maxEver = this._getGpsPlayerMaxEver(session.playerId, m.key);
+            if (maxEver <= 0) return `<td>${display}${m.unit ? ' ' + m.unit : ''}</td>`;
+
+            const pct = Math.round((val / maxEver) * 100);
+            const color = this._getGpsIntensityColor(pct);
+            const bold = pct > 100 ? 'font-weight:700;' : '';
+            const cellId = `gpsCell_${session.id}_${m.key}`;
+            return `<td>
+                <span id="${cellId}" class="gps-intensity-cell" style="color:${color};${bold}cursor:pointer;"
+                    data-raw="${display}${m.unit ? ' ' + m.unit : ''}" data-pct="${pct}%" data-showing="raw"
+                    onclick="event.stopPropagation();window.rpeTracker._gpsToggleCellDisplay('${cellId}')"
+                    title="Toca para ver el % sobre su máximo histórico">${display}${m.unit ? ' ' + m.unit : ''}</span>
+            </td>`;
         }).join('');
 
         return `
@@ -675,6 +717,17 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
         </tr>`;
     }).join('');
 
+    const intensityLegend = `
+        <div class="gps-intensity-legend" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.72rem;color:var(--text-secondary);">
+            <span>Color = % sobre su máximo histórico personal en esa métrica (toca un dato para ver el % exacto):</span>
+            <span style="color:#27ae60;">● 0–20%</span>
+            <span style="color:var(--text-primary);">● 20–50%</span>
+            <span style="color:#f5a623;">● 50–75%</span>
+            <span style="color:#e67e22;">● 75–90%</span>
+            <span style="color:#e74c3c;">● 90–100%</span>
+            <span style="color:#c0392b;font-weight:700;">● &gt;100% (nueva mejor marca)</span>
+        </div>`;
+
     container.innerHTML = columnsPicker + `
         <div class="gps-an-table-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;overflow-x:auto;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
             <table class="data-table">
@@ -686,7 +739,18 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
                 </thead>
                 <tbody>${rows}</tbody>
             </table>
+            ${intensityLegend}
         </div>`;
+};
+
+// Alterna una celda de la tabla entre su valor bruto (p.ej. "35") y su
+// porcentaje sobre el máximo histórico de esa jugadora (p.ej. "93%").
+RPETracker.prototype._gpsToggleCellDisplay = function(cellId) {
+    const el = document.getElementById(cellId);
+    if (!el) return;
+    const showingPct = el.dataset.showing === 'pct';
+    el.textContent = showingPct ? el.dataset.raw : el.dataset.pct;
+    el.dataset.showing = showingPct ? 'raw' : 'pct';
 };
 
 RPETracker.prototype._gpsTableToggleColumnsPanel = function() {
