@@ -1110,35 +1110,42 @@ const GPS_RADAR_AXES = [
     { label: 'Desac. de Alta y Máx. Intensidad', keys: ['highDecelerations', 'maxDecelerations'] },
 ];
 
-// Tarjetas de comparación numérica (debajo del radar): elegibles con el
-// botón "⚙️ Comparar", mismo patrón que "Columnas" en Evolución jugadora.
-// 'calc' señala una métrica derivada (no es una columna directa del CSV);
-// se calcula aparte en _getGpsCompareCardValue.
+// Tarjetas de comparación numérica (debajo del radar): TODOS los datos
+// disponibles, siempre visibles, sin selección — 'calc' señala una
+// métrica derivada (no es una columna directa del CSV); se calcula
+// aparte en _getGpsCompareCardValue.
 const GPS_COMPARE_CARDS = [
     { key: 'playTimeMin',   label: 'Tiempo de actividad', unit: 'min',   decimals: 1 },
     { key: 'distPerMin',    label: 'Dist. por minuto de actividad', unit: 'm/min', decimals: 1, calc: true },
     { key: 'distanceM',     label: 'Distancia recorrida', unit: 'm',    decimals: 0 },
     { key: 'maxSpeedKmh',   label: 'Velocidad máxima',    unit: 'km/h', decimals: 1 },
     { key: 'iio',           label: 'Intensidad Objetiva (IIO)', unit: '%', decimals: 0, special: 'iio' },
-    { key: 'jumps',         label: 'Saltos',              unit: '',     decimals: 0 },
-    { key: 'maxIntensityRuns', label: 'Sprints (episodios)', unit: '',  decimals: 0 },
-    { key: 'caloriesTotal', label: 'Calorías totales',    unit: 'kcal', decimals: 0 },
+    { key: 'walkM',              label: 'Caminata (distancia)', unit: 'm', decimals: 0 },
+    { key: 'walkCount',          label: 'Caminata (episodios)', unit: '',  decimals: 0 },
+    { key: 'jogM',                label: 'Trote (distancia)',   unit: 'm', decimals: 0 },
+    { key: 'jogCount',            label: 'Trote (episodios)',   unit: '',  decimals: 0 },
+    { key: 'moderateRunM',        label: 'Carrera moderada (distancia)', unit: 'm', decimals: 0 },
+    { key: 'moderateRunCount',    label: 'Carrera moderada (episodios)', unit: '',  decimals: 0 },
+    { key: 'highIntensityRunsM',  label: 'Carrera alta int. (distancia)', unit: 'm', decimals: 0 },
+    { key: 'highIntensityRuns',   label: 'Carrera alta int. (episodios)', unit: '',  decimals: 0 },
+    { key: 'maxIntensityRunsM',   label: 'Sprint (distancia)',  unit: 'm', decimals: 0 },
+    { key: 'maxIntensityRuns',    label: 'Sprints (episodios)', unit: '',  decimals: 0 },
+    { key: 'jumps',               label: 'Saltos',              unit: '',  decimals: 0 },
+    { key: 'directionChanges',    label: 'Cambios de dirección', unit: '', decimals: 0 },
+    { key: 'highAccelerations',   label: 'Aceleraciones (alta)', unit: '', decimals: 0 },
+    { key: 'maxAccelerations',    label: 'Aceleraciones (máx.)', unit: '', decimals: 0 },
+    { key: 'highDecelerations',   label: 'Deceleraciones (alta)', unit: '', decimals: 0 },
+    { key: 'maxDecelerations',    label: 'Deceleraciones (máx.)', unit: '', decimals: 0 },
+    { key: 'impactsHigh',         label: 'Impactos alta int.',  unit: '',  decimals: 0 },
+    { key: 'impactsMax',          label: 'Impactos máx. int.',  unit: '',  decimals: 0 },
+    { key: 'caloriesTotal',       label: 'Calorías totales',    unit: 'kcal', decimals: 0 },
 ];
-const GPS_COMPARE_CARDS_DEFAULT = ['playTimeMin', 'distPerMin'];
-const GPS_COMPARE_CARDS_MAX = 6;
 
 RPETracker.prototype._renderGpsRadarTab = function(container) {
     if (!this._gpsBarsModeCtx) this._gpsBarsModeCtx = 'session'; // 'session' | 'range'
     if (!this._gpsBarsRange) this._gpsBarsRange = '30';
     if (!Array.isArray(this._gpsBarsPlayerIds)) this._gpsBarsPlayerIds = [];
     if (this._gpsBarsShowTeamAvg === undefined) this._gpsBarsShowTeamAvg = false;
-    if (!Array.isArray(this._gpsCompareCards)) {
-        const saved = typeof Store !== 'undefined' ? Store.get('gpsCompareCards', null) : null;
-        this._gpsCompareCards = (Array.isArray(saved) && saved.length > 0)
-            ? saved.filter(k => GPS_COMPARE_CARDS.some(c => c.key === k)).slice(0, GPS_COMPARE_CARDS_MAX)
-            : [...GPS_COMPARE_CARDS_DEFAULT];
-        if (this._gpsCompareCards.length === 0) this._gpsCompareCards = [...GPS_COMPARE_CARDS_DEFAULT];
-    }
 
     const activePlayers = this.players.filter(p => !p.archived);
     const teamSessions = this._getTeamSessionOptions();
@@ -1150,27 +1157,6 @@ RPETracker.prototype._renderGpsRadarTab = function(container) {
         this._gpsBarsPlayerIds = activePlayers.slice(0, 2).map(p => p.id);
     }
     if (!this._gpsBarsSessionId && teamSessions.length > 0) this._gpsBarsSessionId = teamSessions[0].id;
-
-    const columnsPicker = `
-        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-            <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._gpsCompareToggleCardsPanel()">
-                ⚙️ Comparar (${this._gpsCompareCards.length}/${GPS_COMPARE_CARDS_MAX})
-            </button>
-        </div>
-        <div id="gpsCompareCardsPanel" style="display:none;margin-bottom:12px;padding:12px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border);">
-            <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px;">
-                Elige hasta ${GPS_COMPARE_CARDS_MAX} datos a comparar debajo del radar:
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;">
-                ${GPS_COMPARE_CARDS.map(c => `
-                    <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;">
-                        <input type="checkbox" value="${c.key}" ${this._gpsCompareCards.includes(c.key) ? 'checked' : ''}
-                            onchange="window.rpeTracker._gpsCompareToggleCard('${c.key}', this.checked)">
-                        ${esc(c.label)}
-                    </label>
-                `).join('')}
-            </div>
-        </div>`;
 
     const selectedPlayers = this._gpsBarsPlayerIds.map(id => this.players.find(p => p.id === id)).filter(Boolean);
     const sides = [...selectedPlayers.map(p => ({ id: p.id, name: p.name, position: p.position || '', color: PlayerTokens.get(p) }))];
@@ -1228,38 +1214,10 @@ RPETracker.prototype._renderGpsRadarTab = function(container) {
                     Elige 2 jugadoras (o una jugadora y la media del equipo) para compararlas.
                 </p>
             </div>
-        ` : this._renderGpsCompareHead(sides) + columnsPicker + this._renderGpsCompareCards(sides)}
+        ` : this._renderGpsCompareHead(sides) + this._renderGpsCompareCards(sides)}
     `;
 
     if (sides.length >= 2) requestAnimationFrame(() => this._drawGpsRadarChart(sides));
-};
-
-RPETracker.prototype._gpsCompareToggleCardsPanel = function() {
-    const panel = document.getElementById('gpsCompareCardsPanel');
-    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-};
-
-RPETracker.prototype._gpsCompareToggleCard = function(key, checked) {
-    if (checked) {
-        if (this._gpsCompareCards.length >= GPS_COMPARE_CARDS_MAX) {
-            this.showToast(`⚠️ Máximo ${GPS_COMPARE_CARDS_MAX} datos en la comparativa`, 'warning');
-            const cb = document.querySelector(`#gpsCompareCardsPanel input[value="${key}"]`);
-            if (cb) cb.checked = false;
-            return;
-        }
-        this._gpsCompareCards.push(key);
-    } else {
-        if (this._gpsCompareCards.length <= 1) {
-            this.showToast('⚠️ Debe quedar al menos 1 dato seleccionado', 'warning');
-            const cb = document.querySelector(`#gpsCompareCardsPanel input[value="${key}"]`);
-            if (cb) cb.checked = true;
-            return;
-        }
-        this._gpsCompareCards = this._gpsCompareCards.filter(k => k !== key);
-    }
-    if (typeof Store !== 'undefined') Store.set('gpsCompareCards', this._gpsCompareCards);
-    const container = document.getElementById('gpsAnTabContent');
-    if (container) this._renderGpsRadarTab(container);
 };
 
 RPETracker.prototype._gpsBarsSetModeCtx = function(ctx) {
@@ -1472,10 +1430,11 @@ RPETracker.prototype._getGpsCompareCardValue = function(cardDef, playerId) {
 // Tarjetas de comparación cara a cara: valor grande a cada lado y un
 // círculo dual en el centro con el % de diferencia (lado derecho vs
 // izquierdo), igual patrón visual para las 2-6 tarjetas elegidas.
+// Todas las tarjetas de comparación (GPS_COMPARE_CARDS completo, sin
+// selección) en un grid de 2 columnas en escritorio; se colapsa a 1
+// columna en móvil vía CSS (.gps-compare-cards-grid, ver styles.css).
 RPETracker.prototype._renderGpsCompareCards = function(sides) {
-    const cards = this._gpsCompareCards.map(key => GPS_COMPARE_CARDS.find(c => c.key === key)).filter(Boolean);
-
-    const cardsHTML = cards.map(cardDef => {
+    const cardsHTML = GPS_COMPARE_CARDS.map(cardDef => {
         const values = sides.map(side => this._getGpsCompareCardValue(cardDef, side.id));
         const [vLeft, vRight] = values;
         const fmt = v => v == null ? '—' : v.toFixed(cardDef.decimals).replace(/\.0+$/, cardDef.decimals > 0 ? '' : '');
@@ -1489,25 +1448,25 @@ RPETracker.prototype._renderGpsCompareCards = function(sides) {
         }
 
         return `
-            <div class="gps-compare-card" style="margin-bottom:1.25rem;">
+            <div class="gps-compare-card-cell" style="background:var(--bg-subtle);border-radius:10px;padding:14px 10px;">
                 <div style="text-align:center;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-secondary);margin-bottom:0.6rem;">
                     ${esc(cardDef.label)}
                 </div>
-                <div style="display:flex;align-items:center;justify-content:center;gap:20px;">
-                    <div style="text-align:right;font-size:1.6rem;font-weight:800;color:var(--text-primary);min-width:70px;">
-                        ${intLeft}${decLeft ? `<span style="font-size:0.9rem;font-weight:600;">.${decLeft}</span>` : ''}
-                        ${cardDef.unit ? `<div style="font-size:0.68rem;font-weight:600;color:var(--text-secondary);">${esc(cardDef.unit)}</div>` : ''}
+                <div style="display:flex;align-items:center;justify-content:center;gap:14px;">
+                    <div style="text-align:right;font-size:1.4rem;font-weight:800;color:var(--text-primary);min-width:58px;">
+                        ${intLeft}${decLeft ? `<span style="font-size:0.85rem;font-weight:600;">.${decLeft}</span>` : ''}
+                        ${cardDef.unit ? `<div style="font-size:0.64rem;font-weight:600;color:var(--text-secondary);">${esc(cardDef.unit)}</div>` : ''}
                     </div>
-                    <div style="width:64px;height:64px;flex-shrink:0;border-radius:50%;border:4px solid ${sides[0].color};border-right-color:${sides[1].color};border-bottom-color:${sides[1].color};display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:var(--text-primary);">
+                    <div style="width:54px;height:54px;flex-shrink:0;border-radius:50%;border:4px solid ${sides[0].color};border-right-color:${sides[1].color};border-bottom-color:${sides[1].color};display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700;color:var(--text-primary);">
                         ${diffLabel}
                     </div>
-                    <div style="text-align:left;font-size:1.6rem;font-weight:800;color:var(--text-primary);min-width:70px;">
-                        ${intRight}${decRight ? `<span style="font-size:0.9rem;font-weight:600;">.${decRight}</span>` : ''}
-                        ${cardDef.unit ? `<div style="font-size:0.68rem;font-weight:600;color:var(--text-secondary);">${esc(cardDef.unit)}</div>` : ''}
+                    <div style="text-align:left;font-size:1.4rem;font-weight:800;color:var(--text-primary);min-width:58px;">
+                        ${intRight}${decRight ? `<span style="font-size:0.85rem;font-weight:600;">.${decRight}</span>` : ''}
+                        ${cardDef.unit ? `<div style="font-size:0.64rem;font-weight:600;color:var(--text-secondary);">${esc(cardDef.unit)}</div>` : ''}
                     </div>
                 </div>
             </div>`;
-    }).join('<hr style="border:none;border-top:1px solid var(--border);margin:0 0 1.25rem;">');
+    }).join('');
 
     return `
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));margin-bottom:16px;">
@@ -1518,7 +1477,9 @@ RPETracker.prototype._renderGpsCompareCards = function(sides) {
                 <canvas id="gpsRadarCanvas"></canvas>
             </div>
         </div>
-        <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:20px 16px 8px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
-            ${cardsHTML}
+        <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+            <div class="gps-compare-cards-grid">
+                ${cardsHTML}
+            </div>
         </div>`;
 };

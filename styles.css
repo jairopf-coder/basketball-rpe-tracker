@@ -10703,3 +10703,17 @@ textarea:focus-visible,
     background-size: 100% 24px, 100% 24px, 100% 8px, 100% 8px;
     background-attachment: local, local, scroll, scroll;
 }
+
+/* Comparar jugadoras (GPS): todas las tarjetas de comparación numérica
+   en 2 columnas en escritorio; en móvil, 1 columna (igual que el resto
+   de vistas del proyecto usan 768px como corte). */
+.gps-compare-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+@media (max-width: 768px) {
+    .gps-compare-cards-grid {
+        grid-template-columns: 1fr;
+    }
+}
