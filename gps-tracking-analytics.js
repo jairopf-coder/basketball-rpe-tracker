@@ -1397,18 +1397,19 @@ RPETracker.prototype._drawGpsRadarChart = function(sides) {
     const gridC = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)';
 
     const datasets = sides.map((side, i) => {
-        // "Media del equipo" se comporta como una jugadora más (mismo
-        // relleno y grosor de línea) — solo se diferencia por el borde
-        // discontinuo. Antes tenía un tratamiento especial (relleno
-        // tenue) que, por el orden de dibujo de Chart.js, seguía
-        // quedando por encima del área de la jugadora y la tapaba.
+        // "Media del equipo" se dibuja SIN relleno (solo su contorno
+        // discontinuo) — con relleno, cuando la jugadora domina en los
+        // 6 ejes a la vez (su área ocupa el 100% del radar), el área de
+        // la media queda completamente tapada por dentro, sea cual sea
+        // el orden de dibujo o la opacidad. Sin relleno, su línea
+        // siempre es visible por encima del área de la jugadora.
         const isTeamAvg = side.id == null;
         return {
             label: side.name,
             data: rawValues[i].map((v, ax) => v == null ? 0 : Math.round((v / axisMax[ax]) * 100)),
-            backgroundColor: side.color + '33',
+            backgroundColor: isTeamAvg ? 'transparent' : side.color + '33',
             borderColor: side.color,
-            borderWidth: 2,
+            borderWidth: isTeamAvg ? 2.5 : 2,
             borderDash: isTeamAvg ? [6, 4] : [],
             pointBackgroundColor: side.color,
             pointRadius: 3,
@@ -1525,7 +1526,7 @@ RPETracker.prototype._renderGpsCompareCards = function(sides) {
     return `
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));margin-bottom:16px;">
             <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
-                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsRadarCanvas', 'comparativa-jugadoras-gps')">📥 Descargar radar</button>
+                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._printGpsCompareReport()">🖨️ Imprimir informe</button>
             </div>
             <div style="height:340px;">
                 <canvas id="gpsRadarCanvas"></canvas>
@@ -1536,4 +1537,116 @@ RPETracker.prototype._renderGpsCompareCards = function(sides) {
                 ${cardsHTML}
             </div>
         </div>`;
+};
+
+// Genera un informe imprimible (misma ventana + botón "Imprimir / Guardar
+// PDF" que el resto de informes del proyecto, ver pdf-reports.js) de la
+// comparativa GPS actual — 1 jugadora sola, o 2 (jugadora vs jugadora,
+// o jugadora vs media del equipo). Reutiliza el radar ya dibujado en
+// pantalla (capturado como imagen) y las mismas 24 métricas de las
+// tarjetas, para no tener que redibujar nada dentro del documento nuevo.
+RPETracker.prototype._printGpsCompareReport = function() {
+    // La ventana se abre YA, de forma síncrona dentro del clic del
+    // usuario — en iOS/Safari, abrirla tras cualquier operación async
+    // hace que el navegador la bloquee en silencio (mismo criterio que
+    // el resto de informes de pdf-reports.js).
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        this.showToast('⚠️ El navegador ha bloqueado la ventana del informe. Permite las ventanas emergentes e inténtalo de nuevo.', 'warning');
+        return;
+    }
+
+    const selectedPlayers = this._gpsBarsPlayerIds.map(id => this.players.find(p => p.id === id)).filter(Boolean);
+    const sides = selectedPlayers.map(p => ({ id: p.id, name: p.name, position: p.position || '', color: PlayerTokens.get(p) }));
+    if (this._gpsBarsShowTeamAvg) sides.push({ id: null, name: 'Media del equipo', position: '', color: '#888' });
+
+    if (sides.length === 0) {
+        printWindow.close();
+        this.showToast('⚠️ Elige al menos una jugadora antes de imprimir', 'warning');
+        return;
+    }
+
+    const canvas = document.getElementById('gpsRadarCanvas');
+    let radarImg = '';
+    if (canvas && canvas._ci) {
+        const composed = document.createElement('canvas');
+        composed.width = canvas.width;
+        composed.height = canvas.height;
+        const ctx = composed.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, composed.width, composed.height);
+        ctx.drawImage(canvas, 0, 0);
+        radarImg = composed.toDataURL('image/png');
+    }
+
+    const contextLabel = this._gpsBarsModeCtx === 'session'
+        ? (this._getTeamSessionOptions().find(s => s.id === this._gpsBarsSessionId)?.label || 'Sesión')
+        : ({ '7': 'Últimos 7 días', '30': 'Últimos 30 días', '90': 'Últimos 90 días', 'all': 'Toda la temporada' }[this._gpsBarsRange] || 'Rango de fechas');
+
+    const titleNames = sides.map(s => s.name).join(sides.length === 2 ? ' vs ' : '');
+
+    const rowsHTML = GPS_COMPARE_CARDS.map(cardDef => {
+        const values = sides.map(side => this._getGpsCompareCardValue(cardDef, side.id));
+        const fmt = v => v == null ? '—' : v.toFixed(cardDef.decimals).replace(/\.0+$/, cardDef.decimals > 0 ? '' : '') + (cardDef.unit ? ' ' + cardDef.unit : '');
+        if (sides.length === 1) {
+            return `<tr><td>${esc(cardDef.label)}</td><td style="text-align:right;font-weight:700;">${fmt(values[0])}</td></tr>`;
+        }
+        return `<tr><td>${esc(cardDef.label)}</td><td style="text-align:right;font-weight:700;">${fmt(values[0])}</td><td style="text-align:right;font-weight:700;">${fmt(values[1])}</td></tr>`;
+    }).join('');
+
+    const tableHead = sides.length === 1
+        ? `<tr><th>Dato</th><th style="text-align:right;">${esc(sides[0].name)}</th></tr>`
+        : `<tr><th>Dato</th><th style="text-align:right;color:${sides[0].color};">${esc(sides[0].name)}</th><th style="text-align:right;color:${sides[1].color};">${esc(sides[1].name)}</th></tr>`;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe GPS - ${esc(titleNames)}</title>
+    <style>
+        @media print {
+            @page { margin: 2cm; }
+            .no-print { display: none !important; }
+        }
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .report-toolbar { position: sticky; top: 0; background: #fff; display: flex; gap: 10px; justify-content: center; padding: 12px 0; margin: -20px -20px 20px; border-bottom: 1px solid #eee; z-index: 10; }
+        .print-btn, .close-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .print-btn { background: #ff6600; color: #fff; }
+        .close-btn { background: #eee; color: #333; }
+        .header { text-align: center; border-bottom: 3px solid #ff6600; padding-bottom: 20px; margin-bottom: 30px; }
+        .header h1 { color: #ff6600; margin: 0; font-size: 1.5em; }
+        .header .subtitle { color: #666; font-size: 1.1em; margin-top: 10px; }
+        .header .date-range { color: #999; font-size: 0.9em; margin-top: 5px; }
+        .radar-img { display: block; max-width: 100%; margin: 20px auto; }
+        .compare-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .compare-table th, .compare-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 0.9em; }
+        .compare-table th { background: #f5f5f5; font-weight: bold; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; text-align: center; color: #999; font-size: 0.85em; }
+    </style>
+</head>
+<body>
+    <div class="report-toolbar no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+    </div>
+    <div class="header">
+        <h1>📡 Informe GPS ${esc(sides.length === 1 ? 'individual' : 'comparativo')}</h1>
+        <div class="subtitle">${esc(titleNames)}</div>
+        <div class="date-range">${esc(contextLabel)}</div>
+    </div>
+    ${radarImg ? `<img class="radar-img" src="${radarImg}" alt="Radar GPS">` : ''}
+    <table class="compare-table">
+        <thead>${tableHead}</thead>
+        <tbody>${rowsHTML}</tbody>
+    </table>
+    <div class="footer">Generado el ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })} — Load Ctrl</div>
+</body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    setTimeout(() => printWindow.print(), 500);
 };
