@@ -1367,6 +1367,11 @@ RPETracker.prototype._drawGpsRadarChart = function(sides) {
     if (!canvas || typeof Chart === 'undefined') return;
     if (canvas._ci) { canvas._ci.destroy(); canvas._ci = null; }
 
+    // La "Media del equipo" (si está presente) se dibuja siempre primero
+    // (al fondo), para que el área de la jugadora comparada quede por
+    // encima y no quede tapada por el relleno de la media.
+    sides = [...sides].sort((a, b) => (a.id == null ? -1 : 0) - (b.id == null ? -1 : 0));
+
     const rawValues = sides.map(side => GPS_RADAR_AXES.map(axis => this._getGpsRadarAxisValue(axis.keys, side.id)));
 
     let axisMax;
@@ -1392,17 +1397,18 @@ RPETracker.prototype._drawGpsRadarChart = function(sides) {
     const gridC = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)';
 
     const datasets = sides.map((side, i) => {
-        // "Media del equipo" se dibuja con línea discontinua, más gruesa
-        // y relleno muy tenue, para que nunca tape la línea de la
-        // jugadora con la que se compara (antes, al ser un área sólida,
-        // podía ocultar visualmente los datos del otro lado).
+        // "Media del equipo" se comporta como una jugadora más (mismo
+        // relleno y grosor de línea) — solo se diferencia por el borde
+        // discontinuo. Antes tenía un tratamiento especial (relleno
+        // tenue) que, por el orden de dibujo de Chart.js, seguía
+        // quedando por encima del área de la jugadora y la tapaba.
         const isTeamAvg = side.id == null;
         return {
             label: side.name,
             data: rawValues[i].map((v, ax) => v == null ? 0 : Math.round((v / axisMax[ax]) * 100)),
-            backgroundColor: side.color + (isTeamAvg ? '14' : '33'),
+            backgroundColor: side.color + '33',
             borderColor: side.color,
-            borderWidth: isTeamAvg ? 3 : 2,
+            borderWidth: 2,
             borderDash: isTeamAvg ? [6, 4] : [],
             pointBackgroundColor: side.color,
             pointRadius: 3,
