@@ -1208,16 +1208,16 @@ RPETracker.prototype._renderGpsRadarTab = function(container) {
             </div>
         </div>
 
-        ${sides.length < 2 ? `
+        ${sides.length < 1 ? `
             <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:24px;text-align:center;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
                 <p style="color:var(--text-secondary);font-size:0.9rem;margin:0;">
-                    Elige 2 jugadoras (o una jugadora y la media del equipo) para compararlas.
+                    Elige una jugadora para ver sus datos, o dos (o una y la media del equipo) para compararlas.
                 </p>
             </div>
         ` : this._renderGpsCompareHead(sides) + this._renderGpsCompareCards(sides)}
     `;
 
-    if (sides.length >= 2) requestAnimationFrame(() => this._drawGpsRadarChart(sides));
+    if (sides.length >= 1) requestAnimationFrame(() => this._drawGpsRadarChart(sides));
 };
 
 RPETracker.prototype._gpsBarsSetModeCtx = function(ctx) {
@@ -1328,10 +1328,13 @@ RPETracker.prototype._getGpsBarsValue = function(metricDef, playerId) {
 // Cabecera de la comparativa: nombre + posición de cada lado, con su
 // color propio (PlayerTokens, o gris para "Media del equipo").
 RPETracker.prototype._renderGpsCompareHead = function(sides) {
+    // Con 1 solo lado (vista individual, sin comparar), el nombre se
+    // centra en vez de quedar pegado a la izquierda.
+    const single = sides.length === 1;
     return `
-        <div class="gps-compare-head" style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px;">
+        <div class="gps-compare-head" style="display:flex;justify-content:${single ? 'center' : 'space-between'};align-items:center;gap:16px;margin-bottom:16px;">
             ${sides.map((side, i) => `
-                <div style="flex:1;text-align:${i === 0 ? 'left' : 'right'};min-width:0;">
+                <div style="flex:${single ? '0 1 auto' : '1'};text-align:${single ? 'center' : (i === 0 ? 'left' : 'right')};min-width:0;">
                     <div style="font-weight:700;font-size:1rem;color:${side.color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(side.name)}</div>
                     ${side.position ? `<div style="font-size:0.8rem;color:var(--text-secondary);">${esc(side.position)}</div>` : ''}
                 </div>
@@ -1353,31 +1356,58 @@ RPETracker.prototype._getGpsRadarAxisValue = function(axisKeys, playerId) {
     return any ? total : null;
 };
 
-// Dibuja el radar de 6 ejes fijos, uno por "lado" (máximo 2: jugadora o
-// media del equipo). Cada eje se normaliza 0-100% sobre el mayor de los
-// dos valores comparados, para que el radar siempre se vea proporcionado
-// sea cual sea el par elegido.
+// Dibuja el radar de 6 ejes fijos, con 1 o 2 "lados" (jugadora o media
+// del equipo). Con 2 lados, cada eje se normaliza 0-100% sobre el mayor
+// de los dos valores comparados. Con 1 solo lado (vista individual, sin
+// comparar), cada eje se normaliza sobre el máximo histórico de esa
+// jugadora — mismo criterio que los colores de la tabla de Evolución
+// jugadora — para responder "qué % de su techo habitual hizo aquí".
 RPETracker.prototype._drawGpsRadarChart = function(sides) {
     const canvas = document.getElementById('gpsRadarCanvas');
     if (!canvas || typeof Chart === 'undefined') return;
     if (canvas._ci) { canvas._ci.destroy(); canvas._ci = null; }
 
     const rawValues = sides.map(side => GPS_RADAR_AXES.map(axis => this._getGpsRadarAxisValue(axis.keys, side.id)));
-    const axisMax = GPS_RADAR_AXES.map((axis, i) => Math.max(...rawValues.map(vals => vals[i] || 0), 0.0001));
+
+    let axisMax;
+    if (sides.length === 1) {
+        const side = sides[0];
+        axisMax = GPS_RADAR_AXES.map(axis => {
+            if (side.id == null) {
+                // "Media del equipo" en solitario: no hay un "máximo histórico
+                // de la media" con sentido individual, así que se normaliza
+                // sobre su propio valor actual (siempre se vería al 100%,
+                // pero este caso solo ocurre si se elige únicamente la media).
+                return Math.max(rawValues[0][GPS_RADAR_AXES.indexOf(axis)] || 0, 0.0001);
+            }
+            const maxes = axis.keys.map(key => this._getGpsPlayerMaxEver(side.id, key));
+            return Math.max(maxes.reduce((a, b) => a + b, 0), 0.0001);
+        });
+    } else {
+        axisMax = GPS_RADAR_AXES.map((axis, i) => Math.max(...rawValues.map(vals => vals[i] || 0), 0.0001));
+    }
 
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const textC = isDark ? '#aaa' : '#555';
     const gridC = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)';
 
-    const datasets = sides.map((side, i) => ({
-        label: side.name,
-        data: rawValues[i].map((v, ax) => v == null ? 0 : Math.round((v / axisMax[ax]) * 100)),
-        backgroundColor: side.color + '33',
-        borderColor: side.color,
-        borderWidth: 2,
-        pointBackgroundColor: side.color,
-        pointRadius: 3,
-    }));
+    const datasets = sides.map((side, i) => {
+        // "Media del equipo" se dibuja con línea discontinua, más gruesa
+        // y relleno muy tenue, para que nunca tape la línea de la
+        // jugadora con la que se compara (antes, al ser un área sólida,
+        // podía ocultar visualmente los datos del otro lado).
+        const isTeamAvg = side.id == null;
+        return {
+            label: side.name,
+            data: rawValues[i].map((v, ax) => v == null ? 0 : Math.round((v / axisMax[ax]) * 100)),
+            backgroundColor: side.color + (isTeamAvg ? '14' : '33'),
+            borderColor: side.color,
+            borderWidth: isTeamAvg ? 3 : 2,
+            borderDash: isTeamAvg ? [6, 4] : [],
+            pointBackgroundColor: side.color,
+            pointRadius: 3,
+        };
+    });
 
     canvas._ci = new Chart(canvas.getContext('2d'), {
         type: 'radar',
@@ -1392,7 +1422,8 @@ RPETracker.prototype._drawGpsRadarChart = function(sides) {
                     callbacks: {
                         label: (ctx) => {
                             const raw = rawValues[ctx.datasetIndex][ctx.dataIndex];
-                            return `${ctx.dataset.label}: ${raw != null ? Math.round(raw * 10) / 10 : '—'} (${ctx.parsed.r}% del máx. comparado)`;
+                            const refLabel = sides.length === 1 ? 'de su máx. histórico' : 'del máx. comparado';
+                            return `${ctx.dataset.label}: ${raw != null ? Math.round(raw * 10) / 10 : '—'} (${ctx.parsed.r}% ${refLabel})`;
                         }
                     }
                 }
@@ -1434,10 +1465,27 @@ RPETracker.prototype._getGpsCompareCardValue = function(cardDef, playerId) {
 // selección) en un grid de 2 columnas en escritorio; se colapsa a 1
 // columna en móvil vía CSS (.gps-compare-cards-grid, ver styles.css).
 RPETracker.prototype._renderGpsCompareCards = function(sides) {
+    const single = sides.length === 1;
+
     const cardsHTML = GPS_COMPARE_CARDS.map(cardDef => {
         const values = sides.map(side => this._getGpsCompareCardValue(cardDef, side.id));
-        const [vLeft, vRight] = values;
         const fmt = v => v == null ? '—' : v.toFixed(cardDef.decimals).replace(/\.0+$/, cardDef.decimals > 0 ? '' : '');
+
+        if (single) {
+            const [intOnly, decOnly] = fmt(values[0]).split('.');
+            return `
+                <div class="gps-compare-card-cell" style="background:var(--bg-subtle);border-radius:10px;padding:14px 10px;">
+                    <div style="text-align:center;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-secondary);margin-bottom:0.6rem;">
+                        ${esc(cardDef.label)}
+                    </div>
+                    <div style="text-align:center;font-size:1.4rem;font-weight:800;color:var(--text-primary);">
+                        ${intOnly}${decOnly ? `<span style="font-size:0.85rem;font-weight:600;">.${decOnly}</span>` : ''}
+                        ${cardDef.unit ? `<div style="font-size:0.64rem;font-weight:600;color:var(--text-secondary);">${esc(cardDef.unit)}</div>` : ''}
+                    </div>
+                </div>`;
+        }
+
+        const [vLeft, vRight] = values;
         const [intLeft, decLeft] = fmt(vLeft).split('.');
         const [intRight, decRight] = fmt(vRight).split('.');
 
