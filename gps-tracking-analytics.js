@@ -1104,8 +1104,8 @@ const GPS_BARS_MAX_PLAYERS = 2; // comparativa cara a cara: jugadora o media del
 const GPS_RADAR_AXES = [
     { label: 'Distancia Recorrida',   keys: ['distanceM'] },
     { label: 'Velocidad Máxima',      keys: ['maxSpeedKmh'] },
-    { label: 'Carreras de Alta Intensidad',    keys: ['highIntensityRunsM'] },
-    { label: 'Carreras de Máx. Intensidad',    keys: ['maxIntensityRunsM'] },
+    { label: 'Carreras de Alta y Máx. Intensidad', keys: ['highIntensityRunsM', 'maxIntensityRunsM'] },
+    { label: 'Cambios de Dirección',  keys: ['directionChanges'] },
     { label: 'Acel. de Alta y Máx. Intensidad', keys: ['highAccelerations', 'maxAccelerations'] },
     { label: 'Desac. de Alta y Máx. Intensidad', keys: ['highDecelerations', 'maxDecelerations'] },
 ];
