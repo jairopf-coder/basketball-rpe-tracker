@@ -6139,14 +6139,30 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 
 /* Tabla de detalle GPS: centrado y formato compacto */
+/* Envuelve solo la tabla (no la leyenda de colores que va debajo) con
+   scroll en los dos ejes: horizontal para las ~22 columnas de métricas,
+   vertical con alto fijo para ver ~10 sesiones sin tener que desplazar
+   toda la página — la cabecera queda fija arriba mientras se hace scroll
+   vertical, igual que la primera columna queda fija al hacer scroll
+   horizontal. 330px ≈ cabecera (30px) + 10 filas (30px cada una). */
+.gps-table-scroll-wrap {
+    max-height: 336px;
+    overflow: auto;
+}
+
 .gps-an-table-card table.data-table {
     /* Antes: width:100% (comprimía las columnas para que cupieran todas).
        Ahora la tabla crece a su ancho natural con muchas columnas, y el
        contenedor padre (.gps-an-table-card, overflow-x:auto) añade la
-       barra de desplazamiento horizontal en vez de apretar el contenido. */
+       barra de desplazamiento horizontal en vez de apretar el contenido.
+       border-collapse:separate (en vez de collapse) es necesario para que
+       el fondo sólido de la columna fija (position:sticky) cubra bien su
+       borde derecho — con collapse, esa franja de borde compartido dejaba
+       "asomar" el texto de las columnas que pasan por debajo al desplazar. */
     width: max-content;
     min-width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 .gps-an-table-card table.data-table th,
 .gps-an-table-card table.data-table td {
@@ -6154,15 +6170,28 @@ details[open] .ewma-toggle-hint { display: none; }
     padding: 6px 10px;
     font-size: 0.85rem;
     white-space: nowrap;
-}
-.gps-an-table-card table.data-table thead tr {
+    /* Con border-collapse:separate, cada celda pone su propio borde
+       inferior (antes lo ponía la fila, con collapse fusionaba las
+       líneas de celdas contiguas en una sola). */
     border-bottom: 1px solid var(--border);
 }
-.gps-an-table-card table.data-table tbody tr {
-    border-bottom: 1px solid var(--border);
-}
-.gps-an-table-card table.data-table tbody tr:hover {
+.gps-an-table-card table.data-table tbody tr:hover td {
     background: var(--bg-elevated);
+}
+
+/* Cabecera fijada arriba al hacer scroll vertical dentro de
+   .gps-table-scroll-wrap — mismo motivo que la columna fija: necesita
+   fondo sólido propio para no dejar "asomar" las filas que pasan por
+   debajo. */
+.gps-an-table-card table.data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-surface);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+[data-theme="dark"] .gps-an-table-card table.data-table thead th {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.35);
 }
 
 /* Primera columna (Fecha) fijada al desplazar el resto en horizontal —
@@ -6178,7 +6207,7 @@ details[open] .ewma-toggle-hint { display: none; }
     box-shadow: 2px 0 4px rgba(0,0,0,0.08);
 }
 .gps-an-table-card table.data-table thead th:first-child {
-    z-index: 2; /* por encima de las celdas del cuerpo al hacer scroll vertical si lo hubiera */
+    z-index: 3; /* por encima de la fila de cabecera fija (z-index:2) y de las celdas del cuerpo */
 }
 .gps-an-table-card table.data-table tbody tr:hover td:first-child {
     background: var(--bg-elevated);

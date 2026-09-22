@@ -716,16 +716,18 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
         </div>`;
 
     container.innerHTML = `
-        <div class="gps-an-table-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;overflow-x:auto;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
-            <table class="data-table">
-                <thead>
-                    <tr style="font-size:0.8rem;color:var(--text-secondary);">
-                        <th>Fecha</th><th>Tipo</th><th>RPE app</th><th>IIO</th>
-                        ${columns.map(m => `<th>${esc(m.label)}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
+        <div class="gps-an-table-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
+            <div class="gps-table-scroll-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr style="font-size:0.8rem;color:var(--text-secondary);">
+                            <th>Fecha</th><th>Tipo</th><th>RPE app</th><th>IIO</th>
+                            ${columns.map(m => `<th>${esc(m.label)}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
             ${intensityLegend}
         </div>`;
 };
