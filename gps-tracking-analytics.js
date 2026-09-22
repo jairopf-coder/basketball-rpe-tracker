@@ -549,11 +549,11 @@ RPETracker.prototype._drawGpsComparisonChart = function() {
     });
 };
 
-// Columnas seleccionables de la tabla de evolución: mismas métricas
-// que en "Comparar jugadoras" (sin el IIO, que ya es una columna fija).
+// Columnas de la tabla de evolución: TODAS las métricas disponibles
+// (sin el IIO, que ya es una columna fija propia), siempre visibles —
+// la primera columna (Fecha) queda fijada con CSS y el resto se ve con
+// scroll horizontal (ver .gps-an-table-card en styles.css).
 const GPS_TABLE_SELECTABLE_METRICS = GPS_COMPARISON_METRICS.filter(m => m.key !== 'iio');
-const GPS_TABLE_DEFAULT_COLUMNS = ['distanceM', 'maxSpeedKmh', 'highIntensityRuns'];
-const GPS_TABLE_MAX_COLUMNS = 3;
 
 // T/P/O: Training, Partido (match), Otro (shooting/gym/recovery/etc).
 RPETracker.prototype._gpsSessionTypeLetter = function(type) {
@@ -657,40 +657,14 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
         return;
     }
 
-    if (!this._gpsTableColumns) {
-        const saved = typeof Store !== 'undefined' ? Store.get('gpsTableColumns', null) : null;
-        this._gpsTableColumns = (Array.isArray(saved) && saved.length > 0)
-            ? saved.filter(k => GPS_TABLE_SELECTABLE_METRICS.some(m => m.key === k)).slice(0, GPS_TABLE_MAX_COLUMNS)
-            : [...GPS_TABLE_DEFAULT_COLUMNS];
-        if (this._gpsTableColumns.length === 0) this._gpsTableColumns = [...GPS_TABLE_DEFAULT_COLUMNS];
-    }
-
     const data = this._getGpsAnalyticsData().slice().reverse(); // más reciente primero
-    const columns = this._gpsTableColumns.map(key => GPS_TABLE_SELECTABLE_METRICS.find(m => m.key === key)).filter(Boolean);
-
-    const columnsPicker = `
-        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-            <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._gpsTableToggleColumnsPanel()">
-                ⚙️ Columnas (${columns.length}/${GPS_TABLE_MAX_COLUMNS})
-            </button>
-        </div>
-        <div id="gpsTableColumnsPanel" style="display:none;margin-bottom:12px;padding:12px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border);">
-            <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px;">
-                Elige hasta ${GPS_TABLE_MAX_COLUMNS} columnas para la tabla:
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;">
-                ${GPS_TABLE_SELECTABLE_METRICS.map(m => `
-                    <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;">
-                        <input type="checkbox" value="${m.key}" ${this._gpsTableColumns.includes(m.key) ? 'checked' : ''}
-                            onchange="window.rpeTracker._gpsTableToggleColumn('${m.key}', this.checked)">
-                        ${esc(m.label)}
-                    </label>
-                `).join('')}
-            </div>
-        </div>`;
+    // Todas las métricas disponibles, siempre visibles — la primera
+    // columna (Fecha) queda fija (CSS position:sticky) y el resto se ve
+    // con scroll horizontal, en vez de tener que elegir columnas.
+    const columns = GPS_TABLE_SELECTABLE_METRICS;
 
     if (data.length === 0) {
-        container.innerHTML = columnsPicker + `<div class="an-empty">📭 No hay sesiones en este rango para esta jugadora</div>`;
+        container.innerHTML = `<div class="an-empty">📭 No hay sesiones en este rango para esta jugadora</div>`;
         return;
     }
 
@@ -741,7 +715,7 @@ RPETracker.prototype._renderGpsSessionsTable = function() {
             <span style="color:#c0392b;font-weight:700;">● &gt;100% (nueva mejor marca)</span>
         </div>`;
 
-    container.innerHTML = columnsPicker + `
+    container.innerHTML = `
         <div class="gps-an-table-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;overflow-x:auto;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
             <table class="data-table">
                 <thead>
@@ -764,33 +738,6 @@ RPETracker.prototype._gpsToggleCellDisplay = function(cellId) {
     const showingPct = el.dataset.showing === 'pct';
     el.textContent = showingPct ? el.dataset.raw : el.dataset.pct;
     el.dataset.showing = showingPct ? 'raw' : 'pct';
-};
-
-RPETracker.prototype._gpsTableToggleColumnsPanel = function() {
-    const panel = document.getElementById('gpsTableColumnsPanel');
-    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-};
-
-RPETracker.prototype._gpsTableToggleColumn = function(key, checked) {
-    if (checked) {
-        if (this._gpsTableColumns.length >= GPS_TABLE_MAX_COLUMNS) {
-            this.showToast(`⚠️ Máximo ${GPS_TABLE_MAX_COLUMNS} columnas en la tabla`, 'warning');
-            const cb = document.querySelector(`#gpsTableColumnsPanel input[value="${key}"]`);
-            if (cb) cb.checked = false;
-            return;
-        }
-        this._gpsTableColumns.push(key);
-    } else {
-        if (this._gpsTableColumns.length <= 1) {
-            this.showToast('⚠️ Debe quedar al menos 1 columna seleccionada', 'warning');
-            const cb = document.querySelector(`#gpsTableColumnsPanel input[value="${key}"]`);
-            if (cb) cb.checked = true;
-            return;
-        }
-        this._gpsTableColumns = this._gpsTableColumns.filter(k => k !== key);
-    }
-    if (typeof Store !== 'undefined') Store.set('gpsTableColumns', this._gpsTableColumns);
-    this._renderGpsSessionsTable();
 };
 
 // ========== PESTAÑA 2: Comparativa de equipo (ranking por métrica) ==========
