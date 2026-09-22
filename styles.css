@@ -9260,15 +9260,29 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 .pvr-table-wrap {
     overflow-x: auto;
+    overflow-y: auto;
+    /* ~20-22 filas visibles (últimos 2 entrenos aprox., según jugadoras
+       por sesión) antes de necesitar scroll vertical — evita cargar la
+       tabla completa desde el primer día. Con menos filas que quepan de
+       sobra, no aparece scroll y se ve igual que antes. */
+    max-height: 660px;
     border-radius: 10px;
     border: 1px solid var(--border-color);
 }
 .pvr-table {
     width: 100%;
-    border-collapse: collapse;
+    /* separate (no collapse): con la cabecera fijada (position:sticky)
+       al hacer scroll vertical, collapse deja una fina franja del borde
+       compartido por donde se "asoma" el contenido de las filas que
+       pasan por debajo — mismo ajuste ya aplicado en la tabla de GPS. */
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.8rem;
 }
 .pvr-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     padding: 0.55rem 0.75rem;
     text-align: left;
     font-size: 0.72rem;
@@ -9276,7 +9290,11 @@ details[open] .ewma-toggle-hint { display: none; }
     color: var(--text-secondary);
     background: var(--bg-card, var(--bg-surface));
     border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
     white-space: nowrap;
+}
+[data-theme="dark"] .pvr-table thead th {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.35);
 }
 /* Columnas numéricas (RPE Plan, RPE Real, Δ): cabecera y datos centrados */
 .pvr-table thead th:nth-child(4),
