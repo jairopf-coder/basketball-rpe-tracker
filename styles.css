@@ -6140,7 +6140,12 @@ details[open] .ewma-toggle-hint { display: none; }
 
 /* Tabla de detalle GPS: centrado y formato compacto */
 .gps-an-table-card table.data-table {
-    width: 100%;
+    /* Antes: width:100% (comprimía las columnas para que cupieran todas).
+       Ahora la tabla crece a su ancho natural con muchas columnas, y el
+       contenedor padre (.gps-an-table-card, overflow-x:auto) añade la
+       barra de desplazamiento horizontal en vez de apretar el contenido. */
+    width: max-content;
+    min-width: 100%;
     border-collapse: collapse;
 }
 .gps-an-table-card table.data-table th,
@@ -6158,6 +6163,29 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 .gps-an-table-card table.data-table tbody tr:hover {
     background: var(--bg-elevated);
+}
+
+/* Primera columna (Fecha) fijada al desplazar el resto en horizontal —
+   necesita fondo sólido propio (si no, se ve "a través" de ella al
+   desplazar) y sombra sutil para marcar dónde empieza el contenido
+   desplazable. */
+.gps-an-table-card table.data-table th:first-child,
+.gps-an-table-card table.data-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--bg-surface);
+    box-shadow: 2px 0 4px rgba(0,0,0,0.08);
+}
+.gps-an-table-card table.data-table thead th:first-child {
+    z-index: 2; /* por encima de las celdas del cuerpo al hacer scroll vertical si lo hubiera */
+}
+.gps-an-table-card table.data-table tbody tr:hover td:first-child {
+    background: var(--bg-elevated);
+}
+[data-theme="dark"] .gps-an-table-card table.data-table th:first-child,
+[data-theme="dark"] .gps-an-table-card table.data-table td:first-child {
+    box-shadow: 2px 0 4px rgba(0,0,0,0.35);
 }
 
 /* Botones de acción junto a los chips de jugadora (selección
