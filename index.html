@@ -213,17 +213,17 @@
             <div class="analytics-container">
                 <div class="analytics-header-row">
                     <h2 class="view-title">📈 Análisis Agudo:Crónico</h2>
-                    <button onclick="window.rpeTracker?.exportAllCharts()" class="btn-secondary">📸 Exportar Todos los Gráficos</button>
                 </div>
                 
-                <!-- 1. Comparativa de jugadoras + caja EWMA -->
+                <!-- Contenido con subpestañas (Ratio A:C / RPE Plan vs Real /
+                     Comparativa / Evolución y Temporada). Los antiguos
+                     #evolutionCharts y #comparisonModule fijos aquí se
+                     quitaron: ahora solo existen dentro de la subpestaña
+                     correspondiente, creados por
+                     RPETracker.prototype._renderAnalyticsTabContent en
+                     app-analytics.js — tenerlos aquí también habría
+                     duplicado esos IDs en el DOM. -->
                 <div id="analyticsContent"></div>
-
-                <!-- 2. Gráficos de evolución -->
-                <div id="evolutionCharts"></div>
-
-                <!-- 3. Comparador -->
-                <div id="comparisonModule"></div>
 
                 <!-- Alertas ocultas: info ya cubierta por comparativa y semáforo -->
                 <div id="alertsContainer" style="display:none;"></div>

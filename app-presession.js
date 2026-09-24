@@ -251,9 +251,12 @@ RPETracker.prototype._renderSemaphoreBar = function() {
         bar = document.createElement('div');
         bar.id = 'semaphoreBar';
         bar.className = 'semaphore-bar';
-        // Insert inside analytics-container, before comparisonModule
-        const anchor = document.getElementById('comparisonModule');
-        if (anchor) anchor.parentNode.insertBefore(bar, anchor);
+        // Se añade al final de la subpestaña "Ratio A:C" (antes se
+        // insertaba antes de #comparisonModule, pero ese contenedor solo
+        // existe ahora en la subpestaña "Comparativa" — ver renderAnalytics
+        // en app-analytics.js).
+        const anchor = document.getElementById('analyticsTabContent');
+        if (anchor) anchor.appendChild(bar);
         else return;
     }
 
@@ -291,6 +294,18 @@ RPETracker.prototype.scrollToPlayerChart = function(playerId) {
     const canvas = document.getElementById(`chart-${playerId}`);
     if (canvas) {
         canvas.closest('.chart-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+    // El gráfico vive en la subpestaña "Evolución y Temporada" de Análisis
+    // A:C (ver app-analytics.js); si se pulsa la pill del semáforo desde
+    // otra subpestaña, cambiamos primero a esa y luego hacemos scroll una
+    // vez esté pintada.
+    if (typeof this._setAnalyticsTab === 'function' && this._analyticsTab !== 'evolution') {
+        this._setAnalyticsTab('evolution');
+        setTimeout(() => {
+            const c = document.getElementById(`chart-${playerId}`);
+            c?.closest('.chart-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
     }
 };
 
