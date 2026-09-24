@@ -1,6 +1,12 @@
 // app-analytics.js — Módulo de analíticas: evolución, A:C, Foster, RPE plan vs real (extraído de app.js V24)
+//
+// Subpestañas (mismo patrón que gps-tracking-analytics.js / _gpsAnSwitchTab):
+// 'ratio'      -> Análisis Agudo:Crónico + Estado equipo (franja resumen)
+// 'planreal'   -> RPE Planificado vs. Percibido
+// 'comparison' -> Comparativa de Jugadoras + Comparador
+// 'evolution'  -> Evolución del Ratio A:C (+ Foster) + Temporada — UA Semanal Acumulada
 RPETracker.prototype._setAnalyticsTab = function(tab) {
-    // Legacy: tab switching removed, single scrollable view
+    this._analyticsTab = tab;
     this.renderAnalytics();
 };
 
@@ -304,52 +310,71 @@ RPETracker.prototype.renderAnalytics = function() {
         return;
     }
 
-    this._renderSemaphoreBar();
-    const ewmaOpen = Store.getString('ewmaOpen') === 'true';
+    if (!this._analyticsTab) this._analyticsTab = 'ratio';
+    const tab = this._analyticsTab;
 
     container.innerHTML = `
-        <!-- 1. Curvas A:C — protagonista -->
-        <div class="an-section-block">
-            ${this._renderACCurveTab()}
-            <details class="ewma-info-box" id="ewmaDetails" ${ewmaOpen?'open':''}>
-                <summary class="ewma-summary">
-                    <span>ℹ️ Método EWMA — ¿Cómo se calcula el ratio A:C?</span>
-                    <span class="ewma-toggle-hint">ver más</span>
-                </summary>
-                <div class="ewma-body">
-                    <p style="margin-bottom:0.5rem"><strong>Carga = RPE × Duración</strong> (método sRPE)</p>
-                    <p style="margin-bottom:0.5rem">Esta app usa el <strong>método EWMA</strong>, el estándar científico usado por equipos profesionales para calcular el ratio Agudo:Crónico.</p>
-                    <p style="margin-bottom:0.5rem"><strong>Interpretación del Ratio:</strong></p>
-                    <ul style="margin-left:1.5rem;color:var(--gray)">
-                        <li><strong style="color:#2e7d32">0.8–1.3 (Verde):</strong> 🟢 Zona óptima</li>
-                        <li><strong style="color:#ef6c00">1.3–1.5 (Naranja):</strong> 🟠 Precaución</li>
-                        <li><strong style="color:#c62828">&gt;1.5 (Rojo):</strong> 🔴 Peligro</li>
-                        <li><strong style="color:#1565c0">&lt;0.8 (Azul):</strong> 🔵 Descarga</li>
-                    </ul>
-                </div>
-            </details>
+        <div class="an-tabs">
+            <button class="an-tab ${tab === 'ratio' ? 'active' : ''}" onclick="window.rpeTracker._setAnalyticsTab('ratio')">📈 Ratio A:C</button>
+            <button class="an-tab ${tab === 'planreal' ? 'active' : ''}" onclick="window.rpeTracker._setAnalyticsTab('planreal')">📋 RPE Plan vs Real</button>
+            <button class="an-tab ${tab === 'comparison' ? 'active' : ''}" onclick="window.rpeTracker._setAnalyticsTab('comparison')">📊 Comparativa</button>
+            <button class="an-tab ${tab === 'evolution' ? 'active' : ''}" onclick="window.rpeTracker._setAnalyticsTab('evolution')">📅 Evolución y Temporada</button>
         </div>
-
-        <!-- 2. Tabla comparativa -->
-        <div class="an-section-block">
-            ${this.renderPlayerComparison()}
-        </div>
-
-        <!-- 3. RPE Plan vs Real -->
-        <div class="an-section-block" id="rpePlanVsRealBlock">
-            ${this._renderRpePlanVsReal()}
-        </div>
-
-        <!-- 4. Evolución individual -->
-        <div id="evolutionCharts"></div>
-
-        <!-- 5. Comparador -->
-        <div id="comparisonModule"></div>
+        <div id="analyticsTabContent" style="padding-top:10px;"></div>
     `;
 
-    requestAnimationFrame(() => this._drawACCurveChart());
-    this.renderEvolutionCharts();
-    setTimeout(() => this.renderComparisonModule(), 50);
+    this._renderAnalyticsTabContent();
+};
+
+RPETracker.prototype._renderAnalyticsTabContent = function() {
+    const el = document.getElementById('analyticsTabContent');
+    if (!el) return;
+    const tab = this._analyticsTab || 'ratio';
+
+    if (tab === 'planreal') {
+        el.innerHTML = `<div class="an-section-block" id="rpePlanVsRealBlock">${this._renderRpePlanVsReal()}</div>`;
+
+    } else if (tab === 'comparison') {
+        el.innerHTML = `
+            <div class="an-section-block">${this.renderPlayerComparison()}</div>
+            <div id="comparisonModule"></div>`;
+        setTimeout(() => this.renderComparisonModule(), 50);
+
+    } else if (tab === 'evolution') {
+        el.innerHTML = `
+            <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                <button onclick="window.rpeTracker?.exportAllCharts()" class="btn-secondary">📸 Exportar Todos los Gráficos</button>
+            </div>
+            <div id="evolutionCharts"></div>`;
+        this.renderEvolutionCharts();
+
+    } else {
+        // 'ratio' (por defecto): Análisis A:C + Estado equipo
+        const ewmaOpen = Store.getString('ewmaOpen') === 'true';
+        el.innerHTML = `
+            <div class="an-section-block">
+                ${this._renderACCurveTab()}
+                <details class="ewma-info-box" id="ewmaDetails" ${ewmaOpen?'open':''}>
+                    <summary class="ewma-summary">
+                        <span>ℹ️ Método EWMA — ¿Cómo se calcula el ratio A:C?</span>
+                        <span class="ewma-toggle-hint">ver más</span>
+                    </summary>
+                    <div class="ewma-body">
+                        <p style="margin-bottom:0.5rem"><strong>Carga = RPE × Duración</strong> (método sRPE)</p>
+                        <p style="margin-bottom:0.5rem">Esta app usa el <strong>método EWMA</strong>, el estándar científico usado por equipos profesionales para calcular el ratio Agudo:Crónico.</p>
+                        <p style="margin-bottom:0.5rem"><strong>Interpretación del Ratio:</strong></p>
+                        <ul style="margin-left:1.5rem;color:var(--gray)">
+                            <li><strong style="color:#2e7d32">0.8–1.3 (Verde):</strong> 🟢 Zona óptima</li>
+                            <li><strong style="color:#ef6c00">1.3–1.5 (Naranja):</strong> 🟠 Precaución</li>
+                            <li><strong style="color:#c62828">&gt;1.5 (Rojo):</strong> 🔴 Peligro</li>
+                            <li><strong style="color:#1565c0">&lt;0.8 (Azul):</strong> 🔵 Descarga</li>
+                        </ul>
+                    </div>
+                </details>
+            </div>`;
+        requestAnimationFrame(() => this._drawACCurveChart());
+        this._renderSemaphoreBar();
+    }
 };
 
 RPETracker.prototype._renderRpePlanVsReal = function() {
