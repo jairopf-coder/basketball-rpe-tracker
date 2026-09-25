@@ -723,11 +723,13 @@ RPETracker.prototype.showSessionDetail = function(id) {
             navEl.innerHTML = `
                 <button type="button" class="btn-secondary sd-nav-btn" id="detailPrevBtn"
                     ${groupIdx <= 0 ? 'disabled' : ''}
-                    onclick="window.rpeTracker?._gotoDetailSibling(-1)">◀ Anterior</button>
+                    title="Jugadora anterior" aria-label="Jugadora anterior"
+                    onclick="window.rpeTracker?._gotoDetailSibling(-1)">◀</button>
                 <span class="sd-nav-count">${groupIdx + 1} de ${siblingSessions.length}</span>
                 <button type="button" class="btn-secondary sd-nav-btn" id="detailNextBtn"
                     ${groupIdx >= siblingSessions.length - 1 ? 'disabled' : ''}
-                    onclick="window.rpeTracker?._gotoDetailSibling(1)">Siguiente ▶</button>
+                    title="Jugadora siguiente" aria-label="Jugadora siguiente"
+                    onclick="window.rpeTracker?._gotoDetailSibling(1)">▶</button>
             `;
         } else {
             navEl.style.display = 'none';

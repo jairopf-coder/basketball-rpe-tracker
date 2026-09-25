@@ -355,9 +355,9 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     </p>
                 </div>
                 <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-                    <button class="btn-secondary btn-sm" id="wpPrev">← Anterior</button>
+                    <button class="btn-secondary btn-sm" id="wpPrev" title="Semana anterior" aria-label="Semana anterior">←</button>
                     <button class="btn-secondary btn-sm" id="wpToday">Hoy</button>
-                    <button class="btn-secondary btn-sm" id="wpNext">Siguiente →</button>
+                    <button class="btn-secondary btn-sm" id="wpNext" title="Semana siguiente" aria-label="Semana siguiente">→</button>
                     <button class="btn-primary btn-sm" id="wpSave">💾 Guardar</button>
                     <span id="wpSaveIndicator" class="wp-save-badge ${isSaved ? 'wp-save-badge--ok' : 'wp-save-badge--pending'}" title="${isSaved ? 'Semana guardada el ' + new Date(weekEntry.savedAt).toLocaleString('es-ES') : 'Esta semana todavía no se ha guardado'}">
                         ${isSaved ? '✅ Guardada' : '❌ Sin guardar'}
@@ -885,7 +885,7 @@ RPETracker.prototype._renderMedCard = function(inj) {
             <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.updateRTPPhase('${inj.id}')">🔄 Actualizar RTP</button>
             <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.markAsRecovered('${inj.id}')">✅ Dar de alta</button>` : ''}
             <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.openClinicalNotesPanel('${inj.playerId}')">📓 Notas clínicas</button>
-            <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.editInjuryModal('${inj.id}')">✏️ Editar</button>
+            <button class="btn-secondary btn-sm" onclick="window.rpeTracker?.editInjuryModal('${inj.id}')" title="Editar" aria-label="Editar">✏️</button>
         </div>
     </div>`;
 };
@@ -2050,7 +2050,7 @@ RPETracker.prototype.renderMicrociclo = function() {
             <h2 class="view-title" style="margin:0">📆 Dashboard Microciclo</h2>
             <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
                 <span style="font-size:.78rem;color:var(--text-secondary)">${weekLabel}</span>
-                <button class="btn-secondary" style="font-size:.8rem;padding:.4rem .85rem" onclick="window.rpeTracker?.generateTeamWeeklyReport()">📊 Informe de equipo</button>
+                <button class="btn-secondary" style="font-size:.8rem;padding:.4rem .85rem" onclick="window.rpeTracker?.generateTeamWeeklyReport()" title="Informe de equipo" aria-label="Informe de equipo">📊</button>
             </div>
         </div>
         ${kpiCards}

@@ -168,8 +168,8 @@ RPETracker.prototype.renderGpsAnalyticsView = function() {
                     Compara la carga interna (RPE × duración) con la carga externa objetiva del GPS.
                 </p>
             </div>
-            <button class="btn-primary" style="font-size:0.85rem;white-space:nowrap;" onclick="window.rpeTracker.openGpsImportFromTab()">
-                📤 Importar CSV
+            <button class="btn-primary" style="font-size:0.85rem;white-space:nowrap;" onclick="window.rpeTracker.openGpsImportFromTab()" title="Importar CSV" aria-label="Importar CSV">
+                📤
             </button>
         </div>
         ${this._renderGpsAlertBanner()}
@@ -260,7 +260,7 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
 
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));">
             <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
-                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsAnComparisonCanvas', 'evolucion-gps')">📥 Descargar</button>
+                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsAnComparisonCanvas', 'evolucion-gps')" title="Descargar gráfico" aria-label="Descargar gráfico">📥</button>
             </div>
             <div style="height:320px;">
                 <canvas id="gpsAnComparisonCanvas"></canvas>
@@ -784,7 +784,7 @@ RPETracker.prototype._renderGpsTeamComparisonTab = function(container) {
                 ${this._gpsTeamSortDesc ? '⬇️ Mayor a menor' : '⬆️ Menor a mayor'}
             </button>
 
-            <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsTeamComparisonCanvas', 'comparativa-equipo-gps')">📥 Descargar</button>
+            <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsTeamComparisonCanvas', 'comparativa-equipo-gps')" title="Descargar gráfico" aria-label="Descargar gráfico">📥</button>
 
             <div style="margin-left:auto;">${this._renderGpsTypeFilterSelect()}</div>
         </div>

@@ -1,6 +1,6 @@
 // Service Worker — BasketballRPE-Web
 // Bump CACHE_VERSION whenever you deploy new code to invalidate stale caches.
-const CACHE_VERSION = 'v101';
+const CACHE_VERSION = 'v102';
 const CACHE_NAME = `rpe-basketball-${CACHE_VERSION}`;
 
 const urlsToCache = [

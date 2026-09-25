@@ -925,7 +925,7 @@ RPETracker.prototype._renderBulkStep = function() {
                 </div>
             </div>
             <div class="wb-footer">
-                ${idx > 0 ? `<button class="btn-secondary wb-btn-back" onclick="window.rpeTracker?._wbNav(-1)">← Anterior</button>` : '<div></div>'}
+                ${idx > 0 ? `<button class="btn-secondary wb-btn-back" onclick="window.rpeTracker?._wbNav(-1)" title="Anterior" aria-label="Anterior">←</button>` : '<div></div>'}
                 <button class="btn-primary wb-btn-next" onclick="window.rpeTracker?._wbSaveAndNav(1)">
                     ${idx < total - 1 ? 'Guardar y siguiente →' : '✅ Finalizar'}
                 </button>

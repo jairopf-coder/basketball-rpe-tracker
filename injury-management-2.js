@@ -589,7 +589,7 @@ RPETracker.prototype._renderClinicalNotesPanel = function(container, filterPlaye
                     <button class="cn-note-del" onclick="window.rpeTracker?._deleteClinicalNote('${n.id}')" title="Eliminar">🗑</button>
                 </div>
                 <div class="cn-note-text" id="cn-text-${n.id}">${n.text.replace(/\n/g,'<br>')}</div>
-                <button class="cn-note-edit-btn" onclick="window.rpeTracker?._editClinicalNoteInline('${n.id}')">✏️ Editar</button>
+                <button class="cn-note-edit-btn" onclick="window.rpeTracker?._editClinicalNoteInline('${n.id}')" title="Editar" aria-label="Editar">✏️</button>
             </div>`;
         }).join('');
 
