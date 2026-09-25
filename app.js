@@ -175,11 +175,10 @@ const PlayerTokens = {
         return player.color;
     },
 
-    /** Render an avatar div with the correct token color inline style */
+    /** Render a small color-dot for the player (replaces the old initials-circle avatar) */
     avatar(player, sizePx = 40, fontSize = '1rem', extraClass = '') {
         const color = this.get(player);
-        const initials = this._initials(player.name);
-        return `<div class="player-token-avatar ${extraClass}" style="width:${sizePx}px;height:${sizePx}px;font-size:${fontSize};background:${color}" title="${esc(player.name)}">${esc(initials)}</div>`;
+        return `<span class="player-token-dot ${extraClass}" style="background:${color}" title="${esc(player.name)}"></span>`;
     },
 
     /** CSS inline style string to set --player-token on a parent element */

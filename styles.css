@@ -806,7 +806,6 @@ header h1 {
 }
 
 .player-btn.selected .player-btn-avatar {
-    background: var(--bg-surface);
     color: var(--primary);
 }
 
@@ -2968,7 +2967,6 @@ header h1 {
 }
 
 .player-btn.multi-selected .player-btn-avatar {
-    background: var(--bg-surface);
     color: var(--primary);
 }
 
@@ -4318,17 +4316,27 @@ header h1 {
 .wl-player-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--player-token, var(--primary)); color: white; font-weight: 700; font-size: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.20); }
 
 /* ===== SHARED PLAYER TOKEN AVATAR ===== */
-.player-token-avatar {
+/* Small color-dot identifying a player (replaces the old initials-circle avatar) */
+.player-token-avatar,
+.player-token-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    min-width: 10px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: 700;
     flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.20);
-    letter-spacing: 0.02em;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25);
     user-select: none;
+}
+/* These three variants used to render a large circle with initials.
+   Kept at dot-size for now; see the on-screen candidates list to decide
+   if any of them should get their large avatar back. */
+.player-btn-avatar,
+.player-rpe-avatar,
+.session-player-token {
+    width: 10px !important;
+    height: 10px !important;
+    min-width: 10px;
 }
 .wl-player-name { font-weight: 500; font-size: 0.95rem; color: var(--text-primary); }
 .wl-loading { color: var(--text-faint); text-align: center; padding: 1rem; font-size: 0.9rem; }
