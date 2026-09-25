@@ -6241,7 +6241,9 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 .gps-player-select-actions .gps-metric-chip:hover { background: var(--bg-elevated); }
 
-/* Charts grid 2-column */
+/* Charts grid 2-column (histórico; ya no se usa desde que Evolución +
+   Temporada se unificaron en .evolution-rows, se deja por si algo lo
+   reutiliza en el futuro) */
 .charts-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -6249,6 +6251,27 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 @media (max-width: 780px) {
     .charts-grid { grid-template-columns: 1fr; }
+}
+
+/* Evolución y Temporada unificadas: una fila completa por jugadora, con
+   su gráfico de Ratio A:C a la izquierda y el de Temporada a la derecha
+   — para ver el resumen de cada jugadora sin tener que bajar a buscar
+   su segundo gráfico más abajo en la página. Varias filas (una por
+   jugadora seleccionada) se apilan verticalmente. En móvil (mismo corte
+   que .charts-grid) cada fila colapsa a 1 columna: Ratio arriba,
+   Temporada debajo, antes de pasar a la fila de la siguiente jugadora. */
+.evolution-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+.evolution-player-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+@media (max-width: 780px) {
+    .evolution-player-row { grid-template-columns: 1fr; }
 }
 
 /* Chart container header with period buttons */

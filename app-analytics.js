@@ -341,11 +341,7 @@ RPETracker.prototype._renderAnalyticsTabContent = function() {
         setTimeout(() => this.renderComparisonModule(), 50);
 
     } else if (tab === 'evolution') {
-        el.innerHTML = `
-            <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-                <button onclick="window.rpeTracker?.exportAllCharts()" class="btn-secondary">📸 Exportar Todos los Gráficos</button>
-            </div>
-            <div id="evolutionCharts"></div>`;
+        el.innerHTML = `<div id="evolutionCharts"></div>`;
         this.renderEvolutionCharts();
 
     } else {
@@ -657,47 +653,44 @@ RPETracker.prototype.renderEvolutionCharts = function() {
         </button>`;
     }).join('');
 
-    const chartsHTML = this.players
+    // Una fila por jugadora seleccionada: Ratio A:C a la izquierda,
+    // Temporada — UA Semanal a la derecha (mismo par de gráficos que
+    // antes, ahora agrupados por jugadora en vez de en dos bloques
+    // separados) — así se ve el resumen completo de cada jugadora sin
+    // tener que buscar su segundo gráfico más abajo en la página.
+    const rowsHTML = this.players
         .filter(p => selected.includes(p.id))
         .map(p => `
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h4>${p.name}${p.number ? ` #${p.number}` : ''}</h4>
-                    <div class="chart-period-btns">
-                        ${[7,14,30,90].map(d => `<button class="chart-period-btn${(this._chartPeriods?.[p.id]||30)===d?' active':''}" onclick="window.rpeTracker?.setChartPeriod('${p.id}',${d})">${d}d</button>`).join('')}
+            <div class="evolution-player-row">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4>${p.name}${p.number ? ` #${p.number}` : ''}</h4>
+                        <div class="chart-period-btns">
+                            ${[7,14,30,90].map(d => `<button class="chart-period-btn${(this._chartPeriods?.[p.id]||30)===d?' active':''}" onclick="window.rpeTracker?.setChartPeriod('${p.id}',${d})">${d}d</button>`).join('')}
+                        </div>
                     </div>
+                    <canvas id="chart-${p.id}" class="chart-canvas"></canvas>
+                    ${this._renderFosterBlock(p)}
                 </div>
-                <canvas id="chart-${p.id}" class="chart-canvas"></canvas>
-                ${this._renderFosterBlock(p)}
-            </div>
-        `).join('');
-
-    // Build season chart section for each selected player
-    const seasonChartsHTML = this.players
-        .filter(p => selected.includes(p.id))
-        .map(p => `
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h4>${p.name}${p.number ? ` #${p.number}` : ''} — Temporada</h4>
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4>${p.name}${p.number ? ` #${p.number}` : ''} — Temporada</h4>
+                    </div>
+                    <canvas id="season-chart-${p.id}" class="chart-canvas"></canvas>
                 </div>
-                <canvas id="season-chart-${p.id}" class="chart-canvas"></canvas>
             </div>
         `).join('');
 
     container.innerHTML = `
         <div class="evolution-section-header">
-            <h3>📈 Evolución del Ratio A:C</h3>
+            <h3>📈 Evolución del Ratio A:C &nbsp;·&nbsp; 📅 Temporada — UA Semanal Acumulada</h3>
             <div class="chart-chips-wrap">${chipsHTML}</div>
-        </div>
-        <div class="charts-grid">${chartsHTML}</div>
-        <div class="evolution-section-header" style="margin-top:1.5rem">
-            <h3>📅 Temporada — UA Semanal Acumulada</h3>
-            <p style="margin:0;font-size:.8rem;color:var(--text-secondary)">
+            <p style="margin:0.35rem 0 0;font-size:.8rem;color:var(--text-secondary)">
                 <span style="color:#e53935">●</span> Lesión &nbsp;
                 <span style="color:#fb8c00">●</span> Partido
             </p>
         </div>
-        <div class="charts-grid" id="seasonChartsGrid">${seasonChartsHTML}</div>
+        <div class="evolution-rows">${rowsHTML}</div>
     `;
 
     setTimeout(() => {
