@@ -1577,7 +1577,7 @@ RPETracker.prototype._printGpsCompareReport = function() {
 <body>
     <div class="report-toolbar no-print">
         <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+        <button class="close-btn" onclick="window.close()" title="Cerrar informe" aria-label="Cerrar informe">✕</button>
     </div>
     <div class="header">
         <h1>📡 Informe GPS ${esc(sides.length === 1 ? 'individual' : 'comparativo')}</h1>

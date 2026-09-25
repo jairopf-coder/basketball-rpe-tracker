@@ -293,7 +293,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
 
     <div class="print-bar no-print">
         <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+        <button class="close-btn" onclick="window.close()" title="Cerrar informe" aria-label="Cerrar informe">✕</button>
     </div>
 
     <div class="header">
