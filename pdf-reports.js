@@ -295,7 +295,7 @@ RPETracker.prototype.buildReportHTML = function(player, report, reportType) {
 <body>
     <div class="report-toolbar no-print">
         <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+        <button class="close-btn" onclick="window.close()" title="Cerrar informe" aria-label="Cerrar informe">✕</button>
     </div>
     <div class="header">
         <h1>🏀 Informe ${reportTitle}</h1>
@@ -532,7 +532,7 @@ RPETracker.prototype.buildTeamReportHTML = function(summary, reportType) {
 <body>
     <div class="report-toolbar no-print">
         <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+        <button class="close-btn" onclick="window.close()" title="Cerrar informe" aria-label="Cerrar informe">✕</button>
     </div>
     <h1>Informe del Equipo - Basketball RPE Tracker</h1>
     <p>Total sesiones: ${summary.sessions || 0}</p>
@@ -619,7 +619,7 @@ RPETracker.prototype.exportSessionsHistoryPDF = function() {
 <body>
   <div class="report-toolbar no-print">
     <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-    <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+    <button class="close-btn" onclick="window.close()" title="Cerrar informe" aria-label="Cerrar informe">✕</button>
   </div>
   <h1>🏀 Historial de Sesiones</h1>
   <div class="subtitle">Exportado el ${now.toLocaleString('es-ES')} · ${sorted.length} sesiones · ${this.players.length} jugadoras</div>
@@ -888,7 +888,7 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
 
 <div class="print-bar no-print">
 <button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-<button class="close-btn no-print" onclick="window.close()">✕ Cerrar informe</button>
+<button class="close-btn no-print" onclick="window.close()" title="Cerrar informe" aria-label="Cerrar informe">✕</button>
 </div>
 
 <div class="rpt-header">
@@ -1151,7 +1151,7 @@ RPETracker.prototype.generatePlayerReport = function(playerId) {
 
 <div class="print-bar no-print">
 <button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-<button class="close-btn no-print" onclick="window.close()">✕ Cerrar informe</button>
+<button class="close-btn no-print" onclick="window.close()" title="Cerrar informe" aria-label="Cerrar informe">✕</button>
 </div>
 
 <div class="rpt-header">
@@ -1508,7 +1508,7 @@ RPETracker.prototype.buildTestsReportHTML = function(data) {
 <body>
     <div class="report-toolbar no-print">
         <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-        <button class="close-btn" onclick="window.close()">✕ Cerrar informe</button>
+        <button class="close-btn" onclick="window.close()" title="Cerrar informe" aria-label="Cerrar informe">✕</button>
     </div>
     <div class="header">
         <h1>🏋️ Informe de Tests Físicos</h1>

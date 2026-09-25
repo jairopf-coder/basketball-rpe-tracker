@@ -360,7 +360,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     <button class="btn-secondary btn-sm" id="wpNext" title="Semana siguiente" aria-label="Semana siguiente">→</button>
                     <button class="btn-primary btn-sm" id="wpSave">💾 Guardar</button>
                     <span id="wpSaveIndicator" class="wp-save-badge ${isSaved ? 'wp-save-badge--ok' : 'wp-save-badge--pending'}" title="${isSaved ? 'Semana guardada el ' + new Date(weekEntry.savedAt).toLocaleString('es-ES') : 'Esta semana todavía no se ha guardado'}">
-                        ${isSaved ? '✅ Guardada' : '❌ Sin guardar'}
+                        ${isSaved ? '✅' : '❌'}
                     </span>
                 </div>
             </div>
@@ -658,7 +658,7 @@ RPETracker.prototype._wpRefreshSaveBadge = function(isSaved, savedAt) {
     const badge = document.getElementById('wpSaveIndicator');
     if (!badge) return;
     badge.className = 'wp-save-badge ' + (isSaved ? 'wp-save-badge--ok' : 'wp-save-badge--pending');
-    badge.textContent = isSaved ? '✅ Guardada' : '❌ Sin guardar';
+    badge.textContent = isSaved ? '✅' : '❌';
     badge.title = isSaved
         ? ('Semana guardada el ' + new Date(savedAt).toLocaleString('es-ES'))
         : 'Esta semana todavía no se ha guardado';
