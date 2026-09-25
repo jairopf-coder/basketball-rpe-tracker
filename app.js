@@ -1056,7 +1056,7 @@ class RPETracker {
                 </div>
                 <div class="modal-footer">
                     <button class="btn-secondary" onclick="document.getElementById('csvExportModal').remove()">Cancelar</button>
-                    <button class="btn-primary" onclick="window.rpeTracker?._doExportCSV()">📥 Descargar CSV</button>
+                    <button class="btn-primary" onclick="window.rpeTracker?._doExportCSV()" title="Descargar CSV" aria-label="Descargar CSV">📥</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);

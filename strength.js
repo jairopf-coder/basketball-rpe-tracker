@@ -831,9 +831,9 @@ RPETracker.prototype._renderExecModal = function(modal) {
                     ${tonSummary}
                 </div>
                 <div style="display:flex;gap:0.5rem">
-                    ${idx > 0 ? `<button class="btn-secondary" onclick="window.rpeTracker._execSaveCurrentAndGo(${idx-1})">← Anterior</button>` : ''}
+                    ${idx > 0 ? `<button class="btn-secondary" onclick="window.rpeTracker._execSaveCurrentAndGo(${idx-1})" title="Sesión anterior" aria-label="Sesión anterior">←</button>` : ''}
                     ${!isLast
-                        ? `<button class="btn-primary" onclick="window.rpeTracker._execSaveCurrentAndGo(${idx+1})">Siguiente →</button>`
+                        ? `<button class="btn-primary" onclick="window.rpeTracker._execSaveCurrentAndGo(${idx+1})" title="Siguiente sesión" aria-label="Siguiente sesión">→</button>`
                         : `<button class="btn-primary" onclick="window.rpeTracker._execSaveAll()">💾 Guardar todo</button>`}
                 </div>
             </div>
@@ -1729,7 +1729,7 @@ RPETracker.prototype.renderTestsView = function() {
                 <h2>📊 Tests de Rendimiento</h2>
                 <div class="str-header-actions">
                     <button class="btn-secondary" onclick="window.rpeTracker.showTestsReportMenu()">📄 Informe</button>
-                    <button class="btn-primary" onclick="window.rpeTracker._openNewTest()">+ Nuevo Test</button>
+                    <button class="btn-primary" onclick="window.rpeTracker._openNewTest()" title="Nuevo test" aria-label="Nuevo test">+</button>
                 </div>
             </div>
             <div class="str-player-list">${playerCards}</div>
@@ -1894,7 +1894,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                     <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${player.name.charAt(0)}</div>
                     <span style="color:${color};font-weight:600">${player.name}</span>
                 </div>
-                <button class="btn-primary" onclick="window.rpeTracker._openNewTest('${player.id}')">+ Nuevo Test</button>
+                <button class="btn-primary" onclick="window.rpeTracker._openNewTest('${player.id}')" title="Nuevo test" aria-label="Nuevo test">+</button>
             </div>
             ${summaryHTML}
             ${buildChartHTML()}

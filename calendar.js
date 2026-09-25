@@ -31,9 +31,9 @@ RPETracker.prototype.renderCalendar = function(year, month) {
 
     const header = `
         <div class="calendar-header">
-            <button onclick="window.rpeTracker?.previousMonth()" class="btn-secondary">← Anterior</button>
+            <button onclick="window.rpeTracker?.previousMonth()" class="btn-secondary" title="Mes anterior" aria-label="Mes anterior">←</button>
             <h2>${monthNames[month]} ${year}</h2>
-            <button onclick="window.rpeTracker?.nextMonth()" class="btn-secondary">Siguiente →</button>
+            <button onclick="window.rpeTracker?.nextMonth()" class="btn-secondary" title="Mes siguiente" aria-label="Mes siguiente">→</button>
         </div>
     `;
 
@@ -470,7 +470,7 @@ RPETracker.prototype.renderSeasonBlocksManager = function() {
                 <h2 class="view-title" style="margin:0 0 .25rem">📆 Bloques de Temporada</h2>
                 <p style="margin:0;color:var(--text-secondary);font-size:.85rem">Gestión de fases: pretemporada, competición, taper</p>
             </div>
-            <button class="btn-primary btn-sm" onclick="window.rpeTracker?.openSeasonBlockModal()">+ Nuevo bloque</button>
+            <button class="btn-primary btn-sm" onclick="window.rpeTracker?.openSeasonBlockModal()" title="Nuevo bloque" aria-label="Nuevo bloque">+</button>
         </div>
         <div class="season-blocks-list">${blocksHTML}</div>
     `;

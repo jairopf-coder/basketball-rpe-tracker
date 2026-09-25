@@ -932,7 +932,7 @@ RPETracker.prototype.showDashboardDaySummary = function(dateStr) {
                 </div>
                 ${resultHTML}
                 <div style="margin-top:0.6rem;">
-                    <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._dbCalGoEditMatch('${match.id}')">✏️ Editar partido</button>
+                    <button class="btn-secondary btn-sm" onclick="window.rpeTracker?._dbCalGoEditMatch('${match.id}')" title="Editar partido" aria-label="Editar partido">✏️</button>
                 </div>
             </div>
         `;
