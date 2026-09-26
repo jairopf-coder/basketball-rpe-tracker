@@ -73,7 +73,7 @@ RPETracker.prototype.renderDashboard = function() {
     if (this._dashSort === 'safe')  players.sort((a, b) => a.st.risk - b.st.risk || a.r - b.r);
     if (this._dashSort === 'name')  players.sort((a, b) => a.player.name.localeCompare(b.player.name));
 
-    const sortLabel = { risk: '↓ Mayor riesgo', safe: '↑ Menor riesgo', name: 'A–Z' };
+    const sortLabel = { risk: '↓', safe: '↑', name: 'A–Z' };
     const nextSort  = { risk: 'safe', safe: 'name', name: 'risk' };
 
     const playerRows = players.map(({ player, ratio, st, r }) => {
@@ -341,7 +341,7 @@ RPETracker.prototype.renderDashboard = function() {
                             </div>
                         </div>
                         <div class="db-right-header-btns">
-                            <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()">
+                            <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()" title="${{risk:'Ordenado por mayor riesgo',safe:'Ordenado por menor riesgo',name:'Ordenado alfabéticamente'}[this._dashSort]} · toca para cambiar orden">
                                 ${sortLabel[this._dashSort]}
                             </button>
                             <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Informe PDF">

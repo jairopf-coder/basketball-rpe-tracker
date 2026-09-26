@@ -294,8 +294,9 @@ RPETracker.prototype._bindComparisonEvents = function() {
         /* ── Heatmap de wellness ── */
         .wh-wrap {
             overflow-x: hidden;
-            border-radius: 8px;
+            border-radius: 12px;
             border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
         }
         .wh-table {
             width: 100%;
@@ -303,7 +304,7 @@ RPETracker.prototype._bindComparisonEvents = function() {
             font-size: 12px;
         }
         .wh-table thead tr {
-            background: var(--bg-subtle);
+            background: var(--bg-surface);
             border-bottom: 1px solid var(--border);
         }
         .wh-table th {

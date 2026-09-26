@@ -1475,7 +1475,7 @@ RPETracker.prototype._renderGpsCompareCards = function(sides) {
     return `
         <div class="gps-an-chart-card" style="background:var(--bg-surface);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.08));margin-bottom:16px;">
             <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
-                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._printGpsCompareReport()">🖨️ Imprimir informe</button>
+                <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._printGpsCompareReport()" title="Imprimir informe" aria-label="Imprimir informe">🖨️</button>
             </div>
             <div style="height:340px;">
                 <canvas id="gpsRadarCanvas"></canvas>
