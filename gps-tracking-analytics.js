@@ -747,7 +747,6 @@ RPETracker.prototype._gpsToggleCellDisplay = function(cellId) {
 RPETracker.prototype._renderGpsTeamComparisonTab = function(container) {
     if (!this._gpsTeamMetric) this._gpsTeamMetric = GPS_COMPARISON_METRICS[0].key;
     if (!this._gpsTeamMode) this._gpsTeamMode = 'session';   // 'session' | 'range'
-    if (!this._gpsTeamSortDesc) this._gpsTeamSortDesc = true; // true = mayor a menor
 
     const teamSessions = this._getTeamSessionOptions();
 
@@ -779,10 +778,6 @@ RPETracker.prototype._renderGpsTeamComparisonTab = function(container) {
                     <option value="all" ${this._gpsTeamRange === 'all' ? 'selected' : ''}>Toda la temporada</option>
                 </select>
             `}
-
-            <button class="btn-secondary" style="font-size:0.85rem;" onclick="window.rpeTracker._gpsTeamToggleSort()">
-                ${this._gpsTeamSortDesc ? '⬇️ Mayor a menor' : '⬆️ Menor a mayor'}
-            </button>
 
             <button class="btn-secondary" style="font-size:0.78rem;padding:4px 10px;" onclick="window.rpeTracker._downloadGpsChart('gpsTeamComparisonCanvas', 'comparativa-equipo-gps')" title="Descargar gráfico" aria-label="Descargar gráfico">📥</button>
 
@@ -861,7 +856,6 @@ RPETracker.prototype._renderGpsTypeFilterSelect = function() {
 RPETracker.prototype._gpsTeamSetMetric = function(key) { this._gpsTeamMetric = key; this._drawGpsTeamComparisonChart(); };
 RPETracker.prototype._gpsTeamSetSession = function(id) { this._gpsTeamSessionId = id; this._drawGpsTeamComparisonChart(); };
 RPETracker.prototype._gpsTeamSetRange = function(range) { this._gpsTeamRange = range; this._drawGpsTeamComparisonChart(); };
-RPETracker.prototype._gpsTeamToggleSort = function() { this._gpsTeamSortDesc = !this._gpsTeamSortDesc; this._renderGpsTeamComparisonTab(document.getElementById('gpsAnTabContent')); };
 
 RPETracker.prototype._gpsTeamSetMode = function(mode) {
     this._gpsTeamMode = mode;
@@ -945,7 +939,7 @@ RPETracker.prototype._getGpsTeamComparisonData = function() {
         if (value !== null) results.push({ player, value });
     });
 
-    results.sort((a, b) => this._gpsTeamSortDesc ? b.value - a.value : a.value - b.value);
+    results.sort((a, b) => b.value - a.value);
     return { data: results, metricDef };
 };
 
