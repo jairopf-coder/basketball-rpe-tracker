@@ -116,7 +116,7 @@ RPETracker.prototype._renderCalendarGrid = function(year, month, dayData, slotLa
             const avgRPE = (slot.entries.reduce((s, x) => s + x.rpe, 0) / slot.entries.length).toFixed(1);
             const icon   = slot.type === 'match' ? '🏟️' : '🏀';
             sessionHTML  = `
-                <span class="session-count">${icon} ${slot.entries.length} jugadora${slot.entries.length !== 1 ? 's' : ''}</span>
+                <span class="session-count" title="${slot.entries.length} jugadora${slot.entries.length !== 1 ? 's' : ''}">${icon} ${slot.entries.length}</span>
                 <span class="cal-rpe-avg">RPE ${avgRPE}</span>
             `;
         } else if (slots.length > 1) {
@@ -168,7 +168,7 @@ RPETracker.prototype._renderCalendarAgenda = function(year, month, dayData, slot
             const avgRPE = (slot.entries.reduce((s, x) => s + x.rpe, 0) / slot.entries.length).toFixed(1);
             const icon   = slot.type === 'match' ? '🏟️' : '🏀';
             sessionHTML  = `
-                <span class="session-count">${icon} ${slot.entries.length} jugadora${slot.entries.length !== 1 ? 's' : ''}</span>
+                <span class="session-count" title="${slot.entries.length} jugadora${slot.entries.length !== 1 ? 's' : ''}">${icon} ${slot.entries.length}</span>
                 <span class="cal-rpe-avg">RPE ${avgRPE}</span>
             `;
         } else {
@@ -459,6 +459,7 @@ RPETracker.prototype.renderSeasonBlocksManager = function() {
                     <span class="season-block-dates">${b.start} → ${b.end}</span>
                     ${b.note ? `<span class="season-block-note">${esc(b.note)}</span>` : ''}
                     ${isActive ? `<span class="season-active-badge">● Activo</span>` : ''}
+                    <button class="btn-icon-sm" onclick="window.rpeTracker?.openSeasonBlockModal('${b.id}')" title="Editar">✏️</button>
                     <button class="btn-icon-sm" onclick="window.rpeTracker?.deleteSeasonBlock('${b.id}')" title="Eliminar">🗑️</button>
                 </div>
             `;

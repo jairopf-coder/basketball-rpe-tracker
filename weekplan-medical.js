@@ -358,7 +358,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     <button class="btn-secondary btn-sm" id="wpPrev" title="Semana anterior" aria-label="Semana anterior">←</button>
                     <button class="btn-secondary btn-sm" id="wpToday">Hoy</button>
                     <button class="btn-secondary btn-sm" id="wpNext" title="Semana siguiente" aria-label="Semana siguiente">→</button>
-                    <button class="btn-primary btn-sm" id="wpSave">💾 Guardar</button>
+                    <button class="btn-primary btn-sm" id="wpSave" title="Guardar" aria-label="Guardar">💾</button>
                     <span id="wpSaveIndicator" class="wp-save-badge ${isSaved ? 'wp-save-badge--ok' : 'wp-save-badge--pending'}" title="${isSaved ? 'Semana guardada el ' + new Date(weekEntry.savedAt).toLocaleString('es-ES') : 'Esta semana todavía no se ha guardado'}">
                         ${isSaved ? '✅' : '❌'}
                     </span>
