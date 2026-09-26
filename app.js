@@ -479,11 +479,9 @@ class RPETracker {
 
         // Show header action buttons only on dashboard view
         const _hpBtn = document.getElementById('headerPreSessionBtn');
-        const _hwBtn = document.getElementById('headerWellnessBtn');
         const _addBtn = document.getElementById('addBtn');
         const _gearBtn = document.getElementById('gearBtn');
         if (_hpBtn) _hpBtn.style.display = viewName === 'dashboard' ? '' : 'none';
-        if (_hwBtn) _hwBtn.style.display = viewName === 'dashboard' ? '' : 'none';
         if (_addBtn) _addBtn.style.display = viewName === 'dashboard' ? '' : 'none';
         if (_gearBtn) _gearBtn.style.display = viewName === 'dashboard' ? '' : 'none';
 
