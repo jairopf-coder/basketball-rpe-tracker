@@ -1437,7 +1437,7 @@ header h1 {
     align-items: center;
     justify-content: space-between;
     padding: 0.5rem 0.75rem;
-    background: #f7f7f7;
+    background: var(--bg-subtle);
     border-bottom: 0.5px solid var(--border);
     flex-wrap: wrap;
     gap: 0.25rem;
