@@ -351,14 +351,11 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
     // ── 4. Sort controls ─────────────────────────────────────────────────
     const sortBarHtml = predictions.length === 0 ? '' : `
         <div class="pred-sort-bar">
-            <span class="pred-sort-label">Ordenar por riesgo:</span>
-            <button class="pred-sort-btn ${this._predState.sortOrder === 'desc' ? 'pred-sort-btn--active' : ''}"
-                onclick="window._rpeTracker._predSetSort('desc')">
-                ↓ Mayor primero
-            </button>
-            <button class="pred-sort-btn ${this._predState.sortOrder === 'asc' ? 'pred-sort-btn--active' : ''}"
-                onclick="window._rpeTracker._predSetSort('asc')">
-                ↑ Menor primero
+            <button class="pred-sort-btn"
+                onclick="window._rpeTracker._predSetSort('${this._predState.sortOrder === 'desc' ? 'asc' : 'desc'}')"
+                title="${this._predState.sortOrder === 'desc' ? 'Ordenado por mayor riesgo primero' : 'Ordenado por menor riesgo primero'} · toca para cambiar orden"
+                aria-label="Cambiar orden de riesgo">
+                ${this._predState.sortOrder === 'desc' ? '↓' : '↑'}
             </button>
         </div>
     `;
