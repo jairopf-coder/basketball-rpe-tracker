@@ -437,12 +437,6 @@ RPETracker.prototype.renderDashboard = function() {
         // Render mini calendar column
         this.renderDashboardCalendar();
         this._renderRightWidgets();
-        // Update wellness badge in global header
-        const _hBadge = document.getElementById('headerWellnessBadge');
-        if (_hBadge) {
-            if (_pendingW.length > 0) { _hBadge.textContent = _pendingW.length; _hBadge.style.display = 'inline'; }
-            else { _hBadge.style.display = 'none'; }
-        }
         // Render comparativa de jugadoras (radar wellness)
         this._renderComparisonRadar();
         this._bindComparisonEvents();
