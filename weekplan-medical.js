@@ -1991,25 +1991,25 @@ RPETracker.prototype.renderMicrociclo = function() {
     .mc-bar-target-line{position:absolute;top:-4px;bottom:-4px;left:100%;transform:translateX(-1px);width:2px;background:var(--text-secondary);opacity:.4;border-radius:1px}
     .mc-bar-labels{display:flex;justify-content:space-between;font-size:.65rem;color:var(--text-secondary);margin-top:.25rem}
 
-    /* ── Table ─────────────────────────────────────────── */
-    .mc-table{width:100%;border-collapse:collapse;font-size:.78rem;min-width:560px}
-    .mc-th-player,.mc-th-day,.mc-th-total{padding:.45rem .4rem;text-align:center;font-weight:600;color:var(--text-secondary);border-bottom:2px solid var(--border-color);font-size:.7rem;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+    /* ── Table (mismo patrón visual que Carga-Equipo: celdas
+       separadas con aire, cada una con su propio radio) ──── */
+    .mc-table{width:100%;border-collapse:separate;border-spacing:3px;font-size:.78rem;min-width:560px}
+    .mc-th-player,.mc-th-day,.mc-th-total{padding:.4rem .4rem;text-align:center;font-weight:600;color:var(--text-secondary);font-size:.7rem;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;background:var(--bg-subtle);border-radius:.4rem}
     .mc-th-player{text-align:left;min-width:110px}
-    .mc-th-today{color:var(--accent-color,#2196f3);border-bottom-color:var(--accent-color,#2196f3)}
+    .mc-th-today{color:var(--accent-color,#2196f3);outline:2px solid var(--accent-color,#2196f3);outline-offset:-2px}
     .mc-th-date{font-weight:400;font-size:.65rem}
-    .mc-td-player{padding:.4rem .4rem;border-bottom:1px solid var(--border-color);white-space:nowrap}
+    .mc-td-player{padding:.4rem .4rem;white-space:nowrap;background:var(--bg-surface);border-radius:.4rem}
     .mc-player-name{font-size:.78rem;font-weight:500;color:var(--text-primary)}
-    .mc-cell{text-align:center;padding:.4rem .3rem;border-bottom:1px solid var(--border-color);font-size:.75rem;font-weight:600;border-radius:.25rem;color:var(--text-primary)}
+    .mc-cell{text-align:center;padding:.4rem .3rem;font-size:.75rem;font-weight:600;border-radius:.4rem;color:var(--text-primary)}
     .mc-plan-of{font-weight:400;font-size:.68rem;color:var(--text-secondary)}
     .mc-cell-ok     {background:color-mix(in srgb,var(--success-color,#4caf50) 18%,transparent)}
     .mc-cell-warn   {background:color-mix(in srgb,var(--warning-color,#ff9800) 18%,transparent)}
     .mc-cell-bad    {background:color-mix(in srgb,var(--danger-color,#f44336) 18%,transparent)}
-    .mc-cell-neutral{color:var(--text-secondary)}
+    .mc-cell-neutral{color:var(--text-secondary);background:var(--bg-subtle)}
     .mc-cell-extra  {background:color-mix(in srgb,var(--accent-color,#2196f3) 15%,transparent)}
     .mc-cell-total  {font-weight:700}
     .mc-cell-team   {opacity:.85}
-    .mc-team-total-row{background:color-mix(in srgb,var(--border-color) 30%,transparent)}
-    .mc-team-total-row td{border-top:2px solid var(--border-color)}
+    .mc-team-total-row td{background:color-mix(in srgb,var(--border-color) 30%,transparent)}
 
     /* ── Legend swatches ───────────────────────────────── */
     .mc-legend{display:inline-block;width:12px;height:12px;border-radius:.2rem;vertical-align:middle;margin-right:.2rem}
