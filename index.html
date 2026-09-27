@@ -263,11 +263,6 @@
             <div class="analytics-container" id="weeklyPlanView"></div>
         </div>
 
-        <!-- Season Blocks View -->
-        <div id="seasonblocksView" class="view">
-            <div class="analytics-container" id="seasonBlocksView"></div>
-        </div>
-
         <!-- Team Load Heatmap View -->
         <div id="teamloadView" class="view">
             <div class="analytics-container" id="teamLoadView"></div>
@@ -762,10 +757,6 @@
                 <span class="bn-more-icon">📅</span>
                 <span class="bn-more-label">Planificación</span>
             </button>
-            <button class="bn-more-item" onclick="BottomNav.selectMore('carga','seasonblocks')" aria-label="Bloques de temporada">
-                <span class="bn-more-icon">📆</span>
-                <span class="bn-more-label">Temporada</span>
-            </button>
             <button class="bn-more-item" onclick="BottomNav.selectMore('carga','sessions')" aria-label="Historial de sesiones">
                 <span class="bn-more-icon">📋</span>
                 <span class="bn-more-label">Historial</span>
@@ -800,7 +791,7 @@
     const BN_PRIMARY_VIEWS = {
         dashboard: ['dashboard'],
         equipo:    ['players', 'teamstatus', 'objectives'],
-        carga:     ['microciclo', 'analytics', 'weekplan', 'seasonblocks', 'sessions'],
+        carga:     ['microciclo', 'analytics', 'weekplan', 'sessions'],
     };
 
     const BottomNav = {
