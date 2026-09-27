@@ -411,9 +411,6 @@ RPETracker.prototype.loadSeasonBlocks = function() {
             if (this.currentView === 'weekplan' && typeof this.renderWeeklyPlanning === 'function') {
                 this.renderWeeklyPlanning();
             }
-            if (this.currentView === 'seasonblocks' && typeof this.renderSeasonBlocksManager === 'function') {
-                this.renderSeasonBlocksManager();
-            }
         });
     } else {
         try {
@@ -436,8 +433,8 @@ RPETracker.prototype.getActiveSeasonBlock = function() {
     return this.seasonBlocks.find(b => b.start <= today && b.end >= today) || null;
 };
 
-RPETracker.prototype.renderSeasonBlocksManager = function() {
-    const container = document.getElementById('seasonBlocksView');
+RPETracker.prototype.renderSeasonBlocksManager = function(targetId) {
+    const container = document.getElementById(targetId || 'seasonBlocksView');
     if (!container) return;
     if (!this.seasonBlocks) this.loadSeasonBlocks();
 

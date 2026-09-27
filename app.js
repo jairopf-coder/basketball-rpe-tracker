@@ -14,7 +14,6 @@ const NavMenu = {
                 { view: 'teamload',  label: '🔥 Carga equipo' },
                 { view: 'gpsanalytics', label: '📡 GPS' },
                 { view: 'weekplan',  label: '📅 Planificación' },
-                { view: 'seasonblocks', label: '📆 Temporada' },
                 { view: 'sessions',  label: '📋 Historial' },
                 { view: 'calendar',  label: '🗓️ Calendario' },
             ],
@@ -550,9 +549,6 @@ class RPETracker {
                 break;
             case 'weekplan':
                 if (typeof this.renderWeeklyPlanning === 'function') this.renderWeeklyPlanning();
-                break;
-            case 'seasonblocks':
-                if (typeof this.renderSeasonBlocksManager === 'function') this.renderSeasonBlocksManager();
                 break;
             case 'microciclo':
                 if (typeof this.renderMicrociclo === 'function') this.renderMicrociclo();

@@ -231,6 +231,8 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     if (!this.weekPlan) this.loadWeekPlan();
     if (!this.weekPlan || !this.weekPlan.weeks) this.weekPlan = this._defaultWeekPlan();
 
+    const howToOpen = typeof Store !== 'undefined' && Store.getString('wpHowToOpen') === 'true';
+
     const offset = this.weekPlan.weekOffset || 0;
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1 + offset * 7);
@@ -390,15 +392,23 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
 
             ${this._renderWpLoadChart(dayKeys, dayLabels, weekStart)}
 
-            <div class="wellness-card" style="font-size:.84rem;color:var(--text-secondary)">
-                <p style="margin:0 0 .4rem"><strong>💡 Cómo usar:</strong></p>
-                <ul style="margin:0;padding-left:1.2rem;line-height:1.8">
-                    <li>Usa el toggle para activar/desactivar mañana o tarde de cada día</li>
-                    <li>Puedes tener mañana, tarde, ambas o ninguna (descanso) por día</li>
-                    <li>Puedes poner dos partidos en la misma semana en cualquier slot</li>
-                    <li>Los datos <strong>REAL</strong> muestran sesiones ya registradas ese día</li>
-                </ul>
-            </div>
+            <details class="ewma-info-box" id="wpHowToDetails" ${howToOpen ? 'open' : ''}
+                ontoggle="if(typeof Store!=='undefined') Store.set('wpHowToOpen', this.open)">
+                <summary class="ewma-summary">
+                    <span>💡 Cómo usar</span>
+                    <span class="ewma-toggle-hint">ver más</span>
+                </summary>
+                <div class="ewma-body">
+                    <ul style="margin:0;padding-left:1.2rem;line-height:1.8">
+                        <li>Usa el toggle para activar/desactivar mañana o tarde de cada día</li>
+                        <li>Puedes tener mañana, tarde, ambas o ninguna (descanso) por día</li>
+                        <li>Puedes poner dos partidos en la misma semana en cualquier slot</li>
+                        <li>Los datos <strong>REAL</strong> muestran sesiones ya registradas ese día</li>
+                    </ul>
+                </div>
+            </details>
+
+            <div id="seasonBlocksInPlan" style="margin-top:1.5rem"></div>
         </div>`;
 
     // ── Attach events via delegation on the grid (no inline handlers) ──
@@ -489,6 +499,8 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     });
 
     this._drawWpLoadChart(dayKeys, dayLabels, weekStart, activeDays);
+
+    if (typeof this.renderSeasonBlocksManager === 'function') this.renderSeasonBlocksManager('seasonBlocksInPlan');
 };
 
 // Vuelca a this.weekPlan el estado ACTUAL de todos los campos visibles del
