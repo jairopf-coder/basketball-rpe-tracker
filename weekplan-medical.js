@@ -251,7 +251,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     const typeLabel = {training:'🏀 Entreno', shooting:'🎯 Tiro', gym:'🏋️ Gym', match:'🏟️ Partido', recovery:'💪 Recuperación'};
     const typeColors = {training:'#2196f3', match:'#f44336', recovery:'#4caf50', shooting:'#9c27b0', gym:'#795548'};
 
-    const intensityRPE_slot = {none:0,low:4,medium:6,high:7.5,max:9};
+    const intensityRPE_slot = {none:0,low:4.5,medium:5.5,high:7.5,max:9.5};
     const buildSlotHTML = (dayKey, slot, s) => {
         const active = !!s.enabled;
         const headerHTML =
@@ -276,7 +276,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
         const selType = Object.entries({training:'🏀 Entreno', shooting:'🎯 Tiro', gym:'🏋️ Gym', match:'🏟️ Partido', recovery:'💪 Recuperación'})
             .map(([v,l]) => `<option value="${v}"${s.type===v?' selected':''}>${l}</option>`).join('');
 
-        const selIntensity = Object.entries({'none':'— Sin carga','low':'🟢 Baja','medium':'🟡 Media','high':'🟠 Alta','max':'🔴 Máxima'})
+        const selIntensity = Object.entries({'none':'— Sin carga (0)','low':'🟢 Baja (4-5)','medium':'🟡 Media (5-6)','high':'🟠 Alta (7-8)','max':'🔴 Máxima (9-10)'})
             .map(([v,l]) => `<option value="${v}"${s.intensity===v?' selected':''}>${l}</option>`).join('');
 
         return `<div class="wp-session-block wp-session-active" style="border-left:2px solid ${typeColors[s.type]||'#ccc'}">
@@ -610,7 +610,7 @@ RPETracker.prototype._getWeekRealSessions = function(weekStart) {
 };
 
 RPETracker.prototype._plannedWeekLoad = function(days) {
-    const intensityRPE = {none:0,low:4,medium:6,high:7.5,max:9};
+    const intensityRPE = {none:0,low:4.5,medium:5.5,high:7.5,max:9.5};
     const plan = days || this.getWeekPlanDays();
     let total = 0;
     Object.values(plan).forEach(d => {
@@ -693,7 +693,7 @@ RPETracker.prototype._drawWpLoadChart = function(days, dayLabels, weekStart, pla
     const iW=W-pad.l-pad.r, iH=H-pad.t-pad.b;
     const n=7, bw=iW/n, gap=bw*0.15;
 
-    const intensityRPE={none:0,low:4,medium:6,high:7.5,max:9};
+    const intensityRPE={none:0,low:4.5,medium:5.5,high:7.5,max:9.5};
     const plan = planDays || this.getWeekPlanDays();
     // Fix: use morning+afternoon structure
     const planLoads=days.map(d=>{
@@ -1782,7 +1782,7 @@ RPETracker.prototype.renderMicrociclo = function() {
     const dayDateStrs = dayDates.map(d => toLocalISODate(d));
 
     // ── Planificado ───────────────────────────────────────────
-    const intensityRPE = { none: 0, low: 4, medium: 6, high: 7.5, max: 9 };
+    const intensityRPE = { none: 0, low: 4.5, medium: 5.5, high: 7.5, max: 9.5 };
     const plan = this.getWeekPlanDays(weekStart);
     const playerCount = Math.max(this.players.length, 1);
 
