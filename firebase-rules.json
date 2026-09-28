@@ -3,6 +3,7 @@
     ".read": false,
     ".write": false,
     "users": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'staff'",
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'staff'",
@@ -32,6 +33,14 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
     },
     "wellnessPlayer": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      "$uid": {
+        ".read":  "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')"
+      }
+    },
+    "playerRpeReports": {
+      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       "$uid": {
         ".read":  "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')",
         ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')"
