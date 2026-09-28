@@ -592,17 +592,24 @@ RPETracker.prototype.renderSessions = function() {
         const _mm = String(sessionDate.getMonth()+1).padStart(2,'0');
         const _yy = String(sessionDate.getFullYear()).slice(-2);
         const shortDate = `${_wd}-${_dd}/${_mm}/${_yy}`;
+
+        // El icono de la izquierda ya identifica Entrenamiento y Partido, asi que su
+        // texto sobra. Tiro / Gym / Recuperacion conservan el texto: sus iconos son
+        // menos evidentes. getSessionTypeName() devuelve 'Entrenamiento' por defecto
+        // (mismo criterio que el icono, que por defecto es el de entrenamiento).
+        const _typeName = this.getSessionTypeName(session.type);
+        const typeLabel = (_typeName === 'Entrenamiento' || _typeName === 'Partido') ? '' : ` - ${_typeName}`;
         const timeIcon = session.timeOfDay === 'morning' ? '☀️' : '🌙';
 
         return `
             <div class="session-card" onclick="window.rpeTracker?.showSessionDetail('${session.id}')">
-                <div class="session-icon ${session.type}">
+                <div class="session-icon ${session.type}" title="${_typeName}" aria-label="${_typeName}">
                     ${{training:'🏀',match:'🏟️',shooting:'🎯',gym:'🏋️',recovery:'💪'}[session.type] || '🏀'}
                 </div>
                 <div class="session-info">
                     <div class="session-type">
                         ${player ? PlayerTokens.avatar(player, 18, '0.55rem', 'session-player-token') : ''}
-                        ${playerName} - ${this.getSessionTypeName(session.type)}
+                        ${playerName}${typeLabel}
                         ${timeBadge}
                         <span class="session-date">- ${shortDate} - ${timeIcon}</span>
                     </div>
