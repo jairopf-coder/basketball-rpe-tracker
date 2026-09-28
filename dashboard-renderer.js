@@ -513,37 +513,6 @@ RPETracker.prototype.cycleDashSort = function() {
     this.renderDashboard();
 };
 
-// ── copyWellnessPendingWA ────────────────────────────────────────────
-RPETracker.prototype.copyWellnessPendingWA = function() {
-    const today = toLocalISODate(new Date());
-    const wData = this.wellnessData || [];
-    const pending = this.players.filter(p => !wData.some(e => e.playerId === p.id && e.date === today));
-    if (!pending.length) { this.showToast('✅ Todas han rellenado el wellness hoy', 'info'); return; }
-    const names = pending.map(p => esc(p.name.split(' ')[0])).join(', ');
-    const dateLabel = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-    const msg = `🏀 Recordatorio wellness — ${dateLabel}\n\nPor favor, rellenad el cuestionario de bienestar de hoy en la app.\n\nPendientes: ${names}\n\n¡Gracias! 💪`;
-    if (navigator.clipboard) {
-        navigator.clipboard.writeText(msg).then(() => {
-            this.showToast('📋 Mensaje copiado — pégalo en WhatsApp', 'success');
-        }).catch(() => this._fallbackCopy(msg));
-    } else {
-        this._fallbackCopy(msg);
-    }
-};
-
-// ── _fallbackCopy ────────────────────────────────────────────────────
-RPETracker.prototype._fallbackCopy = function(text) {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); this.showToast('📋 Mensaje copiado — pégalo en WhatsApp', 'success'); }
-    catch (e) { this.showToast('No se pudo copiar. Copia manualmente.', 'error'); }
-    document.body.removeChild(ta);
-};
-
 // ── _renderRightWidgets — wellness + fatiga + pending en tarjeta propia ──
 RPETracker.prototype._renderRightWidgets = function() {
     const col = document.getElementById('dbRightWidgets');
