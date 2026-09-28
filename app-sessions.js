@@ -572,7 +572,8 @@ RPETracker.prototype.renderSessions = function() {
         const player = this.players.find(p => p.id === session.playerId);
         const playerName = player ? player.name : 'Desconocida';
 
-        // Batch 2: time badge
+        // Batch 2: time badge — solo HOY/AYER aportan urgencia real;
+        // a partir de 2 días la fecha corta ya es suficiente y no se duplica info.
         const sessionDate = new Date(session.date);
         const today = new Date(); today.setHours(0,0,0,0);
         const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
@@ -582,10 +583,16 @@ RPETracker.prototype.renderSessions = function() {
             timeBadge = '<span class="session-time-badge badge-today">HOY</span>';
         } else if (sessionDate.getTime() === yesterday.getTime()) {
             timeBadge = '<span class="session-time-badge badge-yesterday">AYER</span>';
-        } else {
-            const diffDays = Math.floor((today - sessionDate) / 86400000);
-            if (diffDays <= 6) timeBadge = `<span class="session-time-badge badge-recent">hace ${diffDays}d</span>`;
         }
+
+        // Fecha corta: L/M/X/J/V/S/D-DD/MM/AA (usa session.timeOfDay, el dato
+        // real guardado, en vez de adivinar el turno por la hora del reloj).
+        const _wd = ['D','L','M','X','J','V','S'][sessionDate.getDay()];
+        const _dd = String(sessionDate.getDate()).padStart(2,'0');
+        const _mm = String(sessionDate.getMonth()+1).padStart(2,'0');
+        const _yy = String(sessionDate.getFullYear()).slice(-2);
+        const shortDate = `${_wd}-${_dd}/${_mm}/${_yy}`;
+        const timeIcon = session.timeOfDay === 'morning' ? '☀️' : '🌙';
 
         return `
             <div class="session-card" onclick="window.rpeTracker?.showSessionDetail('${session.id}')">
@@ -597,8 +604,8 @@ RPETracker.prototype.renderSessions = function() {
                         ${player ? PlayerTokens.avatar(player, 18, '0.55rem', 'session-player-token') : ''}
                         ${playerName} - ${this.getSessionTypeName(session.type)}
                         ${timeBadge}
+                        <span class="session-date">- ${shortDate} - ${timeIcon}</span>
                     </div>
-                    <div class="session-date">${this.formatDate(session.date)}</div>
                 </div>
                 <div class="session-rpe">
                     <span class="session-rpe-number" style="color: ${this.getRPEColor(session.rpe)}">${session.rpe}</span>
