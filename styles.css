@@ -565,11 +565,11 @@ header h1 {
 .session-card {
     background: var(--bg-surface);
     border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
+    padding: 0.6rem 1rem;
+    margin-bottom: 0.5rem;
     box-shadow: var(--shadow-sm);
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
     align-items: center;
     cursor: pointer;
     transition: all 0.3s;
@@ -581,13 +581,13 @@ header h1 {
 }
 
 .session-icon {
-    width: 60px;
-    height: 60px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
+    font-size: 1.1rem;
     flex-shrink: 0;
 }
 
@@ -606,28 +606,29 @@ header h1 {
 .session-type {
     font-weight: 700;
     font-size: 1.1rem;
-    margin-bottom: 0.25rem;
 }
 
 .session-date {
     color: var(--gray);
     font-size: 0.9rem;
+    /* .session-type es flex con gap 0: sin este margen el texto queda pegado */
+    margin-left: 0.35rem;
 }
 
 .session-rpe {
     text-align: center;
-    min-width: 80px;
+    min-width: 48px;
 }
 
 .session-rpe-number {
-    font-size: 2.5rem;
+    font-size: 1.6rem;
     font-weight: 700;
     display: block;
     line-height: 1;
 }
 
 .session-rpe-label {
-    font-size: 0.7rem;
+    font-size: 0.62rem;
     color: var(--gray);
 }
 
@@ -1711,12 +1712,6 @@ header h1 {
     color: var(--primary, #1976d2);
 }
 
-.pred-sort-btn--active {
-    background: var(--primary, #1976d2);
-    border-color: var(--primary, #1976d2);
-    color: #fff;
-}
-
 /* ── Two-column grid ── */
 .pred-grid {
     display: grid;
@@ -2580,15 +2575,15 @@ header h1 {
 
     /* Tarjetas de sesión: más compactas */
     .session-card {
-        padding: 0.85rem 1rem;
-        gap: 0.75rem;
+        padding: 0.5rem 0.85rem;
+        gap: 0.6rem;
         border-radius: 10px;
     }
 
     .session-icon {
-        width: 44px;
-        height: 44px;
-        font-size: 1.3rem;
+        width: 34px;
+        height: 34px;
+        font-size: 1rem;
     }
 
     .session-type {
@@ -2599,8 +2594,12 @@ header h1 {
         font-size: 0.8rem;
     }
 
+    .session-rpe {
+        min-width: 40px;
+    }
+
     .session-rpe-number {
-        font-size: 2rem;
+        font-size: 1.5rem;
     }
 
     /* Lista de sesiones con padding lateral */
@@ -3185,11 +3184,11 @@ header h1 {
     /* Tarjetas de sesión más limpias */
     .session-card {
         border-radius: var(--radius);
-        padding: 1rem 1.25rem;
-        margin-bottom: 0.6rem;
+        padding: 0.55rem 1rem;
+        margin-bottom: 0.4rem;
         box-shadow: var(--shadow-sm);
         border: var(--border);
-        gap: 1rem;
+        gap: 0.75rem;
     }
 
     .session-card:hover {
@@ -3199,15 +3198,15 @@ header h1 {
     }
 
     .session-icon {
-        width: 44px;
-        height: 44px;
-        font-size: 1.3rem;
-        border-radius: 10px;
+        width: 36px;
+        height: 36px;
+        font-size: 1.1rem;
+        border-radius: 8px;
     }
 
     .session-type { font-size: 0.95rem; }
     .session-date { font-size: 0.82rem; }
-    .session-rpe-number { font-size: 2rem; }
+    .session-rpe-number { font-size: 1.6rem; }
 
     /* Stat cards más limpias */
     .stat-card {
@@ -4317,7 +4316,6 @@ header h1 {
 
 /* ===== SHARED PLAYER TOKEN AVATAR ===== */
 /* Small color-dot identifying a player (replaces the old initials-circle avatar) */
-.player-token-avatar,
 .player-token-dot {
     display: inline-block;
     width: 10px;
@@ -5526,7 +5524,6 @@ header h1 {
 }
 .badge-today     { background: rgba(255,102,0,0.15); color: var(--primary); }
 .badge-yesterday { background: rgba(33,150,243,0.13); color: #1e88e5; }
-.badge-recent    { background: var(--bg-subtle); color: var(--text-muted); }
 
 /* ===== SESSION PLAYER TOKEN (inline avatar in session list) ===== */
 .session-player-token {
@@ -5549,7 +5546,6 @@ header h1 {
 [data-theme="dark"] .trend-new  { background: rgba(33,150,243,0.18); }
 [data-theme="dark"] .badge-today     { background: rgba(255,102,0,0.22); }
 [data-theme="dark"] .badge-yesterday { background: rgba(33,150,243,0.18); }
-[data-theme="dark"] .badge-recent    { background: var(--bg-elevated); }
 
 /* =============================================================
    BATCH 3 STYLES
@@ -6738,68 +6734,8 @@ details[open] .ewma-toggle-hint { display: none; }
     float: right;
 }
 
-/* Botón pase rápido anclado al fondo de columna izquierda */
-.db-left-section--action {
-    padding: 0.6rem 1.25rem;
-    border-top: 0.5px solid var(--border);
-    margin-top: auto;
-    flex-shrink: 0;
-}
-.db-quick-pass-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-    border: 0.5px solid var(--primary);
-    background: transparent;
-    color: var(--primary);
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-}
-.db-quick-pass-btn:hover {
-    background: var(--primary);
-    color: #fff;
-}
-.db-quick-pass-badge {
-    background: var(--primary);
-    color: #fff;
-    border-radius: 20px;
-    font-size: 0.65rem;
-    padding: 1px 6px;
-    font-weight: 700;
-    transition: background 0.15s;
-}
-.db-quick-pass-btn:hover .db-quick-pass-badge {
-    background: rgba(255,255,255,0.3);
-}
-
 /* PDF icon button en cabecera Disponibilidad */
 .db-sort-btn--icon { padding: 3px 7px; font-size: 0.85rem; }
-.db-sort-btn--pass {
-    padding: 3px 8px;
-    font-size: 0.75rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    border-color: var(--primary);
-    color: var(--primary);
-}
-.db-sort-btn--pass:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
-.db-pass-badge {
-    background: var(--primary);
-    color: #fff;
-    border-radius: 10px;
-    font-size: 0.6rem;
-    padding: 0px 4px;
-    font-weight: 700;
-    transition: background 0.15s;
-}
-.db-sort-btn--pass:hover .db-pass-badge { background: rgba(255,255,255,0.3); }
 
 /* --- Vista lesiones: layout wrap --- */
 .inj-wrap {
@@ -9350,7 +9286,7 @@ details[open] .ewma-toggle-hint { display: none; }
 
 .pvr-date   { white-space: nowrap; color: var(--text-secondary); font-size: 0.75rem; }
 .pvr-player { font-weight: 500; white-space: nowrap; }
-.pvr-player .player-token-avatar { display: inline-flex; vertical-align: middle; margin-right: 0.35rem; }
+.pvr-player .player-token-dot { vertical-align: middle; margin-right: 0.35rem; }
 .pvr-slot   { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
 .pvr-plan   { text-align: center; }
 .pvr-plan .pvr-intensity { margin-right: 0.4rem; }
