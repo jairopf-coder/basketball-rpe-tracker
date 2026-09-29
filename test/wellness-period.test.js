@@ -66,7 +66,7 @@ test('la tabla cambia de datos según el periodo', () => {
 test('jugadora sin datos en el periodo muestra —, sin romper', () => {
     T.wellnessData = []; T._wRange = 'today';
     const h = T._renderWPlayerTable();
-    assert.ok(h.includes('Media del equipo') && h.includes('Ana') && h.includes('Bea'));
+    assert.ok(h.includes('📊 Media') && h.includes('Ana') && h.includes('Bea'));
 });
 test('el dato de HOY entra en "Hoy" aunque sea de madrugada (sin desfase UTC)', () => {
     T.wellnessData = [w('p1', 0)];
@@ -144,6 +144,59 @@ test('la tarjeta se renderiza (vacía y con datos) sin errores', () => {
     T.wellnessData = [w('p1', 0, { period: true })];
     const h = T._renderWCycleCard(); assert.ok(h.includes('Día 1') && h.includes('Con la regla ahora'));
 });
+
+console.log('\nModal en <body> y tabla móvil');
+delete T.renderWellnessDashboard; // quitar el stub del primer test: aquí se usa el método real
+// Documento falso mínimo: un contenedor y un <body> que recibe el HTML insertado.
+function makeFakeDoc() {
+    const doc = { container: { innerHTML: '' }, bodyHtml: '', modalEl: null };
+    doc.createElement = () => ({});
+    doc.head = { appendChild() {} };
+    doc.documentElement = { classList: { contains: () => false } };
+    doc.body = {
+        classList: { contains: () => false },
+        insertAdjacentHTML(_pos, html) {
+            doc.bodyHtml += html;
+            doc.modalEl = html.includes('id="wellnessModal"') ? {
+                style: { display: 'none' }, _backdropBound: false, listeners: 0,
+                addEventListener() { this.listeners++; }, remove() { doc.modalEl = null; doc.bodyHtml = ''; }
+            } : null;
+        }
+    };
+    doc.getElementById = id => id === 'wellnessDashboardView' ? doc.container
+        : id === 'wellnessModal' ? doc.modalEl : null;
+    return doc;
+}
+test('el modal NO va dentro de la vista (evita el bug del transform en iPhone)', () => {
+    const doc = makeFakeDoc(); ctx.document = doc;
+    T.players = [{ id: 'p1', name: 'Ana' }]; T.wellnessData = []; T._wRange = 'today';
+    T.renderWellnessDashboard();
+    assert.ok(!doc.container.innerHTML.includes('wellnessModal'), 'el modal sigue dentro del contenedor');
+    assert.ok(doc.bodyHtml.includes('id="wellnessModal"'), 'el modal no se montó en body');
+    assert.ok(doc.container.innerHTML.includes('Estado por jugadora'));
+});
+test('re-render con el modal ABIERTO no lo reconstruye (no pierde lo escrito)', () => {
+    const doc = makeFakeDoc(); ctx.document = doc;
+    T.renderWellnessDashboard();
+    const first = doc.modalEl; first.style.display = 'flex';
+    T.renderWellnessDashboard();
+    assert.strictEqual(doc.modalEl, first, 'se ha sustituido el modal abierto');
+    assert.strictEqual(first.listeners, 1, 'listener de fondo duplicado');
+});
+test('re-render con el modal cerrado sí lo reconstruye (jugadoras actualizadas)', () => {
+    const doc = makeFakeDoc(); ctx.document = doc;
+    T.renderWellnessDashboard();
+    const first = doc.modalEl; // display none
+    T.renderWellnessDashboard();
+    assert.notStrictEqual(doc.modalEl, first);
+});
+test('la tabla incluye estrellas y número, y nombre recortable', () => {
+    T.wellnessData = [w('p1', 0, { sleep: 4 })]; T._wRange = 'today';
+    const h = T._renderWPlayerTable();
+    assert.ok(h.includes('class="wt-stars"') && h.includes('class="wt-num"'));
+    assert.ok(h.includes('wt-name') && h.includes('wellness-table-scroll'));
+});
+ctx.document = { createElement: () => ({}), head: { appendChild() {} }, getElementById: () => null, documentElement: { classList: { contains: () => false } }, body: { classList: { contains: () => false } } };
 
 console.log(`\n${passed} OK, ${failed} fallos`);
 process.exit(failed ? 1 : 0);
