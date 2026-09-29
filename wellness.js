@@ -378,7 +378,7 @@ RPETracker.prototype._renderWPlayerTable = function() {
         return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null;
     };
     const cell = v => v !== null
-        ? `<td><span class="wt-badge" title="${v.toFixed(1)}/5" style="background:${this._wColor(v)}"><span class="wt-stars">${'★'.repeat(Math.round(v))}${'☆'.repeat(5-Math.round(v))}</span><span class="wt-num">${v.toFixed(1)}</span></span></td>`
+        ? `<td><span class="wt-badge" title="${v.toFixed(1)}/5" style="background:${this._wColor(v)}">${v.toFixed(1)}</span></td>`
         : `<td style="color:var(--text-secondary)">—</td>`;
     const overallOf = vals => {
         const present = vals.filter(v => v !== null);
@@ -434,7 +434,7 @@ RPETracker.prototype._renderWPlayerTable = function() {
             </table>
         </div>
         <p style="margin:.5rem 0 0;font-size:.75rem;color:var(--text-secondary)">
-            ★★★★★ 5 = óptimo &nbsp;|&nbsp; ★★★ 3 = aceptable &nbsp;|&nbsp; ★ 1 = muy bajo
+            5 = óptimo &nbsp;|&nbsp; 3 = aceptable &nbsp;|&nbsp; 1 = muy bajo
             ${range.days > 1 ? `&nbsp;|&nbsp; Medias de los últimos ${range.days} días` : ''}
         </p>
         <p class="wt-legend-mobile">😴 Sueño · ⚡ Energía · 😊 Humor · 💪 Muscular · 📈 Tendencia</p>
@@ -991,7 +991,7 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 .wellness-player-table th:first-child,.wellness-player-table td:first-child{position:sticky;left:0;z-index:1;background:var(--wt-sticky-bg)}
 .wellness-team-row td:first-child{background:var(--bg-subtle)}
 .wt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.wt-num,.wt-h-icon,.wt-legend-mobile{display:none}
+.wt-h-icon,.wt-legend-mobile{display:none}
 @media (max-width:640px){
     .wellness-card{padding:.8rem .7rem}
     .wellness-player-table{font-size:.8rem}
@@ -1000,16 +1000,14 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
     .wellness-player-table th{font-size:.7rem}
     .wt-avatar,.wt-long,.wt-h-text{display:none}
     .wt-h-icon{display:inline}
-    .wt-stars{display:none}
-    .wt-num{display:inline}
-    .wt-badge{min-width:1.9rem;text-align:center;padding:.15rem .25rem;font-size:.78rem;letter-spacing:0}
     .wt-legend-mobile{display:block;margin:.35rem 0 0;font-size:.72rem;color:var(--text-secondary)}
     /* Modal "Registrar bienestar" (bottom sheet en iPhone) */
     #wellnessModal .modal-content{max-height:92vh;max-height:92dvh}
     /* 16px evita el zoom automático de Safari al enfocar un campo */
     #wellnessModal select,#wellnessModal input:not([type=checkbox]),#wellnessModal textarea{font-size:16px}
 }
-.wt-badge{display:inline-block;padding:.1rem .5rem;border-radius:10px;color:white;font-size:.72rem;font-weight:600;letter-spacing:.5px}
+.wt-badge{display:inline-block;min-width:2.1rem;text-align:center;padding:.15rem .45rem;border-radius:10px;color:white;font-size:.82rem;font-weight:700;font-variant-numeric:tabular-nums}
+@media (max-width:640px){.wt-badge{min-width:1.9rem;padding:.15rem .25rem;font-size:.78rem}}
 /* slider styles kept for legacy compat but hidden */
 .wellness-slider-row{display:flex;align-items:center;gap:.5rem}
 .ws-label-lo,.ws-label-hi{font-size:.72rem;color:var(--text-secondary);width:80px;flex-shrink:0}

@@ -190,10 +190,11 @@ test('re-render con el modal cerrado sí lo reconstruye (jugadoras actualizadas)
     T.renderWellnessDashboard();
     assert.notStrictEqual(doc.modalEl, first);
 });
-test('la tabla incluye estrellas y número, y nombre recortable', () => {
+test('la tabla muestra número con color (sin estrellas) y nombre recortable', () => {
     T.wellnessData = [w('p1', 0, { sleep: 4 })]; T._wRange = 'today';
     const h = T._renderWPlayerTable();
-    assert.ok(h.includes('class="wt-stars"') && h.includes('class="wt-num"'));
+    assert.ok(!h.includes('★') && !h.includes('☆'), 'siguen apareciendo estrellas');
+    assert.ok(/class="wt-badge"[^>]*background:[^>]*>4\.0<\/span>/.test(h), 'falta el número 4.0 con color');
     assert.ok(h.includes('wt-name') && h.includes('wellness-table-scroll'));
 });
 ctx.document = { createElement: () => ({}), head: { appendChild() {} }, getElementById: () => null, documentElement: { classList: { contains: () => false } }, body: { classList: { contains: () => false } } };
