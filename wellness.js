@@ -177,13 +177,33 @@ RPETracker.prototype.renderWellnessDashboard = function() {
             ${this._renderWTrendChart()}
             ${this._renderWCycleCard()}
             ${this._renderWHistory()}
-        </div>
-        ${this._renderWModal(today)}`;
+        </div>`;
 
     requestAnimationFrame(() => this._drawWellnessTrendChart());
 
-    const modal = document.getElementById('wellnessModal');
-    if (modal) modal.addEventListener('click', e => { if(e.target===modal) this.closeWellnessModal(); });
+    this._mountWellnessModal(today);
+};
+
+// El modal se monta en <body>, NO dentro de la vista. Motivo: la vista activa
+// (.view.active) tiene transform: translateY(0), y un ancestro con transform
+// convierte a los hijos position:fixed en "fixed respecto a ese ancestro". En el
+// iPhone en vertical (bottom sheet, align-items:flex-end) el modal quedaba
+// pegado al final de TODA la vista, fuera de pantalla. Los modales de
+// "Wellness rápido" y bulk ya se montaban en <body> por esta misma razón.
+RPETracker.prototype._mountWellnessModal = function(today) {
+    let modal = document.getElementById('wellnessModal');
+    // Si está abierto (p. ej. llega un dato de Firebase mientras la staff escribe)
+    // no se reconstruye, para no borrarle lo que lleva rellenado.
+    const isOpen = modal && modal.style.display !== 'none';
+    if (!isOpen) {
+        if (modal) modal.remove();
+        document.body.insertAdjacentHTML('beforeend', this._renderWModal(today));
+        modal = document.getElementById('wellnessModal');
+    }
+    if (modal && !modal._backdropBound) {
+        modal._backdropBound = true;
+        modal.addEventListener('click', e => { if (e.target === modal) this.closeWellnessModal(); });
+    }
 };
 
 // ========== TODAY STATUS ==========
@@ -358,7 +378,7 @@ RPETracker.prototype._renderWPlayerTable = function() {
         return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null;
     };
     const cell = v => v !== null
-        ? `<td><span class="wt-badge" style="background:${this._wColor(v)}">${'★'.repeat(Math.round(v))}${'☆'.repeat(5-Math.round(v))}</span></td>`
+        ? `<td><span class="wt-badge" title="${v.toFixed(1)}/5" style="background:${this._wColor(v)}"><span class="wt-stars">${'★'.repeat(Math.round(v))}${'☆'.repeat(5-Math.round(v))}</span><span class="wt-num">${v.toFixed(1)}</span></span></td>`
         : `<td style="color:var(--text-secondary)">—</td>`;
     const overallOf = vals => {
         const present = vals.filter(v => v !== null);
@@ -369,7 +389,7 @@ RPETracker.prototype._renderWPlayerTable = function() {
     // Fila de media del equipo (sustituye a la antigua tarjeta "Media del equipo")
     const teamVals = metrics.map(m => avgOf(recent, m));
     const teamRow = `<tr class="wellness-team-row">
-        <td><span style="font-weight:700">📊 Media del equipo</span></td>
+        <td><span class="wt-name" style="font-weight:700">📊 Media<span class="wt-long"> del equipo</span></span></td>
         ${teamVals.map(cell).join('')}
         ${globalCell(overallOf(teamVals))}
         <td style="color:var(--text-secondary)">—</td>
@@ -380,8 +400,8 @@ RPETracker.prototype._renderWPlayerTable = function() {
         const vals = metrics.map(m => avgOf(pData, m));
         const onPeriod = this._wCycleInfo(p.id).active;
         return `<tr>
-            <td><div style="display:flex;align-items:center;gap:.5rem">
-                ${PlayerTokens.avatar(p,22,'.6rem')}<span style="font-weight:600">${esc(p.name)}</span>${onPeriod ? '<span title="Con la regla">🩸</span>' : ''}
+            <td><div style="display:flex;align-items:center;gap:.5rem;min-width:0">
+                <span class="wt-avatar">${PlayerTokens.avatar(p,22,'.6rem')}</span><span class="wt-name" style="font-weight:600">${esc(p.name)}</span>${onPeriod ? '<span title="Con la regla">🩸</span>' : ''}
             </div></td>
             ${vals.map(cell).join('')}
             ${globalCell(overallOf(vals))}
@@ -399,11 +419,16 @@ RPETracker.prototype._renderWPlayerTable = function() {
                 📅 ${range.label} <span class="wellness-range-next">⟳</span>
             </button>
         </div>
-        <div style="overflow-x:auto">
+        <div class="wellness-table-scroll">
             <table class="wellness-player-table">
                 <thead><tr>
-                    <th>Jugadora</th><th>😴 Sueño</th><th>⚡ Energía</th>
-                    <th>😊 Humor</th><th>💪 Muscular</th><th>Global</th><th>Tendencia</th>
+                    <th>Jugadora</th>
+                    <th title="Sueño">😴<span class="wt-h-text"> Sueño</span></th>
+                    <th title="Energía">⚡<span class="wt-h-text"> Energía</span></th>
+                    <th title="Humor">😊<span class="wt-h-text"> Humor</span></th>
+                    <th title="Muscular">💪<span class="wt-h-text"> Muscular</span></th>
+                    <th>Global</th>
+                    <th title="Tendencia"><span class="wt-h-text">Tendencia</span><span class="wt-h-icon">📈</span></th>
                 </tr></thead>
                 <tbody>${teamRow}${playerRows}</tbody>
             </table>
@@ -412,6 +437,7 @@ RPETracker.prototype._renderWPlayerTable = function() {
             ★★★★★ 5 = óptimo &nbsp;|&nbsp; ★★★ 3 = aceptable &nbsp;|&nbsp; ★ 1 = muy bajo
             ${range.days > 1 ? `&nbsp;|&nbsp; Medias de los últimos ${range.days} días` : ''}
         </p>
+        <p class="wt-legend-mobile">😴 Sueño · ⚡ Energía · 😊 Humor · 💪 Muscular · 📈 Tendencia</p>
     </div>`;
 };
 
@@ -554,11 +580,11 @@ RPETracker.prototype._renderWCycleCard = function() {
         ? `<div style="text-align:center;padding:1rem 0;color:var(--text-secondary)">
             <p style="margin:0;font-size:.88rem">Aún no hay registros. Las jugadoras lo marcan en su wellness diario
             (casilla «Tengo la regla») y tú puedes marcarlo al registrar bienestar.</p></div>`
-        : `<div style="overflow-x:auto"><table class="wellness-player-table">
+        : `<div class="wellness-table-scroll"><table class="wellness-player-table">
             <thead><tr><th>Jugadora</th><th>Estado</th><th>Último inicio</th><th>Ciclo aprox.</th></tr></thead>
             <tbody>${withData.map(({p, info}) => `<tr>
-                <td><div style="display:flex;align-items:center;gap:.5rem">
-                    ${PlayerTokens.avatar(p,22,'.6rem')}<span style="font-weight:600">${esc(p.name)}</span></div></td>
+                <td><div style="display:flex;align-items:center;gap:.5rem;min-width:0">
+                    <span class="wt-avatar">${PlayerTokens.avatar(p,22,'.6rem')}</span><span class="wt-name" style="font-weight:600">${esc(p.name)}</span></div></td>
                 <td>${info.active
                     ? `<span class="wellness-period-badge">🩸 Día ${info.dayNumber}</span>`
                     : '<span style="color:var(--text-secondary)">—</span>'}</td>
@@ -956,6 +982,33 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 .wellness-period-badge{display:inline-block;padding:.1rem .55rem;border-radius:10px;background:rgba(233,30,99,.12);color:#e91e63;font-size:.78rem;font-weight:700}
 .wellness-period-check{display:flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:600;cursor:pointer}
 .wellness-period-check input{width:18px;height:18px}
+.wellness-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* Columna de nombre fija: al hacer scroll horizontal la jugadora siempre se ve.
+   Las celdas fijas necesitan fondo opaco. --card-bg no está definida en la app,
+   así que las tarjetas son transparentes sobre --bg-app: usamos ese mismo color.
+   Si algún día se define --card-bg, cambiar aquí --wt-sticky-bg. */
+.wellness-player-table{--wt-sticky-bg:var(--bg-app)}
+.wellness-player-table th:first-child,.wellness-player-table td:first-child{position:sticky;left:0;z-index:1;background:var(--wt-sticky-bg)}
+.wellness-team-row td:first-child{background:var(--bg-subtle)}
+.wt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.wt-num,.wt-h-icon,.wt-legend-mobile{display:none}
+@media (max-width:640px){
+    .wellness-card{padding:.8rem .7rem}
+    .wellness-player-table{font-size:.8rem}
+    .wellness-player-table th,.wellness-player-table td{padding:.4rem .2rem;text-align:center}
+    .wellness-player-table th:first-child,.wellness-player-table td:first-child{text-align:left;max-width:96px;padding-left:.15rem}
+    .wellness-player-table th{font-size:.7rem}
+    .wt-avatar,.wt-long,.wt-h-text{display:none}
+    .wt-h-icon{display:inline}
+    .wt-stars{display:none}
+    .wt-num{display:inline}
+    .wt-badge{min-width:1.9rem;text-align:center;padding:.15rem .25rem;font-size:.78rem;letter-spacing:0}
+    .wt-legend-mobile{display:block;margin:.35rem 0 0;font-size:.72rem;color:var(--text-secondary)}
+    /* Modal "Registrar bienestar" (bottom sheet en iPhone) */
+    #wellnessModal .modal-content{max-height:92vh;max-height:92dvh}
+    /* 16px evita el zoom automático de Safari al enfocar un campo */
+    #wellnessModal select,#wellnessModal input:not([type=checkbox]),#wellnessModal textarea{font-size:16px}
+}
 .wt-badge{display:inline-block;padding:.1rem .5rem;border-radius:10px;color:white;font-size:.72rem;font-weight:600;letter-spacing:.5px}
 /* slider styles kept for legacy compat but hidden */
 .wellness-slider-row{display:flex;align-items:center;gap:.5rem}
