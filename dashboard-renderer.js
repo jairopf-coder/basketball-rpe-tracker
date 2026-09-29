@@ -167,6 +167,19 @@ RPETracker.prototype.renderDashboard = function() {
         </div>`;
     }
 
+    // Aviso: RPE enviado por una jugadora distinto del que registró el staff
+    const rpeDiscrepancies = this._rpeDiscrepancies || [];
+    if (rpeDiscrepancies.length > 0) {
+        const items = rpeDiscrepancies.map(d =>
+            `<div class="db-alert-item">⚠️ <strong>${esc(d.playerName.split(' ')[0])}</strong> RPE distinto (tú: ${d.staffRpe}, ella: ${d.playerRpe}) — ${d.date}
+                <button class="db-alert-btn-team" onclick="window.rpeTracker?.showSessionDetail('${d.sessionId}')">Revisar →</button>
+            </div>`
+        );
+        bannerHTML += `<div class="db-alert-banner db-alert-banner--trend">
+            ${items.join('<div class="db-alert-sep">·</div>')}
+        </div>`;
+    }
+
     // ── Aviso dominical: recordar hacer la planificación de la semana que empieza ──
     // Solo los domingos, y solo si la semana que empieza mañana todavía no se ha guardado.
     if (new Date().getDay() === 0) {

@@ -998,6 +998,13 @@ RPETracker.prototype.handleEditSessionSubmit = function(e) {
     this.renderSessions();
     this.closeModal('editSessionModal');
     this.showToast('✅ Sesión actualizada correctamente');
+
+    // Si esta sesión tenía un aviso de RPE distinto al enviado por la jugadora,
+    // al editarla ya no hace falta seguir mostrándolo.
+    if (this._rpeDiscrepancies && this._rpeDiscrepancies.length) {
+        this._rpeDiscrepancies = this._rpeDiscrepancies.filter(d => d.sessionId !== sessionId);
+    }
+    if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard();
 };
 
 RPETracker.prototype.updateEditRPEDisplay = function(value) {
@@ -1151,3 +1158,120 @@ RPETracker.prototype.getFilteredAndSortedSessions = function() {
     return filtered;
 };
 
+
+// ========== RPE ENVIADO POR JUGADORAS (playerRpeReports) ==========
+//
+// La vista de jugadora guarda su RPE en /playerRpeReports/{uid}/{fecha}/{turno}
+// con { uid, date, sessionType, rpe, ts, playerId? }, sessionType es
+// 'morning' | 'afternoon' | 'match'. Aquí se traduce a una sesión normal
+// (mismo formato que las que crea el staff) y se añade a this.sessions:
+//
+//  - Si no existe ya una sesión de esa jugadora/fecha/turno → se crea
+//    automáticamente (duración por defecto 60 min, editable después).
+//  - Si ya existe una sesión del staff con un RPE distinto → NO se
+//    sobrescribe nada; se guarda el aviso para mostrarlo en Inicio y que
+//    el staff decida.
+//  - Si coincide el RPE → se descarta en silencio (no hace falta avisar).
+//
+// Se registra una sola vez, igual que el resto de listeners de Firebase.
+
+RPETracker.prototype._registerPlayerRpeListener = function() {
+    if (this._playerRpeListenerSet) return;
+    if (!window.firebaseDB) return;
+    this._playerRpeListenerSet = true;
+    this._rpeDiscrepancies = this._rpeDiscrepancies || [];
+
+    window.firebaseDB.ref('playerRpeReports').on('value', snapshot => {
+        const val = snapshot.val() || {};
+        const allEntries = [];
+        Object.keys(val).forEach(uid => {
+            const dateMap = val[uid] || {};
+            Object.values(dateMap).forEach(sessionTypeMap => {
+                Object.values(sessionTypeMap || {}).forEach(entry => {
+                    if (entry && typeof entry === 'object') {
+                        allEntries.push(Object.assign({}, entry, { uid: entry.uid || uid }));
+                    }
+                });
+            });
+        });
+        this._applyPlayerRpeEntries(allEntries);
+        if (window._devMode) console.log('🔄 RPE de jugadoras actualizado desde Firebase', allEntries.length, 'entries');
+    });
+};
+
+// Traduce sessionType ('morning'|'afternoon'|'match') al type/timeOfDay
+// que usa el resto de la app para las sesiones del staff.
+RPETracker.prototype._sessionTypeToTypeTimeOfDay = function(sessionType) {
+    if (sessionType === 'match') return { type: 'match', timeOfDay: 'morning' };
+    if (sessionType === 'afternoon') return { type: 'training', timeOfDay: 'afternoon' };
+    return { type: 'training', timeOfDay: 'morning' }; // 'morning' o valor inesperado
+};
+
+RPETracker.prototype._applyPlayerRpeEntries = function(entries) {
+    if (!entries || !entries.length) return;
+    this._rpeDiscrepancies = [];
+    let changed = false;
+
+    entries.forEach(entry => {
+        if (!entry || !entry.date || entry.rpe == null) return;
+
+        let playerId = entry.playerId || null;
+        if (!playerId && entry.uid) {
+            const linked = (this.players || []).find(p => p.authUid === entry.uid);
+            if (linked) playerId = linked.id;
+        }
+        if (!playerId) return; // cuenta sin vincular — no se puede asociar a una jugadora
+
+        const { type, timeOfDay } = this._sessionTypeToTypeTimeOfDay(entry.sessionType);
+        const dateKey = entry.date; // YYYY-MM-DD
+
+        // Buscar sesión existente de esa jugadora, mismo día y mismo turno
+        const existing = (this.sessions || []).find(s =>
+            s.playerId === playerId &&
+            (s.date || '').slice(0, 10) === dateKey &&
+            s.timeOfDay === timeOfDay &&
+            s.type === type
+        );
+
+        if (existing) {
+            if (existing.rpe !== entry.rpe) {
+                const player = this.players.find(p => p.id === playerId);
+                this._rpeDiscrepancies.push({
+                    sessionId: existing.id,
+                    playerName: player ? player.name : 'Jugadora',
+                    date: dateKey,
+                    staffRpe: existing.rpe,
+                    playerRpe: entry.rpe,
+                });
+            }
+            // Coincide o difiere: nunca se sobrescribe una sesión ya existente del staff.
+            return;
+        }
+
+        // No hay sesión — crear una nueva a partir del RPE de la jugadora.
+        const id = 'wpr_' + entry.uid + '_' + dateKey + '_' + timeOfDay;
+        if ((this.sessions || []).some(s => s.id === id)) return; // ya creada antes
+
+        this.sessions = this.sessions || [];
+        this.sessions.push({
+            id,
+            playerId,
+            date: dateKey + 'T' + (timeOfDay === 'afternoon' ? '18:00:00' : '10:00:00'),
+            timeOfDay,
+            type,
+            rpe: entry.rpe,
+            duration: 60, // valor por defecto — el staff puede editarlo como cualquier sesión
+            load: entry.rpe * 60,
+            notes: '',
+            season: typeof this._getSelectedSeason === 'function' ? this._getSelectedSeason() : undefined,
+            source: 'player',
+        });
+        changed = true;
+    });
+
+    if (changed) {
+        this.saveSessions();
+        this.renderSessions();
+    }
+    if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard();
+};
