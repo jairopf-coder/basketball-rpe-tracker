@@ -109,9 +109,11 @@ RPETracker.prototype._mergeWellnessPlayer = function(staffEntries, playerEntries
             date:     entry.date,
             rpe:      entry.rpe  != null ? entry.rpe  : null,
             sleep:    entry.sleep   != null ? entry.sleep   : null,
-            fatigue:  entry.fatigue != null ? entry.fatigue : null,
-            mood:     entry.mood    != null ? entry.mood    : null,
-            pain:     entry.pain    != null ? entry.pain    : null,
+            fatigue:  entry.fatigue  != null ? entry.fatigue  : null,
+            mood:     entry.mood     != null ? entry.mood     : null,
+            // La jugadora guarda el dolor muscular como "pain"; el staff
+            // (tabla, gráfico, alertas) lo lee siempre como "soreness".
+            soreness: entry.pain     != null ? entry.pain     : null,
             ts:       entry.ts || null,
             source:   'player', // marca de origen para depuración
         });

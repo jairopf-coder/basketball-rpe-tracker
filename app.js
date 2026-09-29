@@ -778,6 +778,9 @@ class RPETracker {
         } else if (!window.firebaseSync) {
             console.warn('⚠️ Firebase no disponible, usando localStorage');
         }
+        // Escuchar el RPE que envían las jugadoras desde su propia vista
+        // (independiente del listener de /sessions de arriba).
+        if (typeof this._registerPlayerRpeListener === 'function') this._registerPlayerRpeListener();
         return localSessions;
     }
 
