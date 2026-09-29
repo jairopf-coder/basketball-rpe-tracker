@@ -199,5 +199,92 @@ test('la tabla muestra número con color (sin estrellas) y nombre recortable', (
 });
 ctx.document = { createElement: () => ({}), head: { appendChild() {} }, getElementById: () => null, documentElement: { classList: { contains: () => false } }, body: { classList: { contains: () => false } } };
 
+console.log('\nGuardado sin copiar entradas de jugadoras a /wellness');
+const key = e => `${e.playerId}|${e.date}`;
+const visible = arr => arr.map(e => `${key(e)}|${e.sleep}|${e.fatigue}|${e.mood}|${e.soreness}|${e.period === true}`).sort();
+const playerRaw = (uid, off, extra) => Object.assign({ uid, date: iso(off), sleep: 3, fatigue: 3, mood: 3, pain: 3 }, extra || {});
+function tracker() {
+    const t = vm.runInContext('new RPETracker()', ctx);
+    t.players = [{ id: 'p1', name: 'Ana', authUid: 'uA' }, { id: 'p2', name: 'Bea', authUid: 'uB' }];
+    return t;
+}
+test('lo del staff se guarda; lo de jugadoras con original en su buzón, no', () => {
+    const t = tracker();
+    const cache = [playerRaw('uA', 0), playerRaw('uB', 0)];
+    t._wellnessPlayerCache = cache;
+    t.wellnessData = t._mergeWellnessPlayer([w('p1', 5)], cache);
+    assert.strictEqual(t.wellnessData.length, 3);
+    const saved = t._wellnessToPersist();
+    assert.strictEqual(saved.length, 1);
+    assert.strictEqual(saved[0].playerId, 'p1'); assert.strictEqual(saved[0].date, iso(5));
+});
+test('RED DE SEGURIDAD: una copia sin original en el buzón se conserva', () => {
+    const t = tracker();
+    t._wellnessPlayerCache = [playerRaw('uA', 0)];
+    const orphan = { id: `wp_uB_${iso(9)}`, playerId: 'p2', date: iso(9), sleep: 2, fatigue: 2, mood: 2, soreness: 2, source: 'player' };
+    t.wellnessData = [orphan];
+    assert.strictEqual(t._wellnessToPersist().length, 1, 'se perdería un dato sin original');
+});
+test('RED DE SEGURIDAD: con el buzón aún sin cargar no se descarta nada', () => {
+    const t = tracker();
+    t._wellnessPlayerCache = [];
+    const copy = { id: `wp_uA_${iso(0)}`, playerId: 'p1', date: iso(0), sleep: 4, fatigue: 4, mood: 4, soreness: 4, source: 'player' };
+    t.wellnessData = [copy, w('p2', 1)];
+    assert.strictEqual(t._wellnessToPersist().length, 2);
+});
+test('si el staff edita el día de una jugadora, su versión (w_…, sin source) SÍ se guarda', () => {
+    const t = tracker();
+    const cache = [playerRaw('uA', 0)];
+    t._wellnessPlayerCache = cache;
+    t.wellnessData = [w('p1', 0, { id: `w_p1_${iso(0)}`, sleep: 1 })]; // ya sustituyó a la de la jugadora
+    const saved = t._wellnessToPersist();
+    assert.strictEqual(saved.length, 1); assert.strictEqual(saved[0].sleep, 1);
+});
+test('ida y vuelta: guardar y recargar deja EXACTAMENTE los mismos datos visibles', () => {
+    const t = tracker();
+    const cache = [playerRaw('uA', 0, { period: true }), playerRaw('uB', 1), playerRaw('uA', 2)];
+    t._wellnessPlayerCache = cache;
+    const staff = [w('p1', 5), w('p2', 1, { sleep: 5 })]; // staff pisa a Bea el día 1
+    t.wellnessData = t._mergeWellnessPlayer(staff, cache);
+    const before = visible(t.wellnessData);
+    const saved = t._wellnessToPersist();              // lo que iría a Firebase
+    const reloaded = t._mergeWellnessPlayer(saved, cache); // lo que se vería al recargar
+    assert.deepStrictEqual(visible(reloaded), before);
+    assert.strictEqual(reloaded.length, t.wellnessData.length, 'hay duplicados o faltan entradas');
+});
+test('limpieza de copias antiguas: /wellness con copias wp_ → se guardan solo las propias y no se pierde nada', () => {
+    const t = tracker();
+    const cache = [playerRaw('uA', 0), playerRaw('uB', 1)];
+    t._wellnessPlayerCache = cache;
+    const oldCopies = t._mergeWellnessPlayer([], cache);          // así están hoy en /wellness
+    const fromFirebase = [w('p1', 6)].concat(JSON.parse(JSON.stringify(oldCopies)));
+    t.wellnessData = t._mergeWellnessPlayer(fromFirebase, cache);
+    const before = visible(t.wellnessData);
+    const saved = t._wellnessToPersist();
+    assert.strictEqual(saved.length, 1, 'las copias antiguas deberían dejar de guardarse');
+    assert.deepStrictEqual(visible(t._mergeWellnessPlayer(saved, cache)), before);
+});
+test('saveWellnessData envía la lista filtrada y NO toca la de memoria', () => {
+    const t = tracker();
+    const cache = [playerRaw('uA', 0)];
+    t._wellnessPlayerCache = cache;
+    t.wellnessData = t._mergeWellnessPlayer([w('p2', 3)], cache);
+    let sent = null;
+    ctx.window.firebaseSync = { saveWellnessData: list => { sent = list; } };
+    try { t.saveWellnessData(); } finally { delete ctx.window.firebaseSync; }
+    assert.strictEqual(sent.length, 1);
+    assert.strictEqual(t.wellnessData.length, 2, 'la vista debe seguir mostrando las dos');
+});
+test('sin Firebase, el respaldo local guarda también la lista filtrada', () => {
+    const t = tracker();
+    const cache = [playerRaw('uA', 0)];
+    t._wellnessPlayerCache = cache;
+    t.wellnessData = t._mergeWellnessPlayer([w('p2', 3)], cache);
+    let stored = null;
+    const prev = ctx.localStorage; ctx.localStorage = { getItem: () => null, setItem: (k, v) => { stored = JSON.parse(v); } };
+    try { t.saveWellnessData(); } finally { ctx.localStorage = prev; }
+    assert.strictEqual(stored.length, 1);
+});
+
 console.log(`\n${passed} OK, ${failed} fallos`);
 process.exit(failed ? 1 : 0);

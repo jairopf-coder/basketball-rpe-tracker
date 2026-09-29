@@ -140,11 +140,24 @@ RPETracker.prototype._mergeWellnessPlayer = function(staffEntries, playerEntries
     return merged.concat(extras);
 };
 
+// Entradas que hay que guardar en /wellness (el nodo del staff).
+// Las entradas que llegan del buzón de las jugadoras (/wellnessPlayer, marcadas
+// source:'player') NO se copian: ya viven allí y se vuelven a fusionar al cargar.
+// Red de seguridad: solo se omiten las que tienen su original en ese buzón; una
+// copia "huérfana" (sin original) se conserva para no perder nunca un dato.
+// Las entradas editadas por el staff (id "w_…", sin source) siempre se guardan.
+RPETracker.prototype._wellnessToPersist = function() {
+    const all = this.wellnessData || [];
+    const backed = new Set((this._wellnessPlayerCache || []).map(e => 'wp_' + e.uid + '_' + e.date));
+    return all.filter(w => !(w.source === 'player' && backed.has(w.id)));
+};
+
 RPETracker.prototype.saveWellnessData = function() {
+    const toSave = this._wellnessToPersist();
     if (window.firebaseSync) {
-        window.firebaseSync.saveWellnessData(this.wellnessData || []);
+        window.firebaseSync.saveWellnessData(toSave);
     } else {
-        localStorage.setItem('basketballWellness', JSON.stringify(this.wellnessData || []));
+        localStorage.setItem('basketballWellness', JSON.stringify(toSave));
     }
 };
 
