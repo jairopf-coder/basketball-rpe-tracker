@@ -222,6 +222,7 @@ RPETracker.prototype.renderDashboard = function() {
 
     container.innerHTML = `
         ${bannerHTML}
+        ${typeof this._renderPlayerRpeInbox === 'function' ? this._renderPlayerRpeInbox() : ''}
         ${isMatchDay || this._matchDayMode ? `
         <div class="db-matchday-bar">
             <span class="db-matchday-badge">🏟️ DÍA DE PARTIDO</span>

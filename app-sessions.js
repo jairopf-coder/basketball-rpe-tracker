@@ -1159,21 +1159,23 @@ RPETracker.prototype.getFilteredAndSortedSessions = function() {
 };
 
 
-// ========== RPE ENVIADO POR JUGADORAS (playerRpeReports) ==========
+// ========== RPE ENVIADO POR JUGADORAS: BANDEJA DE PENDIENTES ==========
 //
 // La vista de jugadora guarda su RPE en /playerRpeReports/{uid}/{fecha}/{turno}
-// con { uid, date, sessionType, rpe, ts, playerId? }, sessionType es
-// 'morning' | 'afternoon' | 'match'. Aquí se traduce a una sesión normal
-// (mismo formato que las que crea el staff) y se añade a this.sessions:
+// con { uid, date, sessionType, rpe, ts, playerId? }. sessionType es
+// 'morning' | 'afternoon' | 'match'.
 //
-//  - Si no existe ya una sesión de esa jugadora/fecha/turno → se crea
-//    automáticamente (duración por defecto 60 min, editable después).
-//  - Si ya existe una sesión del staff con un RPE distinto → NO se
-//    sobrescribe nada; se guarda el aviso para mostrarlo en Inicio y que
-//    el staff decida.
-//  - Si coincide el RPE → se descarta en silencio (no hace falta avisar).
-//
-// Se registra una sola vez, igual que el resto de listeners de Firebase.
+// IMPORTANTE: estos RPE NO se convierten en sesiones por sí solos (antes se
+// creaban sesiones "wpr_" con 60 min inventados y reaparecían al borrarlas).
+// Ahora aparecen en una tarjeta de Inicio ("RPE de jugadoras pendientes") y
+// el staff decide, jugadora a jugadora:
+//   - Añadir: escribe sus minutos y se crea una sesión normal con ese RPE.
+//   - Descartar: el RPE se marca como revisado y deja de aparecer.
+// Un RPE deja de estar pendiente cuando (a) ya existe una sesión de esa
+// jugadora/fecha/turno/tipo, o (b) está marcado como revisado (reviewed:true,
+// que se guarda en el propio registro de Firebase; el staff ya tiene permiso
+// de escritura ahí). Si el RPE del staff difiere del de la jugadora se avisa
+// en Inicio, como antes; nunca se sobrescribe una sesión existente.
 
 RPETracker.prototype._registerPlayerRpeListener = function() {
     if (this._playerRpeListenerSet) return;
@@ -1186,10 +1188,15 @@ RPETracker.prototype._registerPlayerRpeListener = function() {
         const allEntries = [];
         Object.keys(val).forEach(uid => {
             const dateMap = val[uid] || {};
-            Object.values(dateMap).forEach(sessionTypeMap => {
-                Object.values(sessionTypeMap || {}).forEach(entry => {
+            Object.keys(dateMap).forEach(dateKey => {
+                const typeMap = dateMap[dateKey] || {};
+                Object.keys(typeMap).forEach(typeKey => {
+                    const entry = typeMap[typeKey];
                     if (entry && typeof entry === 'object') {
-                        allEntries.push(Object.assign({}, entry, { uid: entry.uid || uid }));
+                        allEntries.push(Object.assign({}, entry, {
+                            uid: entry.uid || uid,
+                            _path: `playerRpeReports/${uid}/${dateKey}/${typeKey}`,
+                        }));
                     }
                 });
             });
@@ -1207,71 +1214,237 @@ RPETracker.prototype._sessionTypeToTypeTimeOfDay = function(sessionType) {
     return { type: 'training', timeOfDay: 'morning' }; // 'morning' o valor inesperado
 };
 
+// Guarda los RPE recibidos y calcula los avisos de RPE distinto.
+// NO crea sesiones.
 RPETracker.prototype._applyPlayerRpeEntries = function(entries) {
-    if (!entries || !entries.length) return;
-    this._rpeDiscrepancies = [];
-    let changed = false;
+    this._playerRpeRaw = entries || [];
+    this._rpeDiscrepancies = this._analyzePlayerRpe().discrepancies;
+    if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard();
+};
 
-    entries.forEach(entry => {
+// Clasifica los RPE de jugadoras con el estado ACTUAL de sesiones y jugadoras
+// (se calcula al pintar, así no depende de qué llegue antes de Firebase).
+//   pending       → con jugadora vinculada, sin sesión y sin revisar
+//   unlinked      → cuenta sin vincular a ninguna jugadora
+//   discrepancies → ya hay sesión del staff con otro RPE
+RPETracker.prototype._analyzePlayerRpe = function() {
+    const pending = [], unlinked = [], discrepancies = [];
+    // Las sesiones solo se cargan desde el inicio de temporada; RPE anteriores
+    // parecerían "sin sesión" aunque la tengan, así que se ignoran.
+    const windowStart = typeof getCurrentSeasonWindowStart === 'function' ? getCurrentSeasonWindowStart() : '';
+
+    (this._playerRpeRaw || []).forEach(entry => {
         if (!entry || !entry.date || entry.rpe == null) return;
+        if (windowStart && entry.date < windowStart) return;
 
         let playerId = entry.playerId || null;
         if (!playerId && entry.uid) {
             const linked = (this.players || []).find(p => p.authUid === entry.uid);
             if (linked) playerId = linked.id;
         }
-        if (!playerId) return; // cuenta sin vincular — no se puede asociar a una jugadora
 
-        const { type, timeOfDay } = this._sessionTypeToTypeTimeOfDay(entry.sessionType);
-        const dateKey = entry.date; // YYYY-MM-DD
+        const sessionType = entry.sessionType || 'morning';
+        const { type, timeOfDay } = this._sessionTypeToTypeTimeOfDay(sessionType);
+        const item = {
+            key: entry._path || `${entry.uid}/${entry.date}/${sessionType}`,
+            path: entry._path || null,
+            uid: entry.uid, date: entry.date, sessionType, type, timeOfDay, rpe: entry.rpe,
+        };
 
-        // Buscar sesión existente de esa jugadora, mismo día y mismo turno
-        const existing = (this.sessions || []).find(s =>
-            s.playerId === playerId &&
-            (s.date || '').slice(0, 10) === dateKey &&
-            s.timeOfDay === timeOfDay &&
-            s.type === type
-        );
-
-        if (existing) {
-            if (existing.rpe !== entry.rpe) {
-                const player = this.players.find(p => p.id === playerId);
-                this._rpeDiscrepancies.push({
-                    sessionId: existing.id,
-                    playerName: player ? player.name : 'Jugadora',
-                    date: dateKey,
-                    staffRpe: existing.rpe,
-                    playerRpe: entry.rpe,
-                });
+        if (playerId) {
+            const existing = (this.sessions || []).find(s =>
+                s.playerId === playerId &&
+                (s.date || '').slice(0, 10) === entry.date &&
+                s.timeOfDay === timeOfDay &&
+                s.type === type
+            );
+            if (existing) {
+                if (existing.rpe !== entry.rpe) {
+                    const player = (this.players || []).find(p => p.id === playerId);
+                    discrepancies.push({
+                        sessionId: existing.id,
+                        playerName: player ? player.name : 'Jugadora',
+                        date: entry.date,
+                        staffRpe: existing.rpe,
+                        playerRpe: entry.rpe,
+                    });
+                }
+                return; // ya registrado por el staff: nunca se sobrescribe
             }
-            // Coincide o difiere: nunca se sobrescribe una sesión ya existente del staff.
-            return;
         }
 
-        // No hay sesión — crear una nueva a partir del RPE de la jugadora.
-        const id = 'wpr_' + entry.uid + '_' + dateKey + '_' + timeOfDay;
-        if ((this.sessions || []).some(s => s.id === id)) return; // ya creada antes
-
-        this.sessions = this.sessions || [];
-        this.sessions.push({
-            id,
-            playerId,
-            date: dateKey + 'T' + (timeOfDay === 'afternoon' ? '18:00:00' : '10:00:00'),
-            timeOfDay,
-            type,
-            rpe: entry.rpe,
-            duration: 60, // valor por defecto — el staff puede editarlo como cualquier sesión
-            load: entry.rpe * 60,
-            notes: '',
-            season: typeof this._getSelectedSeason === 'function' ? this._getSelectedSeason() : undefined,
-            source: 'player',
-        });
-        changed = true;
+        if (entry.reviewed === true) return;
+        if (!playerId) { unlinked.push(item); return; }
+        const player = (this.players || []).find(p => p.id === playerId);
+        pending.push(Object.assign(item, { playerId, playerName: player ? player.name : 'Jugadora' }));
     });
 
-    if (changed) {
-        this.saveSessions();
-        this.renderSessions();
-    }
+    // Más reciente primero; dentro de cada día/turno, por nombre.
+    const byDateDesc = (a, b) => b.date.localeCompare(a.date) || a.sessionType.localeCompare(b.sessionType);
+    pending.sort((a, b) => byDateDesc(a, b) || a.playerName.localeCompare(b.playerName));
+    unlinked.sort(byDateDesc);
+    return { pending, unlinked, discrepancies };
+};
+
+RPETracker.prototype._priTurnLabel = function(sessionType) {
+    return sessionType === 'match' ? '🏀 Partido' : sessionType === 'afternoon' ? 'Tarde' : 'Mañana';
+};
+
+RPETracker.prototype._priDateLabel = function(isoDate) {
+    const d = new Date(isoDate + 'T12:00:00'); // mediodía: evita desfases de zona horaria
+    return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+};
+
+RPETracker.prototype._priInputId = function(key) {
+    return 'priMin_' + String(key).replace(/[^a-zA-Z0-9]/g, '_');
+};
+
+// Recuerda los minutos escritos para que no se pierdan si Inicio se repinta
+// (p. ej. porque llega otro dato de Firebase mientras escribes).
+RPETracker.prototype._priSetMinutes = function(key, value) {
+    this._priMinutes = this._priMinutes || {};
+    this._priMinutes[key] = value;
+};
+
+RPETracker.prototype._renderPlayerRpeInbox = function() {
+    const { pending, unlinked } = this._analyzePlayerRpe();
+    if (!pending.length && !unlinked.length) return '';
+    const mins = this._priMinutes || {};
+
+    // Agrupar por día + turno: en un partido las quedan todas juntas.
+    const groups = [];
+    pending.forEach(item => {
+        const gKey = item.date + '|' + item.sessionType;
+        let g = groups.find(x => x.gKey === gKey);
+        if (!g) { g = { gKey, date: item.date, sessionType: item.sessionType, items: [] }; groups.push(g); }
+        g.items.push(item);
+    });
+
+    const groupsHtml = groups.map(g => `
+        <div class="pri-group">
+            <div class="pri-group-title">${esc(this._priDateLabel(g.date))} · ${this._priTurnLabel(g.sessionType)}
+                <span class="pri-group-count">${g.items.length}</span></div>
+            ${g.items.map(it => {
+                const k = esc(it.key);
+                return `<div class="pri-row">
+                    <div class="pri-info">
+                        <span class="pri-name">${esc(it.playerName)}</span>
+                        <span class="pri-rpe" style="background:${this.getRPEColor(it.rpe)}">RPE ${it.rpe}</span>
+                    </div>
+                    <div class="pri-actions">
+                        <input type="number" inputmode="numeric" min="1" max="300" placeholder="min"
+                            class="pri-min" id="${this._priInputId(it.key)}" aria-label="Minutos de ${esc(it.playerName)}"
+                            value="${esc(mins[it.key] || '')}"
+                            oninput="window.rpeTracker?._priSetMinutes('${k}', this.value)"
+                            onkeydown="if(event.key==='Enter'){window.rpeTracker?.addPendingPlayerRpe('${k}')}">
+                        <button type="button" class="pri-add" onclick="window.rpeTracker?.addPendingPlayerRpe('${k}')">Añadir</button>
+                        <button type="button" class="pri-dismiss" title="Descartar" aria-label="Descartar RPE de ${esc(it.playerName)}"
+                            onclick="window.rpeTracker?.dismissPendingPlayerRpe('${k}')">✕</button>
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>`).join('');
+
+    const unlinkedHtml = unlinked.length ? `
+        <div class="pri-group">
+            <div class="pri-group-title">Cuentas sin vincular a una jugadora
+                <span class="pri-group-count">${unlinked.length}</span></div>
+            ${unlinked.map(it => `<div class="pri-row">
+                <div class="pri-info">
+                    <span class="pri-name pri-name--muted">⚠️ …${esc(String(it.uid || '').slice(-6))}</span>
+                    <span class="pri-meta">${esc(this._priDateLabel(it.date))} · ${this._priTurnLabel(it.sessionType)}</span>
+                    <span class="pri-rpe" style="background:${this.getRPEColor(it.rpe)}">RPE ${it.rpe}</span>
+                </div>
+                <div class="pri-actions">
+                    <button type="button" class="pri-dismiss" title="Descartar" aria-label="Descartar"
+                        onclick="window.rpeTracker?.dismissPendingPlayerRpe('${esc(it.key)}')">✕</button>
+                </div>
+            </div>`).join('')}
+            <p class="pri-hint">Vincula esa cuenta a su jugadora en la sección Jugadoras para que aparezca con su nombre.</p>
+        </div>` : '';
+
+    return `<div class="pri-card">
+        <h3 class="pri-title">📥 RPE de jugadoras pendientes <span class="pri-count">${pending.length + unlinked.length}</span></h3>
+        <p class="pri-sub">Escribe los minutos de cada una y pulsa <strong>Añadir</strong>: se guarda como una sesión normal. Si un RPE no lo quieres, pulsa ✕.</p>
+        ${groupsHtml}${unlinkedHtml}
+    </div>`;
+};
+
+// Marca el RPE como revisado (Firebase + copia local) para que deje de salir.
+RPETracker.prototype._markPlayerRpeReviewed = function(item) {
+    const raw = (this._playerRpeRaw || []).find(e => e._path && e._path === item.path);
+    if (raw) raw.reviewed = true;
+    if (!window.firebaseDB || !item.path) return Promise.resolve();
+    return window.firebaseDB.ref(item.path)
+        .update({ reviewed: true, reviewedAt: new Date().toISOString() })
+        .catch(err => console.warn('No se pudo marcar el RPE como revisado:', err));
+};
+
+RPETracker.prototype._priFind = function(key) {
+    const a = this._analyzePlayerRpe();
+    return a.pending.find(x => x.key === key) || a.unlinked.find(x => x.key === key) || null;
+};
+
+RPETracker.prototype._priRefresh = function() {
     if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard();
+};
+
+RPETracker.prototype.addPendingPlayerRpe = function(key) {
+    const item = this._priFind(key);
+    if (!item || !item.playerId) { this.showToast('Ese RPE ya no está pendiente', 'info'); this._priRefresh(); return; }
+
+    const input = document.getElementById(this._priInputId(key));
+    const raw = input ? input.value : (this._priMinutes || {})[key];
+    const minutes = parseInt(raw, 10);
+    if (!minutes || minutes < 1 || minutes > 300) {
+        this.showToast(`⚠️ Escribe los minutos de ${item.playerName} (1-300)`, 'warning');
+        if (input && input.focus) input.focus();
+        return;
+    }
+
+    // id único aunque se añadan varias seguidas en el mismo milisegundo
+    const usedIds = new Set((this.sessions || []).map(x => x.id));
+    let n = Date.now();
+    while (usedIds.has(String(n))) n++;
+
+    this.sessions.push({
+        id: String(n),
+        playerId: item.playerId,
+        date: item.date + (item.timeOfDay === 'afternoon' ? 'T18:00:00' : 'T10:00:00'),
+        timeOfDay: item.timeOfDay,
+        type: item.type,
+        rpe: item.rpe,
+        duration: minutes,
+        load: item.rpe * minutes,
+        notes: '',
+        season: Store.getActiveSeason(),
+    });
+
+    if (this._priMinutes) delete this._priMinutes[key];
+    this.saveSessions();
+    this.renderSessions();
+    this._markPlayerRpeReviewed(item);
+    this._priRefresh();
+    this.showToast(`✅ ${item.playerName}: RPE ${item.rpe} · ${minutes} min`, 'success');
+    setTimeout(() => {
+        if (typeof PushNotifications !== 'undefined') PushNotifications.checkACAlerts(this, [item.playerId]);
+    }, 300);
+};
+
+RPETracker.prototype.dismissPendingPlayerRpe = function(key) {
+    const item = this._priFind(key);
+    if (!item) { this._priRefresh(); return; }
+    const who = item.playerName || 'cuenta sin vincular';
+    AppConfirm.show({
+        title: '¿Descartar este RPE?',
+        message: `${who} · ${this._priDateLabel(item.date)} · ${this._priTurnLabel(item.sessionType)} · RPE ${item.rpe}. No se creará ninguna sesión.`,
+        confirmText: 'Descartar',
+        cancelText: 'Cancelar',
+        danger: true
+    }).then(ok => {
+        if (!ok) return;
+        if (this._priMinutes) delete this._priMinutes[key];
+        this._markPlayerRpeReviewed(item);
+        this._priRefresh();
+    });
 };

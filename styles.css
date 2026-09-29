@@ -10778,3 +10778,28 @@ textarea:focus-visible,
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Bandeja "RPE de jugadoras pendientes" (Inicio) ───────────────────── */
+.pri-card { background: var(--bg-surface); border: 1px solid var(--border); border-left: 4px solid var(--primary, #ff6600); border-radius: 12px; padding: 1rem 1.1rem; margin: 0 0 1rem; }
+.pri-title { margin: 0 0 .25rem; font-size: 1rem; display: flex; align-items: center; gap: .5rem; color: var(--text-primary); }
+.pri-count { background: var(--primary, #ff6600); color: #fff; border-radius: 10px; padding: 0 .5rem; font-size: .78rem; font-weight: 700; }
+.pri-sub { margin: 0 0 .75rem; font-size: .8rem; color: var(--text-secondary); }
+.pri-group + .pri-group { margin-top: .75rem; }
+.pri-group-title { font-size: .78rem; font-weight: 700; text-transform: capitalize; color: var(--text-secondary); padding-bottom: .3rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: .4rem; }
+.pri-group-count { background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px; padding: 0 .4rem; font-size: .7rem; }
+.pri-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .5rem 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.pri-row:last-child { border-bottom: none; }
+.pri-info { display: flex; align-items: center; gap: .5rem; min-width: 0; flex: 1 1 140px; flex-wrap: wrap; }
+.pri-name { font-weight: 600; font-size: .9rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.pri-name--muted { color: var(--text-secondary); font-weight: 500; }
+.pri-meta { font-size: .78rem; color: var(--text-secondary); }
+.pri-rpe { color: #fff; font-weight: 700; font-size: .78rem; border-radius: 10px; padding: .1rem .55rem; white-space: nowrap; }
+.pri-actions { display: flex; align-items: center; gap: .4rem; }
+.pri-min { width: 4.6rem; padding: .45rem .5rem; font-size: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); color: var(--text-primary); text-align: center; }
+.pri-add { padding: .5rem .9rem; border: none; border-radius: 8px; background: var(--primary, #ff6600); color: #fff; font-weight: 700; font-size: .85rem; cursor: pointer; touch-action: manipulation; }
+.pri-dismiss { width: 2.2rem; height: 2.2rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-secondary); font-size: .95rem; cursor: pointer; touch-action: manipulation; }
+.pri-hint { margin: .4rem 0 0; font-size: .75rem; color: var(--text-secondary); }
+@media (max-width: 480px) {
+    .pri-actions { width: 100%; }
+    .pri-min { flex: 1; }
+}
