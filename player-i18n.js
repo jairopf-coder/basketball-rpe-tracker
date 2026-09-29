@@ -54,6 +54,9 @@ const PlayerI18n = (() => {
             pvDoneSub: 'Tus datos han sido enviados al cuerpo técnico.<br>¡Hasta mañana!',
             pvAlreadyTitle: '¡Ya respondiste hoy!',
             pvAlreadySub: 'Ya has enviado tu cuestionario de hoy.<br>¡Hasta mañana!',
+            pvPeriodLabel: '🩸 Ciclo menstrual',
+            pvPeriodYes: 'Sí, tengo la regla',
+            pvPeriodHint: 'Márcalo solo mientras la tengas. Cuando termine, no selecciones nada.',
             dateLocale: 'es-ES',
 
             // Menú principal (Wellness / RPE)
@@ -120,6 +123,9 @@ const PlayerI18n = (() => {
             pvDoneSub: 'Your data has been sent to the coaching staff.<br>See you tomorrow!',
             pvAlreadyTitle: 'Already submitted today!',
             pvAlreadySub: "You've already sent today's questionnaire.<br>See you tomorrow!",
+            pvPeriodLabel: '🩸 Menstrual cycle',
+            pvPeriodYes: 'Yes, I have my period',
+            pvPeriodHint: 'Select it only while you have it. When it ends, just leave it unselected.',
             dateLocale: 'en-GB',
 
             // Main menu (Wellness / RPE)

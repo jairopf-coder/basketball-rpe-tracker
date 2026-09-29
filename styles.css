@@ -4231,6 +4231,19 @@ header h1 {
 .pv-scale-num  { font-size: 1.05rem; font-weight: 700; line-height: 1; }
 .pv-scale-lbl  { font-size: 0.6rem; line-height: 1.2; }
 
+/* Casilla "Tengo la regla" (wellness de jugadora) */
+.pv-period-btn {
+    width: 100%; padding: 0.7rem 0.9rem; border: 2px solid var(--border);
+    border-radius: 10px; background: var(--bg-surface); color: var(--text-primary);
+    font-size: 16px; font-weight: 600; cursor: pointer; text-align: center;
+    touch-action: manipulation; transition: border-color 0.15s, background 0.15s;
+}
+.pv-period-btn:hover { border-color: #e91e63; }
+.pv-period-btn.selected { background: #e91e63; border-color: #e91e63; color: #fff; }
+.pv-period-hint { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; text-align: center; }
+[data-theme="dark"] .pv-period-btn { background: var(--bg-surface); border-color: var(--border-input); color: var(--text-primary); }
+[data-theme="dark"] .pv-period-btn.selected { background: #e91e63; border-color: #e91e63; color: #fff; }
+
 /* Menú principal (Wellness / RPE) */
 .pv-menu-btn {
     display: flex; align-items: center; justify-content: space-between; width: 100%;

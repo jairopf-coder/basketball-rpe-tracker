@@ -33,7 +33,7 @@ const PlayerView = (() => {
     // usaría el uid real de AppAuth se sustituye por un uid de prueba,
     // y el guardado real hacia Firebase/localStorage queda desactivado.
     let _previewMode = false;
-    let _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0 };
+    let _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0, period: false };
     let _rpeState = { date: _today(), sessionType: null, value: 0 };
 
     // ---- Helpers ----
@@ -130,6 +130,8 @@ const PlayerView = (() => {
             mood: _wellnessState.mood, pain: _wellnessState.pain,
             ts: new Date().toISOString(),
         };
+        // Solo se guarda cuando está marcado; sin marca = no tiene la regla
+        if (_wellnessState.period) entry.period = true;
         if (playerId) entry.playerId = playerId;
 
         await _writeToFirebase(`wellnessPlayer/${uid}/${_wellnessState.date}`, entry);
@@ -235,6 +237,22 @@ const PlayerView = (() => {
         }).join('');
     }
 
+    // Casilla opcional: se marca mientras dure la regla; al terminar, no se marca nada.
+    function _renderPeriodToggle() {
+        const on = _wellnessState.period;
+        return `
+        <div class="pv-question">
+            <div class="pv-q-label">${_esc(PlayerI18n.t('pvPeriodLabel'))}</div>
+            <button type="button" id="pv-period-btn"
+                class="pv-period-btn${on ? ' selected' : ''}"
+                aria-pressed="${on}"
+                onclick="PlayerView._onPeriod()">
+                ${_esc(PlayerI18n.t('pvPeriodYes'))}
+            </button>
+            <div class="pv-period-hint">${_esc(PlayerI18n.t('pvPeriodHint'))}</div>
+        </div>`;
+    }
+
     function _renderDateField() {
         return `
         <div class="pv-date-row">
@@ -284,6 +302,7 @@ const PlayerView = (() => {
             <button class="pv-back-btn" onclick="PlayerView._goMenu()">${_esc(PlayerI18n.t('backBtn'))}</button>
             <div id="pv-step-form">
                 ${_renderWellnessButtons()}
+                ${_renderPeriodToggle()}
                 ${_renderDateField()}
                 <button
                     class="pv-submit"
@@ -421,7 +440,7 @@ const PlayerView = (() => {
         const existing = document.getElementById('player-view-screen');
         if (existing) existing.remove();
 
-        _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0 };
+        _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0, period: false };
         _rpeState = { date: _today(), sessionType: null, value: 0 };
         _view = 'menu';
 
@@ -444,7 +463,7 @@ const PlayerView = (() => {
         const existing = document.getElementById('player-view-screen');
         if (existing) existing.remove();
 
-        _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0 };
+        _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0, period: false };
         _rpeState = { date: _today(), sessionType: null, value: 0 };
         _view = 'menu';
 
@@ -487,6 +506,15 @@ const PlayerView = (() => {
         });
         const btn = document.getElementById('pv-submit-btn');
         if (btn) btn.disabled = !_allWellnessAnswered();
+    }
+
+    function _onPeriod() {
+        _wellnessState.period = !_wellnessState.period;
+        const btn = document.getElementById('pv-period-btn');
+        if (btn) {
+            btn.classList.toggle('selected', _wellnessState.period);
+            btn.setAttribute('aria-pressed', _wellnessState.period ? 'true' : 'false');
+        }
     }
 
     function _onDate(val) {
@@ -538,6 +566,7 @@ const PlayerView = (() => {
         showPreview,
         exitPreview,
         _onWellness,
+        _onPeriod,
         _onDate,
         _onRpeValue,
         _onSubmitWellness,
