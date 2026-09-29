@@ -88,6 +88,9 @@ RPETracker.prototype._mergeWellnessPlayer = function(staffEntries, playerEntries
     );
 
     const extras = [];
+    // Claves "playerId|date" donde la jugadora marcó la regla pero ya existe
+    // una entrada de staff (que tiene prioridad) sin decisión sobre "period".
+    const periodFromPlayer = new Set();
     playerEntries.forEach(entry => {
         if (!entry || !entry.date) return;
 
@@ -100,10 +103,14 @@ RPETracker.prototype._mergeWellnessPlayer = function(staffEntries, playerEntries
         if (!playerId) return; // No se puede vincular — descartar silenciosamente
 
         const key = playerId + '|' + entry.date;
-        if (staffKeys.has(key)) return; // Ya existe entrada staff — prioridad staff
+        if (staffKeys.has(key)) {
+            // Ya existe entrada staff — prioridad staff, salvo el dato de la regla
+            if (entry.period === true) periodFromPlayer.add(key);
+            return;
+        }
 
         // Convertir a formato wellness staff
-        extras.push({
+        const extra = {
             id:       'wp_' + entry.uid + '_' + entry.date,
             playerId: playerId,
             date:     entry.date,
@@ -116,11 +123,21 @@ RPETracker.prototype._mergeWellnessPlayer = function(staffEntries, playerEntries
             soreness: entry.pain     != null ? entry.pain     : null,
             ts:       entry.ts || null,
             source:   'player', // marca de origen para depuración
-        });
+        };
+        // Solo se añade la propiedad cuando es true (Firebase rechaza undefined)
+        if (entry.period === true) extra.period = true;
+        extras.push(extra);
         staffKeys.add(key); // evitar duplicados dentro de playerEntries
     });
 
-    return (staffEntries || []).concat(extras);
+    // El staff manda: si su entrada define "period" (true o false) se respeta;
+    // si no lo define, se completa con lo marcado por la jugadora.
+    const merged = (staffEntries || []).map(w =>
+        (w.period === undefined && periodFromPlayer.has(w.playerId + '|' + w.date))
+            ? Object.assign({}, w, { period: true })
+            : w
+    );
+    return merged.concat(extras);
 };
 
 RPETracker.prototype.saveWellnessData = function() {
@@ -140,7 +157,7 @@ RPETracker.prototype.renderWellnessDashboard = function() {
 
     const today = toLocalISODate(new Date());
     const filledIds = new Set((this.wellnessData||[]).filter(w=>w.date===today).map(w=>w.playerId));
-    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate()-6);
+    this._wCycleCache = null; // se recalcula en cada render
 
     container.innerHTML = `
         <div class="wellness-wrap">
@@ -155,9 +172,10 @@ RPETracker.prototype.renderWellnessDashboard = function() {
                 </div>
             </div>
             ${this._renderWTodayStatus(filledIds, today)}
-            ${this._renderWTeamSummary(sevenDaysAgo)}
-            ${this._renderWPlayerTable(sevenDaysAgo)}
+            ${this._renderWAlertsCard()}
+            ${this._renderWPlayerTable()}
             ${this._renderWTrendChart()}
+            ${this._renderWCycleCard()}
             ${this._renderWHistory()}
         </div>
         ${this._renderWModal(today)}`;
@@ -198,50 +216,57 @@ RPETracker.prototype._renderWTodayStatus = function(filledIds, today) {
     </div>`;
 };
 
-// ========== TEAM SUMMARY ==========
+// ========== PERIODO SELECCIONABLE (Hoy / 7 días / 21 días) ==========
 
-RPETracker.prototype._renderWTeamSummary = function(sevenDaysAgo) {
+// Opciones del chip, en el orden en que rotan al pulsarlo.
+RPETracker.prototype._wRanges = function() {
+    return [
+        { key: 'today', days: 1,  label: 'Hoy' },
+        { key: '7d',    days: 7,  label: '7 días' },
+        { key: '21d',   days: 21, label: '21 días' }
+    ];
+};
+
+RPETracker.prototype._wCurrentRange = function() {
+    const ranges = this._wRanges();
+    return ranges.find(r => r.key === this._wRange) || ranges[0]; // por defecto: Hoy
+};
+
+RPETracker.prototype._wCycleRange = function() {
+    const ranges = this._wRanges();
+    const i = ranges.findIndex(r => r.key === this._wCurrentRange().key);
+    this._wRange = ranges[(i + 1) % ranges.length].key;
+    this.renderWellnessDashboard();
+};
+
+// Primer día (YYYY-MM-DD, hora local) incluido en una ventana de N días que
+// termina hoy. Se compara como texto para evitar el desfase de zona horaria
+// de new Date('YYYY-MM-DD') (que se interpreta en UTC).
+RPETracker.prototype._wRangeStart = function(days) {
+    const d = new Date();
+    d.setDate(d.getDate() - (days - 1));
+    return toLocalISODate(d);
+};
+
+// ========== ALERTAS DE BIENESTAR (siempre últimos 7 días) ==========
+
+RPETracker.prototype._renderWAlertsCard = function() {
     if (!this.players.length) return '';
-    const recent = (this.wellnessData||[]).filter(w=>new Date(w.date)>=sevenDaysAgo);
-    const metrics = ['sleep','fatigue','mood','soreness'];
-    const labels  = {sleep:'😴 Sueño',fatigue:'⚡ Energía',mood:'😊 Humor',soreness:'💪 Muscular'};
-
-    const avgs = metrics.map(m => {
-        const vals = recent.filter(w=>w[m]!=null).map(w=>w[m]);
-        return { m, label:labels[m], avg: vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null };
-    });
-
-    const overallVals = avgs.filter(a=>a.avg!==null).map(a=>a.avg);
-    const teamScore = overallVals.length ? overallVals.reduce((a,b)=>a+b,0)/overallVals.length : null;
+    const start = this._wRangeStart(7);
+    const recent = (this.wellnessData||[]).filter(w => w.date >= start);
     const alerts = this._wAlerts(recent);
 
-    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:.5rem">
-        <div class="wellness-card">
-            <h3 class="wellness-section-title">📊 Media del equipo (7 días)</h3>
-            ${avgs.map(a=>`<div class="wellness-metric-row">
-                <span class="wm-label">${a.label}</span>
-                <div class="wm-bar-wrap"><div class="wm-bar-fill" style="width:${a.avg?(a.avg/5*100).toFixed(0):0}%;background:${a.avg?this._wColor(a.avg):'#ddd'}"></div></div>
-                <span class="wm-val" style="color:${a.avg?this._wColor(a.avg):'var(--text-secondary)'}">
-                    ${a.avg!==null?a.avg.toFixed(1):'—'}</span>
-            </div>`).join('')}
-            <div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border-color);display:flex;align-items:center;gap:.5rem">
-                <span style="font-weight:600;color:var(--text-secondary);font-size:.85rem">Global:</span>
-                <span style="font-size:1.4rem;font-weight:700;color:${teamScore?this._wColor(teamScore):'var(--text-secondary)'}">
-                    ${teamScore!==null?teamScore.toFixed(1):'—'} / 5</span>
-            </div>
-        </div>
-        <div class="wellness-card">
-            <h3 class="wellness-section-title">⚠️ Alertas de bienestar</h3>
-            ${alerts.length===0
-                ? `<div style="text-align:center;padding:1.5rem 0;color:var(--text-secondary)">
-                    <div style="font-size:2rem">🟢</div>
-                    <p style="margin:.5rem 0 0;font-size:.88rem">Todo el equipo en buen estado</p></div>`
-                : alerts.map(a=>`<div class="wellness-alert-row">
-                    <span class="wa-icon">${a.icon}</span>
-                    <div class="wa-text"><strong>${a.name}</strong><span>${a.message}</span></div>
-                  </div>`).join('')
-            }
-        </div>
+    return `<div class="wellness-card">
+        <h3 class="wellness-section-title">⚠️ Alertas de bienestar <span style="text-transform:none;font-weight:400;letter-spacing:0">(últimos 7 días)</span></h3>
+        ${alerts.length===0
+            ? `<div style="text-align:center;padding:1rem 0;color:var(--text-secondary)">
+                <div style="font-size:2rem">🟢</div>
+                <p style="margin:.5rem 0 0;font-size:.88rem">Todo el equipo en buen estado</p></div>`
+            : alerts.map(a=>`<div class="wellness-alert-row">
+                <span class="wa-icon">${a.icon}</span>
+                <div class="wa-text"><strong>${esc(a.name)}</strong><span>${a.message}</span></div>
+              </div>`).join('')
+        }
     </div>`;
 };
 
@@ -320,42 +345,72 @@ RPETracker.prototype._wAlerts = function(recentData) {
 
 // ========== PLAYER TABLE ==========
 
-RPETracker.prototype._renderWPlayerTable = function(sevenDaysAgo) {
+RPETracker.prototype._renderWPlayerTable = function() {
     if (!this.players.length) return '';
-    const recent = (this.wellnessData||[]).filter(w=>new Date(w.date)>=sevenDaysAgo);
+    const range = this._wCurrentRange();
+    const start = this._wRangeStart(range.days);
+    const recent = (this.wellnessData||[]).filter(w => w.date >= start);
+    const nextRange = this._wRanges()[(this._wRanges().findIndex(r => r.key === range.key) + 1) % 3];
+    const metrics = ['sleep','fatigue','mood','soreness'];
+
+    const avgOf = (rows, m) => {
+        const v = rows.map(w => w[m]).filter(x => x != null);
+        return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null;
+    };
+    const cell = v => v !== null
+        ? `<td><span class="wt-badge" style="background:${this._wColor(v)}">${'★'.repeat(Math.round(v))}${'☆'.repeat(5-Math.round(v))}</span></td>`
+        : `<td style="color:var(--text-secondary)">—</td>`;
+    const overallOf = vals => {
+        const present = vals.filter(v => v !== null);
+        return present.length ? present.reduce((a,b) => a+b, 0) / present.length : null;
+    };
+    const globalCell = o => `<td style="font-weight:700;color:${o!==null?this._wColor(o):'var(--text-secondary)'}">${o!==null?o.toFixed(1):'—'}</td>`;
+
+    // Fila de media del equipo (sustituye a la antigua tarjeta "Media del equipo")
+    const teamVals = metrics.map(m => avgOf(recent, m));
+    const teamRow = `<tr class="wellness-team-row">
+        <td><span style="font-weight:700">📊 Media del equipo</span></td>
+        ${teamVals.map(cell).join('')}
+        ${globalCell(overallOf(teamVals))}
+        <td style="color:var(--text-secondary)">—</td>
+    </tr>`;
+
+    const playerRows = this.players.map(p => {
+        const pData = recent.filter(w => w.playerId === p.id);
+        const vals = metrics.map(m => avgOf(pData, m));
+        const onPeriod = this._wCycleInfo(p.id).active;
+        return `<tr>
+            <td><div style="display:flex;align-items:center;gap:.5rem">
+                ${PlayerTokens.avatar(p,22,'.6rem')}<span style="font-weight:600">${esc(p.name)}</span>${onPeriod ? '<span title="Con la regla">🩸</span>' : ''}
+            </div></td>
+            ${vals.map(cell).join('')}
+            ${globalCell(overallOf(vals))}
+            <td style="font-size:1.1rem">${this._wTrend(p.id)}</td>
+        </tr>`;
+    }).join('');
+
     return `<div class="wellness-card">
-        <h3 class="wellness-section-title">👥 Estado por jugadora (últimos 7 días)</h3>
+        <div class="wellness-table-head">
+            <h3 class="wellness-section-title" style="margin:0">👥 Estado por jugadora</h3>
+            <button type="button" class="wellness-range-chip"
+                onclick="window.rpeTracker?._wCycleRange()"
+                title="Pulsa para cambiar a: ${nextRange.label}"
+                aria-label="Periodo mostrado: ${range.label}. Pulsa para cambiar a ${nextRange.label}">
+                📅 ${range.label} <span class="wellness-range-next">⟳</span>
+            </button>
+        </div>
         <div style="overflow-x:auto">
             <table class="wellness-player-table">
                 <thead><tr>
                     <th>Jugadora</th><th>😴 Sueño</th><th>⚡ Energía</th>
                     <th>😊 Humor</th><th>💪 Muscular</th><th>Global</th><th>Tendencia</th>
                 </tr></thead>
-                <tbody>
-                    ${this.players.map(p=>{
-                        const pData=recent.filter(w=>w.playerId===p.id);
-                        const avg=m=>{const v=pData.map(w=>w[m]).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
-                        const s=avg('sleep'),f=avg('fatigue'),m=avg('mood'),so=avg('soreness');
-                        const overall=(s!==null||f!==null||m!==null||so!==null)?this._wOverall({sleep:s,fatigue:f,mood:m,soreness:so}):null;
-                        const cell=v=>v!==null
-                            ?`<td><span class="wt-badge" style="background:${this._wColor(v)}">${'★'.repeat(Math.round(v))}${'☆'.repeat(5-Math.round(v))}</span></td>`
-                            :`<td style="color:var(--text-secondary)">—</td>`;
-                        const trend=this._wTrend(p.id);
-                        return `<tr>
-                            <td><div style="display:flex;align-items:center;gap:.5rem">
-                                ${PlayerTokens.avatar(p,22,'.6rem')}<span style="font-weight:600">${p.name}</span>
-                            </div></td>
-                            ${cell(s)}${cell(f)}${cell(m)}${cell(so)}
-                            <td style="font-weight:700;color:${overall!==null?this._wColor(overall):'var(--text-secondary)'}">
-                                ${overall!==null?overall.toFixed(1):'—'}</td>
-                            <td style="font-size:1.1rem">${trend}</td>
-                        </tr>`;
-                    }).join('')}
-                </tbody>
+                <tbody>${teamRow}${playerRows}</tbody>
             </table>
         </div>
         <p style="margin:.5rem 0 0;font-size:.75rem;color:var(--text-secondary)">
             ★★★★★ 5 = óptimo &nbsp;|&nbsp; ★★★ 3 = aceptable &nbsp;|&nbsp; ★ 1 = muy bajo
+            ${range.days > 1 ? `&nbsp;|&nbsp; Medias de los últimos ${range.days} días` : ''}
         </p>
     </div>`;
 };
@@ -431,6 +486,98 @@ RPETracker.prototype._drawWellnessTrendChart = function() {
     });
 };
 
+// ========== CICLO MENSTRUAL ==========
+// Dato aportado por las jugadoras (casilla "Tengo la regla" en su wellness
+// diario) o por el staff (casilla en "Registrar bienestar"). Se guarda como
+// period:true dentro de la entrada de wellness de ese día; sin marca = no.
+
+RPETracker.prototype._wDaysBetween = function(isoA, isoB) {
+    const [ya, ma, da] = isoA.split('-').map(Number);
+    const [yb, mb, db] = isoB.split('-').map(Number);
+    return Math.round((Date.UTC(yb, mb-1, db) - Date.UTC(ya, ma-1, da)) / 86400000);
+};
+
+// Devuelve { active, dayNumber, lastStart, cycleLength, episodes } de una jugadora.
+// Un "episodio" es una racha de días marcados; se corta si hay un registro sin
+// marcar entre medias o si pasan más de 3 días sin registros.
+RPETracker.prototype._wCycleInfo = function(playerId) {
+    if (!this._wCycleCache) this._wCycleCache = {};
+    if (this._wCycleCache[playerId]) return this._wCycleCache[playerId];
+
+    const rows = (this.wellnessData||[])
+        .filter(w => w.playerId === playerId && w.date)
+        .sort((a,b) => a.date.localeCompare(b.date));
+
+    const runs = [];
+    let cur = null;
+    rows.forEach(w => {
+        if (w.period === true) {
+            if (cur && this._wDaysBetween(cur.last, w.date) <= 3) cur.last = w.date;
+            else { cur = { start: w.date, last: w.date }; runs.push(cur); }
+        } else {
+            cur = null; // registro sin marcar: el episodio termina
+        }
+    });
+
+    const today = toLocalISODate(new Date());
+    const lastRun = runs[runs.length - 1] || null;
+    // Activa: el último registro de la jugadora está marcado y es de hace ≤2 días
+    const active = !!(lastRun && cur === lastRun && this._wDaysBetween(lastRun.last, today) <= 2);
+    let cycleLength = null;
+    if (runs.length >= 2) {
+        const len = this._wDaysBetween(runs[runs.length-2].start, lastRun.start);
+        if (len >= 15 && len <= 60) cycleLength = len; // descarta datos incompletos
+    }
+
+    const info = {
+        active,
+        dayNumber: active ? this._wDaysBetween(lastRun.start, lastRun.last) + 1 : null,
+        lastStart: lastRun ? lastRun.start : null,
+        cycleLength,
+        episodes: runs.length
+    };
+    this._wCycleCache[playerId] = info;
+    return info;
+};
+
+RPETracker.prototype._renderWCycleCard = function() {
+    if (!this.players.length) return '';
+    const infos = this.players.map(p => ({ p, info: this._wCycleInfo(p.id) }));
+    const withData = infos.filter(x => x.info.episodes > 0);
+    const activeCount = infos.filter(x => x.info.active).length;
+
+    // Primero las que la tienen ahora, luego por inicio más reciente
+    withData.sort((a,b) => (b.info.active - a.info.active) ||
+        (b.info.lastStart || '').localeCompare(a.info.lastStart || ''));
+
+    const body = withData.length === 0
+        ? `<div style="text-align:center;padding:1rem 0;color:var(--text-secondary)">
+            <p style="margin:0;font-size:.88rem">Aún no hay registros. Las jugadoras lo marcan en su wellness diario
+            (casilla «Tengo la regla») y tú puedes marcarlo al registrar bienestar.</p></div>`
+        : `<div style="overflow-x:auto"><table class="wellness-player-table">
+            <thead><tr><th>Jugadora</th><th>Estado</th><th>Último inicio</th><th>Ciclo aprox.</th></tr></thead>
+            <tbody>${withData.map(({p, info}) => `<tr>
+                <td><div style="display:flex;align-items:center;gap:.5rem">
+                    ${PlayerTokens.avatar(p,22,'.6rem')}<span style="font-weight:600">${esc(p.name)}</span></div></td>
+                <td>${info.active
+                    ? `<span class="wellness-period-badge">🩸 Día ${info.dayNumber}</span>`
+                    : '<span style="color:var(--text-secondary)">—</span>'}</td>
+                <td>${info.lastStart ? this._wFmtDate(info.lastStart) : '—'}</td>
+                <td>${info.cycleLength ? info.cycleLength + ' días' : '—'}</td>
+            </tr>`).join('')}</tbody></table></div>`;
+
+    return `<div class="wellness-card">
+        <h3 class="wellness-section-title">🩸 Ciclo menstrual</h3>
+        <p style="margin:0 0 .75rem;font-size:.85rem;color:var(--text-secondary)">
+            Con la regla ahora: <strong style="color:var(--text-primary)">${activeCount}</strong> de ${this.players.length} jugadoras
+        </p>
+        ${body}
+        <p style="margin:.5rem 0 0;font-size:.75rem;color:var(--text-secondary)">
+            Estado según el último registro (≤2 días). «Ciclo aprox.» = días entre los dos últimos inicios registrados; es orientativo porque depende de que la jugadora registre cada día.
+        </p>
+    </div>`;
+};
+
 // ========== HISTORY ==========
 
 RPETracker.prototype._renderWHistory = function() {
@@ -460,7 +607,7 @@ RPETracker.prototype._renderWHistory = function() {
             if(!p) return '';
             const o = this._wOverall(w);
             return `<tr>
-                <td><div style="display:flex;align-items:center;gap:.35rem">${PlayerTokens.avatar(p,17,'.5rem')}<span style="font-size:.83rem">${p.name}</span></div></td>
+                <td><div style="display:flex;align-items:center;gap:.35rem">${PlayerTokens.avatar(p,17,'.5rem')}<span style="font-size:.83rem">${esc(p.name)}</span>${w.period===true?' <span title="Con la regla">🩸</span>':''}</div></td>
                 <td style="font-size:.82rem">${dot(w.sleep)}</td>
                 <td style="font-size:.82rem">${dot(w.fatigue)}</td>
                 <td style="font-size:.82rem">${dot(w.mood)}</td>
@@ -549,6 +696,11 @@ RPETracker.prototype._renderWModal = function(today) {
                     </div>`;
                 }).join('')}
                 <div class="form-group">
+                    <label class="wellness-period-check">
+                        <input type="checkbox" id="wFormPeriod"> 🩸 Con la regla
+                    </label>
+                </div>
+                <div class="form-group">
                     <label class="form-label">📝 Notas (opcional)</label>
                     <textarea id="wFormNotes" class="form-textarea" rows="2" placeholder="Estrés, viaje, enfermedad..."></textarea>
                 </div>
@@ -612,6 +764,8 @@ RPETracker.prototype.openWellnessForm = function(presetPlayerId) {
         }
     });
     if (existing) { const n=document.getElementById('wFormNotes'); if(n) n.value=existing.notes||''; }
+    const periodBox = document.getElementById('wFormPeriod');
+    if (periodBox) periodBox.checked = existing?.period === true;
     this._wUpdateOverallPreview();
 
     const sel = document.getElementById('wFormPlayer');
@@ -630,6 +784,8 @@ RPETracker.prototype.openWellnessForm = function(presetPlayerId) {
         });
         const notes=document.getElementById('wFormNotes');
         if(notes) notes.value=ex?.notes||'';
+        const pBox=document.getElementById('wFormPeriod');
+        if(pBox) pBox.checked = ex?.period === true;
         this._wUpdateOverallPreview();
     };
 };
@@ -701,6 +857,8 @@ RPETracker.prototype.saveWellnessEntry = function() {
         id:`w_${playerId}_${date}`,playerId,date,
         sleep:sleepVal, fatigue:fatigueVal, mood:moodVal, soreness:sorenessVal,
         notes:document.getElementById('wFormNotes')?.value||'',
+        // true/false explícito: así el staff puede quitar una marca puesta por la jugadora
+        period: !!document.getElementById('wFormPeriod')?.checked,
         savedAt:new Date().toISOString()
     };
     const idx=this.wellnessData.findIndex(w=>w.playerId===playerId&&w.date===date);
@@ -790,6 +948,14 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 .wellness-player-table th{text-align:left;padding:.4rem .6rem;color:var(--text-secondary);font-size:.75rem;border-bottom:2px solid var(--border-color)}
 .wellness-player-table td{padding:.45rem .6rem;border-bottom:1px solid var(--border-color)}
 .wellness-player-table tr:last-child td{border-bottom:none}
+.wellness-table-head{display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:.85rem;flex-wrap:wrap}
+.wellness-range-chip{font-size:.8rem;font-weight:700;padding:.3rem .8rem;border-radius:20px;border:2px solid var(--primary);color:var(--primary);background:rgba(255,102,0,.10);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:.35rem;user-select:none;touch-action:manipulation;transition:background .15s,transform .1s}
+.wellness-range-chip:hover{background:rgba(255,102,0,.22);transform:scale(1.04)}
+.wellness-range-next{opacity:.6;font-size:.85rem}
+.wellness-team-row td{background:var(--bg-subtle);border-bottom:2px solid var(--border)}
+.wellness-period-badge{display:inline-block;padding:.1rem .55rem;border-radius:10px;background:rgba(233,30,99,.12);color:#e91e63;font-size:.78rem;font-weight:700}
+.wellness-period-check{display:flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:600;cursor:pointer}
+.wellness-period-check input{width:18px;height:18px}
 .wt-badge{display:inline-block;padding:.1rem .5rem;border-radius:10px;color:white;font-size:.72rem;font-weight:600;letter-spacing:.5px}
 /* slider styles kept for legacy compat but hidden */
 .wellness-slider-row{display:flex;align-items:center;gap:.5rem}
@@ -987,6 +1153,8 @@ RPETracker.prototype._wbSaveAndNav = function(dir) {
         savedAt:  new Date().toISOString()
     };
     const idx = this.wellnessData.findIndex(w => w.playerId === player.id && w.date === date);
+    // Conservar el dato de la regla si ya existía (este flujo no lo pregunta)
+    if (idx >= 0 && this.wellnessData[idx].period !== undefined) entry.period = this.wellnessData[idx].period;
     if (idx >= 0) this.wellnessData[idx] = entry; else this.wellnessData.push(entry);
     this.saveWellnessData();
 
@@ -1155,6 +1323,8 @@ RPETracker.prototype.saveWellnessQuick = function() {
             savedAt: new Date().toISOString()
         };
         const idx = this.wellnessData.findIndex(w => w.playerId === player.id && w.date === today);
+        // Conservar el dato de la regla si ya existía (este flujo no lo pregunta)
+        if (idx >= 0 && this.wellnessData[idx].period !== undefined) entry.period = this.wellnessData[idx].period;
         if (idx >= 0) this.wellnessData[idx] = entry; else this.wellnessData.push(entry);
         count++;
     });
