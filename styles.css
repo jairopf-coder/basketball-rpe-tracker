@@ -5137,6 +5137,11 @@ header h1 {
 .db-rw-pending   { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; }
 .db-rw-pending-names { color: var(--text-secondary); }
 .db-rw-pending--ok { color: #2e7d32; font-weight: 600; }
+.db-rw-pending + .db-rw-pending { margin-top: 0.25rem; }
+.db-rw-pending-label { font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.db-rw-pending-actions { display: flex; gap: 0.5rem; margin-top: 0.65rem; flex-wrap: wrap; }
+.db-rw-btn { min-height: 36px; padding: 0.4rem 0.8rem; font-size: 0.78rem; font-weight: 600; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); color: var(--text-primary); cursor: pointer; touch-action: manipulation; }
+.db-rw-btn:hover { border-color: var(--primary, #ff6600); }
 
 /* ── Dark mode ───────────────────────────────────────────────────── */
 [data-theme="dark"] .db-rw-bar-track  { background: #2a2a32; }
