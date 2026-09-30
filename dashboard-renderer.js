@@ -527,6 +527,85 @@ RPETracker.prototype.cycleDashSort = function() {
     this.renderDashboard();
 };
 
+// ── "Faltan hoy": quién no ha cubierto wellness / RPE ─────────────────
+// Nombre corto para listas: solo el nombre de pila; si dos jugadoras comparten
+// nombre, se añade la inicial del primer apellido ("María G.").
+RPETracker.prototype._shortPlayerName = function(player) {
+    const parts = String(player.name || '').trim().split(/\s+/);
+    const first = parts[0] || '';
+    const sameFirst = (this.players || []).filter(p =>
+        String(p.name || '').trim().split(/\s+/)[0] === first).length > 1;
+    return sameFirst && parts.length > 1 ? `${first} ${parts[1].charAt(0)}.` : first;
+};
+
+// Devuelve { date, wellness, rpe, hasSessionToday } con las jugadoras que faltan hoy.
+//  - wellness: sin ninguna entrada de wellness hoy (enviada por ella o registrada por el staff).
+//  - rpe: solo se calcula si hoy ya hay alguna sesión registrada (que no sea descanso);
+//    así no se marca a todo el equipo en días sin entreno. Cuenta como "con RPE" quien
+//    tiene sesión hoy o ha enviado su RPE (aunque el staff lo haya descartado).
+//    Se excluyen las jugadoras con una lesión activa.
+RPETracker.prototype._pendingToday = function() {
+    const today = toLocalISODate(new Date());
+    const players = this.players || [];
+    const wellnessData = this.wellnessData || [];
+    const wellness = players.filter(p => !wellnessData.some(e => e.playerId === p.id && e.date === today));
+
+    const sessionsToday = (this.sessions || []).filter(s =>
+        (s.date || '').slice(0, 10) === today && s.type !== 'rest');
+    let rpe = [];
+    if (sessionsToday.length) {
+        const done = new Set(sessionsToday.map(s => s.playerId));
+        (this._playerRpeRaw || []).forEach(e => {
+            if (e.date !== today) return;
+            const linked = e.playerId ? { id: e.playerId }
+                : players.find(p => p.authUid && p.authUid === e.uid);
+            if (linked) done.add(linked.id);
+        });
+        const injured = new Set((this.injuries || [])
+            .filter(i => i.status === 'active').map(i => i.playerId));
+        rpe = players.filter(p => !done.has(p.id) && !injured.has(p.id));
+    }
+    return { date: today, wellness, rpe, hasSessionToday: sessionsToday.length > 0 };
+};
+
+// Mensaje listo para pegar en WhatsApp. Vacío si no falta nadie.
+// Solo nombres y qué falta: nunca datos de salud.
+RPETracker.prototype._pendingNoticeText = function() {
+    const p = this._pendingToday();
+    if (!p.wellness.length && !p.rpe.length) return '';
+    const names = list => list.map(x => this._shortPlayerName(x)).join(', ');
+    const lines = ['¡Hola! Recordad rellenar hoy en la app:'];
+    if (p.wellness.length) lines.push(`• Wellness: ${names(p.wellness)}`);
+    if (p.rpe.length)      lines.push(`• RPE: ${names(p.rpe)}`);
+    lines.push('¡Gracias! 🏀');
+    return lines.join('\n');
+};
+
+RPETracker.prototype.copyPendingNotice = function() {
+    const text = this._pendingNoticeText();
+    if (!text) { this.showToast('Hoy no falta nadie por rellenar', 'info'); return; }
+    const done = () => this.showToast('📋 Aviso copiado. Pégalo en WhatsApp.', 'success');
+    const fallback = () => {
+        // Respaldo para navegadores sin portapapeles moderno
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        if (ok) done(); else this.showToast('No se pudo copiar. Prueba con el botón de WhatsApp.', 'warning');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+};
+
+RPETracker.prototype.sendPendingNoticeWhatsApp = function() {
+    const text = this._pendingNoticeText();
+    if (!text) { this.showToast('Hoy no falta nadie por rellenar', 'info'); return; }
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+};
+
 // ── _renderRightWidgets — wellness + fatiga + pending en tarjeta propia ──
 RPETracker.prototype._renderRightWidgets = function() {
     const col = document.getElementById('dbRightWidgets');
@@ -534,7 +613,6 @@ RPETracker.prototype._renderRightWidgets = function() {
 
     const _wToday = toLocalISODate(new Date());
     const _wData  = this.wellnessData || [];
-    const _pendingW = this.players.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
 
     // Wellness summary
     const wsum = (() => {
@@ -587,11 +665,18 @@ RPETracker.prototype._renderRightWidgets = function() {
         </div>
     </div>` : '';
 
-    // Pending wellness info (action buttons live in the global header now)
-    const pendingHTML = _pendingW.length > 0 ? `<div class="db-rw-section">
-        <div class="db-rw-label">Sin wellness hoy</div>
-        <div class="db-rw-pending">
-            <span class="db-rw-pending-names">${_pendingW.map(p => esc(p.name.split(' ')[0])).join(', ')}</span>
+    // "Faltan hoy": quién no ha cubierto wellness ni RPE + aviso para WhatsApp
+    const pend = this._pendingToday();
+    const pendingRow = (icon, label, list) => list.length
+        ? `<div class="db-rw-pending"><span class="db-rw-pending-label">${icon} ${label}:</span> <span class="db-rw-pending-names">${list.map(p => esc(this._shortPlayerName(p))).join(', ')}</span></div>`
+        : '';
+    const pendingHTML = (pend.wellness.length || pend.rpe.length) ? `<div class="db-rw-section">
+        <div class="db-rw-label">Faltan hoy</div>
+        ${pendingRow('😴', 'Wellness', pend.wellness)}
+        ${pendingRow('💪', 'RPE', pend.rpe)}
+        <div class="db-rw-pending-actions">
+            <button type="button" class="db-rw-btn" onclick="window.rpeTracker?.copyPendingNotice()">📋 Copiar aviso</button>
+            <button type="button" class="db-rw-btn" onclick="window.rpeTracker?.sendPendingNoticeWhatsApp()">💬 WhatsApp</button>
         </div>
     </div>` : `<div class="db-rw-section"><div class="db-rw-pending db-rw-pending--ok">✅ Todas al día</div></div>`;
 
