@@ -82,7 +82,7 @@ RPETracker.prototype.renderDashboard = function() {
         const wEntry = _wData.find(e => e.playerId === player.id && e.date === _wToday);
         let wScore = '—', wColor = 'var(--text-faint)', wBg = 'var(--bg-subtle)';
         if (wEntry) {
-            const overall = (wEntry.sleep + (6 - wEntry.fatigue) + wEntry.mood + (6 - wEntry.soreness)) / 4;
+            const overall = this._wOverall(wEntry); // 1 = peor, 5 = mejor en las cuatro dimensiones
             wScore = overall.toFixed(1);
             if (overall >= 4)        { wColor = '#2e7d32'; wBg = '#e8f5e9'; }
             else if (overall >= 2.5) { wColor = '#e65100'; wBg = '#fff3e0'; }
@@ -623,12 +623,11 @@ RPETracker.prototype._renderRightWidgets = function() {
             return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : '—';
         };
         const sleep = avg('sleep'), fatigue = avg('fatigue'), mood = avg('mood'), soreness = avg('soreness');
-        const col = (val, invert=false) => {
+        // Las cuatro dimensiones usan la misma escala: 1 = peor, 5 = mejor
+        const col = (val) => {
             const n = parseFloat(val);
             if (isNaN(n)) return 'var(--text-faint)';
-            const good = invert ? n <= 2.5 : n >= 3.5;
-            const bad  = invert ? n >= 3.5 : n <= 2.5;
-            return good ? '#4caf50' : bad ? '#f44336' : '#ff9800';
+            return n >= 3.5 ? '#4caf50' : n <= 2.5 ? '#f44336' : '#ff9800';
         };
         const pct = (val) => Math.round((parseFloat(val)||0) / 5 * 100);
         return `<div class="db-rw-section">
@@ -636,12 +635,12 @@ RPETracker.prototype._renderRightWidgets = function() {
                 <span class="db-rw-coverage">${todayEntries.length}/${this.players.length}</span>
             </div>
             <div class="db-rw-bars">
-                ${[['😴 Sueño', sleep, false],['⚡ Energía', fatigue, true],['😊 Humor', mood, false],['💪 Agujetas', soreness, true]]
-                    .map(([lbl, val, inv]) => `
+                ${[['😴 Sueño', sleep],['⚡ Energía', fatigue],['😊 Humor', mood],['💪 Muscular', soreness]]
+                    .map(([lbl, val]) => `
                 <div class="db-rw-bar-row">
                     <span class="db-rw-bar-lbl">${lbl}</span>
-                    <div class="db-rw-bar-track"><div class="db-rw-bar-fill" style="width:${pct(val)}%;background:${col(val,inv)}"></div></div>
-                    <span class="db-rw-bar-num" style="color:${col(val,inv)}">${val}</span>
+                    <div class="db-rw-bar-track"><div class="db-rw-bar-fill" style="width:${pct(val)}%;background:${col(val)}"></div></div>
+                    <span class="db-rw-bar-num" style="color:${col(val)}">${val}</span>
                 </div>`).join('')}
             </div>
         </div>`;

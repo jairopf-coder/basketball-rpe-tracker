@@ -15,7 +15,8 @@ RPETracker.prototype.calculateReadiness = function(playerId) {
 
     if (!w) return null;
 
-    // Wellness fields: sleep, mood, fatigue, soreness — each 1-5
+    // Wellness fields: sleep, mood, fatigue (energía), soreness (muscular) — each 1-5,
+    // siempre con la misma escala: 1 = peor, 5 = mejor. Las cuatro SUMAN.
     const sleep    = Number(w.sleep    || w.sueno    || 0);
     const mood     = Number(w.mood     || w.humor    || 0);
     const fatigue  = Number(w.fatigue  || w.cansancio|| 0);
@@ -38,10 +39,11 @@ RPETracker.prototype.calculateReadiness = function(playerId) {
         else if (r > t.high)               acBonus = 0;
     }
 
+    // Pesos 25 + 20 + 20 + 15 = 80 de wellness + hasta 20 del A:C = máximo 100
     const score = Math.round(
         norm(sleep)    * 25 +
-        norm(mood)     * 20 -
-        norm(fatigue)  * 20 -
+        norm(mood)     * 20 +
+        norm(fatigue)  * 20 +
         norm(soreness) * 15 +
         acBonus
     );
