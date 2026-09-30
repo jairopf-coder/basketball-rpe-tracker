@@ -15,7 +15,7 @@ function test(name, fn) { queue.push({ name, fn }); }
 const ROOT = path.join(__dirname, '..');
 
 // ── Sandbox de navegador ────────────────────────────────────────────────
-const dom = { widgets: { innerHTML: '' }, written: [] };
+const dom = { widgets: { innerHTML: '' }, written: [], styles: [] };
 const ctx = vm.createContext({
     console, Date, Math, JSON, Set, Object, Array, Number, String, parseInt, parseFloat, isNaN, Promise, Map,
     esc: s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
@@ -26,7 +26,7 @@ const ctx = vm.createContext({
     navigator: {},
     document: {
         createElement: () => ({ style: {}, setAttribute() {} }),
-        head: { appendChild() {} },
+        head: { appendChild(el) { dom.styles.push(el); } },
         getElementById: id => id === 'dbRightWidgets' ? dom.widgets : null,
         documentElement: { classList: { contains: () => false } },
         body: { classList: { contains: () => false } },
@@ -57,18 +57,19 @@ function make(wellness) {
     t.players = [{ id: 'p1', name: 'Ana Pérez' }, { id: 'p2', name: 'Bea Ruiz' }, { id: 'p3', name: 'Carla Gil' }];
     t.wellnessData = wellness || []; t.sessions = []; t.injuries = []; t._playerRpeRaw = [];
     t.calculateAcuteChronicRatio = () => ({ ratio: '1.00', confidence: 'high' });
-    t.getRatioColor = () => '#4caf50';
+    t.getRatioColor = () => '#2e7d32'; // uno de los 4 colores reales de getRatioColor
     t.getPlayerThresholds = () => ({ low: 0.8, opt: 1.3, high: 1.5 });
     t.showToast = () => {};
     t.weekPlan = {}; t.loadWeekPlan = () => {}; t.getLocationName = () => '';
     return t;
 }
-const GREEN = '#2e7d32', AMBER = '#e65100', RED = '#c62828';
-// Celdas de una fila del heatmap: [{val, color}] en orden Sueño, Energía, Humor, Muscular, Ø
+const GREEN = 'wh-good', AMBER = 'wh-warn', RED = 'wh-bad';   // el color es una clase, no un fondo
+// Celdas de una fila de la tabla: [{val, color}] en orden Sueño, Energía, Humor, Muscular, Ø
+// (color = clase de color del número: wh-good / wh-warn / wh-bad)
 function heatRow(html, name) {
     const row = html.split('<tr>').find(r => r.includes(`<span>${name}</span>`));
     assert.ok(row, 'no se encontró la fila de ' + name);
-    return [...row.matchAll(/class="wh-cell(?: wh-overall)?" style="background:[^;]+;color:([^"]+)"[^>]*>([\d.]+)</g)]
+    return [...row.matchAll(/<td class="wh-cell(?: wh-overall)? (wh-(?:good|warn|bad|nodata))"[^>]*>([^<]+)</g)]
         .map(m => ({ color: m[1], val: m[2] }));
 }
 
@@ -101,6 +102,80 @@ test('la media de 7 días promedia los valores tal cual (sin invertir)', () => {
     ]);
     const [, energy, , muscle] = heatRow(t._renderPlayerComparisonSection(), 'Ana');
     assert.strictEqual(energy.val, '3.0'); assert.strictEqual(muscle.val, '3.0');
+});
+
+console.log('\nRediseño: un solo fondo, color solo en el número');
+const tableStyle = () => {
+    const el = dom.styles.find(e => e.id === 'dashboard-comparison-style');
+    assert.ok(el && el.textContent, 'no se inyectó el CSS de la tabla');
+    return el.textContent;
+};
+test('ninguna celda ni fila lleva fondo propio (no hay style="background")', () => {
+    const t = make([entry('p1', 5, 5, 5, 5), entry('p2', 1, 1, 1, 1), entry('p3', 3, 3, 3, 3)]);
+    const html = t._renderPlayerComparisonSection();
+    assert.ok(!/background/i.test(html), 'la tabla no debe pintar fondos');
+    const table = html.slice(html.indexOf('<table'), html.indexOf('</table>'));
+    assert.ok(!/style=/.test(table), 'el color de las celdas debe ir en clases, no en style');
+});
+test('el CSS de la tabla no define ningún fondo de color (solo transparent)', () => {
+    const css = tableStyle();
+    const heat = css.slice(css.indexOf('Tabla de wellness'));
+    const bgs = [...heat.matchAll(/background:\s*([^;]+);/g)].map(m => m[1].trim());
+    assert.ok(bgs.length > 0);
+    bgs.forEach(v => assert.strictEqual(v, 'transparent', 'fondo distinto de transparent: ' + v));
+    assert.ok(!/2e7d3220|f9a82520|c6282820/.test(css), 'quedan los fondos teñidos antiguos');
+});
+test('hay variante para el tema oscuro en verde, naranja, rojo y azul', () => {
+    const css = tableStyle();
+    ['wh-good', 'wh-warn', 'wh-bad', 'wh-blue'].forEach(c =>
+        assert.ok(css.includes(`[data-theme="dark"] .${c}`), 'falta la variante oscura de ' + c));
+});
+test('umbrales: 5.0 y 4.0 verde · 3.5 y 3.0 naranja · 2.5 y 1.0 rojo', () => {
+    const cls = v => heatRow(make([entry('p1', v, v, v, v)])._renderPlayerComparisonSection(), 'Ana')[0].color;
+    assert.deepStrictEqual([5, 4, 3.5, 3, 2.5, 1].map(cls), [GREEN, GREEN, AMBER, AMBER, RED, RED]);
+});
+test('el color sigue al número que se VE: un 3,96 se muestra "4.0" y sale verde; un 2,96 se muestra "3.0" y sale naranja', () => {
+    const d = n => { const z = new Date(); z.setDate(z.getDate() - n); return vm.runInContext('toLocalISODate', ctx)(z); };
+    // 7 días: sueño/energía/humor = 4 siempre; muscular = 4 seis días y 3 uno → media 3,857 → Ø = 3,964
+    const mk = (pid, muscleLastDay) => [0, 1, 2, 3, 4, 5, 6].map(i => ({ id: `${pid}${i}`, playerId: pid, date: d(i), sleep: 4, fatigue: 4, mood: 4, soreness: i === 6 ? muscleLastDay : 4 }));
+    const t = make(mk('p1', 3));
+    const cells = heatRow(t._renderPlayerComparisonSection(), 'Ana');
+    const overall = cells[4];
+    assert.strictEqual(overall.val, '4.0'); assert.strictEqual(overall.color, GREEN, 'un "4.0" visible no puede ser naranja');
+    assert.strictEqual(cells[3].val, '3.9'); assert.strictEqual(cells[3].color, AMBER);
+    // y al otro lado: 2,964 → "3.0" naranja (no rojo)
+    const t2 = make([0, 1, 2, 3, 4, 5, 6].map(i => ({ id: `q${i}`, playerId: 'p1', date: d(i), sleep: 3, fatigue: 3, mood: 3, soreness: i === 6 ? 2 : 3 })));
+    const o2 = heatRow(t2._renderPlayerComparisonSection(), 'Ana')[4];
+    assert.strictEqual(o2.val, '3.0'); assert.strictEqual(o2.color, AMBER, 'un "3.0" visible no puede ser rojo');
+});
+test('sin datos: celdas "—" sin color de estado, todas iguales', () => {
+    const cells = heatRow(make([])._renderPlayerComparisonSection(), 'Ana');
+    assert.strictEqual(cells.length, 5);
+    cells.forEach(c => { assert.strictEqual(c.color, 'wh-nodata'); assert.strictEqual(c.val, '—'); });
+});
+test('la columna A:C también colorea solo el número (clase), sin fondo', () => {
+    const t = make([entry('p1', 4, 4, 4, 4)]);
+    t.getRatioColor = () => '#c62828';
+    let html = t._renderPlayerComparisonSection();
+    assert.ok(html.includes('<span class="wh-bad">1.00</span>'));
+    t.getRatioColor = () => '#2e7d32';
+    assert.ok(t._renderPlayerComparisonSection().includes('<span class="wh-good">1.00</span>'));
+    t.getRatioColor = () => '#1565c0';
+    assert.ok(t._renderPlayerComparisonSection().includes('<span class="wh-blue">1.00</span>'));
+});
+test('la leyenda usa puntos de color (texto) y describe bien los tramos', () => {
+    const html = make([entry('p1', 4, 4, 4, 4)])._renderPlayerComparisonSection();
+    assert.ok(html.includes('<b class="wh-good">●</b>') && html.includes('<b class="wh-warn">●</b>') && html.includes('<b class="wh-bad">●</b>'));
+    assert.ok(html.includes('≥4 bueno') && html.includes('3–3,9 normal') && html.includes('&lt;3 atención'));
+});
+test('el subtítulo ya no dice "mayor = mejor" (no vale para el A:C)', () => {
+    const html = make([entry('p1', 4, 4, 4, 4)])._renderPlayerComparisonSection();
+    assert.ok(!html.includes('mayor = mejor'));
+    assert.ok(html.includes('1 (peor) a 5 (mejor)'));
+});
+test('el nombre va en su propio contenedor recortable (no rompe la celda)', () => {
+    const html = make([entry('p1', 4, 4, 4, 4)])._renderPlayerComparisonSection();
+    assert.ok(html.includes('<td class="wh-name">') && html.includes('class="wh-name-in"'));
 });
 
 console.log('\nBarras "Wellness hoy" de Inicio');
