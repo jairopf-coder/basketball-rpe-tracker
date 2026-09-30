@@ -137,6 +137,7 @@ RPETracker.prototype.restoreBackup = function(event) {
             }
 
             AppConfirm.show({title:'¿Restaurar backup?',message:`Backup del ${new Date(backup.exportDate).toLocaleDateString('es-ES')}. Esto REEMPLAZARÁ todos los datos actuales.`,confirmText:'Restaurar',cancelText:'Cancelar',danger:true}).then(ok=>{ if(ok) {
+                if (typeof this._wellnessCanSave === 'function' && !this._wellnessCanSave()) return;
                 this.players      = backup.players;
                 this.sessions     = backup.sessions;
                 this.wellnessData = backup.wellnessData || [];
@@ -202,6 +203,10 @@ RPETracker.prototype._confirmSeasonClear = function(expectedAnswer) {
         if (input)   { input.style.borderColor = '#f44336'; input.focus(); }
         return;
     }
+
+    // Sin los datos de wellness cargados, la copia de seguridad saldría incompleta
+    // y el borrado sobrescribiría lo que hay en la nube: no se hace nada.
+    if (typeof this._wellnessCanSave === 'function' && !this._wellnessCanSave()) return;
 
     // Download full season backup first
     const now = new Date();

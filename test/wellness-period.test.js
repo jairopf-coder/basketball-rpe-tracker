@@ -286,5 +286,91 @@ test('sin Firebase, el respaldo local guarda también la lista filtrada', () => 
     assert.strictEqual(stored.length, 1);
 });
 
+console.log('\nBloqueo de guardado hasta cargar los datos de la nube');
+// Prepara un tracker "en la nube": firebaseSync con db y un registro de lo que se envía.
+function cloudTracker(ready) {
+    const t = tracker();
+    t.toasts = []; t.showToast = (m, ty) => t.toasts.push([m, ty]);
+    t.renderWellnessDashboard = () => {};
+    t.closed = 0; t.closeWellnessModal = () => { t.closed++; };
+    t.sent = [];
+    ctx.window.firebaseSync = { db: {}, saveWellnessData: list => t.sent.push(list) };
+    t._wellnessCloudReady = !!ready;
+    return t;
+}
+const noCloud = () => { delete ctx.window.firebaseSync; delete ctx.window.firebaseDB; };
+const setForm = vals => { ctx.document = { getElementById: id => (id in vals ? { value: vals[id], checked: !!vals[id] } : null) }; };
+const okForm = () => setForm({ wFormPlayer: 'p1', wFormDate: iso(0), wFormSleep: '4', wFormFatigue: '4', wFormMood: '4', wFormSoreness: '4', wFormNotes: '', wFormPeriod: false });
+const resetDoc = () => { ctx.document = { createElement: () => ({}), head: { appendChild() {} }, getElementById: () => null, documentElement: { classList: { contains: () => false } }, body: { classList: { contains: () => false } } }; };
+ctx.AppConfirm = { show: () => ({ then: fn => fn(true) }) }; // confirmación síncrona para las pruebas
+
+test('antes del primer snapshot: NO se envía nada a Firebase y avisa', () => {
+    const t = cloudTracker(false); t.wellnessData = [w('p1', 2)];
+    try {
+        assert.strictEqual(t.saveWellnessData(), false);
+        assert.strictEqual(t.sent.length, 0, 'se ha escrito en la nube sin haber cargado');
+        assert.strictEqual(t.toasts.length, 1); assert.strictEqual(t.toasts[0][1], 'warning');
+    } finally { noCloud(); }
+});
+test('tras el primer snapshot sí se guarda', () => {
+    const t = cloudTracker(true); t.wellnessData = [w('p1', 2)];
+    try { assert.strictEqual(t.saveWellnessData(), true); assert.strictEqual(t.sent.length, 1); }
+    finally { noCloud(); }
+});
+test('sin Firebase (modo local) no se bloquea nunca', () => {
+    const t = tracker(); t.showToast = () => {}; t.wellnessData = [w('p1', 2)];
+    noCloud(); t._wellnessCloudReady = false;
+    let stored = null; const prev = ctx.localStorage; ctx.localStorage = { getItem: () => null, setItem: (k, v) => { stored = v; } };
+    try { assert.strictEqual(t.saveWellnessData(), true); assert.ok(stored); } finally { ctx.localStorage = prev; }
+});
+test('el listener marca "cargado" con el primer snapshot, aunque venga VACÍO', () => {
+    const t = tracker(); let cb = null;
+    ctx.window.firebaseSync = { db: {}, onWellnessChange: f => { cb = f; } };
+    ctx.window.firebaseDB = { ref: () => ({ on() {} }) };
+    try {
+        t.loadWellnessData();
+        assert.ok(cb, 'no se registró el listener');
+        assert.ok(!t._wellnessCloudReady, 'no debería estar listo antes del snapshot');
+        cb([]); // nodo /wellness vacío
+        assert.strictEqual(t._wellnessCloudReady, true);
+    } finally { noCloud(); }
+});
+test('ESCENARIO REAL: app sin conexión → intenta guardar (bloqueado) → llega la nube → guarda TODO', () => {
+    const t = cloudTracker(false); t.wellnessData = []; // memoria vacía: aún no descargó nada
+    let cb = null; ctx.window.firebaseSync.onWellnessChange = f => { cb = f; };
+    ctx.window.firebaseDB = { ref: () => ({ on() {} }) };
+    try {
+        t._wellnessListenerSet = false; t.loadWellnessData();
+        okForm(); t.saveWellnessEntry();                       // 1) intento de guardar sin haber cargado
+        assert.strictEqual(t.sent.length, 0, 'sobrescribiría la nube con una lista casi vacía');
+        assert.strictEqual(t.wellnessData.length, 0, 'no debe modificar nada a medias');
+        assert.strictEqual(t.closed, 0, 'el formulario debe quedarse abierto');
+        cb([w('p1', 5), w('p2', 4), w('p2', 3)]);              // 2) llega el wellness guardado en la nube
+        okForm(); t.saveWellnessEntry();                       // 3) ahora sí
+        assert.strictEqual(t.sent.length, 1);
+        assert.strictEqual(t.sent[0].length, 4, 'debe conservar las 3 de la nube + la nueva');
+        assert.strictEqual(t.closed, 1);
+    } finally { noCloud(); resetDoc(); }
+});
+test('borrar un registro y borrar todo también quedan bloqueados (y no tocan la memoria)', () => {
+    const t = cloudTracker(false); t.wellnessData = [w('p1', 2)];
+    try {
+        t._deleteWellness(t.wellnessData[0].id); t._clearWellness();
+        assert.strictEqual(t.wellnessData.length, 1, 'se ha borrado en memoria estando bloqueado');
+        assert.strictEqual(t.sent.length, 0);
+        assert.strictEqual(t.toasts.length, 2);
+    } finally { noCloud(); }
+});
+test('wellness paso a paso y rápido: bloqueados sin cambios ni avance', () => {
+    const t = cloudTracker(false); t.wellnessData = [];
+    t._bulkQueue = [{ id: 'p1' }]; t._bulkIndex = 0; t._bulkDate = iso(0);
+    ctx.document = { getElementById: id => id === 'wellnessQuickOverlay' ? { querySelector: () => null, remove() { t.overlayRemoved = true; } } : null, querySelector: () => null };
+    try {
+        t._wbSaveAndNav(1); t.saveWellnessQuick();
+        assert.strictEqual(t.wellnessData.length, 0); assert.strictEqual(t._bulkIndex, 0);
+        assert.ok(!t.overlayRemoved, 'el panel rápido no debe cerrarse'); assert.strictEqual(t.sent.length, 0);
+    } finally { noCloud(); resetDoc(); }
+});
+
 console.log(`\n${passed} OK, ${failed} fallos`);
 process.exit(failed ? 1 : 0);

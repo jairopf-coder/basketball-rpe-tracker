@@ -12,6 +12,9 @@ RPETracker.prototype.loadWellnessData = function() {
         if (window.firebaseSync && !this._wellnessListenerSet) {
             this._wellnessListenerSet = true;
             window.firebaseSync.onWellnessChange(updated => {
+                // Primer snapshot recibido (aunque venga vacío): ya se puede guardar sin riesgo
+                // de sobrescribir en la nube datos que la app todavía no ha descargado.
+                this._wellnessCloudReady = true;
                 this.wellnessData = this._mergeWellnessPlayer(updated, this._wellnessPlayerCache || []);
                 if (this.currentView === 'wellness') this.renderWellnessDashboard();
                 if (this.currentView === 'dashboard') this.renderDashboard();
@@ -152,13 +155,29 @@ RPETracker.prototype._wellnessToPersist = function() {
     return all.filter(w => !(w.source === 'player' && backed.has(w.id)));
 };
 
+// BLOQUEO DE GUARDADO: firebaseSync.saveWellnessData hace set() sobre TODO /wellness,
+// es decir, reemplaza el nodo entero por lo que haya en memoria. Si se guardara antes
+// de que llegue el primer snapshot (app abierta sin conexión o con mala señal), se
+// sobrescribiría en la nube el wellness existente con una lista casi vacía.
+// Solo aplica con Firebase activo; sin Firebase (modo local) no hay nada que proteger.
+// Debe llamarse ANTES de modificar this.wellnessData, para no dejar cambios a medias.
+RPETracker.prototype._wellnessCanSave = function() {
+    const cloud = !!(window.firebaseSync && window.firebaseSync.db);
+    if (!cloud || this._wellnessCloudReady) return true;
+    this.showToast('⏳ Aún no se han cargado los datos de wellness desde la nube. No se ha guardado nada: comprueba la conexión y vuelve a intentarlo en unos segundos.', 'warning');
+    return false;
+};
+
+// Devuelve true si se guardó, false si el bloqueo lo impidió.
 RPETracker.prototype.saveWellnessData = function() {
+    if (!this._wellnessCanSave()) return false;
     const toSave = this._wellnessToPersist();
     if (window.firebaseSync) {
         window.firebaseSync.saveWellnessData(toSave);
     } else {
         localStorage.setItem('basketballWellness', JSON.stringify(toSave));
     }
+    return true;
 };
 
 // ========== MAIN RENDER ==========
@@ -883,6 +902,7 @@ RPETracker.prototype._wUpdateOverallPreview = function() {
 };
 
 RPETracker.prototype.saveWellnessEntry = function() {
+    if (!this._wellnessCanSave()) return; // el formulario se queda abierto con lo escrito
     if(!this.wellnessData) this.wellnessData=this.loadWellnessData();
     const playerId=document.getElementById('wFormPlayer')?.value;
     const date=document.getElementById('wFormDate')?.value;
@@ -910,6 +930,7 @@ RPETracker.prototype.saveWellnessEntry = function() {
 
 RPETracker.prototype._deleteWellness = function(id) {
     AppConfirm.show({title:'¿Eliminar registro?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar',danger:true}).then(ok=>{ if(!ok) return;
+    if (!this._wellnessCanSave()) return;
     this.wellnessData=(this.wellnessData||[]).filter(w=>w.id!==id);
     this.saveWellnessData();
     this.showToast('🗑️ Registro eliminado','info');
@@ -919,6 +940,7 @@ RPETracker.prototype._deleteWellness = function(id) {
 
 RPETracker.prototype._clearWellness = function() {
     AppConfirm.show({title:'¿Eliminar TODOS los registros de bienestar?',message:'Esta acción no se puede deshacer.',confirmText:'Eliminar todo',danger:true}).then(ok=>{ if(!ok) return;
+    if (!this._wellnessCanSave()) return;
     this.wellnessData=[];this.saveWellnessData();
     this.showToast('🗑️ Historial eliminado','info');
     this.renderWellnessDashboard();
@@ -1199,6 +1221,7 @@ RPETracker.prototype._wbUpdateSlider = function() {}; // kept for compat
 RPETracker.prototype._wbRefreshBadge = function() {};  // kept for compat
 
 RPETracker.prototype._wbSaveAndNav = function(dir) {
+    if (!this._wellnessCanSave()) return; // no avanza a la siguiente jugadora
     if (!this.wellnessData) this.wellnessData = [];
     const player = this._bulkQueue[this._bulkIndex];
     const date   = this._bulkDate;
@@ -1366,6 +1389,7 @@ RPETracker.prototype.saveWellnessQuick = function() {
     const today = toLocalISODate(new Date());
     const overlay = document.getElementById('wellnessQuickOverlay');
     if (!overlay) return;
+    if (!this._wellnessCanSave()) return; // el panel se queda abierto con lo marcado
 
     let count = 0;
     this.players.forEach(player => {
