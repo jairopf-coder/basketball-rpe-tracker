@@ -139,7 +139,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
     const wScore = (playerId) => {
         const e = wToday.find(x => x.playerId === playerId);
         if (!e) return null;
-        return (e.sleep + (6 - e.fatigue) + e.mood + (6 - e.soreness)) / 4;
+        return this._wOverall(e); // 1 = peor, 5 = mejor en las cuatro dimensiones
     };
     const wBar = (val) => {
         if (val === null) return '<span style="color:var(--text-faint);font-size:11px">—</span>';
@@ -232,15 +232,15 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
         const avg = f => e7.length ? (e7.reduce((s,x)=>s+(x[f]||0),0)/e7.length).toFixed(1) : '—';
         const todayE = wToday.find(x => x.playerId === player.id);
         const cells = [
-            { f:'sleep',    inv:false, label:'Sueño' },
-            { f:'fatigue',  inv:true,  label:'Fatiga' },
-            { f:'mood',     inv:false, label:'Humor' },
-            { f:'soreness', inv:true,  label:'Agujetas' },
-        ].map(({f, inv}) => {
+            { f:'sleep',    label:'Sueño' },
+            { f:'fatigue',  label:'Energía' },
+            { f:'mood',     label:'Humor' },
+            { f:'soreness', label:'Muscular' },
+        ].map(({f}) => {
             const val = todayE ? todayE[f] : null;
             if (val === null) return `<td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);text-align:center;color:var(--text-faint)">—</td>`;
-            const good = inv ? val <= 2 : val >= 4;
-            const bad  = inv ? val >= 4 : val <= 2;
+            const good = val >= 4;   // misma escala en las cuatro: 1 = peor, 5 = mejor
+            const bad  = val <= 2;
             const col  = good ? '#2e7d32' : bad ? '#c62828' : '#e65100';
             const bg   = good ? '#e8f5e9' : bad ? '#ffebee' : '#fff3e0';
             return `<td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);text-align:center"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${bg};color:${col};font-weight:700;font-size:12px;line-height:24px">${val}</span></td>`;
@@ -321,7 +321,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
         <div class="legend-item"><div class="legend-dot" style="background:#ff9800"></div> Precaución (1.3–1.5)</div>
         <div class="legend-item"><div class="legend-dot" style="background:#f44336"></div> Peligro (>1.5)</div>
         <div class="legend-item"><div class="legend-dot" style="background:#2196f3"></div> Bajo (<0.8)</div>
-        <div class="legend-item" style="margin-left:8px">Wellness hoy: barra sueño/humor/fatiga/agujetas (1–5)</div>
+        <div class="legend-item" style="margin-left:8px">Wellness hoy: sueño/energía/humor/muscular (1 = peor, 5 = mejor)</div>
     </div>
     <table style="margin-top:10px">
         <thead><tr>
@@ -340,9 +340,9 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
         <thead><tr>
             <th style="width:180px">Jugadora</th>
             <th style="text-align:center">😴 Sueño</th>
-            <th style="text-align:center">⚡ Fatiga</th>
+            <th style="text-align:center">⚡ Energía</th>
             <th style="text-align:center">😊 Humor</th>
-            <th style="text-align:center">💪 Agujetas</th>
+            <th style="text-align:center">💪 Muscular</th>
             <th style="text-align:center">Avg 7d (sueño/humor)</th>
         </tr></thead>
         <tbody>${wTeamRows}</tbody>

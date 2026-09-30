@@ -19,9 +19,9 @@ const WELLNESS_LABELS = { sleep: 'Sueño', fatigue: 'Energía', mood: 'Humor', s
 
 /**
  * Devuelve la media de los últimos `days` días de wellness para una jugadora.
- * Para 'fatigue' y 'soreness' invierte la escala (6 - valor) para que
- * "más alto = mejor estado" en todas las dimensiones del radar, igual que
- * el cálculo de overall usado en el resto del dashboard.
+ * Las cuatro dimensiones se guardan con la MISMA escala en todos los formularios:
+ * 1 = peor, 5 = mejor (Energía: 1 agotada … 5 descansada; Muscular: 1 mucho dolor
+ * … 5 sin dolor). Por eso NO se invierte nada: más alto = mejor en todas.
  * @returns {{values: Object, count: number}}
  */
 function _avgWellness(wellnessData, playerId, days) {
@@ -47,9 +47,9 @@ function _avgWellness(wellnessData, playerId, days) {
     return {
         values: {
             sleep:    sums.sleep    / count,
-            fatigue:  6 - (sums.fatigue  / count), // invertido: más = mejor
+            fatigue:  sums.fatigue  / count,
             mood:     sums.mood     / count,
-            soreness: 6 - (sums.soreness / count), // invertido: más = mejor
+            soreness: sums.soreness / count,
         },
         count
     };
@@ -82,7 +82,6 @@ RPETracker.prototype._renderPlayerComparisonSection = function() {
 function _renderWellnessHeatmap(rows, tracker) {
     const dims = ['sleep', 'fatigue', 'mood', 'soreness'];
     const labels = { sleep: '😴 Sueño', fatigue: '⚡ Energía', mood: '😊 Humor', soreness: '💪 Muscular' };
-    const invertedDims = new Set(['fatigue', 'soreness']);
 
     const heatColor = (val) => {
         if (val === null || val === undefined) return 'var(--bg-subtle)';
@@ -114,7 +113,7 @@ function _renderWellnessHeatmap(rows, tracker) {
                 return `<td class="wh-cell wh-nodata" title="Sin datos">—</td>`;
             }
             const val = wellness.values[dim];
-            const displayVal = invertedDims.has(dim) ? (6 - val).toFixed(1) : val.toFixed(1);
+            const displayVal = val.toFixed(1);
             return `<td class="wh-cell" style="background:${heatColor(val)};color:${heatText(val)}" title="${labels[dim]}: ${displayVal}/5">${displayVal}</td>`;
         }).join('');
 

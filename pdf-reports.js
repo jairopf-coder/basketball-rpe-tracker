@@ -713,7 +713,7 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
     const wScore = (playerId) => {
         const e = wToday.find(x => x.playerId === playerId);
         if (!e) return null;
-        return (e.sleep + (6 - e.fatigue) + e.mood + (6 - e.soreness)) / 4;
+        return this._wOverall(e); // 1 = peor, 5 = mejor en las cuatro dimensiones
     };
 
     // ── UA 7 days per player ──
@@ -934,7 +934,7 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
       <td>TOTAL EQUIPO</td>
       <td class="td-num">${totalUA.toLocaleString('es-ES')}</td>
       <td class="td-num">—</td>
-      <td class="td-num">${wCoverage ? (wToday.reduce((s, e) => s + (e.sleep + (6-e.fatigue) + e.mood + (6-e.soreness))/4, 0) / wCoverage).toFixed(1) : '—'}</td>
+      <td class="td-num">${wCoverage ? (wToday.reduce((s, e) => s + this._wOverall(e), 0) / wCoverage).toFixed(1) : '—'}</td>
       <td>${activeInj.length} activa${activeInj.length !== 1 ? 's' : ''}</td>
       <td>${countOk} disp. · ${countWarn} prec. · ${countOut} baja</td>
     </tr>

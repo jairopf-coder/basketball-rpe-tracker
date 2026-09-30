@@ -692,7 +692,7 @@ class RPETracker {
 
 
     // ========== READINESS SCORE ==========
-    // Composite 0-100 score: sleep + mood - fatigue - soreness + A:C zone bonus
+    // Composite 0-100 score: sleep + mood + energía + muscular (1 = peor, 5 = mejor) + A:C zone bonus
     // Returns null if no wellness data for today.
 
 
