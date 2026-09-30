@@ -78,33 +78,36 @@ RPETracker.prototype._renderPlayerComparisonSection = function() {
     return _renderWellnessHeatmap(rows, this);
 };
 
-// ── Heatmap unificado: jugadora × A:C + dimensiones wellness ─────────────
+// ── Tabla unificada: jugadora × A:C + dimensiones wellness ───────────────
+// Diseño: UN solo fondo para toda la tabla (el de la tarjeta). El color va
+// únicamente en el número, mediante clases (wh-good / wh-warn / wh-bad / wh-blue),
+// para que tenga variante clara y oscura y se lea bien con ambos temas.
 function _renderWellnessHeatmap(rows, tracker) {
     const dims = ['sleep', 'fatigue', 'mood', 'soreness'];
     const labels = { sleep: '😴 Sueño', fatigue: '⚡ Energía', mood: '😊 Humor', soreness: '💪 Muscular' };
 
-    const heatColor = (val) => {
-        if (val === null || val === undefined) return 'var(--bg-subtle)';
-        if (val >= 4.0) return '#2e7d3220';
-        if (val >= 3.0) return '#f9a82520';
-        return '#c6282820';
-    };
-    const heatText = (val) => {
-        if (val === null || val === undefined) return 'var(--text-faint)';
-        if (val >= 4.0) return '#2e7d32';
-        if (val >= 3.0) return '#e65100';
-        return '#c62828';
+    // Wellness (1 = peor, 5 = mejor): ≥4 verde · 3–3,9 naranja · <3 rojo.
+    // Se clasifica el valor YA REDONDEADO a un decimal, que es el que se ve: así un
+    // 3,96 (que se muestra como "4.0") sale verde y dos "4.0" nunca tienen colores distintos.
+    const heatClass = (val) => {
+        if (val === null || val === undefined) return 'wh-nodata';
+        const shown = Math.round(val * 10) / 10;
+        if (shown >= 4.0) return 'wh-good';
+        if (shown >= 3.0) return 'wh-warn';
+        return 'wh-bad';
     };
 
-    // A:C color reutilizando getRatioColor del tracker
-    const acColor = (ratio) => {
-        if (!tracker || ratio.confidence === 'low' || ratio.ratio === 'N/A') return 'var(--text-muted)';
-        return tracker.getRatioColor(ratio.ratio);
-    };
+    // A:C: se reutiliza getRatioColor del tracker (no se duplican los umbrales) y
+    // su color se traduce a clase para poder tener variante oscura.
+    const AC_CLASS = { '#1565c0': 'wh-blue', '#2e7d32': 'wh-good', '#ef6c00': 'wh-warn', '#c62828': 'wh-bad' };
     const acDisplay = (ratio) => {
         if (ratio.confidence === 'low') return `<span title="${esc(ratio.message || 'Datos insuf.')}">⚠️</span>`;
         if (ratio.ratio === 'N/A') return '—';
-        return `<span style="color:${acColor(ratio)};font-weight:700">${ratio.ratio}</span>`;
+        const color = tracker ? tracker.getRatioColor(ratio.ratio) : null;
+        const cls = AC_CLASS[color];
+        return cls
+            ? `<span class="${cls}">${ratio.ratio}</span>`
+            : `<span${color ? ` style="color:${color}"` : ''}>${ratio.ratio}</span>`;
     };
 
     const rowsHtml = rows.map(({ player, ratio, wellness }) => {
@@ -114,7 +117,7 @@ function _renderWellnessHeatmap(rows, tracker) {
             }
             const val = wellness.values[dim];
             const displayVal = val.toFixed(1);
-            return `<td class="wh-cell" style="background:${heatColor(val)};color:${heatText(val)}" title="${labels[dim]}: ${displayVal}/5">${displayVal}</td>`;
+            return `<td class="wh-cell ${heatClass(val)}" title="${labels[dim]}: ${displayVal}/5">${displayVal}</td>`;
         }).join('');
 
         let overall = null;
@@ -123,13 +126,15 @@ function _renderWellnessHeatmap(rows, tracker) {
             overall = sum / dims.length;
         }
         const overallHtml = overall !== null
-            ? `<td class="wh-cell wh-overall" style="background:${heatColor(overall)};color:${heatText(overall)}">${overall.toFixed(1)}</td>`
-            : `<td class="wh-cell wh-nodata">—</td>`;
+            ? `<td class="wh-cell wh-overall ${heatClass(overall)}" title="Media global: ${overall.toFixed(1)}/5">${overall.toFixed(1)}</td>`
+            : `<td class="wh-cell wh-overall wh-nodata">—</td>`;
 
         return `<tr>
             <td class="wh-name">
-                ${PlayerTokens.avatar(player, 20, '0.58rem')}
-                <span>${esc(player.name.split(' ')[0])}</span>
+                <div class="wh-name-in">
+                    ${PlayerTokens.avatar(player, 20, '0.58rem')}
+                    <span>${esc(player.name.split(' ')[0])}</span>
+                </div>
             </td>
             <td class="wh-cell wh-ac">${acDisplay(ratio)}</td>
             ${cells}
@@ -143,7 +148,7 @@ function _renderWellnessHeatmap(rows, tracker) {
     <div class="db-comparison-radar">
         <div class="cmp-radar-header">
             <span class="db-left-label">🌡️ Carga y wellness — 7 días</span>
-            <span class="cmp-subtitle">A:C + bienestar por jugadora · mayor = mejor</span>
+            <span class="cmp-subtitle">A:C = carga · bienestar de 1 (peor) a 5 (mejor)</span>
         </div>
         <div class="wh-wrap">
             <table class="wh-table">
@@ -162,9 +167,9 @@ function _renderWellnessHeatmap(rows, tracker) {
             </table>
         </div>
         <div class="wh-legend">
-            <span class="wh-leg-item wh-leg-good">≥4 bueno</span>
-            <span class="wh-leg-item wh-leg-warn">3–4 normal</span>
-            <span class="wh-leg-item wh-leg-bad">≤3 atención</span>
+            <span class="wh-leg-item"><b class="wh-good">●</b> ≥4 bueno</span>
+            <span class="wh-leg-item"><b class="wh-warn">●</b> 3–3,9 normal</span>
+            <span class="wh-leg-item"><b class="wh-bad">●</b> &lt;3 atención</span>
             <span style="margin-left:auto;font-size:10px;color:var(--text-faint)">Ordenado por mayor A:C</span>
         </div>
     </div>`;
@@ -290,67 +295,71 @@ RPETracker.prototype._bindComparisonEvents = function() {
             padding: 1rem;
         }
 
-        /* ── Heatmap de wellness ── */
+        /* ── Tabla de wellness: un solo fondo (el de la tarjeta); color SOLO en los números ── */
         .wh-wrap {
             overflow-x: hidden;
             border-radius: 12px;
             border: 1px solid var(--border);
-            box-shadow: var(--shadow-sm);
+            background: transparent;
         }
         .wh-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 12px;
+            background: transparent;
         }
-        .wh-table thead tr {
-            background: var(--bg-surface);
-            border-bottom: 1px solid var(--border);
-        }
+        .wh-table thead tr { background: transparent; border-bottom: 1px solid var(--border); }
+        .wh-table th, .wh-table td { background: transparent; }
         .wh-table th {
-            padding: 4px 5px;
+            padding: 6px 5px;
             text-align: center;
             font-weight: 600;
-            font-size: 11px;
+            font-size: 12px;
             color: var(--text-muted);
             white-space: nowrap;
         }
-        .wh-th-name { text-align: left !important; padding-left: 8px; }
-        .wh-th-overall { font-style: italic; }
-        .wh-table tr { border-bottom: 1px solid var(--border); }
-        .wh-table tr:last-child { border-bottom: none; }
+        .wh-th-name { text-align: left !important; padding-left: 10px !important; }
+        .wh-table tbody tr { border-bottom: 1px solid var(--border); }
+        .wh-table tbody tr:last-child { border-bottom: none; }
         .wh-name {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            padding: 4px 5px 4px 8px;
+            padding: 6px 5px 6px 10px;
             font-weight: 500;
             color: var(--text-primary);
             white-space: nowrap;
         }
+        .wh-name-in { display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .wh-name-in span { overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
         .wh-cell {
-            padding: 5px 4px;
+            padding: 6px 4px;
             text-align: center;
             font-variant-numeric: tabular-nums;
-            font-size: 12px;
-            font-weight: 600;
-            border-left: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
         }
-        .wh-overall { border-left: 2px solid var(--border); }
-        .wh-nodata { color: var(--text-faint); font-weight: 400; background: var(--bg-subtle) !important; }
-        .wh-ac { border-left: 2px solid var(--border); font-size: 12px; font-weight: 600; }
+        .wh-ac, .wh-overall { border-left: 1px solid var(--border); }
+        .wh-overall { font-size: 14px; font-weight: 800; }
+        .wh-nodata { color: var(--text-faint); font-weight: 400; }
+
+        /* Colores: solo texto. Tono oscuro para fondo claro y tono claro para fondo oscuro */
+        .wh-good { color: #2e7d32; }
+        .wh-warn { color: #e65100; }
+        .wh-bad  { color: #c62828; }
+        .wh-blue { color: #1565c0; }
+        [data-theme="dark"] .wh-good { color: #66bb6a; }
+        [data-theme="dark"] .wh-warn { color: #ffa726; }
+        [data-theme="dark"] .wh-bad  { color: #ef5350; }
+        [data-theme="dark"] .wh-blue { color: #64b5f6; }
+
         .wh-legend {
             display: flex;
-            gap: 10px;
-            padding: 5px 8px;
-            font-size: 10px;
-            border-top: 1px solid var(--border);
-            background: var(--bg-subtle);
-            border-radius: 0 0 8px 8px;
+            flex-wrap: wrap;
+            gap: 4px 14px;
+            padding: 8px 4px 0;
+            font-size: 11px;
+            background: transparent;
         }
         .wh-leg-item { display: flex; align-items: center; gap: 4px; color: var(--text-muted); }
-        .wh-leg-good::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #2e7d3220; border: 1px solid #2e7d32; }
-        .wh-leg-warn::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #f9a82520; border: 1px solid #e65100; }
-        .wh-leg-bad::before  { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #c6282820; border: 1px solid #c62828; }
     `;
     document.head.appendChild(s);
 }());
