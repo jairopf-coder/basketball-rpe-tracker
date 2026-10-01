@@ -581,6 +581,32 @@ RPETracker.prototype._pendingNoticeText = function() {
     return lines.join('\n');
 };
 
+// ── Avisos push: qué jugadoras los tienen activados (solo lectura para el staff) ──
+// Lee /pushStatus (solo { active, updatedAt }; las suscripciones en sí NO son legibles por el staff).
+// Si falta la clave VAPID o las reglas de Firebase aún no están publicadas, simplemente no se muestra nada.
+RPETracker.prototype._pushFeatureOn = function() {
+    return typeof PushClient !== 'undefined' && PushClient.isConfigured();
+};
+
+RPETracker.prototype._registerPushStatusListener = function() {
+    if (this._pushStatusListenerSet || !window.firebaseDB || !this._pushFeatureOn()) return;
+    this._pushStatusListenerSet = true;
+    this._pushStatus = this._pushStatus || {};
+    window.firebaseDB.ref('pushStatus').on('value', snap => {
+        this._pushStatus = snap.val() || {};
+        if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard();
+    }, err => {
+        this._pushStatus = {};
+        console.warn('pushStatus no disponible (¿reglas de Firebase sin publicar?):', err && err.code);
+    });
+};
+
+RPETracker.prototype._hasPushActive = function(player) {
+    if (!this._pushFeatureOn()) return false;
+    const st = player && player.authUid && this._pushStatus ? this._pushStatus[player.authUid] : null;
+    return !!(st && st.active === true);
+};
+
 RPETracker.prototype.copyPendingNotice = function() {
     const text = this._pendingNoticeText();
     if (!text) { this.showToast('Hoy no falta nadie por rellenar', 'info'); return; }
@@ -667,7 +693,7 @@ RPETracker.prototype._renderRightWidgets = function() {
     // "Faltan hoy": quién no ha cubierto wellness ni RPE + aviso para WhatsApp
     const pend = this._pendingToday();
     const pendingRow = (icon, label, list) => list.length
-        ? `<div class="db-rw-pending"><span class="db-rw-pending-label">${icon} ${label}:</span> <span class="db-rw-pending-names">${list.map(p => esc(this._shortPlayerName(p))).join(', ')}</span></div>`
+        ? `<div class="db-rw-pending"><span class="db-rw-pending-label">${icon} ${label}:</span> <span class="db-rw-pending-names">${list.map(p => esc(this._shortPlayerName(p)) + (this._hasPushActive(p) ? ' 🔔' : '')).join(', ')}</span></div>`
         : '';
     const pendingHTML = (pend.wellness.length || pend.rpe.length) ? `<div class="db-rw-section">
         <div class="db-rw-label">Faltan hoy</div>
@@ -677,6 +703,7 @@ RPETracker.prototype._renderRightWidgets = function() {
             <button type="button" class="db-rw-btn" onclick="window.rpeTracker?.copyPendingNotice()">📋 Copiar aviso</button>
             <button type="button" class="db-rw-btn" onclick="window.rpeTracker?.sendPendingNoticeWhatsApp()">💬 WhatsApp</button>
         </div>
+        ${this._pushFeatureOn() ? '<div class="db-rw-hint">🔔 = tiene los avisos activados en su móvil</div>' : ''}
     </div>` : `<div class="db-rw-section"><div class="db-rw-pending db-rw-pending--ok">✅ Todas al día</div></div>`;
 
     // Render into dedicated card (id="dbRightWidgets")

@@ -4244,6 +4244,20 @@ header h1 {
 [data-theme="dark"] .pv-period-btn { background: var(--bg-surface); border-color: var(--border-input); color: var(--text-primary); }
 [data-theme="dark"] .pv-period-btn.selected { background: #e91e63; border-color: #e91e63; color: #fff; }
 
+/* Tarjeta "Avisos" (menú de la jugadora) */
+.pv-push-card { margin-top: 0.9rem; padding: 0.9rem 1rem; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-surface); text-align: center; }
+.pv-push-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+.pv-push-desc { font-size: 0.85rem; color: var(--text-secondary); margin: 0.3rem 0 0.7rem; }
+.pv-push-btn { width: 100%; padding: 0.7rem 0.9rem; border: none; border-radius: 10px; background: var(--primary, #ff6600); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+.pv-push-status { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+.pv-push-status.ok { color: #2e7d32; }
+.pv-push-status.warn { color: #e65100; font-weight: 500; }
+[data-theme="dark"] .pv-push-status.ok { color: #66bb6a; }
+[data-theme="dark"] .pv-push-status.warn { color: #ffa726; }
+.pv-push-link { margin-top: 0.4rem; padding: 0.5rem; background: none; border: none; color: var(--text-secondary); text-decoration: underline; font-size: 0.82rem; cursor: pointer; touch-action: manipulation; }
+.pv-push-msg { margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); }
+.pv-push-privacy { margin-top: 0.7rem; font-size: 0.72rem; color: var(--text-secondary); opacity: 0.8; }
+
 /* Menú principal (Wellness / RPE) */
 .pv-menu-btn {
     display: flex; align-items: center; justify-content: space-between; width: 100%;
@@ -5142,6 +5156,7 @@ header h1 {
 .db-rw-pending-actions { display: flex; gap: 0.5rem; margin-top: 0.65rem; flex-wrap: wrap; }
 .db-rw-btn { min-height: 36px; padding: 0.4rem 0.8rem; font-size: 0.78rem; font-weight: 600; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); color: var(--text-primary); cursor: pointer; touch-action: manipulation; }
 .db-rw-btn:hover { border-color: var(--primary, #ff6600); }
+.db-rw-hint { margin-top: 0.45rem; font-size: 0.72rem; color: var(--text-secondary); }
 
 /* ── Dark mode ───────────────────────────────────────────────────── */
 [data-theme="dark"] .db-rw-bar-track  { background: #2a2a32; }

@@ -35,6 +35,10 @@ const PlayerView = (() => {
     let _previewMode = false;
     let _wellnessState = { date: _today(), sleep: 0, fatigue: 0, mood: 0, pain: 0, period: false };
     let _rpeState = { date: _today(), sessionType: null, value: 0 };
+    // Avisos push (ver push-client.js). null = aún no se ha consultado el estado.
+    let _pushState = null;      // 'unconfigured' | 'preview' | 'unsupported' | 'denied' | 'active' | 'ready'
+    let _pushBusy = false;
+    let _pushMsgKey = '';       // clave i18n de un mensaje bajo el botón (errores)
 
     // ---- Helpers ----
     function _today() {
@@ -283,6 +287,36 @@ const PlayerView = (() => {
         }
     }
 
+    // Tarjeta "Avisos": permite activar/desactivar los recordatorios en este móvil.
+    // No se pinta nada hasta conocer el estado ni si falta la clave VAPID.
+    function _renderPushCard() {
+        if (!_pushState || _pushState === 'unconfigured') return '';
+        const t = k => _esc(PlayerI18n.t(k));
+        let body = '';
+        if (_pushBusy) {
+            body = `<div class="pv-push-status">${t('pvPushWorking')}</div>`;
+        } else if (_pushState === 'active') {
+            body = `<div class="pv-push-status ok">${t('pvPushActive')}</div>
+                    <button type="button" class="pv-push-link" onclick="PlayerView._onDisablePush()">${t('pvPushDisable')}</button>`;
+        } else if (_pushState === 'ready') {
+            body = `<button type="button" class="pv-push-btn" onclick="PlayerView._onEnablePush()">${t('pvPushEnable')}</button>`;
+        } else if (_pushState === 'denied') {
+            body = `<div class="pv-push-status warn">${t('pvPushDenied')}</div>`;
+        } else if (_pushState === 'unsupported') {
+            body = `<div class="pv-push-status warn">${t('pvPushUnsupported')}</div>`;
+        } else if (_pushState === 'preview') {
+            body = `<div class="pv-push-status">${t('pvPushPreview')}</div>`;
+        }
+        const msg = _pushMsgKey ? `<div class="pv-push-msg">${t(_pushMsgKey)}</div>` : '';
+        return `
+        <div class="pv-push-card" id="pv-push-card">
+            <div class="pv-push-title">${t('pvPushTitle')}</div>
+            <div class="pv-push-desc">${t('pvPushDesc')}</div>
+            ${body}${msg}
+            <div class="pv-push-privacy">${t('pvPushPrivacy')}</div>
+        </div>`;
+    }
+
     function _renderMenu() {
         const wellnessDone = _hasAnsweredWellnessToday();
         _screenEl.innerHTML = _shell(`
@@ -293,6 +327,7 @@ const PlayerView = (() => {
             <button class="pv-menu-btn" onclick="PlayerView._goRpeType()">
                 <span><span class="pv-menu-btn-icon">🏃</span>${_esc(PlayerI18n.t('menuRpeBtn'))}</span>
             </button>
+            ${_renderPushCard()}
         `);
     }
 
@@ -451,6 +486,7 @@ const PlayerView = (() => {
         _render();
         _drainQueue();
         _syncTodayStatus();
+        _initPush();
     }
 
     // Vista previa para el staff: igual que show(), pero en modo aislado
@@ -472,6 +508,7 @@ const PlayerView = (() => {
         document.body.appendChild(_screenEl);
 
         _render();
+        _initPush();
     }
 
     // Vuelve al panel de staff y desactiva el modo vista previa.
@@ -506,6 +543,65 @@ const PlayerView = (() => {
         });
         const btn = document.getElementById('pv-submit-btn');
         if (btn) btn.disabled = !_allWellnessAnswered();
+    }
+
+    // ---- Avisos push ----
+    // Consulta el estado y, en la pantalla real (no en vista previa), vuelve a guardar la
+    // suscripción si existe o limpia el 🔔 si ya no es válida.
+    async function _initPush() {
+        if (typeof PushClient === 'undefined') return;
+        try {
+            _pushState = await PushClient.getState({ preview: _previewMode });
+            if (_view === 'menu') _render();
+            if (!_previewMode) await PushClient.syncOnOpen(_getUid(), window.firebaseDB);
+        } catch (_) { /* los avisos son opcionales: nunca deben romper la pantalla */ }
+    }
+
+    // OJO: PushClient.enable() se llama ANTES de repintar y sin ningún await previo.
+    // iOS solo muestra el permiso de notificaciones dentro del gesto de la jugadora.
+    function _onEnablePush() {
+        if (_pushBusy || _previewMode || typeof PushClient === 'undefined') return;
+        _pushBusy = true;
+        _pushMsgKey = '';
+        const p = PushClient.enable(_getUid(), window.firebaseDB);
+        if (_view === 'menu') _render();
+        p.then(r => {
+            _pushBusy = false;
+            if (r.ok) {
+                _pushState = 'active';
+            } else if (r.reason === 'denied') {
+                _pushState = 'denied';
+            } else if (r.reason === 'save') {
+                _pushState = 'active';   // el móvil quedó suscrito; se reintentará el guardado al abrir
+                _pushMsgKey = 'pvPushErrSave';
+            } else if (r.reason === 'unsupported') {
+                _pushState = 'unsupported';
+            } else {
+                _pushMsgKey = r.reason === 'dismissed' ? 'pvPushErrDismissed'
+                            : r.reason === 'sw'        ? 'pvPushErrSw'
+                            :                            'pvPushErrGeneric';
+            }
+            if (_view === 'menu') _render();
+        }).catch(() => {
+            _pushBusy = false;
+            _pushMsgKey = 'pvPushErrGeneric';
+            if (_view === 'menu') _render();
+        });
+    }
+
+    async function _onDisablePush() {
+        if (_pushBusy || _previewMode || typeof PushClient === 'undefined') return;
+        _pushBusy = true;
+        _pushMsgKey = '';
+        if (_view === 'menu') _render();
+        try {
+            const r = await PushClient.disable(_getUid(), window.firebaseDB);
+            if (r.ok) _pushState = 'ready'; else _pushMsgKey = 'pvPushErrGeneric';
+        } catch (_) {
+            _pushMsgKey = 'pvPushErrGeneric';
+        }
+        _pushBusy = false;
+        if (_view === 'menu') _render();
     }
 
     function _onPeriod() {
@@ -567,6 +663,8 @@ const PlayerView = (() => {
         exitPreview,
         _onWellness,
         _onPeriod,
+        _onEnablePush,
+        _onDisablePush,
         _onDate,
         _onRpeValue,
         _onSubmitWellness,
