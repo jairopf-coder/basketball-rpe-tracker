@@ -781,6 +781,8 @@ class RPETracker {
         // Escuchar el RPE que envían las jugadoras desde su propia vista
         // (independiente del listener de /sessions de arriba).
         if (typeof this._registerPlayerRpeListener === 'function') this._registerPlayerRpeListener();
+        // Qué jugadoras tienen los avisos push activados (para mostrar 🔔 en "Faltan hoy")
+        if (typeof this._registerPushStatusListener === 'function') this._registerPushStatusListener();
         return localSessions;
     }
 

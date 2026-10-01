@@ -46,6 +46,33 @@
         ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')"
       }
     },
+    "pushSubscriptions": {
+      "$uid": {
+        ".read":  "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['endpoint', 'keys', 'updatedAt'])",
+        "endpoint": { ".validate": "newData.isString() && newData.val().matches(/^https:\\/\\/.+/) && newData.val().length < 1000" },
+        "keys": {
+          ".validate": "newData.hasChildren(['p256dh', 'auth'])",
+          "p256dh": { ".validate": "newData.isString() && newData.val().length < 200" },
+          "auth":   { ".validate": "newData.isString() && newData.val().length < 100" },
+          "$other": { ".validate": false }
+        },
+        "updatedAt": { ".validate": "newData.isString() && newData.val().length < 40" },
+        "$other": { ".validate": false }
+      }
+    },
+    "pushStatus": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      "$uid": {
+        ".read":  "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['active', 'updatedAt'])",
+        "active":    { ".validate": "newData.isBoolean()" },
+        "updatedAt": { ".validate": "newData.isString() && newData.val().length < 40" },
+        "$other": { ".validate": false }
+      }
+    },
     "injuries": {
       ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
