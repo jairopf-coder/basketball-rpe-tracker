@@ -1,6 +1,6 @@
 // Service Worker — BasketballRPE-Web
 // Bump CACHE_VERSION whenever you deploy new code to invalidate stale caches.
-const CACHE_VERSION = 'v129';
+const CACHE_VERSION = 'v130';
 const CACHE_NAME = `rpe-basketball-${CACHE_VERSION}`;
 
 // Rutas RELATIVAS al scope del service worker (la app vive en /basketball-rpe-tracker/,
@@ -50,6 +50,8 @@ const urlsToCache = [
   'ui-helpers.js',
   'weekplan-medical.js',
   'wellness.js',
+  'export-fisio.js',
+  'xlsx.mini.min.js',
 ];
 
 // Convierte una ruta relativa en URL absoluta dentro del scope de la app.
