@@ -99,6 +99,65 @@ RPETracker.prototype.saveGpsPlayerMap = function() {
     }
 };
 
+// ========== ID de Oli por jugadora (campo "ID Oli" de la ficha) ==========
+// Fuente única: gpsPlayerMap { [oliPlayerId]: playerId }. No se duplica en la jugadora.
+// Se rellena solo al confirmar una importación de GPS y también a mano desde la ficha.
+
+// Todos los ID de Oli asociados a una jugadora (normalmente uno).
+RPETracker.prototype.getOliIdsForPlayer = function(playerId) {
+    const map = this.gpsPlayerMap || {};
+    return Object.keys(map).filter(oliId => map[oliId] === playerId).sort();
+};
+
+// El ID de Oli de una jugadora, o '' si no tiene.
+RPETracker.prototype.getOliIdForPlayer = function(playerId) {
+    return this.getOliIdsForPlayer(playerId)[0] || '';
+};
+
+// Valida el texto escrito en el campo. Devuelve { ok, value, error }.
+// Vacío es válido (= quitar el ID). Las claves de Firebase no admiten . $ # [ ] /
+RPETracker.prototype.validateOliId = function(raw) {
+    const value = String(raw == null ? '' : raw).trim();
+    if (value === '') return { ok: true, value: '' };
+    if (!/^[A-Za-z0-9_-]{1,30}$/.test(value)) {
+        return { ok: false, value, error: 'El ID de Oli solo puede llevar letras, números, guion y guion bajo (máx. 30).' };
+    }
+    return { ok: true, value };
+};
+
+// Si ese ID ya pertenece a OTRA jugadora, la devuelve (para pedir confirmación).
+RPETracker.prototype.findOliIdOwner = function(oliId, exceptPlayerId) {
+    const ownerId = (this.gpsPlayerMap || {})[oliId];
+    if (!ownerId || ownerId === exceptPlayerId) return null;
+    return (this.players || []).find(p => p.id === ownerId) || { id: ownerId, name: ownerId };
+};
+
+// Asigna (o quita, con '') el ID de Oli de una jugadora. Deja UN solo ID por jugadora:
+// borra los anteriores y, si el ID era de otra jugadora, se lo quita a ella.
+// Escribe solo las claves afectadas. Devuelve true si cambió algo.
+RPETracker.prototype.setOliIdForPlayer = function(playerId, oliId) {
+    if (!this.gpsPlayerMap) this.gpsPlayerMap = {};
+    const changes = {};
+    this.getOliIdsForPlayer(playerId).forEach(old => {
+        if (old !== oliId) { changes[old] = null; delete this.gpsPlayerMap[old]; }
+    });
+    if (oliId && this.gpsPlayerMap[oliId] !== playerId) {
+        changes[oliId] = playerId;
+        this.gpsPlayerMap[oliId] = playerId;
+    }
+    if (Object.keys(changes).length === 0) return false;
+
+    if (window.firebaseSync) {
+        this._savingGpsPlayerMap = true;
+        window.firebaseSync.updateGpsPlayerMapEntries(changes, this.gpsPlayerMap).finally(() => {
+            this._savingGpsPlayerMap = false;
+        });
+    } else {
+        localStorage.setItem('basketballGpsPlayerMap', JSON.stringify(this.gpsPlayerMap));
+    }
+    return true;
+};
+
 // ========== Utilidades de emparejamiento de jugadoras ==========
 
 // Normaliza un nombre para comparar sin acentos, mayúsculas ni espacios extra.
@@ -576,13 +635,15 @@ RPETracker.prototype._confirmGpsImport = function(sessionGroupId) {
     rowsToProcess.forEach(({ playerId, record, oliPlayerId }) => {
         const targetSession = this._findPlayerSessionInGroup(sessionGroupId, playerId);
         const player = this.players.find(p => p.id === playerId);
+        // El ID de Oli se aprende siempre que el staff confirma la fila, aunque ese día la
+        // jugadora no tenga sesión de RPE (y por tanto no se guarde su GPS).
+        if (oliPlayerId) newMappings[oliPlayerId] = playerId;
         if (!targetSession) {
             skippedPlayerNames.push(player ? player.name : playerId);
             return;
         }
         if (!this.gpsData[targetSession.id]) this.gpsData[targetSession.id] = {};
         this.gpsData[targetSession.id][playerId] = record;
-        newMappings[oliPlayerId] = playerId;
         savedPlayerNames.push(player ? player.name : playerId);
     });
 
