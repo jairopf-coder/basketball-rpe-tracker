@@ -704,6 +704,23 @@ FirebaseSync.prototype.saveGpsPlayerMap = async function(gpsPlayerMap) {
     }
 };
 
+// Cambios puntuales del mapeo (edición manual del ID Oli en la ficha de la jugadora).
+// A diferencia de saveGpsPlayerMap (que hace set() de TODO el nodo), update() solo toca
+// las claves indicadas: { [oliPlayerId]: playerId | null } — null borra esa clave.
+// Así no se pisan mapeos que otro dispositivo haya añadido mientras tanto.
+// Si falla (sin conexión), cae al guardado completo con cola offline de siempre.
+FirebaseSync.prototype.updateGpsPlayerMapEntries = async function(entries, fullMap) {
+    try {
+        if (!this.db) { Store.set('gpsPlayerMap', fullMap || {}); return; }
+        await this.db.ref('gpsPlayerMap').update(entries);
+        Store.set('gpsPlayerMap', fullMap || {});
+    } catch (e) {
+        console.error('Error updating gpsPlayerMap in Firebase:', e);
+        Store.set('gpsPlayerMap', fullMap || {});
+        await this._enqueueWrite('gpsPlayerMap', fullMap || {});
+    }
+};
+
 FirebaseSync.prototype.onGpsPlayerMapChange = function(callback) {
     if (!this.db) return;
     this.db.ref('gpsPlayerMap').on('value', snapshot => {

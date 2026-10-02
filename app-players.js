@@ -356,6 +356,20 @@ RPETracker.prototype.editPlayer = function(playerId) {
     document.getElementById('editPlayerName').value = player.name;
     document.getElementById('editPlayerNumber').value = player.number || '';
 
+    // ID de Oli (se lee del mapeo gpsPlayerMap; ver gps-tracking.js)
+    const oliInput = document.getElementById('editPlayerOliId');
+    if (oliInput) {
+        const oliIds = this.getOliIdsForPlayer(player.id);
+        oliInput.value = oliIds[0] || '';
+        this._editOliInitial = oliInput.value;
+        const hint = document.getElementById('editPlayerOliIdHint');
+        if (hint) {
+            hint.textContent = oliIds.length > 1
+                ? `Esta jugadora tiene ${oliIds.length} ID asociados (${oliIds.join(', ')}). Si cambias este campo, solo quedará el que escribas.`
+                : 'Se rellena solo al importar el CSV de Oli. Puedes escribirlo o corregirlo a mano.';
+        }
+    }
+
     // Individual A:C thresholds (empty = use global defaults)
     document.getElementById('editAcThresholdLow').value  = player.acThresholdLow  != null ? player.acThresholdLow  : '';
     document.getElementById('editAcThresholdOpt').value  = player.acThresholdOpt  != null ? player.acThresholdOpt  : '';
@@ -382,6 +396,31 @@ RPETracker.prototype.handleEditPlayerSubmit = function(e) {
         return;
     }
 
+    // ID de Oli: solo se toca si el usuario lo ha cambiado. Se valida ANTES de guardar nada.
+    const oliInput = document.getElementById('editPlayerOliId');
+    let oliChange = null; // null = sin cambios; si no, { value }
+    if (oliInput && oliInput.value.trim() !== (this._editOliInitial || '')) {
+        const oli = this.validateOliId(oliInput.value);
+        if (!oli.ok) {
+            this.showToast('❌ ' + oli.error, 'error');
+            return;
+        }
+        oliChange = { value: oli.value };
+        const owner = oli.value ? this.findOliIdOwner(oli.value, playerId) : null;
+        if (owner) {
+            AppConfirm.show({
+                title: 'ID de Oli ya asignado',
+                message: `El ID ${oli.value} está asociado a ${owner.name}. ¿Quieres asignárselo a ${player.name.trim() || 'esta jugadora'}? ${owner.name} se quedará sin ID.`,
+                confirmText: 'Reasignar',
+                cancelText: 'Cancelar'
+            }).then(ok => { if (ok) this._applyEditPlayer(player, oliChange); });
+            return;
+        }
+    }
+    this._applyEditPlayer(player, oliChange);
+};
+
+RPETracker.prototype._applyEditPlayer = function(player, oliChange) {
     player.name = document.getElementById('editPlayerName').value;
     player.number = document.getElementById('editPlayerNumber').value || null;
     const chosenColor = document.getElementById('editPlayerColor').value;
@@ -394,6 +433,8 @@ RPETracker.prototype.handleEditPlayerSubmit = function(e) {
     player.acThresholdLow  = _low  !== '' ? parseFloat(_low)  : null;
     player.acThresholdOpt  = _opt  !== '' ? parseFloat(_opt)  : null;
     player.acThresholdHigh = _high !== '' ? parseFloat(_high) : null;
+
+    if (oliChange) this.setOliIdForPlayer(player.id, oliChange.value);
 
     this.savePlayers();
     this.renderPlayers();
