@@ -1,0 +1,13 @@
+{
+  "name": "basketballrpe-avisos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Envío manual de recordatorios push a las jugadoras (se ejecuta desde GitHub Actions)",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "web-push": "^3.6.7"
+  }
+}

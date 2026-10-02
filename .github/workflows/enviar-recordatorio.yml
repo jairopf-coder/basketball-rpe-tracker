@@ -1,0 +1,84 @@
+name: Enviar recordatorio a jugadoras
+
+# Se lanza A MANO: GitHub → pestaña Actions → «Enviar recordatorio a jugadoras» → Run workflow
+# (también desde la app GitHub Mobile). No se ejecuta nunca por su cuenta.
+on:
+  workflow_dispatch:
+    inputs:
+      tipo:
+        description: 'Qué falta por rellenar'
+        type: choice
+        options:
+          - wellness
+          - rpe
+        default: wellness
+      turno:
+        description: 'Solo para RPE: de qué sesión'
+        type: choice
+        options:
+          - mañana
+          - tarde
+          - partido
+        default: mañana
+      modo:
+        description: 'enviar = manda el aviso | simulacro = solo cuenta, no envía nada | prueba = un aviso de prueba a una jugadora'
+        type: choice
+        options:
+          - enviar
+          - simulacro
+          - prueba
+        default: enviar
+      jugadora:
+        description: 'Solo en modo prueba: nombre de la jugadora (basta una parte del nombre)'
+        type: string
+        required: false
+      fecha:
+        description: 'Opcional, AAAA-MM-DD. Si lo dejas vacío, hoy (hora de Madrid)'
+        type: string
+        required: false
+
+# El trabajo solo necesita leer el repositorio
+permissions:
+  contents: read
+
+# Si pulsas dos veces, la segunda espera a que acabe la primera (así no se duplican los avisos)
+concurrency:
+  group: recordatorio-jugadoras
+  cancel-in-progress: false
+
+jobs:
+  enviar:
+    name: Enviar
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: scripts/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: scripts
+        run: npm ci --omit=dev --no-audit --no-fund
+
+      - name: Enviar recordatorio
+        working-directory: scripts
+        # Los valores del formulario y los secretos se pasan como variables de entorno
+        # (nunca se escriben dentro del comando), para evitar inyección de código.
+        env:
+          TIPO: ${{ inputs.tipo }}
+          TURNO: ${{ inputs.turno }}
+          MODO: ${{ inputs.modo }}
+          JUGADORA: ${{ inputs.jugadora }}
+          FECHA: ${{ inputs.fecha }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+        run: node send-reminders.js
