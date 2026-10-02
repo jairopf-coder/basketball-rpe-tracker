@@ -26,6 +26,9 @@ RPETracker.prototype.showGearMenu = function() {
             <button class="gear-item" onclick="window.rpeTracker?.exportSessionsHistoryPDF();document.getElementById('gearMenuOverlay').remove()">
                 <span class="gear-icon">📄</span><span>PDF sesiones</span>
             </button>
+            <button class="gear-item" onclick="document.getElementById('gearMenuOverlay').remove();window.rpeTracker?.openExportFisioModal()">
+                <span class="gear-icon">🩺</span><span>Exportar para el fisio</span>
+            </button>
             <div class="gear-divider"></div>
             <div class="gear-section-label">Temporada</div>
             <button class="gear-item" onclick="document.getElementById('gearMenuOverlay').remove();window.rpeTracker?.exportSeasonAndClear()">
