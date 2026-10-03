@@ -551,6 +551,9 @@ const PlayerView = (() => {
     async function _initPush() {
         if (typeof PushClient === 'undefined') return;
         try {
+            // La jugadora no pasa por RPETracker (que es quien registra el service worker en staff):
+            // se registra aquí, ANTES de consultar el estado. En la vista previa el staff ya lo tiene.
+            if (!_previewMode) await PushClient.registerServiceWorker();
             _pushState = await PushClient.getState({ preview: _previewMode });
             if (_view === 'menu') _render();
             if (!_previewMode) await PushClient.syncOnOpen(_getUid(), window.firebaseDB);

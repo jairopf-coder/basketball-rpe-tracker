@@ -33,8 +33,8 @@ const KEY = KEY_BYTES.toString('base64url');
 // ════════════════════════════════════════════════════════════════════
 function loadPush(opts) {
     const o = Object.assign({ perm: 'default', prompt: 'granted', hasSub: false, subKey: null, subscribeFails: false,
-        noPushManager: false, noSW: false, noNotification: false, swNever: false, dbFails: false, noDb: false, key: KEY, ls: {} }, opts || {});
-    const calls = [], ops = [], ls = Object.assign({}, o.ls);
+        noPushManager: false, noSW: false, noNotification: false, swNever: false, swNeedsRegister: false, registerFails: false, dbFails: false, noDb: false, key: KEY, ls: {} }, opts || {});
+    const calls = [], ops = [], regCalls = [], ls = Object.assign({}, o.ls);
     const state = { perm: o.perm };
     const mkSub = keyBytes => ({
         endpoint: 'https://web.push.apple.com/ABC123',
@@ -43,14 +43,18 @@ function loadPush(opts) {
         unsubscribe: async () => { calls.push('sub.unsubscribe'); current = null; return true; },
     });
     let current = o.hasSub ? mkSub(o.subKey || KEY_BYTES) : null;
-    const reg = { pushManager: {
+    const reg = { update: async () => { regCalls.push('update'); }, pushManager: {
         getSubscription: async () => { calls.push('getSubscription'); return current; },
         subscribe: async opt => { calls.push('subscribe'); reg.subscribeOpts = opt; if (o.subscribeFails) throw new Error('boom'); current = mkSub(opt.applicationServerKey); return current; },
     } };
     const navigator = {};
-    if (!o.noSW) navigator.serviceWorker = { ready: o.swNever ? new Promise(() => {}) : Promise.resolve(reg), getRegistration: async () => reg };
+    // swNeedsRegister: igual que en el móvil de una jugadora, el service worker NO existe hasta que alguien llama a register()
+    let registered = !o.swNeedsRegister, resolveReady = () => {};
+    const readyP = o.swNever ? new Promise(() => {}) : o.swNeedsRegister ? new Promise(r => { resolveReady = r; }) : Promise.resolve(reg);
+    if (!o.noSW) navigator.serviceWorker = { ready: readyP, getRegistration: async () => (registered ? reg : undefined),
+        register: async url => { regCalls.push('register:' + url); if (o.registerFails) throw new Error('sw boom'); registered = true; resolveReady(reg); return reg; } };
     const window = {}; if (!o.noPushManager) window.PushManager = function PushManager() {};
-    const ctx = vm.createContext({ navigator, window, atob, Uint8Array, String, Promise, setTimeout, console,
+    const ctx = vm.createContext({ navigator, window, atob, Uint8Array, String, Promise, setTimeout, console: { log: console.log, warn() {} },
         localStorage: { getItem: k => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: k => { delete ls[k]; } } });
     if (!o.noNotification) ctx.Notification = { get permission() { return state.perm; }, requestPermission: async () => { calls.push('requestPermission'); state.perm = o.prompt; return o.prompt; } };
     vm.runInContext(read('push-client.js') + ';this.PC = PushClient;', ctx);
@@ -60,7 +64,7 @@ function loadPush(opts) {
         set: async v => { if (o.dbFails) throw new Error('offline'); calls.push('db.set'); ops.push({ op: 'set', path: p, value: JSON.parse(JSON.stringify(v)) }); },
         remove: async () => { if (o.dbFails) throw new Error('offline'); calls.push('db.remove'); ops.push({ op: 'remove', path: p }); },
     }) };
-    return { PC, db, calls, ops, ls, reg, state, getSub: () => current };
+    return { PC, db, calls, ops, regCalls, ls, reg, state, o, getSub: () => current };
 }
 
 console.log('\nA) push-client.js');
@@ -215,6 +219,48 @@ test('syncOnOpen: sin clave / sin uid / sin base de datos → "skip"', async () 
     assert.strictEqual(await loadPush({ perm: 'granted', hasSub: true }).PC.syncOnOpen('u1', null), 'skip');
 });
 
+// ── Registro del service worker en el móvil de la jugadora ──────────
+// La jugadora entra por PlayerView.show() y NUNCA crea RPETracker (que es quien registra sw.js en staff/fisio).
+test('registerServiceWorker: instala sw.js UNA sola vez y pide buscar actualizaciones', async () => {
+    const e = loadPush({ swNeedsRegister: true });
+    const r1 = await e.PC.registerServiceWorker(), r2 = await e.PC.registerServiceWorker();
+    assert.deepStrictEqual(J(e.regCalls.filter(c => c.startsWith('register'))), ['register:sw.js']);
+    assert.ok(e.regCalls.includes('update'));
+    assert.strictEqual(r1, e.reg); assert.strictEqual(r2, e.reg);
+});
+test('registerServiceWorker: sin clave VAPID no toca nada (la función sigue desactivada)', async () => {
+    const e = loadPush({ key: '', swNeedsRegister: true });
+    assert.strictEqual(await e.PC.registerServiceWorker(), null); assert.deepStrictEqual(J(e.regCalls), []);
+});
+test('registerServiceWorker: navegador sin service workers → null, sin error', async () => {
+    assert.strictEqual(await loadPush({ noSW: true }).PC.registerServiceWorker(), null);
+});
+test('registerServiceWorker: si el registro falla devuelve null (no lanza) y se puede reintentar', async () => {
+    const e = loadPush({ swNeedsRegister: true, registerFails: true });
+    assert.strictEqual(await e.PC.registerServiceWorker(), null);
+    e.o.registerFails = false;
+    assert.strictEqual(await e.PC.registerServiceWorker(), e.reg, 'el fallo no debe quedar memorizado');
+});
+test('REGRESIÓN jugadora: con el service worker sin registrar, enable() lo registra y activa los avisos', async () => {
+    const e = loadPush({ swNeedsRegister: true });
+    assert.deepStrictEqual(J(await e.PC.enable('u1', e.db)), { ok: true }, 'antes del arreglo devolvía {ok:false, reason:"sw"}');
+    assert.ok(e.regCalls.includes('register:sw.js'));
+    assert.ok(e.getSub(), 'debe quedar una suscripción en el móvil');
+    assert.ok(e.ops.some(o => o.path === 'pushSubscriptions/u1') && e.ops.some(o => o.path === 'pushStatus/u1'));
+});
+test('REGRESIÓN jugadora: tras activar, getState() dice \"active\" (ya no vuelve a ofrecer activar)', async () => {
+    const e = loadPush({ swNeedsRegister: true });
+    assert.strictEqual(await e.PC.getState(), 'ready', 'antes de activar se ofrece activar');
+    await e.PC.enable('u1', e.db);
+    assert.strictEqual(await e.PC.getState(), 'active');
+});
+test('enable: permiso pedido LO PRIMERO aunque el service worker aún no esté registrado (iOS)', async () => {
+    const e = loadPush({ swNeedsRegister: true });
+    const p = e.PC.enable('u1', e.db);
+    assert.deepStrictEqual(J(e.calls), ['requestPermission']); assert.deepStrictEqual(J(e.regCalls), [], 'el registro va DESPUÉS del permiso');
+    await p;
+});
+
 // ════════════════════════════════════════════════════════════════════
 // B) player-view.js — tarjeta "Avisos"
 // ════════════════════════════════════════════════════════════════════
@@ -236,8 +282,9 @@ function loadPlayerView(pushStub, lang) {
     return { PV: ctx.PV, I18N: ctx.I18N, html: () => els[els.length - 1].innerHTML, ctx };
 }
 function pushStub(state, extra) {
-    const s = { states: [], enableCalls: [], disableCalls: [], syncCalls: [], _state: state,
-        getState: async opts => { s.states.push(opts); return s._state; },
+    const s = { states: [], enableCalls: [], disableCalls: [], syncCalls: [], registerCalls: [], order: [], _state: state,
+        registerServiceWorker: async () => { s.registerCalls.push(1); s.order.push('register'); return {}; },
+        getState: async opts => { s.order.push('getState'); s.states.push(opts); return s._state; },
         enable: (uid, db) => { s.enableCalls.push([uid, db]); return s._enableResult || Promise.resolve({ ok: true }); },
         disable: async (uid, db) => { s.disableCalls.push([uid, db]); return s._disableResult || { ok: true }; },
         syncOnOpen: async (uid, db) => { s.syncCalls.push([uid, db]); return 'saved'; } };
@@ -258,6 +305,14 @@ test('estado "ready": botón Activar avisos y se sincroniza al abrir (con su uid
     assert.ok(v.html().includes('pv-push-card') && v.html().includes('Activar avisos') && v.html().includes('PlayerView._onEnablePush()'));
     assert.deepStrictEqual(J(stub.states[0]), { preview: false });
     assert.strictEqual(stub.syncCalls.length, 1); assert.strictEqual(stub.syncCalls[0][0], 'u1');
+});
+test('al abrir la pantalla de la jugadora se registra el service worker ANTES de consultar el estado', async () => {
+    const stub = pushStub('ready'); const v = loadPlayerView(stub); v.PV.show(); await tick(); await tick();
+    assert.deepStrictEqual(J(stub.order), ['register', 'getState']);
+});
+test('vista previa del staff: no registra nada (el staff ya lo tiene por RPETracker)', async () => {
+    const stub = pushStub('preview'); const v = loadPlayerView(stub); v.PV.showPreview(); await tick(); await tick();
+    assert.strictEqual(stub.registerCalls.length, 0);
 });
 test('la tarjeta explica para qué se usa y que se puede desactivar', async () => {
     const v = loadPlayerView(pushStub('ready')); v.PV.show(); await tick();
@@ -556,6 +611,10 @@ test('la clave VAPID pegada en push-client.js (si hay) es válida: 65 bytes que 
     const b = Buffer.from(m[1], 'base64url');
     assert.strictEqual(b.length, 65, `la clave pública debe decodificar a 65 bytes (tiene ${b.length}); ¿has pegado la privada o la has cortado?`);
     assert.strictEqual(b[0], 4);
+});
+test('push-client.js y app.js registran el MISMO archivo (sw.js): un solo service worker para todos', () => {
+    assert.ok(/register\('sw\.js'\)/.test(read('push-client.js')), 'push-client.js debe registrar sw.js');
+    assert.ok(/register\('sw\.js'\)/.test(read('app.js')), 'app.js debe registrar sw.js');
 });
 test('la clave PRIVADA nunca está en el código', () => {
     // Una clave privada VAPID son 32 bytes en base64url = 43 caracteres sin relleno
