@@ -12,6 +12,10 @@
 //   /pushStatus/{uid}         → { active:true, updatedAt }
 //        Solo indica "tiene avisos activados". El staff lo lee para mostrar 🔔.
 //
+// IMPORTANTE: el service worker (sw.js) es el que recibe los avisos. En staff/fisio lo
+// registra app.js (clase RPETracker), pero la jugadora NO pasa por ahí, así que lo
+// registra este archivo con registerServiceWorker(). Sin eso no hay suscripción posible.
+//
 // Para activar la función hay que pegar la clave PÚBLICA VAPID abajo.
 // Mientras esté vacía NO se muestra nada a nadie (la app funciona como siempre).
 // ======================================================================
@@ -24,8 +28,9 @@ const PushClient = (() => {
 
     const LS_ACTIVE = 'pv_push_active';   // recuerda que este móvil dejó los avisos activos en la nube
     let _key = VAPID_PUBLIC_KEY;
-    let _swTimeoutMs = 5000;
+    let _swTimeoutMs = 10000;
     let _syncedThisSession = false;
+    let _swRegistration = null;   // promesa del registro de sw.js (se hace una sola vez por sesión)
 
     // Solo para pruebas / ajustes puntuales.
     function configure(opts) {
@@ -33,6 +38,7 @@ const PushClient = (() => {
         if (typeof opts.vapidPublicKey === 'string') _key = opts.vapidPublicKey;
         if (typeof opts.swTimeoutMs === 'number') _swTimeoutMs = opts.swTimeoutMs;
         _syncedThisSession = false;
+        _swRegistration = null;
     }
 
     function isConfigured() {
@@ -56,8 +62,28 @@ const PushClient = (() => {
         return out;
     }
 
-    // El service worker puede tardar o no llegar a activarse: no esperamos para siempre.
-    function _swReady() {
+    // Instala sw.js (la misma ruta relativa que usa app.js para el staff). Se hace una sola vez
+    // por sesión y NUNCA lanza error: si no se puede, devuelve null y los avisos quedan sin activar.
+    function registerServiceWorker() {
+        if (_swRegistration) return _swRegistration;
+        if (!isConfigured() || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+            return Promise.resolve(null);
+        }
+        _swRegistration = Promise.resolve()
+            .then(() => navigator.serviceWorker.register('sw.js'))
+            .then(reg => { try { reg.update().catch(() => {}); } catch (_) { /* ignorar */ } return reg; })
+            .catch(err => {
+                _swRegistration = null;   // que se pueda reintentar la próxima vez
+                console.warn('SW registration failed:', err);
+                return null;
+            });
+        return _swRegistration;
+    }
+
+    // Espera a que el service worker esté activo. Antes lo registra por si nadie lo había hecho
+    // (sin registro, navigator.serviceWorker.ready no se resuelve nunca). No esperamos para siempre.
+    async function _swReady() {
+        await registerServiceWorker();
         return Promise.race([
             navigator.serviceWorker.ready,
             new Promise(resolve => setTimeout(() => resolve(null), _swTimeoutMs)),
@@ -191,5 +217,5 @@ const PushClient = (() => {
         return 'noop';
     }
 
-    return { configure, isConfigured, isSupported, getState, enable, disable, syncOnOpen, urlBase64ToUint8Array };
+    return { configure, isConfigured, isSupported, getState, enable, disable, syncOnOpen, registerServiceWorker, urlBase64ToUint8Array };
 })();
