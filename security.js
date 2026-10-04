@@ -9,16 +9,92 @@
 
 // ── 1. SANITIZACIÓN XSS ────────────────────────────────────
 /**
- * Escapa caracteres HTML para uso seguro en innerHTML.
+ * Escapa caracteres HTML para uso seguro en innerHTML, tanto en texto como
+ * dentro de atributos entre comillas (value="${esc(x)}", title="${esc(x)}"...).
  * Uso: element.innerHTML = `<h3>${esc(player.name)}</h3>`
+ *
+ * OJO: esc() NO es seguro dentro de un onclick="...('${esc(x)}')": el navegador
+ * decodifica las entidades antes de ejecutar el JavaScript. Ahí hay que pasar
+ * solo un id y leer el dato de memoria (ver AppAuth._umEdit).
  */
 function esc(str) {
     if (str == null) return '';
-    const d = document.createElement('div');
-    d.textContent = String(str);
-    return d.innerHTML;
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 window.esc = esc;
+
+// ── 1b. DATOS QUE ESCRIBEN LAS JUGADORAS ───────────────────
+/**
+ * Las jugadoras escriben directamente en Firebase (/wellnessPlayer y
+ * /playerRpeReports) y una cuenta manipulada puede guardar cualquier cosa,
+ * saltándose la pantalla de la app (texto con HTML en un número, claves raras...).
+ * Todo lo que llega de esos dos nodos se limpia AQUÍ, una sola vez, antes de que
+ * el resto de la app lo use o lo pinte. Si algo no es válido se descarta o se
+ * deja en null; nunca se arregla "a ojo".
+ */
+const SafeData = {
+    DATE_RE: /^\d{4}-\d{2}-\d{2}$/,
+    ID_RE: /^[A-Za-z0-9_-]{1,128}$/,
+    TS_RE: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})?$/,
+    SESSION_TYPES: ['morning', 'afternoon', 'match'],
+
+    date(v) { return typeof v === 'string' && this.DATE_RE.test(v) ? v : null; },
+    id(v) { return typeof v === 'string' && this.ID_RE.test(v) ? v : null; },
+    ts(v) { return typeof v === 'string' && this.TS_RE.test(v) ? v : null; },
+    sessionType(v) { return this.SESSION_TYPES.indexOf(v) !== -1 ? v : null; },
+
+    // Número real dentro del rango (acepta "7" pero no "<img...>", true, {} ni NaN)
+    num(v, min, max) {
+        let n = null;
+        if (typeof v === 'number') n = v;
+        else if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) n = Number(v);
+        return n !== null && isFinite(n) && n >= min && n <= max ? n : null;
+    },
+
+    /** Entrada de /wellnessPlayer/{uid}/{fecha}. uid = el de la RUTA (el real). */
+    wellnessEntry(raw, uid, dateKey) {
+        if (!raw || typeof raw !== 'object' || !this.id(uid)) return null;
+        const date = this.date(raw.date) || this.date(dateKey);
+        if (!date) return null;
+        const out = {
+            uid, date,
+            sleep: this.num(raw.sleep, 0, 10),
+            fatigue: this.num(raw.fatigue, 0, 10),
+            mood: this.num(raw.mood, 0, 10),
+            pain: this.num(raw.pain, 0, 10),
+            rpe: this.num(raw.rpe, 0, 10),
+            ts: this.ts(raw.ts),
+        };
+        const playerId = this.id(raw.playerId);
+        if (playerId) out.playerId = playerId;
+        if (raw.period === true) out.period = true;
+        return out;
+    },
+
+    /** Entrada de /playerRpeReports/{uid}/{fecha}/{turno}. Sin RPE válido (1-10) se descarta. */
+    rpeEntry(raw, uid, dateKey, typeKey) {
+        if (!raw || typeof raw !== 'object' || !this.id(uid)) return null;
+        const date = this.date(dateKey);
+        const sessionType = this.sessionType(typeKey);
+        const rpe = this.num(raw.rpe, 1, 10);
+        if (!date || !sessionType || rpe === null) return null;
+        const out = {
+            uid, date, sessionType, rpe,
+            ts: this.ts(raw.ts),
+            reviewed: raw.reviewed === true,
+            _path: 'playerRpeReports/' + uid + '/' + date + '/' + sessionType,
+        };
+        const playerId = this.id(raw.playerId);
+        if (playerId) out.playerId = playerId;
+        return out;
+    },
+};
+window.SafeData = SafeData;
 
 // ── 2. MODAL DE CONFIRMACIÓN (reemplaza confirm() nativo) ──
 const AppConfirm = {

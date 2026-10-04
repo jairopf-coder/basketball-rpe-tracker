@@ -1187,17 +1187,16 @@ RPETracker.prototype._registerPlayerRpeListener = function() {
         const val = snapshot.val() || {};
         const allEntries = [];
         Object.keys(val).forEach(uid => {
-            const dateMap = val[uid] || {};
+            const dateMap = val[uid];
+            if (!dateMap || typeof dateMap !== 'object') return;
             Object.keys(dateMap).forEach(dateKey => {
-                const typeMap = dateMap[dateKey] || {};
+                const typeMap = dateMap[dateKey];
+                if (!typeMap || typeof typeMap !== 'object') return;
                 Object.keys(typeMap).forEach(typeKey => {
-                    const entry = typeMap[typeKey];
-                    if (entry && typeof entry === 'object') {
-                        allEntries.push(Object.assign({}, entry, {
-                            uid: entry.uid || uid,
-                            _path: `playerRpeReports/${uid}/${dateKey}/${typeKey}`,
-                        }));
-                    }
+                    // Se valida todo (uid, fecha, turno, RPE) antes de usarlo: la _path que
+                    // sale de aquí acaba dentro de un onclick, así que no puede traer texto libre.
+                    const clean = SafeData.rpeEntry(typeMap[typeKey], uid, dateKey, typeKey);
+                    if (clean) allEntries.push(clean);
                 });
             });
         });
