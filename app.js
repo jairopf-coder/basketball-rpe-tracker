@@ -5,9 +5,9 @@ const NavMenu = {
         dashboard: { label: '📊 Inicio', direct: 'dashboard' },
         carga: {
             label: '🏋️ Carga',
-            // ⚠️ Si añades un item aquí, añádelo TAMBIÉN al menú "Más"
-            // de móvil en index.html (#bnMoreMenu .bn-more-grid), o
-            // esa vista no aparecerá en el iPhone/Android.
+            // Los items de TODOS los grupos salen solos en el móvil (BottomNav, index.html):
+            // la fila de subsecciones para Carga/Salud y el cajón "Más" para el resto.
+            // Formato del label: "<emoji> <texto>" (el emoji se separa por el primer espacio).
             items: [
                 { view: 'microciclo', label: '📆 Microciclo' },
                 { view: 'analytics', label: '📈 Análisis A:C' },
@@ -103,6 +103,14 @@ const NavMenu = {
                 onclick="NavMenu.selectView('${item.view}')">
                 ${item.label}
             </button>`).join('');
+
+        // La fila se redibuja entera y vuelve a empezar por la izquierda: centramos el chip activo
+        // para que en pantallas estrechas no quede fuera de la vista.
+        const active = bar.querySelector('.nav-sub-btn.active');
+        if (active) {
+            const a = active.getBoundingClientRect(), b = bar.getBoundingClientRect();
+            bar.scrollLeft += (a.left - b.left) - (b.width - a.width) / 2;
+        }
     },
 
     hideSubBar() {
@@ -479,6 +487,7 @@ class RPETracker {
 
         // Sync grouped nav
         if (typeof NavMenu !== 'undefined') NavMenu.syncToView(viewName);
+        if (typeof BottomNav !== 'undefined') BottomNav.syncToView(viewName);
         
         // Update views
         document.querySelectorAll('.view').forEach(view => {

@@ -6530,8 +6530,26 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 
 @media (max-width: 640px) {
-    body { padding-bottom: 68px; }
-    .nav-groups { display: none; }
+    :root {
+        /* --bn-h: zona de botones (≥44px = tamaño mínimo recomendado para pulsar en iOS).
+           --bn-total: barra completa = botones + zona segura del iPhone (indicador de inicio).
+           La zona segura es un margen APARTE: antes se restaba de los 60px y los botones
+           quedaban en 25px de alto, con los iconos sobresaliendo por arriba. */
+        --bn-h: 56px;
+        --bn-total: calc(var(--bn-h) + env(safe-area-inset-bottom, 0px));
+    }
+    body { padding-bottom: calc(var(--bn-total) + 8px); }
+
+    /* Subsecciones del grupo activo (Carga, Salud…): la misma fila del PC, bajo la cabecera.
+       La barra de grupos se oculta porque en móvil los grupos están en la barra inferior.
+       --header-h la mide BottomNav.init() (la cabecera varía con la zona segura del iPhone). */
+    .nav-groups { display: block; top: var(--header-h, 48px); padding: 0; }
+    .nav-group-bar { display: none; }
+    .nav-sub-bar {
+        margin: 0.4rem 0.75rem 0.3rem;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+    }
 
     .bottom-nav {
         display: flex;
@@ -6543,103 +6561,89 @@ details[open] .ewma-toggle-hint { display: none; }
         background: var(--bg-surface);
         border-top: 1px solid var(--border);
         box-shadow: 0 -2px 12px rgba(0,0,0,0.10);
-        height: 60px;
-        align-items: stretch;
+        height: var(--bn-total);
         padding-bottom: env(safe-area-inset-bottom, 0px);
+        align-items: stretch;
     }
 
     .bottom-nav-btn {
-        flex: 1;
+        flex: 1 1 0;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 2px;
+        gap: 3px;
         border: none;
         background: transparent;
         cursor: pointer;
         color: var(--text-muted);
-        font-size: 0.6rem;
+        font-size: 0.7rem;
         font-weight: 500;
         padding: 0 2px;
         transition: color var(--transition);
         position: relative;
+        touch-action: manipulation;
         -webkit-tap-highlight-color: transparent;
     }
 
+    /* Caja fija para el icono: el emoji se centra dentro y no puede desbordar la barra */
     .bottom-nav-btn .bn-icon {
-        font-size: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 28px;
+        font-size: 1.4rem;
         line-height: 1;
         transition: transform 0.15s ease;
     }
+    .bottom-nav-btn .bn-icon-dots { font-size: 1.9rem; font-weight: 700; }
 
     .bottom-nav-btn span.bn-label {
-        line-height: 1;
+        line-height: 1.1;
         letter-spacing: 0.01em;
         white-space: nowrap;
     }
 
-    /* FAB central — botón Nueva Sesión */
-    .bottom-nav-btn.bn-fab {
-        flex: 0 0 56px;
-        overflow: visible;
-    }
-    .bottom-nav-btn.bn-fab .bn-icon {
-        position: absolute;
-        bottom: 8px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        background: var(--primary, #ff6600);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        font-weight: 300;
-        color: #fff;
-        box-shadow: 0 3px 10px rgba(255,102,0,0.4);
-        transition: transform 0.15s ease, box-shadow 0.15s;
-        line-height: 1;
-    }
-    .bottom-nav-btn.bn-fab:active .bn-icon {
-        transform: translateX(-50%) scale(0.92);
-        box-shadow: 0 1px 6px rgba(255,102,0,0.3);
-    }
-    .bottom-nav-btn.bn-fab.active::before { display: none; }
-    .bottom-nav-btn.bn-fab.active { color: var(--text-muted); }
+    .bottom-nav-btn:active .bn-icon { transform: scale(0.9); }
 
-    .bottom-nav-btn.active { color: var(--primary); }
-    .bottom-nav-btn.active .bn-icon { transform: translateY(-1px); }
+    .bottom-nav-btn.active,
+    .bottom-nav-btn[aria-expanded="true"] { color: var(--primary); }
 
-    .bottom-nav-btn.active::before {
+    .bottom-nav-btn.active::before,
+    .bottom-nav-btn[aria-expanded="true"]::before {
         content: '';
         position: absolute;
         top: 0;
-        left: 20%;
-        right: 20%;
+        left: 25%;
+        right: 25%;
         height: 2px;
         border-radius: 0 0 3px 3px;
         background: var(--primary);
     }
 
+    /* Con el cajón "Más" abierto solo "Más" aparece resaltado (nunca dos a la vez) */
+    .bottom-nav.bn-more-open .bottom-nav-btn.active:not([aria-expanded="true"]) { color: var(--text-muted); }
+    .bottom-nav.bn-more-open .bottom-nav-btn.active:not([aria-expanded="true"])::before { display: none; }
+
     .bottom-nav-btn .bn-badge {
         position: absolute;
-        top: 6px;
-        right: calc(50% - 18px);
+        top: 5px;
+        right: calc(50% - 22px);
         background: var(--danger);
         color: #fff;
         font-size: 0.6rem;
         font-weight: 700;
-        min-width: 14px;
-        height: 14px;
-        border-radius: 7px;
+        min-width: 15px;
+        height: 15px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 0 3px;
         line-height: 1;
+        pointer-events: none;   /* el toque en la insignia cuenta como toque en el botón */
     }
 
     [data-theme="dark"] .bottom-nav {
@@ -9671,7 +9675,7 @@ details[open] .ewma-toggle-hint { display: none; }
 .view-fab {
     display: none !important;
     position: fixed;
-    bottom: calc(68px + env(safe-area-inset-bottom, 0px) + 12px);
+    bottom: calc(var(--bn-total, 60px) + 12px);
     right: 1rem;
     z-index: 190;
     width: 52px;
@@ -9699,50 +9703,69 @@ details[open] .ewma-toggle-hint { display: none; }
 /* Hide old bn-fab if it survives anywhere */
 .bottom-nav-btn.bn-fab { display: none !important; }
 
-/* ── Bottom nav: 4 tabs (mobile) ── */
-@media (max-width: 640px) {
-    .bottom-nav {
-        /* 4 equal tabs — no FAB slot needed */
-    }
-    .bottom-nav-btn { flex: 1; }
-}
-
-/* ── Drawer "Más" ── */
+/* ── Cajón "Más" (móvil) ──
+   · Pegado a la barra (sin hueco) y con el fondo oscuro SOLO por encima de ella: la barra
+     sigue visible y pulsable con el cajón abierto.
+   · Se muestra/oculta con visibility + pointer-events (no con display + transitionend):
+     cerrado no recoge ningún toque y no depende de que termine una animación. */
 .bn-more-overlay {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--bn-total, 60px);
     z-index: 1050;
     background: rgba(0,0,0,0.35);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    touch-action: none;
+    overscroll-behavior: contain;
+    transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+}
+.bn-more-overlay.bn-more-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.2s ease, visibility 0s;
 }
 
 .bn-more-menu {
     position: fixed;
-    bottom: calc(60px + env(safe-area-inset-bottom, 0px));
     left: 0;
     right: 0;
+    bottom: var(--bn-total, 60px);
     z-index: 1100;
     background: var(--bg-surface);
     border-top: 1px solid var(--border);
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+    display: flex;
     flex-direction: column;
-    overflow: hidden;
-    /* slide-up animation */
-    transform: translateY(100%);
-    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: calc(100vh - var(--bn-total, 60px) - 72px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(16px);
+    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease, visibility 0s linear 0.25s;
 }
-
 .bn-more-menu.bn-more-open {
-    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease, visibility 0s;
 }
 
 .bn-more-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 1rem 0.5rem;
+    padding: 0.6rem 0.75rem 0.1rem 1rem;
     font-size: 0.78rem;
     font-weight: 600;
     color: var(--text-muted);
@@ -9754,22 +9777,36 @@ details[open] .ewma-toggle-hint { display: none; }
     border: none;
     background: var(--bg-subtle);
     color: var(--text-muted);
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
+.bn-more-section { padding: 0 0.75rem; }
+
+.bn-more-title {
+    margin: 0;
+    padding: 0.55rem 0.25rem 0.3rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Cada sección es una cuadrícula de 3 columnas con separación entre fichas (menos toques errados) */
 .bn-more-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 0;
-    padding: 0.25rem 0 calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
 }
 
 .bn-more-item {
@@ -9777,50 +9814,35 @@ details[open] .ewma-toggle-hint { display: none; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 0.85rem 0.25rem;
+    gap: 6px;
+    padding: 0.7rem 0.25rem;
+    min-height: 76px;
     border: none;
-    background: transparent;
+    border-radius: 12px;
+    background: var(--bg-subtle);
     cursor: pointer;
     color: var(--text-primary);
-    position: relative;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
-    min-height: 72px;
 }
+.bn-more-item:active { background: var(--border); }
 
-.bn-more-item:active { background: var(--bg-subtle); }
-
-.bn-more-icon { font-size: 1.5rem; line-height: 1; }
+.bn-more-icon { font-size: 1.6rem; line-height: 1; }
 
 .bn-more-label {
-    font-size: 0.65rem;
+    font-size: 0.72rem;
     font-weight: 500;
-    color: var(--text-muted);
-    white-space: nowrap;
-    line-height: 1.1;
-}
-
-/* Badge on drawer items */
-.bn-more-item .bn-badge {
-    position: absolute;
-    top: 10px;
-    right: calc(50% - 20px);
-    background: var(--danger);
-    color: #fff;
-    font-size: 0.55rem;
-    font-weight: 700;
-    min-width: 14px;
-    height: 14px;
-    border-radius: 7px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 3px;
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: 1.15;
 }
 
 [data-theme="dark"] .bn-more-menu {
     box-shadow: 0 -4px 28px rgba(0,0,0,0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bn-more-menu, .bn-more-overlay { transition: none; }
 }
 
 /* Ocultar overlay y drawer en desktop */
