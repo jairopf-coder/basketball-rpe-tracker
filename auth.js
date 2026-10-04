@@ -509,19 +509,20 @@ const AppAuth = {
                 return;
             }
 
+            this._umUsers = users;
             const roleLabel = { staff: '🏋️ Staff', fisio: '🩺 Fisio', player: '👤 Jugadora' };
             const playersById = {};
             ((window.rpeTracker && window.rpeTracker.players) || []).forEach(p => { playersById[p.id] = p.name; });
             const rows = Object.entries(users).map(([uid, u]) => `
                 <div class="um-user-row">
                     <div class="um-user-info">
-                        <span class="um-user-name">${u.displayName || '—'}</span>
-                        <span class="um-user-email">${u.email || '—'}${u.role === 'player' ? (u.playerId && playersById[u.playerId] ? ` · vinculada a ${playersById[u.playerId]}` : ' · sin vincular') : ''}</span>
+                        <span class="um-user-name">${esc(u.displayName || '—')}</span>
+                        <span class="um-user-email">${esc(u.email || '—')}${u.role === 'player' ? (u.playerId && playersById[u.playerId] ? ` · vinculada a ${esc(playersById[u.playerId])}` : ' · sin vincular') : ''}</span>
                     </div>
-                    <span class="um-user-role um-role-${u.role}">${roleLabel[u.role] || u.role}</span>
-                    <button class="um-edit-btn" onclick="AppAuth.editUser('${uid}', '${(u.displayName || '').replace(/'/g, "\\'")}')" title="Editar usuario">✏️</button>
-                    <button class="um-reset-btn" onclick="AppAuth.openFirebaseUserReset('${(u.email || '').replace(/'/g, "\\'")}')" title="Cambiar email o resetear contraseña en Firebase Console">🔒</button>
-                    <button class="um-delete-btn" onclick="AppAuth.deleteUser('${uid}', '${(u.displayName || u.email || uid).replace(/'/g, "\\'")}')" title="Eliminar usuario">🗑</button>
+                    <span class="um-user-role um-role-${esc(u.role)}">${roleLabel[u.role] || esc(u.role)}</span>
+                    <button class="um-edit-btn" onclick="AppAuth._umEdit('${uid}')" title="Editar usuario">✏️</button>
+                    <button class="um-reset-btn" onclick="AppAuth._umReset('${uid}')" title="Cambiar email o resetear contraseña en Firebase Console">🔒</button>
+                    <button class="um-delete-btn" onclick="AppAuth._umDelete('${uid}')" title="Eliminar usuario">🗑</button>
                 </div>
             `).join('');
 
@@ -581,6 +582,23 @@ const AppAuth = {
         } catch (e) {
             AppAlert.show(`Error al eliminar: ${esc(e.message)}`);
         }
+    },
+
+    // Los botones de la lista de usuarios solo pasan el uid; el nombre y el email
+    // se leen aquí de memoria para no meter texto de usuario dentro de un onclick="...".
+    _umEdit(uid) {
+        const u = (this._umUsers || {})[uid] || {};
+        this.editUser(uid, u.displayName || '');
+    },
+
+    _umReset(uid) {
+        const u = (this._umUsers || {})[uid] || {};
+        this.openFirebaseUserReset(u.email || '');
+    },
+
+    _umDelete(uid) {
+        const u = (this._umUsers || {})[uid] || {};
+        this.deleteUser(uid, u.displayName || u.email || uid);
     },
 
     editUser(uid, currentName) {
