@@ -20,30 +20,30 @@
       }
     },
     "players": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "sessions": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
       ".indexOn": ["date"]
     },
     "wellness": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "wellnessPlayer": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
       "$uid": {
-        ".read":  "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')",
-        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')"
+        ".read":  "auth != null && (auth.uid === $uid || (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio'))",
+        ".write": "auth != null && (auth.uid === $uid || (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio'))"
       }
     },
     "playerRpeReports": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
       "$uid": {
-        ".read":  "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')",
-        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() !== 'player')"
+        ".read":  "auth != null && (auth.uid === $uid || (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio'))",
+        ".write": "auth != null && (auth.uid === $uid || (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio'))"
       }
     },
     "pushSubscriptions": {
@@ -63,7 +63,7 @@
       }
     },
     "pushStatus": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
       "$uid": {
         ".read":  "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
@@ -74,66 +74,70 @@
       }
     },
     "injuries": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "availability": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "gpsData": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "gpsPlayerMap": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "exerciseLibrary": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "gymTemplates": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "templates": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "strength": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "gymSessions": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "testSessions": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "weekPlan": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "clinicalNotes": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "seasonBlocks": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     },
     "anamnesis": {
       "$pid": {
-        ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+        ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
       }
     },
+    "matches": {
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
+    },
     "$other": {
-      ".read":  "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'player'"
+      ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
     }
   }
 }

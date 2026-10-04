@@ -28,8 +28,9 @@ Esta guía te llevará paso a paso para publicar tu aplicación Basketball RPE T
 2. Haz clic en **"Crear base de datos"**
 3. Ubicación: Selecciona **"europe-west1"** (Bélgica - más cerca de España)
 4. Haz clic en **"Siguiente"**
-5. Reglas de seguridad: Selecciona **"Comenzar en modo de prueba"**
-   ⚠️ IMPORTANTE: Esto permite acceso temporal. Más tarde configuraremos reglas más seguras.
+5. Reglas de seguridad: Selecciona **"Comenzar en modo bloqueado"**
+   (el modo de prueba deja la base de datos abierta a todo internet; **no lo uses**).
+   Las reglas de la app se publican en la **Parte 4**, que es obligatoria.
 6. Haz clic en **"Habilitar"**
 
 ### Paso 1.4: Obtener configuración
@@ -80,7 +81,7 @@ const firebaseConfig = {
 
 ### Paso 2.2: Probar localmente
 1. Abre una terminal en la carpeta `BasketballRPE-Web`
-2. Ejecuta: `node server.js`
+2. Ejecuta: `python3 -m http.server 3000` (en Windows: `python -m http.server 3000`)
 3. Abre tu navegador en: http://localhost:3000
 4. Abre la **Consola del navegador** (F12 → pestaña Console)
 5. Deberías ver: `🟢 Conectado a Firebase`
@@ -131,30 +132,64 @@ git push -u origin main
 
 ---
 
-## 🔒 PARTE 4: Configurar Reglas de Seguridad Firebase (Importante)
+## 🔒 PARTE 4: Configurar la seguridad de Firebase (OBLIGATORIO)
 
-Por defecto, Firebase está en "modo de prueba" (cualquiera puede leer/escribir durante 30 días).
-Vamos a configurar reglas más seguras pero que permitan colaboración:
+La app guarda **datos de salud de deportistas** (lesiones, notas clínicas, bienestar).
+La dirección de la base de datos y la clave de Firebase viajan dentro del JavaScript de la
+web, así que cualquiera puede verlas. Lo único que protege los datos son las **reglas**.
 
-### Paso 4.1: Reglas básicas (todos pueden leer/escribir)
-1. Ve a Firebase Console: https://console.firebase.google.com/
-2. Selecciona tu proyecto
-3. Realtime Database → **"Reglas"**
-4. Reemplaza todo con:
+⚠️ **NUNCA publiques reglas abiertas** (`".read": true, ".write": true`) ni dejes el
+"modo de prueba": cualquier persona de internet podría leer y modificar todo.
 
-```json
-{
-  "rules": {
-    ".read": true,
-    ".write": true
-  }
-}
+Las reglas correctas ya están preparadas en el archivo `firebase-rules.json` del proyecto.
+Hay tres tipos de cuenta (roles):
+
+| Rol | Qué puede hacer |
+|---|---|
+| `staff` | Todo, incluida la gestión de usuarios |
+| `fisio` | Todo lo de los datos del equipo, pero no ve la lista de usuarios |
+| `player` | Solo enviar su propio bienestar y RPE |
+
+Una cuenta **sin rol no puede hacer nada**. Por eso el orden de estos pasos importa.
+
+### Paso 4.1: Activar el acceso con email y contraseña
+1. Firebase Console → **"Compilación"** → **"Authentication"** → **"Comenzar"**
+2. Pestaña **"Sign-in method"** → **"Correo electrónico/contraseña"** → actívalo → **"Guardar"**
+
+### Paso 4.2: Crear tu cuenta de staff
+1. Authentication → pestaña **"Usuarios"** → **"Añadir usuario"**
+2. Escribe tu email y una contraseña larga → **"Añadir usuario"**
+3. Copia el **UID** de la cuenta que aparece en la lista (una cadena larga de letras y números)
+
+### Paso 4.3: Darte el rol de staff (hazlo ANTES de publicar las reglas)
+1. Realtime Database → pestaña **"Datos"**
+2. Crea esta estructura (usa el **"+"** junto a la raíz de la base de datos):
+
+```
+users
+  └── (tu UID)
+        ├── role: staff
+        ├── displayName: tu nombre
+        └── email: tu email
 ```
 
-5. Haz clic en **"Publicar"**
+Escribe `staff` en minúsculas, exactamente así.
 
-⚠️ **NOTA**: Estas reglas permiten que cualquiera con el enlace pueda ver y modificar los datos.
-Para un equipo pequeño es suficiente. Si necesitas más seguridad, podemos añadir autenticación después.
+### Paso 4.4: Publicar las reglas
+1. Realtime Database → pestaña **"Reglas"**
+2. Abre el archivo `firebase-rules.json` del proyecto, copia **todo** su contenido
+3. Reemplaza lo que haya en la consola y haz clic en **"Publicar"**
+
+### Paso 4.5: Comprobar que son seguras
+1. En la pestaña **"Reglas"** abre el **"Simulador"** (Rules Playground)
+2. Tipo **"Lectura"**, ubicación `/players`, activa **"Autenticado"** con un UID inventado
+   (por ejemplo `uid-que-no-existe`) → debe salir **denegado**
+3. Repite con **tu UID** → debe salir **permitido**
+4. Entra en la app con tu cuenta y comprueba que ves tus datos
+
+### Crear el resto de cuentas (fisio y jugadoras)
+Hazlo desde la propia app: ⚙️ → **"Gestionar PINs"** (abre la gestión de usuarios).
+Ahí eliges el rol de cada cuenta. No hace falta tocar la consola.
 
 ---
 
@@ -162,7 +197,7 @@ Para un equipo pequeño es suficiente. Si necesitas más seguridad, podemos aña
 
 ### Compartir con tu equipo
 1. Comparte el enlace: `https://TU_USUARIO.github.io/basketball-rpe-tracker/`
-2. Todos podrán ver y modificar los mismos datos
+2. Cada persona entra con su propia cuenta y ve solo lo que permite su rol
 3. Los cambios aparecen en tiempo real para todos los usuarios
 
 ### Migrar datos existentes (si ya tenías datos en local)
@@ -212,8 +247,10 @@ Espera 1-2 minutos y los cambios estarán en línea.
 - Revisa la consola del navegador (F12) para ver errores específicos
 
 ### "Permission denied"
-- Ve a Firebase → Realtime Database → Reglas
-- Asegúrate de que `.read` y `.write` están en `true`
+- **No pongas las reglas en `true`**: dejaría los datos abiertos a todo internet
+- Comprueba que tu cuenta tiene rol: Realtime Database → Datos → `users` → tu UID → `role`
+  (debe ser `staff`, `fisio` o `player`, en minúsculas)
+- Comprueba que las reglas publicadas son las de `firebase-rules.json` (Parte 4)
 
 ### "Los datos no se sincronizan"
 - Abre la consola del navegador (F12)
@@ -229,10 +266,8 @@ Espera 1-2 minutos y los cambios estarán en línea.
 ## 📞 Próximos Pasos Opcionales
 
 Si quieres mejorar la seguridad o añadir funciones:
-1. **Autenticación de usuarios** (Google, email/password)
-2. **Reglas de seguridad avanzadas** (control de permisos por usuario)
-3. **Dominio personalizado** (ej: `rpe-baloncesto.com`)
-4. **Notificaciones push** cuando se añaden sesiones
+1. **Dominio personalizado** (ej: `rpe-baloncesto.com`)
+2. **Notificaciones push** cuando se añaden sesiones
 
 ¡Dime si necesitas ayuda con alguno de estos pasos!
 

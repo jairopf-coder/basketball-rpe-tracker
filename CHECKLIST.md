@@ -22,7 +22,7 @@ Sigue estos pasos en orden. Marca cada uno cuando lo completes.
 ## 🧪 PROBAR LOCAL (5 min)
 
 - [ ] 11. Abrir terminal en carpeta `BasketballRPE-Web`
-- [ ] 12. Ejecutar: `node server.js`
+- [ ] 12. Ejecutar: `python3 -m http.server 3000` (en Windows: `python -m http.server 3000`)
 - [ ] 13. Abrir navegador en http://localhost:3000
 - [ ] 14. Abrir consola del navegador (F12)
 - [ ] 15. Verificar que aparece: "🟢 Conectado a Firebase"
@@ -43,12 +43,14 @@ Sigue estos pasos en orden. Marca cada uno cuando lo completes.
 
 ---
 
-## 🔒 SEGURIDAD (2 min)
+## 🔒 SEGURIDAD (10 min) — OBLIGATORIO antes de compartir el enlace
 
-- [ ] 25. Volver a Firebase Console
+⚠️ Nunca uses el "modo de prueba" ni reglas con `".read": true`. Los datos son de salud.
+
+- [ ] 25. Crear tu cuenta de staff (Authentication) y darle `role: staff` en Realtime Database → `users/TU_UID` (Parte 4 de INSTRUCCIONES-FIREBASE.md, pasos 4.1 a 4.3)
 - [ ] 26. Realtime Database → Reglas
-- [ ] 27. Copiar y pegar las reglas del archivo INSTRUCCIONES-FIREBASE.md
-- [ ] 28. Publicar
+- [ ] 27. Copiar y pegar TODO el contenido del archivo `firebase-rules.json`
+- [ ] 28. Publicar y comprobar con el Simulador que una cuenta sin rol queda denegada (paso 4.5)
 
 ---
 

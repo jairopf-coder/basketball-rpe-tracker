@@ -598,7 +598,7 @@ test('reglas: suscripciones solo de su dueña (sin acceso del staff); estado leg
     assert.strictEqual(subs['.write'], 'auth != null && auth.uid === $uid');
     assert.ok(!/role/.test(JSON.stringify(r.pushSubscriptions)), 'las suscripciones no deben depender del rol (el staff no las lee)');
     assert.ok(!r.pushSubscriptions['.read'] && !r.pushSubscriptions['.write'], 'sin permisos a nivel de nodo');
-    assert.ok(/role'\)\.val\(\) !== 'player'/.test(r.pushStatus['.read']), 'staff y fisio leen pushStatus');
+    assert.ok(/=== 'staff'/.test(r.pushStatus['.read']) && /=== 'fisio'/.test(r.pushStatus['.read']) && !/'player'/.test(r.pushStatus['.read']), 'staff y fisio leen pushStatus (lista blanca)');
     assert.strictEqual(r.pushStatus.$uid['.write'], 'auth != null && auth.uid === $uid');
     assert.strictEqual(subs.$other['.validate'], false); assert.strictEqual(r.pushStatus.$uid.$other['.validate'], false);
     assert.ok(r.$other, 'el comodín $other sigue ahí (no se ha tocado lo demás)');

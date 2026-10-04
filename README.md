@@ -36,8 +36,8 @@ cd basketball-rpe-tracker
 # 1. Crear proyecto en https://firebase.google.com
 # 2. Editar firebase-config.js con tus credenciales
 
-# Iniciar servidor local
-node server.js
+# Iniciar servidor local (en Windows: python -m http.server 3000)
+python3 -m http.server 3000
 
 # Abrir en navegador
 # http://localhost:3000
@@ -47,6 +47,8 @@ node server.js
 
 1. Sigue el [CHECKLIST.md](CHECKLIST.md)
 2. Tu app estará en: `https://TU_USUARIO.github.io/basketball-rpe-tracker/`
+3. ⚠️ Antes de compartir el enlace, publica las reglas de `firebase-rules.json` en Firebase
+   (Parte 4 de INSTRUCCIONES-FIREBASE.md). Sin ellas la base de datos queda sin proteger.
 
 ## 🛠️ Tecnologías
 
