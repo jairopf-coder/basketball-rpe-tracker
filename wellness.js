@@ -45,11 +45,14 @@ RPETracker.prototype._registerWellnessPlayerListeners = function() {
         // Construir array plano con todos los entries, añadiendo uid si no está
         const allEntries = [];
         Object.keys(val).forEach(uid => {
-            const dateMap = val[uid] || {};
-            Object.values(dateMap).forEach(entry => {
-                if (entry && typeof entry === 'object') {
-                    allEntries.push(Object.assign({}, entry, { uid: entry.uid || uid }));
-                }
+            const dateMap = val[uid];
+            if (!dateMap || typeof dateMap !== 'object') return;
+            // La clave de primer nivel es el uid REAL de quien escribió (las reglas solo
+            // le dejan escribir en su propio nodo). Lo que traiga dentro cada entrada puede
+            // venir manipulado, así que se valida antes de usarlo (ver SafeData).
+            Object.keys(dateMap).forEach(dateKey => {
+                const clean = SafeData.wellnessEntry(dateMap[dateKey], uid, dateKey);
+                if (clean) allEntries.push(clean);
             });
         });
         this._wellnessPlayerCache = allEntries;

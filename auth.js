@@ -828,11 +828,17 @@ const AppAuth = {
                 list.innerHTML = '<div class="wl-loading">No hay jugadoras registradas</div>';
                 return;
             }
-            list.innerHTML = players.map(p => `
-                <button class="wl-player-btn" onclick="AppAuth.selectPlayer('${p.id}', '${p.name.replace(/'/g,"\\'")}')">
-                    <span class="wl-player-avatar">${p.name.charAt(0).toUpperCase()}</span>
-                    <span class="wl-player-name">${p.name}${p.number ? ` #${p.number}` : ''}</span>
-                </button>`).join('');
+            // Los botones solo llevan el id; el nombre se lee de memoria (no va dentro del onclick)
+            this._wlPlayers = {};
+            players.forEach(p => { this._wlPlayers[p.id] = p; });
+            list.innerHTML = players.map(p => {
+                const name = String(p.name || '');
+                return `
+                <button class="wl-player-btn" data-pid="${esc(p.id)}" onclick="AppAuth._pickPlayer(this.dataset.pid)">
+                    <span class="wl-player-avatar">${esc(name.charAt(0).toUpperCase())}</span>
+                    <span class="wl-player-name">${esc(name)}${p.number ? ` #${esc(p.number)}` : ''}</span>
+                </button>`;
+            }).join('');
         };
         if (window.firebaseDB) {
             window.firebaseDB.ref('players').once('value')
@@ -841,6 +847,11 @@ const AppAuth = {
         } else {
             render(JSON.parse(localStorage.getItem('basketballPlayers') || '[]'));
         }
+    },
+
+    _pickPlayer(id) {
+        const p = (this._wlPlayers || {})[id];
+        this.selectPlayer(id, p ? String(p.name || '') : '');
     },
 
     selectPlayer(id, name) {
