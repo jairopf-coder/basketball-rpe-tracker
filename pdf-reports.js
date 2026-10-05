@@ -146,7 +146,7 @@ RPETracker.prototype.buildReportHTML = function(player, report, reportType) {
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Informe ${reportTitle} - ${player.name}</title>
+    <title>Informe ${reportTitle} - ${esc(player.name)}</title>
     <style>
         @media print {
             @page { margin: 2cm; }
@@ -671,7 +671,7 @@ RPETracker.prototype.showPlayerReportMenu = function(playerId) {
     overlay.innerHTML = `
         <div style="background:var(--bg-card);border-radius:16px;padding:1.5rem;min-width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.25)">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
-                <h3 style="margin:0;font-size:1rem">📄 Informe — ${player.name}</h3>
+                <h3 style="margin:0;font-size:1rem">📄 Informe — ${esc(player.name)}</h3>
                 <button onclick="document.getElementById('reportMenuOverlay').remove()"
                     style="background:none;border:none;font-size:1.25rem;cursor:pointer;color:var(--text-secondary)">✕</button>
             </div>
@@ -1061,7 +1061,7 @@ RPETracker.prototype.generatePlayerReport = function(playerId) {
             ${notes.map(n => `
                 <div class="note-row">
                     <div class="note-date">${new Date(n.date).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric' })}</div>
-                    <div class="note-text">${n.text || n.content || ''}</div>
+                    <div class="note-text">${esc(n.text || n.content || '')}</div>
                 </div>`).join('')}
         </div>`;
 
@@ -1082,7 +1082,7 @@ RPETracker.prototype.generatePlayerReport = function(playerId) {
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Informe — ${player.name}</title>
+<title>Informe — ${esc(player.name)}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"><\/script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

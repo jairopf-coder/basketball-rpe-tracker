@@ -273,7 +273,7 @@ RPETracker.prototype.renderGymView = function() {
             const pendingBadge = pendingCount > 0 ? `<span class="gym-pending-badge">${pendingCount} pendiente${pendingCount!==1?'s':''}</span>` : '';
             return `
             <div class="str-player-card" onclick="window.rpeTracker._openGymPlayer('${p.id}')">
-                <div class="str-player-avatar" style="background:${color}">${p.name.charAt(0).toUpperCase()}</div>
+                <div class="str-player-avatar" style="background:${color}">${esc(p.name.charAt(0).toUpperCase())}</div>
                 <div class="str-player-info">
                     <div class="str-player-name">${esc(p.name)}${p.number ? ` <span class="str-num">#${esc(p.number)}</span>` : ''} ${pendingBadge}</div>
                     <div class="str-player-meta">${last ? `Última sesión: ${last.date}` : 'Sin sesiones de gimnasio'}</div>
@@ -398,8 +398,8 @@ RPETracker.prototype._renderGymPlayer = function(el) {
                 <button class="str-back-btn"
                     onclick="window.rpeTracker._gymSub='list';window.rpeTracker._gymFilter='all';window.rpeTracker.renderGymView()">← Volver</button>
                 <div class="str-player-pill" style="background:${color}20;border-color:${color}40">
-                    <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${player.name.charAt(0)}</div>
-                    <span style="color:${color};font-weight:600">${player.name}</span>
+                    <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${esc(player.name.charAt(0))}</div>
+                    <span style="color:${color};font-weight:600">${esc(player.name)}</span>
                 </div>
                 <button class="btn-primary" onclick="window.rpeTracker._openNewGymSession('${player.id}')">+ Nueva sesión</button>
             </div>
@@ -619,7 +619,7 @@ RPETracker.prototype._openGymSessionDetail = function(sessionId) {
 
         return `
         <div class="pvr-ex-block">
-            <div class="pvr-ex-name">${name}</div>
+            <div class="pvr-ex-name">${esc(name)}</div>
             <div class="pvr-columns">
                 <div class="pvr-col">
                     <div class="pvr-col-label">📋 Plan</div>
@@ -733,7 +733,7 @@ RPETracker.prototype._renderExecModal = function(modal) {
                 return `<button class="exec-player-tab ${i===idx?'exec-player-tab--active':''}"
                     style="${i===idx?`border-bottom-color:${c};color:${c}`:''}"
                     onclick="window.rpeTracker._execSaveCurrentAndGo(${i})">
-                    ${done ? '✅ ' : ''}${p ? p.name.split(' ')[0] : 'Jugadora'}
+                    ${done ? '✅ ' : ''}${esc(p ? p.name.split(' ')[0] : 'Jugadora')}
                 </button>`;
             }).join('')}
         </div>` : '';
@@ -769,7 +769,7 @@ RPETracker.prototype._renderExecModal = function(modal) {
         return `
         <div class="exec-ex-block">
             <div class="exec-ex-header">
-                <span class="exec-ex-name">${name}</span>
+                <span class="exec-ex-name">${esc(name)}</span>
                 <button class="exec-eq-btn"
                     onclick="window.rpeTracker._execEqualPlan('${gs.id}','${e.exerciseId}')">
                     = Igual al plan
@@ -813,8 +813,8 @@ RPETracker.prototype._renderExecModal = function(modal) {
             <div class="modal-body" style="padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:75vh">
                 ${navHTML}
                 <div style="padding:0.75rem 1.25rem;background:${color}10;border-bottom:1px solid ${color}30;display:flex;align-items:center;gap:0.75rem">
-                    <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${player?.name?.charAt(0)||'?'}</div>
-                    <strong style="color:${color}">${player?.name||'Jugadora'}</strong>
+                    <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${esc(player?.name?.charAt(0)||'?')}</div>
+                    <strong style="color:${color}">${esc(player?.name||'Jugadora')}</strong>
                     <span style="font-size:0.78rem;color:var(--text-muted)">${(gs.exercises||[]).length} ejercicios</span>
                     <button class="exec-all-plan-btn" onclick="window.rpeTracker._execAllEqualPlan('${gs.id}')">= Todo igual al plan</button>
                 </div>
@@ -950,7 +950,7 @@ RPETracker.prototype._renderGymModal = function(modal) {
         return `<button class="gym-player-chip ${on?'gym-player-chip--active':''}"
             style="${on?`background:${color};color:#fff;border-color:${color}`:`border-color:${color}50;color:${color}`}"
             onclick="window.rpeTracker._toggleGymPlayer('${p.id}')">
-            ${p.name.split(' ')[0]}${p.number?' #'+p.number:''}
+            ${esc(p.name.split(' ')[0])}${p.number?' #'+esc(p.number):''}
         </button>`;
     }).join('');
 
@@ -1012,7 +1012,7 @@ RPETracker.prototype._renderStep1 = function() {
             return `<button class="gym-tab ${isA?'gym-tab--active':''}"
                 style="${isA?`border-bottom-color:${color};color:${color}`:''}"
                 onclick="window.rpeTracker._setGymTab('${p.id}')">
-                ${p.name.split(' ')[0]} <span class="gym-tab-count">${(mp?.rows||[]).length}</span>
+                ${esc(p.name.split(' ')[0])} <span class="gym-tab-count">${(mp?.rows||[]).length}</span>
             </button>`;
         }).join('')}
     </div>` : '';
@@ -1046,11 +1046,11 @@ RPETracker.prototype._renderStep1 = function() {
             <span class="gym-summary-label">Seleccionados (${allSelected.length}):</span>
             ${allSelected.map(({r,label})=>{
                 const ex=(this.exerciseLibrary||[]).find(e=>e.id===r.exId);
-                return `<span class="gym-summary-chip">${ex?.name||r.exId}${multi?`<span class="gym-summary-owner">${label}</span>`:''}<button onclick="window.rpeTracker._removeExerciseFromSelection('${r.exId}')">✕</button></span>`;
+                return `<span class="gym-summary-chip">${esc(ex?.name||r.exId)}${multi?`<span class="gym-summary-owner">${esc(label)}</span>`:''}<button onclick="window.rpeTracker._removeExerciseFromSelection('${r.exId}')">✕</button></span>`;
             }).join('')}
         </div>`;
 
-    const tabInfo = multi ? `<div class="gym-tab-info">${this._gymActiveTab==='__shared__'?'👥 Ejercicios para <strong>todas</strong>':`Exclusivos de <strong>${this.players.find(p=>p.id===this._gymActiveTab)?.name}</strong>`}</div>` : '';
+    const tabInfo = multi ? `<div class="gym-tab-info">${this._gymActiveTab==='__shared__'?'👥 Ejercicios para <strong>todas</strong>':`Exclusivos de <strong>${esc(this.players.find(p=>p.id===this._gymActiveTab)?.name)}</strong>`}</div>` : '';
 
     return `<div class="gym-step1">
         <h3 class="gym-step-title">Paso 1 — Selecciona los ejercicios</h3>
@@ -1076,7 +1076,7 @@ RPETracker.prototype._renderStep2 = function() {
             return `<button class="gym-tab ${isA?'gym-tab--active':''}"
                 style="${isA?`border-bottom-color:${color};color:${color}`:''}"
                 onclick="window.rpeTracker._setGymTab('${p.id}')">
-                ${p.name.split(' ')[0]} <span class="gym-tab-count">${(mp?.rows||[]).length}</span>
+                ${esc(p.name.split(' ')[0])} <span class="gym-tab-count">${(mp?.rows||[]).length}</span>
             </button>`;
         }).join('')}
     </div>` : '';
@@ -1112,7 +1112,7 @@ RPETracker.prototype._renderStep2 = function() {
 
         return `<div class="gym-ex-block" id="exblock_${row.exId}">
             <div class="gym-ex-block-header">
-                <span class="gym-ex-block-name">${ex?.name||row.exId}</span>
+                <span class="gym-ex-block-name">${esc(ex?.name||row.exId)}</span>
                 <div class="gym-ex-block-defaults">
                     <label class="gym-def-label">Series</label>
                     <input type="number" class="gym-def-input" value="${row.defaultSets}" min="1" max="20"
@@ -1421,8 +1421,8 @@ RPETracker.prototype._renderGymTeamView = function(el) {
         }).join('');
         return `<tr>
             <td class="gym-cmp-player">
-                <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${player.name.charAt(0)}</div>
-                <span>${player.name.split(' ')[0]}</span>
+                <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${esc(player.name.charAt(0))}</div>
+                <span>${esc(player.name.split(' ')[0])}</span>
             </td>
             ${cells}
         </tr>`;
@@ -1489,7 +1489,7 @@ RPETracker.prototype._renderTemplatesModal = function(modal) {
         : templates.map((t, i) => `
             <div class="lib-row">
                 <div style="flex:1">
-                    <div class="lib-ex-name">${t.name}</div>
+                    <div class="lib-ex-name">${esc(t.name)}</div>
                     <div style="font-size:0.75rem;color:var(--text-faint)">${t.exercises.length} ejercicios</div>
                 </div>
                 <div class="lib-row-actions">
@@ -1713,7 +1713,7 @@ RPETracker.prototype.renderTestsView = function() {
                     : `<span class="str-badge str-badge--green">Hace ${weeksSince} sem.</span>`;
             return `
             <div class="str-player-card" onclick="window.rpeTracker._openTestPlayer('${p.id}')">
-                <div class="str-player-avatar" style="background:${color}">${p.name.charAt(0).toUpperCase()}</div>
+                <div class="str-player-avatar" style="background:${color}">${esc(p.name.charAt(0).toUpperCase())}</div>
                 <div class="str-player-info">
                     <div class="str-player-name">${esc(p.name)}${p.number ? ` <span class="str-num">#${esc(p.number)}</span>` : ''}</div>
                     <div class="str-player-meta">${last ? `Último test: ${last.date}` : 'Sin tests registrados'}</div>
@@ -1891,8 +1891,8 @@ RPETracker.prototype._renderTestPlayer = function(el) {
             <div class="str-header">
                 <button class="str-back-btn" onclick="window.rpeTracker._testSub='list';window.rpeTracker.renderTestsView()">← Volver</button>
                 <div class="str-player-pill" style="background:${color}20;border-color:${color}40">
-                    <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${player.name.charAt(0)}</div>
-                    <span style="color:${color};font-weight:600">${player.name}</span>
+                    <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${esc(player.name.charAt(0))}</div>
+                    <span style="color:${color};font-weight:600">${esc(player.name)}</span>
                 </div>
                 <button class="btn-primary" onclick="window.rpeTracker._openNewTest('${player.id}')" title="Nuevo test" aria-label="Nuevo test">+</button>
             </div>

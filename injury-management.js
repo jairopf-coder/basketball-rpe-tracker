@@ -434,7 +434,7 @@ RPETracker.prototype.openAddInjuryModal = function(playerId = null) {
     modal.className = 'modal active';
     
     const playerOptions = this.players.map(p => 
-        `<option value="${p.id}" ${p.id === playerId ? 'selected' : ''}>${p.name}${p.number ? ` #${p.number}` : ''}</option>`
+        `<option value="${p.id}" ${p.id === playerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ` #${esc(p.number)}` : ''}</option>`
     ).join('');
     
     modal.innerHTML = `
@@ -894,12 +894,12 @@ RPETracker.prototype.renderInjuryCard = function(injury) {
                 <div class="inj-card-player">
                     ${typeof PlayerTokens !== 'undefined' ? PlayerTokens.avatar(player, 28, '0.75rem') : `<div style="width:28px;height:28px;border-radius:50%;background:${player.color||col};display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:#fff;font-weight:600">${player.name.charAt(0)}</div>`}
                     <div>
-                        <div class="inj-card-name">${player.name}${player.number ? ` <span class="inj-num">#${player.number}</span>` : ''}</div>
+                        <div class="inj-card-name">${esc(player.name)}${player.number ? ` <span class="inj-num">#${esc(player.number)}</span>` : ''}</div>
                         <div class="inj-card-badges">
                             <span class="inj-badge" style="background:${col}">${sevLabel[injury.severity]||'—'}</span>
                             <span class="inj-badge inj-badge-blue">${this.getLocationName(injury.location)}</span>
                             <span class="inj-badge inj-badge-purple">${this.getTypeName(injury.type)}</span>
-                            ${injury.mechanism ? `<span class="inj-badge inj-badge-gray">${injury.mechanism}</span>` : ''}
+                            ${injury.mechanism ? `<span class="inj-badge inj-badge-gray">${esc(injury.mechanism)}</span>` : ''}
                         </div>
                     </div>
                 </div>
@@ -922,7 +922,7 @@ RPETracker.prototype.renderInjuryCard = function(injury) {
             </div>
 
             ${injury.description ? `<div class="inj-desc">📝 ${esc(injury.description)}</div>` : ''}
-            ${injury.initialTreatment ? `<div class="inj-desc" style="background:var(--bg-subtle)">🩹 ${injury.initialTreatment}</div>` : ''}
+            ${injury.initialTreatment ? `<div class="inj-desc" style="background:var(--bg-subtle)">🩹 ${esc(injury.initialTreatment)}</div>` : ''}
 
             ${(() => {
                 // ── Criterios de progresión de fase actual ──────────────────
@@ -998,7 +998,7 @@ RPETracker.prototype.renderCompactInjuryCard = function(injury) {
         <div class="inj-history-card" style="border-left:4px solid #${(sevColor[injury.severity]||'999').replace('#','')}">
             <div class="inj-history-top">
                 <div>
-                    <div class="inj-card-name">${player.name}${player.number ? ` <span class="inj-num">#${player.number}</span>` : ''}</div>
+                    <div class="inj-card-name">${esc(player.name)}${player.number ? ` <span class="inj-num">#${esc(player.number)}</span>` : ''}</div>
                     <div class="inj-card-badges" style="margin-top:.3rem">
                         <span class="inj-badge" style="background:#${(sevColor[injury.severity]||'999').replace('#','')}">${sevLabel[injury.severity]||'—'}</span>
                         <span class="inj-badge inj-badge-blue">${this.getLocationName(injury.location)}</span>

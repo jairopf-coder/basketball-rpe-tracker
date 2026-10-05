@@ -52,7 +52,7 @@ RPETracker.prototype.renderAvailabilityRow = function(player, dates) {
     let row = `
         <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 0.75rem; font-weight: 600;">
-                ${player.name}${player.number ? ` #${player.number}` : ''}
+                ${esc(player.name)}${player.number ? ` #${esc(player.number)}` : ''}
             </td>
     `;
     
@@ -159,7 +159,7 @@ RPETracker.prototype.updateRTPPhase = function(injuryId) {
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h2>🔄 Actualizar Fase RTP — ${player.name}</h2>
+                <h2>🔄 Actualizar Fase RTP — ${esc(player.name)}</h2>
                 <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
             </div>
             <div class="modal-body" style="padding:1.5rem">
@@ -305,7 +305,7 @@ RPETracker.prototype.showRTPProgram = function(injuryId) {
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 900px;">
             <div class="modal-header">
-                <h2>📋 Programa Return to Play - ${player.name}</h2>
+                <h2>📋 Programa Return to Play - ${esc(player.name)}</h2>
                 <button onclick="this.closest('.modal').remove()" class="btn-close">&times;</button>
             </div>
             <div style="padding: 1.5rem; max-height: 70vh; overflow-y: auto;">
@@ -569,7 +569,7 @@ RPETracker.prototype._renderClinicalNotesPanel = function(container, filterPlaye
     const today = new Date().toISOString().split('T')[0];
 
     const playerOptions = this.players
-        .map(p => `<option value="${p.id}" ${fp === p.id ? 'selected' : ''}>${p.name}</option>`)
+        .map(p => `<option value="${p.id}" ${fp === p.id ? 'selected' : ''}>${esc(p.name)}</option>`)
         .join('');
 
     let notes = [...(this.clinicalNotes || [])].sort((a, b) => b.date.localeCompare(a.date));
@@ -584,11 +584,11 @@ RPETracker.prototype._renderClinicalNotesPanel = function(container, filterPlaye
             return `
             <div class="cn-note-row" id="cn-row-${n.id}">
                 <div class="cn-note-meta">
-                    <span class="cn-note-player">${typeof PlayerTokens !== 'undefined' ? PlayerTokens.avatar(player, 22, '0.65rem') : ''} ${player.name}</span>
+                    <span class="cn-note-player">${typeof PlayerTokens !== 'undefined' ? PlayerTokens.avatar(player, 22, '0.65rem') : ''} ${esc(player.name)}</span>
                     <span class="cn-note-date">${new Date(n.date).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})}</span>
                     <button class="cn-note-del" onclick="window.rpeTracker?._deleteClinicalNote('${n.id}')" title="Eliminar">🗑</button>
                 </div>
-                <div class="cn-note-text" id="cn-text-${n.id}">${n.text.replace(/\n/g,'<br>')}</div>
+                <div class="cn-note-text" id="cn-text-${n.id}">${esc(n.text).replace(/\n/g,'<br>')}</div>
                 <button class="cn-note-edit-btn" onclick="window.rpeTracker?._editClinicalNoteInline('${n.id}')" title="Editar" aria-label="Editar">✏️</button>
             </div>`;
         }).join('');
@@ -598,7 +598,7 @@ RPETracker.prototype._renderClinicalNotesPanel = function(container, filterPlaye
             <div class="cn-form-row">
                 <select class="filter-select" id="cnNewPlayer" style="flex:1">
                     <option value="">— Seleccionar jugadora —</option>
-                    ${this.players.map(p => `<option value="${p.id}" ${fp===p.id?'selected':''}>${p.name}</option>`).join('')}
+                    ${this.players.map(p => `<option value="${p.id}" ${fp===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}
                 </select>
                 <input type="date" id="cnNewDate" class="filter-select" value="${today}" style="flex:0 0 auto">
             </div>
@@ -658,10 +658,10 @@ RPETracker.prototype._editClinicalNoteInline = function(noteId) {
     if (!textDiv) return;
     const original = note.text;
     textDiv.innerHTML = `
-        <textarea style="width:100%;padding:.5rem;border:1px solid var(--primary);border-radius:6px;font-family:inherit;background:var(--bg-card);color:var(--text-primary);resize:vertical" rows="3">${original}</textarea>
+        <textarea style="width:100%;padding:.5rem;border:1px solid var(--primary);border-radius:6px;font-family:inherit;background:var(--bg-card);color:var(--text-primary);resize:vertical" rows="3">${esc(original)}</textarea>
         <div style="display:flex;gap:.5rem;margin-top:.4rem">
             <button class="btn-primary" style="flex:1;padding:.35rem" onclick="window.rpeTracker?._saveEditedNote('${noteId}',this)">💾 Guardar</button>
-            <button class="btn-secondary" style="flex:1;padding:.35rem" onclick="window.rpeTracker?._cancelEditNote('${noteId}','${original.replace(/'/g,'\\\'').replace(/\n/g,'\\n')}')">✕ Cancelar</button>
+            <button class="btn-secondary" style="flex:1;padding:.35rem" onclick="window.rpeTracker?._cancelEditNote('${noteId}')">✕ Cancelar</button>
         </div>`;
 };
 
@@ -679,9 +679,11 @@ RPETracker.prototype._saveEditedNote = function(noteId, btn) {
     if (c) this._renderClinicalNotesPanel(c);
 };
 
-RPETracker.prototype._cancelEditNote = function(noteId, original) {
+RPETracker.prototype._cancelEditNote = function(noteId) {
     const textDiv = document.getElementById(`cn-text-${noteId}`);
-    if (textDiv) textDiv.innerHTML = original.replace(/\n/g,'<br>');
+    // El texto se lee de memoria (no viaja dentro del onclick) y se escapa al pintarlo
+    const note = (this.clinicalNotes || []).find(n => n.id === noteId);
+    if (textDiv && note) textDiv.innerHTML = esc(note.text).replace(/\n/g,'<br>');
 };
 
 RPETracker.prototype._getClinicalNotesForPlayer = function(playerId) {
