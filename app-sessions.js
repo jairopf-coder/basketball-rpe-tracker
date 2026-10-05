@@ -36,8 +36,8 @@ RPETracker.prototype.renderPlayerButtonsMulti = function() {
         return `
         <button type="button" class="player-btn" data-player-id="${player.id}" style="--player-token:${color}">
             ${PlayerTokens.avatar(player, 50, '1.3rem', 'player-btn-avatar')}
-            <div class="player-btn-name">${player.name}</div>
-            ${player.number ? `<div class="player-btn-number">#${player.number}</div>` : ''}
+            <div class="player-btn-name">${esc(player.name)}</div>
+            ${player.number ? `<div class="player-btn-number">#${esc(player.number)}</div>` : ''}
         </button>`;
     }).join('');
     this.updateSelectedCount();
@@ -184,7 +184,7 @@ RPETracker.prototype.renderPlayerRpeList = function() {
             <div class="player-rpe-item" id="rpe-item-${player.id}" style="border-left:3px solid ${color}">
                 <div class="player-rpe-header">
                     ${PlayerTokens.avatar(player, 36, '0.9rem', 'player-rpe-avatar')}
-                    <div class="player-rpe-name">${player.name}${player.number ? ` <span style="opacity:0.6;font-size:0.85rem">#${player.number}</span>` : ''}</div>
+                    <div class="player-rpe-name">${esc(player.name)}${player.number ? ` <span style="opacity:0.6;font-size:0.85rem">#${esc(player.number)}</span>` : ''}</div>
                     <div style="display:flex;align-items:center;gap:6px;">
                         <div class="player-rpe-label-text" id="rpeLbl-${player.id}" style="text-align:right">${this.getRPELabel(5)}</div>
                     </div>
@@ -206,7 +206,7 @@ RPETracker.prototype.renderPlayerRpeList = function() {
                 </div>
                 <input type="hidden" id="rpeHidden-${player.id}" value="">
                 <textarea class="player-rpe-notes" id="notes-${player.id}" rows="2"
-                    placeholder="Incidencias de ${player.name} (opcional)..."></textarea>
+                    placeholder="Incidencias de ${esc(player.name)} (opcional)..."></textarea>
             </div>`;
     }).join('');
 };
@@ -598,18 +598,18 @@ RPETracker.prototype.renderSessions = function() {
         // menos evidentes. getSessionTypeName() devuelve 'Entrenamiento' por defecto
         // (mismo criterio que el icono, que por defecto es el de entrenamiento).
         const _typeName = this.getSessionTypeName(session.type);
-        const typeLabel = (_typeName === 'Entrenamiento' || _typeName === 'Partido') ? '' : ` - ${_typeName}`;
+        const typeLabel = (_typeName === 'Entrenamiento' || _typeName === 'Partido') ? '' : ` - ${esc(_typeName)}`;
         const timeIcon = session.timeOfDay === 'morning' ? '☀️' : '🌙';
 
         return `
             <div class="session-card" onclick="window.rpeTracker?.showSessionDetail('${session.id}')">
-                <div class="session-icon ${session.type}" title="${_typeName}" aria-label="${_typeName}">
+                <div class="session-icon ${session.type}" title="${esc(_typeName)}" aria-label="${esc(_typeName)}">
                     ${{training:'🏀',match:'🏟️',shooting:'🎯',gym:'🏋️',recovery:'💪'}[session.type] || '🏀'}
                 </div>
                 <div class="session-info">
                     <div class="session-type">
                         ${player ? PlayerTokens.avatar(player, 18, '0.55rem', 'session-player-token') : ''}
-                        ${playerName}${typeLabel}
+                        ${esc(playerName)}${typeLabel}
                         ${timeBadge}
                         <span class="session-date">- ${shortDate} - ${timeIcon}</span>
                     </div>
@@ -677,7 +677,7 @@ RPETracker.prototype.showSessionDetail = function(id) {
         <div class="sd-player-header">
             ${PlayerTokens.avatar(player, 44, '1.1rem')}
             <div class="sd-player-info">
-                <div class="sd-player-name">${playerName}${player.number ? ` <span class="sd-player-number">#${player.number}</span>` : ''}</div>
+                <div class="sd-player-name">${esc(playerName)}${player.number ? ` <span class="sd-player-number">#${esc(player.number)}</span>` : ''}</div>
                 <div class="sd-player-meta">Sesión ${sessionIdx} de ${totalSessions}</div>
             </div>
             <div class="sd-ratio-badge" style="color:${ratioColor};border-color:${ratioColor}20;background:${ratioColor}12">
@@ -723,7 +723,7 @@ RPETracker.prototype.showSessionDetail = function(id) {
         ` : '<div class="detail-notes" style="font-style: italic; color: var(--text-faint);">Sin incidencias registradas</div>'}
         ${playerSessions.length >= 2 ? `
         <div class="detail-rpe-hist-section">
-            <div class="detail-rpe-hist-title">📊 Distribución RPE — historial de ${playerName}</div>
+            <div class="detail-rpe-hist-title">📊 Distribución RPE — historial de ${esc(playerName)}</div>
             <canvas id="rpeHistogramCanvas" class="detail-rpe-hist-canvas"></canvas>
         </div>` : ''}
         ${typeof this.renderGpsSummaryBlock === 'function' ? this.renderGpsSummaryBlock(session) : ''}
@@ -954,7 +954,7 @@ RPETracker.prototype.editSession = function(sessionId) {
     // Populate player select
     const playerSelect = document.getElementById('editSessionPlayer');
     playerSelect.innerHTML = this.players.map(p => 
-        `<option value="${p.id}" ${p.id === session.playerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ` #${p.number}` : ''}</option>`
+        `<option value="${p.id}" ${p.id === session.playerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ` #${esc(p.number)}` : ''}</option>`
     ).join('');
     
     // Open modal

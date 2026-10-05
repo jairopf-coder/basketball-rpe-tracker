@@ -294,7 +294,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                 <span style="font-size:.72rem;color:var(--text-secondary)">min</span>
             </div>
             <input type="text" class="wp-input-focus" placeholder="Foco..."
-                value="${(s.focus||'').replace(/"/g,'&quot;')}"
+                value="${esc(s.focus||'')}"
                 data-wp-day="${dayKey}" data-wp-slot="${slot}" data-wp-field="focus">
             ${this._renderProjectedACRow((intensityRPE_slot[s.intensity||'none']||0) * (s.duration||0))}
         </div>`;

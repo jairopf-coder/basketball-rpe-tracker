@@ -96,6 +96,20 @@ const SafeData = {
 };
 window.SafeData = SafeData;
 
+// ── 1c. CELDAS DE CSV ──────────────────────────────────────
+/**
+ * Devuelve una celda de CSV lista para pegar: entre comillas, con las comillas
+ * internas duplicadas, y con un apóstrofo delante si empieza por = + - @ (o tabulador /
+ * retorno), para que Excel o LibreOffice no la ejecuten como fórmula.
+ * Uso: csv += `${csvCell(player.name)},${csvCell(session.notes)}\n`;
+ */
+function csvCell(value) {
+    let s = value == null ? '' : String(value);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+}
+window.csvCell = csvCell;
+
 // ── 2. MODAL DE CONFIRMACIÓN (reemplaza confirm() nativo) ──
 const AppConfirm = {
     _resolve: null,
