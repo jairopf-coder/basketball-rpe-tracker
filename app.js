@@ -1118,7 +1118,6 @@ class RPETracker {
             const timeOfDay = session.timeOfDay === 'morning' ? 'Mañana' : 'Tarde';
             const type  = {training:'Entrenamiento',match:'Partido',shooting:'Tiro',gym:'Gym',recovery:'Recuperación'}[session.type] || 'Entrenamiento';
             const load  = session.load || (session.rpe * (session.duration || 60));
-            const notes = (session.notes || '').replace(/"/g, '""');
 
             let ewmaCols = '';
             if (includeEWMA && player) {
@@ -1130,7 +1129,7 @@ class RPETracker {
                 ewmaCols = `,"${acute}","${chronic}","${ratio}","${status}"`;
             }
 
-            csv += `"${playerName}","${playerNumber}","${dateStr}","${timeOfDay}","${type}",${session.rpe},${session.duration || 60},${load},"${notes}"${ewmaCols}\n`;
+            csv += `${csvCell(playerName)},${csvCell(playerNumber)},"${dateStr}","${timeOfDay}","${type}",${session.rpe},${session.duration || 60},${load},${csvCell(session.notes)}${ewmaCols}\n`;
         });
 
         // Summary per player
@@ -1152,7 +1151,7 @@ class RPETracker {
                     : ',"N/A","N/A","N/A","Sin datos"';
             }
 
-            csv += `"${player.name}","${player.number || ''}",${playerSessions.length},${avgRPE},${totalLoad}${ewmaSumCols}\n`;
+            csv += `${csvCell(player.name)},${csvCell(player.number)},${playerSessions.length},${avgRPE},${totalLoad}${ewmaSumCols}\n`;
         });
 
         const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });

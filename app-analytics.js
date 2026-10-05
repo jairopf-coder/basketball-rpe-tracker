@@ -493,7 +493,7 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
             <td class="pvr-date">${fmtDate(r.date)}</td>
             <td class="pvr-player">
                 ${PlayerTokens.avatar(r.player, 20, '0.6rem')}
-                <span>${r.player.name.split(' ')[0]}</span>
+                <span>${esc(r.player.name.split(' ')[0])}</span>
             </td>
             <td class="pvr-slot">${fmtSlot(r.slot)}</td>
             <td class="pvr-plan">
@@ -648,7 +648,7 @@ RPETracker.prototype.renderEvolutionCharts = function() {
         const avatar = PlayerTokens.avatar(p, 20, '0.55rem');
         return `<button class="chart-chip ${active}" data-pid="${p.id}" onclick="window.rpeTracker?.toggleChartPlayer('${p.id}')">
             ${avatar}
-            <span class="chart-chip-name">${p.name}${p.number ? ' <span class="chip-num">#'+p.number+'</span>' : ''}</span>
+            <span class="chart-chip-name">${esc(p.name)}${p.number ? ' <span class="chip-num">#'+esc(p.number)+'</span>' : ''}</span>
             <span class="chart-chip-ratio" style="color:${dot}">${ratioDisplay}</span>
         </button>`;
     }).join('');
@@ -664,7 +664,7 @@ RPETracker.prototype.renderEvolutionCharts = function() {
             <div class="evolution-player-row">
                 <div class="chart-container">
                     <div class="chart-header">
-                        <h4>${p.name}${p.number ? ` #${p.number}` : ''}</h4>
+                        <h4>${esc(p.name)}${p.number ? ` #${esc(p.number)}` : ''}</h4>
                         <div class="chart-period-btns">
                             ${[7,14,30,90].map(d => `<button class="chart-period-btn${(this._chartPeriods?.[p.id]||30)===d?' active':''}" onclick="window.rpeTracker?.setChartPeriod('${p.id}',${d})">${d}d</button>`).join('')}
                         </div>
@@ -674,7 +674,7 @@ RPETracker.prototype.renderEvolutionCharts = function() {
                 </div>
                 <div class="chart-container">
                     <div class="chart-header">
-                        <h4>${p.name}${p.number ? ` #${p.number}` : ''} — Temporada</h4>
+                        <h4>${esc(p.name)}${p.number ? ` #${esc(p.number)}` : ''} — Temporada</h4>
                     </div>
                     <canvas id="season-chart-${p.id}" class="chart-canvas"></canvas>
                 </div>

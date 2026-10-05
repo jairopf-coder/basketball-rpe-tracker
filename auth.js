@@ -366,7 +366,7 @@ const AppAuth = {
         return players
             .slice()
             .sort((a, b) => a.name.localeCompare(b.name))
-            .map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${(p.name || '').replace(/</g, '&lt;')}${p.number ? ` #${p.number}` : ''}</option>`)
+            .map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(p.name || '')}${p.number ? ` #${esc(p.number)}` : ''}</option>`)
             .join('');
     },
 
@@ -379,7 +379,7 @@ const AppAuth = {
         section.style.display = '';
         list.innerHTML = this._sessionAccounts.map(a => `
             <div class="um-session-row">
-                <span><strong>${(a.displayName || '').replace(/</g, '&lt;')}</strong> — ${a.email}</span>
+                <span><strong>${esc(a.displayName || '')}</strong> — ${esc(a.email)}</span>
                 <span class="um-session-pass">🔑 ${a.password}</span>
             </div>
         `).join('');
@@ -623,11 +623,11 @@ const AppAuth = {
                     <div class="um-section">
                         <div class="form-group">
                             <label>Nombre completo</label>
-                            <input type="text" id="ue-displayName" class="form-input" value="${(u.displayName || '').replace(/"/g, '&quot;')}">
+                            <input type="text" id="ue-displayName" class="form-input" value="${esc(u.displayName || '')}">
                         </div>
                         <div class="form-group">
                             <label>Email</label>
-                            <input type="text" id="ue-email" class="form-input" value="${(u.email || '').replace(/"/g, '&quot;')}">
+                            <input type="text" id="ue-email" class="form-input" value="${esc(u.email || '')}">
                             <small style="color:var(--text-secondary)">Esto solo actualiza el email mostrado en esta lista. Para cambiar el email con el que esta persona inicia sesión, hazlo en Firebase Console → Authentication (botón 🔒).</small>
                         </div>
                         <div class="form-group">

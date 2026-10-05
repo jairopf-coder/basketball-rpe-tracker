@@ -611,7 +611,7 @@ RPETracker.prototype._renderClinicalNotesPanel = function(container, filterPlaye
                 <option value="">Todas las jugadoras</option>
                 ${playerOptions}
             </select>
-            <input class="filter-select" type="search" placeholder="🔍 Buscar en notas…" value="${ft}"
+            <input class="filter-select" type="search" placeholder="🔍 Buscar en notas…" value="${esc(ft)}"
                    oninput="window.rpeTracker?._cnFilter(null,this.value)"
                    style="flex:2;min-width:0">
         </div>

@@ -300,14 +300,14 @@ RPETracker.prototype.renderObjectives = function () {
 RPETracker.prototype._objMatchCard = function (m, isNext, isPast) {
     const { day, month, weekday } = _formatDate(m.date);
     const isHome = m.venue === 'casa';
-    const venueLabel = isHome ? '🏠 Casa' : `✈️ ${m.venue || '—'}`;
-    const timeLabel  = m.time ? `🕐 ${m.time}` : '';
+    const venueLabel = isHome ? '🏠 Casa' : `✈️ ${esc(m.venue || '—')}`;
+    const timeLabel  = m.time ? `🕐 ${esc(m.time)}` : '';
     const compBadge  = m.competition === 'friendly'
         ? '<span class="obj-badge-comp obj-badge-friendly">Amistoso</span>'
-        : `<span class="obj-badge-comp">${m.competition || 'Liga'}</span>`;
+        : `<span class="obj-badge-comp">${esc(m.competition || 'Liga')}</span>`;
 
     const resultHtml = (m.localScore !== '' && m.localScore !== undefined && m.visitorScore !== '' && m.visitorScore !== undefined)
-        ? `<div class="obj-match-result">${m.localTeam} ${m.localScore} – ${m.visitorScore} ${m.visitorTeam}</div>`
+        ? `<div class="obj-match-result">${esc(m.localTeam)} ${esc(m.localScore)} – ${esc(m.visitorScore)} ${esc(m.visitorTeam)}</div>`
         : (isPast ? '<div style="font-size:0.75rem;color:var(--text-faint)">Sin resultado</div>' : '');
 
     return `
@@ -318,7 +318,7 @@ RPETracker.prototype._objMatchCard = function (m, isNext, isPast) {
             <span class="obj-match-mon">${weekday}</span>
         </div>
         <div class="obj-match-info">
-            <div class="obj-match-rival">vs ${m.rival || '—'}</div>
+            <div class="obj-match-rival">vs ${esc(m.rival || '—')}</div>
             <div class="obj-match-meta">
                 ${venueLabel}
                 ${timeLabel ? `<span>${timeLabel}</span>` : ''}
@@ -352,11 +352,11 @@ RPETracker.prototype._objShowForm = function (editId) {
             </div>
             <div class="obj-field">
                 <label>Hora</label>
-                <input type="time" id="objTime" value="${m ? (m.time || '') : ''}">
+                <input type="time" id="objTime" value="${esc(m ? (m.time || '') : '')}">
             </div>
             <div class="obj-field">
                 <label>Rival *</label>
-                <input type="text" id="objRival" placeholder="Nombre del equipo rival" value="${m ? (m.rival || '') : ''}">
+                <input type="text" id="objRival" placeholder="Nombre del equipo rival" value="${esc(m ? (m.rival || '') : '')}">
             </div>
             <div class="obj-field">
                 <label>Competición</label>
@@ -371,17 +371,17 @@ RPETracker.prototype._objShowForm = function (editId) {
             <div class="obj-field obj-field-full">
                 <label>Lugar</label>
                 <div class="obj-venue-wrap">
-                    <input type="text" id="objVenue" placeholder="Casa o nombre del pabellón" value="${m ? (m.venue || '') : ''}">
+                    <input type="text" id="objVenue" placeholder="Casa o nombre del pabellón" value="${esc(m ? (m.venue || '') : '')}">
                     <button class="obj-venue-home-btn" type="button" onclick="document.getElementById('objVenue').value='casa'">🏠 Casa</button>
                 </div>
             </div>
             <div class="obj-field">
                 <label>Equipo local</label>
-                <input type="text" id="objLocalTeam" placeholder="Nombre equipo local" value="${m ? (m.localTeam || '') : ''}">
+                <input type="text" id="objLocalTeam" placeholder="Nombre equipo local" value="${esc(m ? (m.localTeam || '') : '')}">
             </div>
             <div class="obj-field">
                 <label>Equipo visitante</label>
-                <input type="text" id="objVisitorTeam" placeholder="Nombre equipo visitante" value="${m ? (m.visitorTeam || '') : ''}">
+                <input type="text" id="objVisitorTeam" placeholder="Nombre equipo visitante" value="${esc(m ? (m.visitorTeam || '') : '')}">
             </div>
             <div class="obj-field">
                 <label>Puntos local (resultado)</label>

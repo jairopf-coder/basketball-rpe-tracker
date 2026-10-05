@@ -147,25 +147,25 @@ RPETracker.prototype._renderPreSessionModal = function() {
         const lbl = this.readinessLabel(d.score);
         return `<div class="pss-row">
             ${PlayerTokens.avatar(d.player, 22, '0.65rem')}
-            <span class="pss-name">${d.player.name}</span>
+            <span class="pss-name">${esc(d.player.name)}</span>
             <span class="pss-tag" style="color:${lbl.color};background:${lbl.bg}">${lbl.icon} ${d.score}/100</span>
         </div>`;
     }).join('');
 
     const acRows = acOutOfRange.map(d => `<div class="pss-row">
         ${PlayerTokens.avatar(d.player, 22, '0.65rem')}
-        <span class="pss-name">${d.player.name}</span>
+        <span class="pss-name">${esc(d.player.name)}</span>
         <span class="pss-tag" style="color:${d.color}">${d.icon} Ratio ${d.ratio}</span>
     </div>`).join('');
 
     const injRows = injured.map(d => `<div class="pss-row">
         ${PlayerTokens.avatar(d.player, 22, '0.65rem')}
-        <span class="pss-name">${d.player.name}</span>
+        <span class="pss-name">${esc(d.player.name)}</span>
         <span class="pss-tag pss-tag--inj">🏥 ${d.loc} — ${d.phase}</span>
     </div>`).join('');
 
     const trendRows = wellnessTrend.map(d => `<div class="pss-row pss-row--trend">
-        <span class="pss-trend-name">${d.name.split(' ')[0]}</span>
+        <span class="pss-trend-name">${esc(d.name.split(' ')[0])}</span>
         <span class="pss-trend-msgs">${d.messages.join(' · ')}</span>
     </div>`).join('');
 
@@ -220,7 +220,7 @@ RPETracker.prototype._renderPreSessionModal = function() {
             ${clearPlayers.length > 0 && !allClear ? `
             <div class="pss-clear-row">
                 ✅ <strong>${clearPlayers.length} jugadora${clearPlayers.length !== 1 ? 's' : ''}</strong> sin alertas:
-                ${clearPlayers.map(p => `<span class="pss-clear-chip">${p.name.split(' ')[0]}</span>`).join('')}
+                ${clearPlayers.map(p => `<span class="pss-clear-chip">${esc(p.name.split(' ')[0])}</span>`).join('')}
             </div>` : ''}
         </div>
     </div>`;

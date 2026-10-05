@@ -221,7 +221,7 @@ RPETracker.prototype.renderPlayers = function() {
                 <div class="player-info">
                     ${PlayerTokens.avatar(player, 56, '1.4rem')}
                     <div class="player-details">
-                        <h3>${player.name}${player.number ? ` <span style="opacity:0.5;font-size:0.85em">#${player.number}</span>` : ''}${trendHTML}</h3>
+                        <h3>${esc(player.name)}${player.number ? ` <span style="opacity:0.5;font-size:0.85em">#${esc(player.number)}</span>` : ''}${trendHTML}</h3>
                         <p class="player-meta">${playerSessions.length} registros · ${rpeTracker ? rpeTracker.countUniqueSessions(playerSessions) : playerSessions.length} sesiones<span class="player-meta-last">${lastSessionLabel}</span></p>
                     </div>
                 </div>
@@ -330,7 +330,7 @@ RPETracker.prototype.populatePlayerSelects = function() {
     
     if (filterSelect) {
         filterSelect.innerHTML = '<option value="all">Todas las jugadoras</option>' +
-            this.players.map(p => `<option value="${p.id}">${esc(p.name)}${p.number ? ` #${p.number}` : ''}</option>`).join('');
+            this.players.map(p => `<option value="${p.id}">${esc(p.name)}${p.number ? ` #${esc(p.number)}` : ''}</option>`).join('');
     }
 };
 
