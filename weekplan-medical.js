@@ -813,7 +813,7 @@ RPETracker.prototype.renderMedicalHistory = function() {
                     ${this.players.map(p=>`
                         <button class="wp-filter-btn ${this._medPlayerFilter===p.id?'active':''}"
                             onclick="window.rpeTracker?._medSetFilter('${p.id}')">
-                            ${PlayerTokens.avatar(p,16,'.5rem')} ${p.name}
+                            ${PlayerTokens.avatar(p,16,'.5rem')} ${esc(p.name)}
                         </button>`).join('')}
                 </div>
             </div>
@@ -1503,7 +1503,7 @@ RPETracker.prototype._renderInjIndividual = function() {
         ...this.players.filter(p => injuries.some(i=>i.playerId===p.id)).map(p =>
             `<button class="wp-filter-btn ${this._injSelPlayer===p.id?'active':''}"
                 onclick="window.rpeTracker._injSelPlayer='${p.id}';window.rpeTracker.renderInjuryHub()">
-                ${PlayerTokens.avatar(p,16,'.4rem')} ${p.name}
+                ${PlayerTokens.avatar(p,16,'.4rem')} ${esc(p.name)}
             </button>`)
     ].join('');
 
@@ -1625,7 +1625,7 @@ RPETracker.prototype._renderInjEquipo = function() {
         return `
         <div class="ijh-zone-row">
             <div class="ijh-zone-name" style="display:flex;align-items:center;gap:.4rem">
-                ${PlayerTokens.avatar(p,18,'.4rem')} ${p.name}
+                ${PlayerTokens.avatar(p,18,'.4rem')} ${esc(p.name)}
                 ${active ? `<span class="ijh-badge-active" style="font-size:.65rem">● activa</span>` : ''}
             </div>
             <div class="ijh-zone-bar-wrap">

@@ -258,7 +258,7 @@ RPETracker.prototype._renderWTodayStatus = function(filledIds, today) {
                     onclick="window.rpeTracker?.openWellnessForm('${p.id}')"
                     title="${entry?'Editar':'Registrar'}">
                     ${PlayerTokens.avatar(p,26,'.65rem')}
-                    <span class="wt-name">${p.name}${p.number?` <span style="opacity:.6">#${p.number}</span>`:''}</span>
+                    <span class="wt-name">${esc(p.name)}${p.number?` <span style="opacity:.6">#${esc(p.number)}</span>`:''}</span>
                     ${entry
                         ? `<span class="wt-score" style="background:${this._wColor(score)}">${score.toFixed(1)}</span>`
                         : `<span class="wt-pending">—</span>`}
@@ -726,7 +726,7 @@ RPETracker.prototype._renderWModal = function(today) {
                 <div class="form-group">
                     <label class="form-label">Jugadora</label>
                     <select id="wFormPlayer" class="form-select">
-                        ${this.players.map(p=>`<option value="${p.id}">${esc(p.name)}${p.number?` #${p.number}`:''}</option>`).join('')}
+                        ${this.players.map(p=>`<option value="${p.id}">${esc(p.name)}${p.number?` #${esc(p.number)}`:''}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">
@@ -1169,7 +1169,7 @@ RPETracker.prototype._renderBulkStep = function() {
             <div class="wb-player-bar">
                 ${PlayerTokens.avatar(player, 38, '0.9rem')}
                 <div class="wb-player-info">
-                    <div class="wb-player-name">${player.name}${player.number ? ` <span class="db-num">#${player.number}</span>` : ''}</div>
+                    <div class="wb-player-name">${esc(player.name)}${player.number ? ` <span class="db-num">#${esc(player.number)}</span>` : ''}</div>
                     ${isDone ? '<div class="wb-already-done">✅ Ya registrado — editando</div>' : ''}
                 </div>
                 <div class="wb-overall-badge" id="wbBadge" style="color:${scoreColor}">${score.toFixed(1)}</div>
@@ -1178,7 +1178,7 @@ RPETracker.prototype._renderBulkStep = function() {
                 <div class="wb-notes-row">
                     <label class="wb-notes-label">📝 Notas</label>
                     <input type="text" class="wb-notes-input" id="wbNotes"
-                        placeholder="Estrés, dolor, viaje..." value="${existing?.notes || ''}">
+                        placeholder="Estrés, dolor, viaje..." value="${esc(existing?.notes || '')}">
                 </div>
             </div>
             <div class="wb-footer">
@@ -1321,7 +1321,7 @@ RPETracker.prototype.openWellnessQuick = function() {
         return `<div class="wq-row" id="wqRow_${player.id}">
             <div class="wq-player-cell">
                 ${PlayerTokens.avatar(player, 28, '.7rem')}
-                <span class="wq-player-name">${player.name}${player.number ? `<span class="wq-num"> #${player.number}</span>` : ''}</span>
+                <span class="wq-player-name">${esc(player.name)}${player.number ? `<span class="wq-num"> #${esc(player.number)}</span>` : ''}</span>
                 ${alreadyFilled ? '<span class="wq-done-badge">✓</span>' : ''}
             </div>
             <div class="wq-sliders-wrap">${btnCells}</div>

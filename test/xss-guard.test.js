@@ -169,7 +169,7 @@ console.log('\nContador de nombres/emails sin esc()');
 // Una parte son legítimas y no se tocan: toasts (showToast usa textContent), AppConfirm (ya escapa),
 // constantes del código (TEST_DEFINITIONS, RTP_PHASES), nombres de fichero, etc.
 // Estos números solo pueden BAJAR (a medida que se corrijan los lotes 2b-2 y 2b-3). Subirlos = XSS nuevo.
-const BASELINE = {"app-analytics.js": 4, "app-comparisons.js": 2, "app-players.js": 5, "app-presession.js": 5, "app-sessions.js": 3, "app.js": 2, "auth.js": 7, "dashboard-renderer.js": 3, "injury-management-2.js": 3, "injury-management.js": 2, "injury-prediction.js": 1, "pdf-reports.js": 4, "strength.js": 12, "team-load.js": 1, "team-status.js": 4, "weekplan-medical.js": 3, "wellness.js": 3};
+const BASELINE = {"app-analytics.js": 4, "app-comparisons.js": 2, "app-players.js": 5, "app-presession.js": 5, "app-sessions.js": 3, "app.js": 2, "auth.js": 7, "injury-management-2.js": 3, "injury-management.js": 2, "injury-prediction.js": 1, "pdf-reports.js": 4, "strength.js": 12, "team-load.js": 1};
 const EXPR = /\$\{((?:[^{}]|\{[^{}]*\})*)\}/g;
 const KEY = /\.(?:name|displayName|email)\b/;
 function contarSinEsc(src) {

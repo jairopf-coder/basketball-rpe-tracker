@@ -445,7 +445,7 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                             <div class="pred-collapsed-left">
                                 <div class="pred-player-name">
                                     ${esc(player.name)}
-                                    ${player.number ? `<span class="pred-player-num">#${player.number}</span>` : ''}
+                                    ${player.number ? `<span class="pred-player-num">#${esc(player.number)}</span>` : ''}
                                 </div>
                                 <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
                                     <div class="pred-level-badge pred-level-badge--${pred.riskLevel}">${levelLabel}</div>
@@ -465,7 +465,7 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
                                 <div class="pred-player-info">
                                     <div class="pred-player-name">
                                         ${esc(player.name)}
-                                        ${player.number ? `<span class="pred-player-num">#${player.number}</span>` : ''}
+                                        ${player.number ? `<span class="pred-player-num">#${esc(player.number)}</span>` : ''}
                                     </div>
                                     <div class="pred-level-badge pred-level-badge--${pred.riskLevel}">${levelLabel}</div>
                                 </div>
