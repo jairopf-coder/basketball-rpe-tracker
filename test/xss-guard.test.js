@@ -5,8 +5,8 @@
 //   2) SafeData valida lo que escriben las jugadoras en Firebase
 //   3) Los listeners de /wellnessPlayer y /playerRpeReports descartan
 //      lo manipulado y la bandeja de RPE no deja pasar código
-//   4) Храповик: el nº de ${x.name} / ${x.displayName} / ${x.email} sin esc()
-//      no puede AUMENTAR (la Fase 2b lo irá bajando a 0)
+//   4) Contador: el nº de ${…name/displayName/email…} sin esc() no puede AUMENTAR
+//      (la Fase 2b lo va bajando)
 //  Uso:  node test/xss-guard.test.js
 // ============================================================
 'use strict';
@@ -163,15 +163,27 @@ test('un RPE legítimo como string "7" se normaliza a número 7', () => {
     assert.strictEqual(T._playerRpeRaw[0].rpe, 7);
 });
 
-// ---------- Храповик: nombres sin esc() ----------
-console.log('\nХраповик (interpolaciones de name/displayName/email sin esc)');
-// Bajar estos números a medida que se corrijan (Fase 2b). Subirlos = introducir XSS.
-const BASELINE = { 'app-analytics.js': 3, 'app-comparisons.js': 1, 'app-players.js': 4, 'app-presession.js': 3, 'app-sessions.js': 3, 'app.js': 2, 'auth.js': 3, 'dashboard-renderer.js': 1, 'injury-management-2.js': 9, 'injury-management.js': 3, 'injury-prediction.js': 1, 'pdf-reports.js': 6, 'strength.js': 15, 'team-status.js': 2, 'weekplan-medical.js': 3, 'wellness.js': 3 };
-const PAT = /\$\{\s*[A-Za-z_][\w.?\[\]']*\.(?:name|displayName|email)\s*\}/g;
+// ---------- Contador (храповик): nombres sin esc() ----------
+console.log('\nContador de nombres/emails sin esc()');
+// Cuenta las interpolaciones ${...} que contienen .name / .displayName / .email y NO llevan esc().
+// Una parte son legítimas y no se tocan: toasts (showToast usa textContent), AppConfirm (ya escapa),
+// constantes del código (TEST_DEFINITIONS, RTP_PHASES), nombres de fichero, etc.
+// Estos números solo pueden BAJAR (a medida que se corrijan los lotes 2b-2 y 2b-3). Subirlos = XSS nuevo.
+const BASELINE = {"app-analytics.js": 4, "app-comparisons.js": 2, "app-players.js": 5, "app-presession.js": 5, "app-sessions.js": 3, "app.js": 2, "auth.js": 7, "dashboard-renderer.js": 3, "injury-management-2.js": 3, "injury-management.js": 2, "injury-prediction.js": 1, "pdf-reports.js": 4, "strength.js": 12, "team-load.js": 1, "team-status.js": 4, "weekplan-medical.js": 3, "wellness.js": 3};
+const EXPR = /\$\{((?:[^{}]|\{[^{}]*\})*)\}/g;
+const KEY = /\.(?:name|displayName|email)\b/;
+function contarSinEsc(src) {
+    let n = 0;
+    for (const linea of src.split('\n')) {
+        let m; EXPR.lastIndex = 0;
+        while ((m = EXPR.exec(linea))) { if (KEY.test(m[1]) && !m[1].includes('esc(')) n++; }
+    }
+    return n;
+}
 test('ningún fichero tiene MÁS interpolaciones sin escapar que la línea base', () => {
     const over = [];
     for (const f of fs.readdirSync(ROOT).filter(n => n.endsWith('.js') && n !== 'sw.js' && !n.startsWith('firebase-config'))) {
-        const n = (fs.readFileSync(path.join(ROOT, f), 'utf8').match(PAT) || []).length;
+        const n = contarSinEsc(fs.readFileSync(path.join(ROOT, f), 'utf8'));
         if (n > (BASELINE[f] || 0)) over.push(`${f}: ${n} > ${BASELINE[f] || 0}`);
     }
     assert.deepStrictEqual(over, [], 'nuevas interpolaciones sin esc(): ' + over.join(', '));
