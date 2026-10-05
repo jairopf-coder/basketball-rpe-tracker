@@ -298,7 +298,7 @@ window.AnamnesisModule = {
     tbody.innerHTML = list.map((inj, i) => `
       <tr>
         <td>${esc(inj.zone || '—')}</td>
-        <td><span class="ana-badge" style="background:${markColor(inj.type)}">${MARK_TYPES.find(t=>t.id===inj.type)?.label||inj.type}</span></td>
+        <td><span class="ana-badge" style="background:${markColor(inj.type)}">${esc(MARK_TYPES.find(t=>t.id===inj.type)?.label||inj.type)}</span></td>
         <td>${esc(inj.date || '—')}</td>
         <td>${esc(inj.description || '—')}</td>
         <td>${inj.downtime ? inj.downtime + ' sem.' : '—'}</td>
@@ -401,7 +401,7 @@ window.AnamnesisModule = {
       ${existing.map(m => `
         <div class="bmf-existing-item">
           <span style="color:${markColor(m.type)}">●</span>
-          ${MARK_TYPES.find(t=>t.id===m.type)?.label||m.type}
+          ${esc(MARK_TYPES.find(t=>t.id===m.type)?.label||m.type)}
           ${m.date ? `· ${esc(m.date)}` : ''}
           <button class="bmf-del" data-mid="${m.id}">✕</button>
         </div>`).join('')}

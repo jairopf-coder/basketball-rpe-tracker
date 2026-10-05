@@ -160,7 +160,7 @@ RPETracker.prototype.renderDashboard = function() {
     const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
     if (trendAlerts.length > 0) {
         const trendItems = trendAlerts.map(a =>
-            `🔁 <strong>${a.name.split(' ')[0]}</strong> — ${a.message}`
+            `🔁 <strong>${esc(a.name.split(' ')[0])}</strong> — ${a.message}`
         );
         bannerHTML += `<div class="db-alert-banner db-alert-banner--trend">
             ${trendItems.map(i=>`<div class="db-alert-item">${i}</div>`).join('<div class="db-alert-sep">·</div>')}
@@ -255,7 +255,7 @@ RPETracker.prototype.renderDashboard = function() {
                     return { day: dt.getDate(), month: months[dt.getMonth()], weekday: days[dt.getDay()] };
                 })();
                 nextMatchHtml = `${weekday} ${day} ${month}`;
-                nextMatchSub  = `vs ${nm.rival || '—'}`;
+                nextMatchSub  = `vs ${esc(nm.rival || '—')}`;
             }
             return `
             <div class="db-kpi db-kpi--${teamACStatus} db-kpi--7d" title="Ratio A:C medio del equipo (jugadoras con datos suficientes: ${_acValues.length}/${this.players.length})">
@@ -1148,13 +1148,13 @@ RPETracker.prototype.renderTeamRatios = function() {
     const cards = this.players.map(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
         const st = getStatus(ratio.ratio, player.id);
-        const num = player.number ? `<span class="rcard-number">#${player.number}</span>` : '';
+        const num = player.number ? `<span class="rcard-number">#${esc(player.number)}</span>` : '';
         return `
             <div class="rcard ${st.cls}">
                 <div class="rcard-top">
-                    <div class="rcard-avatar">${player.name.charAt(0).toUpperCase()}</div>
+                    <div class="rcard-avatar">${esc(player.name.charAt(0).toUpperCase())}</div>
                     <div class="rcard-info">
-                        <div class="rcard-name">${player.name}${num}</div>
+                        <div class="rcard-name">${esc(player.name)}${num}</div>
                         <div class="rcard-status-label">${st.icon} ${st.label}</div>
                     </div>
                 </div>

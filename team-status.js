@@ -55,7 +55,7 @@ RPETracker.prototype.renderTeamStatus = function() {
 
         return `
             <div class="ts-card ${borderClass}">
-                <div class="ts-card-avatar">${player.name.charAt(0).toUpperCase()}</div>
+                <div class="ts-card-avatar">${esc(player.name.charAt(0).toUpperCase())}</div>
                 <div class="ts-card-info">
                     <div class="ts-card-name">${esc(player.name)}${player.number ? ` <span class="ts-num">#${esc(player.number)}</span>` : ''}</div>
                     <div class="ts-card-status">${statusText}</div>
@@ -201,8 +201,8 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
                 <div style="display:flex;align-items:center;gap:10px">
                     <div style="width:32px;height:32px;border-radius:50%;background:var(--primary,#ff6600);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${initials}</div>
                     <div>
-                        <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${player.name}</div>
-                        ${player.number ? `<div style="font-size:11px;color:var(--text-muted)">#${player.number}</div>` : ''}
+                        <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${esc(player.name)}</div>
+                        ${player.number ? `<div style="font-size:11px;color:var(--text-muted)">#${esc(player.number)}</div>` : ''}
                     </div>
                 </div>
             </td>
@@ -220,7 +220,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
     const injuryRows = activeInj.map(inj => {
         const p = this.players.find(x => x.id === inj.playerId);
         return `<tr>
-            <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);font-weight:600">${p?.name || '?'}</td>
+            <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);font-weight:600">${esc(p?.name || '?')}</td>
             <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8)">${inj.location ? this.getLocationName(inj.location) : '—'}</td>
             <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8);text-align:center">${typeof inj.getDaysInjured === 'function' ? inj.getDaysInjured() : '?'} días</td>
             <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8)">Fase RTP ${inj.rtpPhase || 1}/6</td>
@@ -250,7 +250,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
             <td style="padding:8px 14px;border-bottom:1px solid var(--border,#e8e8e8)">
                 <div style="display:flex;align-items:center;gap:8px">
                     <div style="width:26px;height:26px;border-radius:50%;background:var(--primary,#ff6600);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${initials}</div>
-                    <span style="font-weight:500;font-size:12px">${player.name}</span>
+                    <span style="font-weight:500;font-size:12px">${esc(player.name)}</span>
                 </div>
             </td>
             ${cells}
