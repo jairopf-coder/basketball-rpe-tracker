@@ -123,6 +123,15 @@ esperar('cuenta SIN rol NO lee /pushStatus', allowed('.read', ['pushStatus'], 'g
 // --- Raíz cerrada ---
 esperar('nadie lee la raíz sin rol', allowed('.read', [], 'ghost'), false);
 
+// --- Estructura: un error de llaves puede dejar una regla en el sitio equivocado ---
+const uidRules = (RULES.users && RULES.users['$uid']) || {};
+esperar('users solo contiene .read y $uid (nada suelto a su nivel)',
+    JSON.stringify(Object.keys(RULES.users).filter(k => !k.startsWith('.') && k !== '$uid')), '[]');
+for (const campo of ['displayName', 'email', 'photoURL', 'role', 'playerLink', 'playerId']) {
+    esperar(`users/$uid/${campo} existe`, Object.prototype.hasOwnProperty.call(uidRules, campo), true);
+}
+esperar('users/$uid/playerId tiene .validate', typeof (uidRules.playerId || {})['.validate'], 'string');
+
 if (fallos) {
     console.error(`\n${fallos} de ${total} comprobaciones FALLAN`);
     process.exit(1);
