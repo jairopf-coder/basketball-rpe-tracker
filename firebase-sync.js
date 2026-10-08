@@ -73,7 +73,51 @@ const SyncDiff = {
         });
         return { ok: true, patch, count, next };
     },
+
+    // ----- Variante por RUTAS, para objetos anidados { clave1: { clave2: valor } } -----
+    // (availability: { [jugadora]: { [fecha]: 'limited' | 'unavailable' } }). La unidad de
+    // cambio es "clave1/clave2", así dos dispositivos que editan fechas distintas de la
+    // misma jugadora no se pisan.
+    _leaves(obj) {
+        const out = {};
+        if (!obj || typeof obj !== 'object') return out;
+        Object.keys(obj).forEach(k1 => {
+            const v1 = obj[k1];
+            if (v1 && typeof v1 === 'object' && !Array.isArray(v1)) {
+                Object.keys(v1).forEach(k2 => { if (v1[k2] !== null && v1[k2] !== undefined) out[k1 + '/' + k2] = v1[k2]; });
+            } else if (v1 !== null && v1 !== undefined) {
+                out[k1] = v1;
+            }
+        });
+        return out;
+    },
+
+    fromRemotePaths(raw) {
+        const m = {}, leaves = this._leaves(raw);
+        Object.keys(leaves).forEach(p => { m[p] = this.canon(leaves[p]); });
+        return m;
+    },
+
+    planPaths(obj, synced) {
+        const leaves = this._leaves(obj || {});
+        const next = {}, patch = {};
+        let count = 0;
+        for (const p of Object.keys(leaves)) {
+            if (!p.split('/').every(seg => this.validKey(seg))) return { ok: false };
+            next[p] = this.canon(leaves[p]);
+        }
+        Object.keys(next).forEach(p => {
+            if (synced[p] !== next[p]) { patch[p] = JSON.parse(JSON.stringify(leaves[p])); count++; }
+        });
+        Object.keys(synced).forEach(p => {
+            if (!Object.prototype.hasOwnProperty.call(next, p)) { patch[p] = null; count++; }
+        });
+        return { ok: true, patch, count, next };
+    },
 };
+
+// Colecciones que no son "lista de elementos con id" sino objetos anidados
+const DIFF_PATH_NODES = { availability: true };
 
 
 class FirebaseSync {
@@ -178,6 +222,7 @@ class FirebaseSync {
 
     // Guardar todos los jugadores
     async savePlayers(players) {
+        if (DIFF_WRITES_ENABLED) return this._saveByDiff('players', players, 'jugadoras', { offlineLabel: 'jugadoras' });
         try {
             // Convertir array a objeto con IDs como keys
             const playersObj = {};
@@ -199,6 +244,7 @@ class FirebaseSync {
     onPlayersChange(callback) {
         this.playersRef.on('value', (snapshot) => {
             const data = snapshot.val();
+            this._diffObserve('players', data);
             const players = data ? Object.values(data) : [];
             callback(players);
         });
@@ -264,6 +310,7 @@ class FirebaseSync {
 // ========== GYM SESSIONS (Firebase sync) ==========
 
 FirebaseSync.prototype.saveGymSessions = async function(gymSessions) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('gymSessions', gymSessions, 'sesiones de gimnasio');
     try {
         const obj = {};
         if (!this.db) { Store.set('gymSessions', gymSessions); return; }
@@ -281,6 +328,7 @@ FirebaseSync.prototype.onGymSessionsChange = function(callback) {
     if (!this.db) return;
     this.db.ref('gymSessions').on('value', snapshot => {
         const data = snapshot.val();
+        this._diffObserve('gymSessions', data);
         const sessions = data ? Object.values(data) : [];
         callback(sessions);
     });
@@ -289,6 +337,7 @@ FirebaseSync.prototype.onGymSessionsChange = function(callback) {
 // ========== TEST SESSIONS (Firebase sync) ==========
 
 FirebaseSync.prototype.saveTestSessions = async function(testSessions) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('testSessions', testSessions, 'tests físicos');
     try {
         const obj = {};
         if (!this.db) { Store.set('testSessions', testSessions); return; }
@@ -306,6 +355,7 @@ FirebaseSync.prototype.onTestSessionsChange = function(callback) {
     if (!this.db) return;
     this.db.ref('testSessions').on('value', snapshot => {
         const data = snapshot.val();
+        this._diffObserve('testSessions', data);
         const sessions = data ? Object.values(data) : [];
         callback(sessions);
     });
@@ -382,6 +432,7 @@ FirebaseSync.prototype.onInjuriesChange = function(callback) {
 // Estructura: { [playerId]: { [fecha YYYY-MM-DD]: 'limited' | 'unavailable' } }
 
 FirebaseSync.prototype.saveAvailability = async function(availability) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('availability', availability || {}, 'disponibilidad');
     try {
         if (!this.db) { Store.set('availability', availability || {}); return; }
         await this.db.ref('availability').set(availability || {});
@@ -396,6 +447,7 @@ FirebaseSync.prototype.saveAvailability = async function(availability) {
 FirebaseSync.prototype.onAvailabilityChange = function(callback) {
     if (!this.db) return;
     this.db.ref('availability').on('value', snapshot => {
+        this._diffObserve('availability', snapshot.val());
         // null explícito = el nodo no existe aún en Firebase (primer arranque),
         // a diferencia de {} que significa "existe pero está vacío".
         callback(snapshot.exists() ? (snapshot.val() || {}) : null);
@@ -527,6 +579,7 @@ FirebaseSync.prototype.onClinicalNotesChange = function(callback) {
 };
 
 FirebaseSync.prototype.saveSeasonBlocks = async function(blocks) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('seasonBlocks', blocks || [], 'bloques de temporada');
     try {
         const obj = {};
         if (!this.db) { Store.set('seasonBlocks', blocks || []); return; }
@@ -544,6 +597,7 @@ FirebaseSync.prototype.loadSeasonBlocks = function(callback) {
     if (!this.db) { if (callback) callback([]); return; }
     this.db.ref('seasonBlocks').once('value', snapshot => {
         const data = snapshot.val();
+        this._diffObserve('seasonBlocks', data);
         const blocks = data ? Object.values(data) : [];
         Store.set('seasonBlocks', blocks);
         if (callback) callback(blocks);
@@ -666,6 +720,7 @@ FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
     if (!this.db) return;
     this.db.ref('seasonBlocks').on('value', snapshot => {
         const data = snapshot.val();
+        this._diffObserve('seasonBlocks', data);
         const blocks = data ? Object.values(data) : [];
         Store.set('seasonBlocks', blocks);
         if (callback) callback(blocks);
@@ -682,14 +737,14 @@ FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
 //   saving  = nº de escrituras en vuelo (mientras haya, se ignoran las lecturas, igual que la app)
 FirebaseSync.prototype._diffState = function(node) {
     this._ds = this._ds || {};
-    return this._ds[node] || (this._ds[node] = { synced: {}, loaded: false, saving: 0 });
+    return this._ds[node] || (this._ds[node] = { synced: {}, loaded: false, saving: 0, paths: !!DIFF_PATH_NODES[node] });
 };
 
 // Llamar desde el listener de cada colección con el objeto crudo (snapshot.val()).
 FirebaseSync.prototype._diffObserve = function(node, rawObj) {
     const st = this._diffState(node);
     if (st.saving > 0) return;
-    st.synced = SyncDiff.fromRemote(rawObj);
+    st.synced = st.paths ? SyncDiff.fromRemotePaths(rawObj) : SyncDiff.fromRemote(rawObj);
     st.loaded = true;
 };
 
@@ -705,10 +760,11 @@ FirebaseSync.prototype._saveLegacySetById = async function(node, list) {
  * Devuelve true si quedó guardada (o no había nada que guardar) y false si no se pudo
  * (primera lectura pendiente, o fallo de red/permisos con el cambio en la cola offline).
  */
-FirebaseSync.prototype._saveByDiff = async function(node, items, label) {
-    const list = Array.isArray(items) ? items : [];
-    if (!this.db) { Store.set(node, list); return true; }
+FirebaseSync.prototype._saveByDiff = async function(node, items, label, opts) {
+    opts = opts || {};
     const st = this._diffState(node);
+    const value = st.paths ? (items || {}) : (Array.isArray(items) ? items : []);
+    if (!this.db) { Store.set(node, value); return true; }
     if (!st.loaded) {
         // Sin la primera lectura no sabemos qué ha cambiado: no se escribe nada (misma idea
         // que el bloqueo de wellness). La lectura que llegue repondrá el estado correcto.
@@ -716,20 +772,22 @@ FirebaseSync.prototype._saveByDiff = async function(node, items, label) {
         this._notifyNotSynced(label || node);
         return false;
     }
-    const plan = SyncDiff.plan(list, st.synced);
+    const plan = st.paths ? SyncDiff.planPaths(value, st.synced) : SyncDiff.plan(value, st.synced);
     if (!plan.ok) {
-        // Algún id no sirve como clave de Firebase: camino de siempre (colección completa)
-        Store.set(node, list);
+        // Alguna clave no sirve en Firebase: camino de siempre (colección completa)
+        Store.set(node, value);
         try {
-            await this._saveLegacySetById(node, list);
+            if (st.paths) { await this.db.ref(node).set(value); st.synced = SyncDiff.fromRemotePaths(value); }
+            else await this._saveLegacySetById(node, value);
             return true;
         } catch (e) {
             console.error(`Error saving ${node} to Firebase:`, e);
-            await this._enqueueWrite(node, Object.fromEntries(list.map(it => [it.id, it])));
+            await this._enqueueWrite(node, st.paths ? value : Object.fromEntries(value.map(it => [it.id, it])));
+            if (opts.offlineLabel) this._notifyOffline(opts.offlineLabel);
             return false;
         }
     }
-    Store.set(node, list);
+    Store.set(node, value);
     if (!plan.count) return true;
     st.synced = plan.next;
     st.saving++;
@@ -739,6 +797,7 @@ FirebaseSync.prototype._saveByDiff = async function(node, items, label) {
     } catch (e) {
         console.error(`Error saving ${node} to Firebase:`, e);
         await this._enqueueWrite(node, plan.patch, 'patch');
+        if (opts.offlineLabel) this._notifyOffline(opts.offlineLabel);
         return false;
     } finally {
         st.saving--;
@@ -792,6 +851,7 @@ FirebaseSync.prototype.loadAnamnesis = function(playerId, callback) {
 
 // ── Partidos / Próximos objetivos ─────────────────────────
 FirebaseSync.prototype.saveMatches = async function(matches) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('matches', matches, 'partidos');
     try {
         const obj = {};
         matches.forEach(m => { obj[m.id] = m; });
@@ -813,6 +873,7 @@ FirebaseSync.prototype.onMatchesChange = function(callback) {
     }
     this.db.ref('matches').on('value', snapshot => {
         const val = snapshot.val();
+        this._diffObserve('matches', val);
         callback(val ? Object.values(val) : []);
     });
 };
