@@ -4,6 +4,77 @@
 // Debug logger — only emits in dev mode (window._devMode = true)
 const _dbg = (...a) => { if (window._devMode) console.log(...a); };
 
+// ========== ESCRITURA POR DIFERENCIAS (Fase 3) ==========
+// En vez de reescribir una colección entera con set() (lo que borra lo que otro
+// dispositivo haya añadido mientras tanto), se envían SOLO los elementos que este
+// dispositivo ha cambiado desde la última vez que sincronizó. Los borrados van como null.
+// Interruptor de emergencia: false = vuelve al set() de la colección completa de siempre.
+const DIFF_WRITES_ENABLED = true;
+
+const SyncDiff = {
+    // Firebase no guarda null/undefined/[]/{}. Se quitan aquí también para que "lo local" y
+    // "lo que devuelve el servidor" tengan la misma forma al compararlos. Dentro de un array
+    // nunca se quita nada: preferimos una escritura de más a perder un cambio.
+    _norm(v) {
+        if (v === null || v === undefined) return undefined;
+        if (Array.isArray(v)) {
+            if (!v.length) return undefined;
+            return v.map(x => { const n = this._norm(x); return n === undefined ? null : n; });
+        }
+        if (typeof v === 'object') {
+            const out = {}; let any = false;
+            Object.keys(v).sort().forEach(k => {
+                const n = this._norm(v[k]);
+                if (n !== undefined) { out[k] = n; any = true; }
+            });
+            return any ? out : undefined;
+        }
+        return v;
+    },
+
+    /** Forma canónica (texto) de un elemento, independiente del orden de las claves. */
+    canon(item) {
+        const plain = JSON.parse(JSON.stringify(item));   // quita funciones/undefined y aplica toJSON
+        const n = this._norm(plain);
+        return n === undefined ? '' : JSON.stringify(n);
+    },
+
+    validKey(id) {
+        if (typeof id === 'number') return isFinite(id);
+        return typeof id === 'string' && id.length > 0 && !/[.$#\[\]\/]/.test(id);
+    },
+
+    /** Mapa { id: forma canónica } a partir del objeto crudo que devuelve Firebase. */
+    fromRemote(obj) {
+        const m = {};
+        if (obj && typeof obj === 'object') Object.keys(obj).forEach(k => { m[k] = this.canon(obj[k]); });
+        return m;
+    },
+
+    /**
+     * Qué hay que escribir: elementos nuevos o modificados respecto a `synced`, y null
+     * para los que estaban en `synced` y ya no están. Si algún elemento no tiene un id
+     * válido como clave de Firebase devuelve { ok: false } (se usará el camino de siempre).
+     */
+    plan(items, synced) {
+        const next = {}, plain = {}, patch = {};
+        let count = 0;
+        for (const it of items) {
+            if (!it || typeof it !== 'object' || !this.validKey(it.id)) return { ok: false };
+            const key = String(it.id);
+            next[key] = this.canon(it);
+            plain[key] = it;
+        }
+        Object.keys(next).forEach(key => {
+            if (synced[key] !== next[key]) { patch[key] = JSON.parse(JSON.stringify(plain[key])); count++; }
+        });
+        Object.keys(synced).forEach(key => {
+            if (!Object.prototype.hasOwnProperty.call(next, key)) { patch[key] = null; count++; }
+        });
+        return { ok: true, patch, count, next };
+    },
+};
+
 
 class FirebaseSync {
     constructor() {
@@ -283,6 +354,7 @@ FirebaseSync.prototype.migrateStrengthData = async function() {
 // ========== INJURIES (Firebase sync) ==========
 
 FirebaseSync.prototype.saveInjuries = async function(injuries) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('injuries', injuries, 'lesiones');
     try {
         const obj = {};
         if (!this.db) { Store.set('injuries', injuries); return; }
@@ -300,6 +372,7 @@ FirebaseSync.prototype.onInjuriesChange = function(callback) {
     if (!this.db) return;
     this.db.ref('injuries').on('value', snapshot => {
         const data = snapshot.val();
+        this._diffObserve('injuries', data);
         const injuries = data ? Object.values(data) : [];
         callback(injuries);
     });
@@ -429,6 +502,7 @@ FirebaseSync.prototype.onWeekPlanChange = function(callback) {
 };
 
 FirebaseSync.prototype.saveClinicalNotes = async function(notes) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('clinicalNotes', notes, 'notas clínicas');
     try {
         const obj = {};
         if (!this.db) { Store.set('clinicalNotes', notes); return; }
@@ -446,6 +520,7 @@ FirebaseSync.prototype.onClinicalNotesChange = function(callback) {
     if (!this.db) return;
     this.db.ref('clinicalNotes').on('value', snapshot => {
         const data = snapshot.val();
+        this._diffObserve('clinicalNotes', data);
         const notes = data ? Object.values(data) : [];
         callback(notes);
     });
@@ -496,13 +571,13 @@ FirebaseSync.prototype._openIDB = function() {
     return this._idbReady;
 };
 
-FirebaseSync.prototype._enqueueWrite = async function(ref, data) {
+FirebaseSync.prototype._enqueueWrite = async function(ref, data, mode) {
     try {
         const db = await this._openIDB();
         return new Promise((resolve, reject) => {
             const tx    = db.transaction('rpe_pendingWrites', 'readwrite');
             const store = tx.objectStore('rpe_pendingWrites');
-            const req   = store.add({ ref, data, timestamp: Date.now() });
+            const req   = store.add({ ref, data, mode: mode || 'set', timestamp: Date.now() });
             req.onsuccess = () => {
                 resolve();
                 this._updatePendingCount();
@@ -533,7 +608,9 @@ FirebaseSync.prototype._drainQueue = async function() {
 
         for (const entry of all) {
             try {
-                await this.db.ref(entry.ref).set(entry.data);
+                // 'patch' = solo los elementos que cambiaron (update); sin modo = colección completa (set)
+                if (entry.mode === 'patch') await this.db.ref(entry.ref).update(entry.data);
+                else await this.db.ref(entry.ref).set(entry.data);
                 // Remove from queue on success
                 await new Promise((resolve, reject) => {
                     const tx    = db.transaction('rpe_pendingWrites', 'readwrite');
@@ -599,6 +676,82 @@ FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
 
 // Crear instancia global
 // Notify user when data is saved locally only (offline/error state)
+// Estado de sincronización por colección: lo último que este dispositivo sabe del servidor.
+//   synced  = { id: forma canónica } de lo último recibido o escrito
+//   loaded  = ya llegó la primera lectura (sin ella no se sabe qué ha cambiado)
+//   saving  = nº de escrituras en vuelo (mientras haya, se ignoran las lecturas, igual que la app)
+FirebaseSync.prototype._diffState = function(node) {
+    this._ds = this._ds || {};
+    return this._ds[node] || (this._ds[node] = { synced: {}, loaded: false, saving: 0 });
+};
+
+// Llamar desde el listener de cada colección con el objeto crudo (snapshot.val()).
+FirebaseSync.prototype._diffObserve = function(node, rawObj) {
+    const st = this._diffState(node);
+    if (st.saving > 0) return;
+    st.synced = SyncDiff.fromRemote(rawObj);
+    st.loaded = true;
+};
+
+FirebaseSync.prototype._saveLegacySetById = async function(node, list) {
+    const obj = {};
+    list.forEach(it => { obj[it.id] = it; });
+    await this.db.ref(node).set(obj);
+    this._diffState(node).synced = SyncDiff.fromRemote(obj);
+};
+
+/**
+ * Guarda una colección (array de elementos con id) enviando solo lo que cambió.
+ * Devuelve true si quedó guardada (o no había nada que guardar) y false si no se pudo
+ * (primera lectura pendiente, o fallo de red/permisos con el cambio en la cola offline).
+ */
+FirebaseSync.prototype._saveByDiff = async function(node, items, label) {
+    const list = Array.isArray(items) ? items : [];
+    if (!this.db) { Store.set(node, list); return true; }
+    const st = this._diffState(node);
+    if (!st.loaded) {
+        // Sin la primera lectura no sabemos qué ha cambiado: no se escribe nada (misma idea
+        // que el bloqueo de wellness). La lectura que llegue repondrá el estado correcto.
+        console.warn(`[sync] ${node}: guardado pospuesto, aún no ha llegado la primera lectura de Firebase`);
+        this._notifyNotSynced(label || node);
+        return false;
+    }
+    const plan = SyncDiff.plan(list, st.synced);
+    if (!plan.ok) {
+        // Algún id no sirve como clave de Firebase: camino de siempre (colección completa)
+        Store.set(node, list);
+        try {
+            await this._saveLegacySetById(node, list);
+            return true;
+        } catch (e) {
+            console.error(`Error saving ${node} to Firebase:`, e);
+            await this._enqueueWrite(node, Object.fromEntries(list.map(it => [it.id, it])));
+            return false;
+        }
+    }
+    Store.set(node, list);
+    if (!plan.count) return true;
+    st.synced = plan.next;
+    st.saving++;
+    try {
+        await this.db.ref(node).update(plan.patch);
+        return true;
+    } catch (e) {
+        console.error(`Error saving ${node} to Firebase:`, e);
+        await this._enqueueWrite(node, plan.patch, 'patch');
+        return false;
+    } finally {
+        st.saving--;
+    }
+};
+
+FirebaseSync.prototype._notifyNotSynced = function(tipo) {
+    const tracker = window.rpeTracker;
+    if (tracker && typeof tracker.showToast === 'function') {
+        tracker.showToast(`⏳ Aún sincronizando ${tipo} con Firebase. Espera unos segundos y repite el cambio.`, 'warning');
+    }
+};
+
 FirebaseSync.prototype._notifyOffline = function(tipo) {
     if (typeof announceA11y === 'function') {
         announceA11y(`Guardado localmente (sin conexión a Firebase): ${tipo}`);
