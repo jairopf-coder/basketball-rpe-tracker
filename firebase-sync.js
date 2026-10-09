@@ -156,6 +156,7 @@ class FirebaseSync {
 
     // Guardar todas las sesiones
     async saveSessions(sessions) {
+        if (DIFF_WRITES_ENABLED) return this._saveByDiff('sessions', sessions, 'sesiones', { offlineLabel: 'sesiones' });
         try {
             // Convertir array a objeto con IDs como keys
             const sessionsObj = {};
@@ -184,6 +185,7 @@ class FirebaseSync {
         }
         ref.on('value', (snapshot) => {
             const data = snapshot.val();
+            this._diffObserve('sessions', data, startDate ? { windowStart: startDate } : undefined);
             const sessions = data ? Object.values(data) : [];
             callback(sessions);
         });
@@ -197,6 +199,7 @@ class FirebaseSync {
         try {
             const snapshot = await this.sessionsRef.once('value');
             const data = snapshot.val();
+            this._diffAdoptFull('sessions', data);
             return data ? Object.values(data) : [];
         } catch (error) {
             console.error('Error loading full session history:', error);
@@ -364,6 +367,7 @@ FirebaseSync.prototype.onTestSessionsChange = function(callback) {
 // ========== WELLNESS (Firebase sync) ==========
 
 FirebaseSync.prototype.saveWellnessData = async function(wellnessData) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('wellness', wellnessData, 'wellness');
     try {
         const obj = {};
         if (!this.db) { Store.set('wellnessData', wellnessData); return; }
@@ -381,6 +385,7 @@ FirebaseSync.prototype.onWellnessChange = function(callback) {
     if (!this.db) return;
     this.db.ref('wellness').on('value', snapshot => {
         const data = snapshot.val();
+        this._diffObserve('wellness', data);
         const entries = data ? Object.values(data) : [];
         callback(entries);
     });
@@ -731,21 +736,71 @@ FirebaseSync.prototype.onSeasonBlocksChange = function(callback) {
 
 // Crear instancia global
 // Notify user when data is saved locally only (offline/error state)
+// ¿Está activa la escritura por diferencias? (la app lo consulta, p. ej. para no descargar el histórico al guardar)
+FirebaseSync.prototype.diffWrites = DIFF_WRITES_ENABLED;
+
 // Estado de sincronización por colección: lo último que este dispositivo sabe del servidor.
 //   synced  = { id: forma canónica } de lo último recibido o escrito
 //   loaded  = ya llegó la primera lectura (sin ella no se sabe qué ha cambiado)
 //   saving  = nº de escrituras en vuelo (mientras haya, se ignoran las lecturas, igual que la app)
 FirebaseSync.prototype._diffState = function(node) {
     this._ds = this._ds || {};
-    return this._ds[node] || (this._ds[node] = { synced: {}, loaded: false, saving: 0, paths: !!DIFF_PATH_NODES[node] });
+    return this._ds[node] || (this._ds[node] = { synced: {}, loaded: false, saving: 0, paths: !!DIFF_PATH_NODES[node], dates: {}, windowStart: '', fullAdopted: false });
 };
 
 // Llamar desde el listener de cada colección con el objeto crudo (snapshot.val()).
-FirebaseSync.prototype._diffObserve = function(node, rawObj) {
+// opts.windowStart ('YYYY-MM-DD'): la lectura está FILTRADA (solo elementos con date >= windowStart,
+// como el listener de sesiones por temporada). Lo anterior a esa fecha no aparece en la lectura,
+// así que lo que ya se sabía de ahí se conserva en lugar de darlo por borrado.
+FirebaseSync.prototype._diffObserve = function(node, rawObj, opts) {
     const st = this._diffState(node);
     if (st.saving > 0) return;
-    st.synced = st.paths ? SyncDiff.fromRemotePaths(rawObj) : SyncDiff.fromRemote(rawObj);
+    const fresh = st.paths ? SyncDiff.fromRemotePaths(rawObj) : SyncDiff.fromRemote(rawObj);
+    if (opts && opts.windowStart) {
+        const dates = {};
+        Object.keys(rawObj || {}).forEach(k => { dates[k] = rawObj[k] && rawObj[k].date; });
+        const keep = {}, keepDates = {};
+        Object.keys(st.synced).forEach(id => {
+            const d = st.dates[id];
+            if (!Object.prototype.hasOwnProperty.call(fresh, id) && typeof d === 'string' && d < opts.windowStart) {
+                keep[id] = st.synced[id]; keepDates[id] = d;
+            }
+        });
+        st.synced = Object.assign(keep, fresh);
+        st.dates = Object.assign(keepDates, dates);
+        st.windowStart = opts.windowStart;
+    } else {
+        st.synced = fresh;
+        st.dates = {};
+    }
     st.loaded = true;
+};
+
+// Llamar tras cargar TODO el histórico (sin filtro): la app ya tiene todos los elementos en memoria.
+FirebaseSync.prototype._diffAdoptFull = function(node, rawObj) {
+    const st = this._diffState(node);
+    st.fullAdopted = true;
+    if (st.saving > 0) return;
+    const dates = {};
+    Object.keys(rawObj || {}).forEach(k => { dates[k] = rawObj[k] && rawObj[k].date; });
+    st.synced = SyncDiff.fromRemote(rawObj);
+    st.dates = dates;
+};
+
+// Copia local (localStorage) de la colección. En colecciones leídas por ventana, si el histórico
+// completo no está en memoria, se conservan las entradas anteriores a la ventana que ya estaban
+// en la copia, para que sigan viéndose si la app arranca sin conexión.
+FirebaseSync.prototype._storeMirror = function(node, value, st) {
+    let out = value;
+    if (st.windowStart && !st.fullAdopted && Array.isArray(value)) {
+        try {
+            const prev = JSON.parse(Store.getString(node) || '[]');
+            const ids = new Set(value.map(i => String(i && i.id)));
+            const older = prev.filter(i => i && typeof i.date === 'string' && i.date < st.windowStart && !ids.has(String(i.id)));
+            out = value.concat(older);
+        } catch (e) { /* si la copia no se puede leer, se guarda lo que hay */ }
+    }
+    Store.set(node, out);
 };
 
 FirebaseSync.prototype._saveLegacySetById = async function(node, list) {
@@ -775,7 +830,7 @@ FirebaseSync.prototype._saveByDiff = async function(node, items, label, opts) {
     const plan = st.paths ? SyncDiff.planPaths(value, st.synced) : SyncDiff.plan(value, st.synced);
     if (!plan.ok) {
         // Alguna clave no sirve en Firebase: camino de siempre (colección completa)
-        Store.set(node, value);
+        this._storeMirror(node, value, st);
         try {
             if (st.paths) { await this.db.ref(node).set(value); st.synced = SyncDiff.fromRemotePaths(value); }
             else await this._saveLegacySetById(node, value);
@@ -787,7 +842,7 @@ FirebaseSync.prototype._saveByDiff = async function(node, items, label, opts) {
             return false;
         }
     }
-    Store.set(node, value);
+    this._storeMirror(node, value, st);
     if (!plan.count) return true;
     st.synced = plan.next;
     st.saving++;
