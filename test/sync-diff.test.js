@@ -39,7 +39,17 @@ function makeNet() {
         net.server = prune(net.server) || {};   // como Firebase: un nodo que se queda vacío desaparece
     }
     const related = (a, b) => { const A = segs(a), B = segs(b), n = Math.min(A.length, B.length); return A.slice(0, n).join('/') === B.slice(0, n).join('/'); };
-    const snap = p => ({ val: () => { const v = getAt(p); return v === undefined ? null : clone(v); }, exists: () => getAt(p) !== undefined });
+    const snap = (p, q) => ({
+        val: () => {
+            let v = getAt(p); if (v === undefined) return null; v = clone(v);
+            if (q && v && typeof v === 'object') {              // orderByChild(k).startAt(x): solo hijos con hijo[k] >= x
+                const f = {}; Object.keys(v).forEach(id => { if (v[id] && v[id][q.k] !== undefined && v[id][q.k] >= q.v) f[id] = v[id]; });
+                return Object.keys(f).length ? f : null;
+            }
+            return v;
+        },
+        exists: () => { const x = snap(p, q).val(); return x !== null; },
+    });
 
     net.seed = (p, v) => setAt(p, v);
     net.deliver = () => { Object.values(net.devices).forEach(d => { const q = d.inbox.splice(0); q.forEach(f => f()); }); };
@@ -49,7 +59,7 @@ function makeNet() {
         net.devices[name] = dev;
         const fire = (writtenPath, own) => Object.values(net.devices).forEach(d => d.listeners.forEach(l => {
             if (!related(l.path, writtenPath)) return;
-            const f = () => l.cb(snap(l.path));
+            const f = () => l.cb(snap(l.path, l.q));
             if (d === dev && own) f(); else d.inbox.push(f);          // el propio dispositivo ve su eco al instante; los demás, al "llegar"
         }));
         const clavesInvalidas = (v) => v && typeof v === 'object' && Object.keys(v).some(k => /[.$#\[\]\/]/.test(k) || clavesInvalidas(v[k]));
@@ -70,6 +80,7 @@ function makeNet() {
         dev.db = {
             ref: (p) => ({
                 on: (ev, cb) => { const l = { path: p, cb }; dev.listeners.push(l); dev.inbox.push(() => cb(snap(p))); },
+                orderByChild: (k) => ({ startAt: (v) => ({ on: (ev, cb) => { const l = { path: p, cb, q: { k, v } }; dev.listeners.push(l); dev.inbox.push(() => cb(snap(p, l.q))); }, off() {} }) }),
                 off() {}, once: (ev, cb) => { const sn = snap(p); if (typeof cb === 'function') { dev.inbox.push(() => cb(sn)); } return Promise.resolve(sn); },
                 set: v => write('set', p, v), update: v => write('update', p, v),
             }),
@@ -85,7 +96,7 @@ function boot(net, name, opts = {}) {
     const stored = {}, toasts = [];
     const ctx = vm.createContext({
         console: { log() {}, warn() {}, error() {} }, Date, Math, JSON, Object, Array, Promise, Number, String, isFinite, setTimeout, queueMicrotask,
-        Store: { set: (k, v) => { stored[k] = v; }, getString: () => null },
+        Store: { set: (k, v) => { stored[k] = JSON.parse(JSON.stringify(v)); }, getString: (k) => (stored[k] === undefined ? null : JSON.stringify(stored[k])) },
         document: { getElementById: () => null }, localStorage: { getItem: () => null, setItem() {} },
     });
     ctx.window = ctx; ctx.firebaseDB = dev.db;
@@ -111,6 +122,16 @@ function boot(net, name, opts = {}) {
     app.saveBlocks = () => fs_.saveSeasonBlocks(app.seasonBlocks);
     app.saveMatches = () => fs_.saveMatches(app.matches);
     app.saveAvail = () => { app.savingAv = true; return fs_.saveAvailability(app.availability).finally(() => { app.savingAv = false; }); };
+    const mergeById = (primary, secondary) => { const m = new Map(); (secondary || []).forEach(x => m.set(x.id, x)); (primary || []).forEach(x => m.set(x.id, x)); return Array.from(m.values()); };
+    app.sessions = []; app.wellness = []; app.fullLoaded = false; app.ensureFullCalls = 0;
+    fs_.onSessionsChange(items => {                       // igual que app.js: ignora mientras guarda y fusiona si ya hay histórico completo
+        if (app.savingSess) return;
+        app.sessions = app.fullLoaded ? mergeById(items, app.sessions) : items.map(x => Object.assign({}, x));
+    }, opts.windowStart === undefined ? '2026-08-01' : opts.windowStart);
+    fs_.onWellnessChange(items => { app.wellness = items.map(x => Object.assign({}, x)); });
+    app.ensureFull = async () => { const all = await fs_.loadAllSessions(); app.sessions = mergeById(all, app.sessions); app.fullLoaded = true; };
+    app.saveSessions = async () => { app.savingSess = true; try { return await fs_.saveSessions(app.sessions); } finally { app.savingSess = false; } };
+    app.saveWell = () => fs_.saveWellnessData(app.wellness);
     app.saveInjuries = () => { app.savingInj = true; return fs_.saveInjuries(app.injuries).finally(() => { app.savingInj = false; }); };
     app.saveNotes = () => fs_.saveClinicalNotes(app.clinicalNotes);
     app.writes = () => net.log.filter(l => l.device === name);
@@ -448,6 +469,146 @@ test('con DIFF_WRITES_ENABLED = false todas vuelven al set() completo', async ()
     A.players.push(pl('p2')); await A.savePlayers();
     A.availability.p1.b = 'limited'; await A.saveAvail();
     assert.deepStrictEqual(A.writes().map(w => [w.op, w.path]), [['set', 'players'], ['set', 'availability']]);
+});
+
+
+console.log('\nFase 3c: sesiones (lectura por ventana de temporada)');
+const ses = (id, date, extra) => Object.assign({ id, date, playerId: 'p1', type: 'training', rpe: 5, duration: 60 }, extra);
+const sembrar = (net) => net.seed('sessions', { old1: ses('old1', '2025-05-01'), old2: ses('old2', '2025-11-10'), new1: ses('new1', '2026-09-01') });
+test('guardar con solo la ventana cargada NO borra las sesiones anteriores', async () => {
+    const net = makeNet(); sembrar(net);
+    const A = boot(net, 'A'); await sync(net);
+    assert.deepStrictEqual(A.sessions.map(x => x.id), ['new1'], 'la app solo ve la ventana');
+    A.sessions.push(ses('new2', '2026-09-02')); await A.saveSessions();
+    assert.deepStrictEqual(Object.keys(net.server.sessions).sort(), ['new1', 'new2', 'old1', 'old2']);
+    assert.deepStrictEqual(Object.keys(A.writes()[0].value), ['new2']);
+});
+test('(referencia) con el guardado antiguo, la misma operación SÍ borraba lo anterior a la ventana', async () => {
+    const net = makeNet(); sembrar(net);
+    const A = boot(net, 'A', { diffOff: true }); await sync(net);
+    A.sessions.push(ses('new2', '2026-09-02')); await A.saveSessions();
+    assert.deepStrictEqual(Object.keys(net.server.sessions).sort(), ['new1', 'new2'], 'por eso hacía falta traer el histórico antes');
+});
+test('sin cambios, ni una escritura; con el histórico completo cargado tampoco', async () => {
+    const net = makeNet(); sembrar(net);
+    const A = boot(net, 'A'); await sync(net);
+    await A.saveSessions(); assert.strictEqual(A.writes().length, 0);
+    await A.ensureFull(); assert.strictEqual(A.sessions.length, 3);
+    await A.saveSessions(); assert.strictEqual(A.writes().length, 0, 'las antiguas ya cargadas no se reescriben');
+});
+test('con histórico completo: editar una antigua escribe solo esa; borrar una antigua, solo su null', async () => {
+    const net = makeNet(); sembrar(net);
+    const A = boot(net, 'A'); await sync(net); await A.ensureFull();
+    A.sessions.find(x => x.id === 'old1').rpe = 8; await A.saveSessions();
+    A.sessions = A.sessions.filter(x => x.id !== 'old2'); await A.saveSessions();
+    assert.deepStrictEqual(A.writes().map(w => Object.keys(w.value)), [['old1'], ['old2']]);
+    assert.strictEqual(A.writes()[1].value.old2, null);
+    assert.deepStrictEqual(Object.keys(net.server.sessions).sort(), ['new1', 'old1']);
+});
+test('una lectura de ventana posterior no hace creer que las antiguas son nuevas (sin reescritura masiva)', async () => {
+    const net = makeNet(); sembrar(net);
+    const A = boot(net, 'A'), B = boot(net, 'B'); await sync(net);
+    await A.ensureFull();
+    B.sessions.push(ses('new3', '2026-09-05')); await B.saveSessions();
+    net.deliver();                                        // A recibe la ventana con new3
+    assert.ok(A.sessions.some(x => x.id === 'new3'));
+    await A.saveSessions();
+    assert.strictEqual(A.writes().length, 0, 'las 2 antiguas NO se reescriben');
+});
+test('dos dispositivos añaden sesión a la vez: se conservan las dos y las antiguas', async () => {
+    const net = makeNet(); sembrar(net);
+    const A = boot(net, 'A'), B = boot(net, 'B'); await sync(net);
+    A.sessions.push(ses('sA', '2026-09-10')); await A.saveSessions();
+    B.sessions.push(ses('sB', '2026-09-10')); await B.saveSessions();
+    assert.deepStrictEqual(Object.keys(net.server.sessions).sort(), ['new1', 'old1', 'old2', 'sA', 'sB']);
+});
+test('dispositivo desfasado edita una sesión: no revierte la edición de otro ni borra lo que no vio', async () => {
+    const net = makeNet(); sembrar(net); net.seed('sessions/new2', ses('new2', '2026-09-03'));
+    const A = boot(net, 'A'), B = boot(net, 'B'); await sync(net);
+    A.sessions.find(x => x.id === 'new1').duration = 90; A.sessions.push(ses('nuevaA', '2026-09-20')); await A.saveSessions();
+    B.sessions.find(x => x.id === 'new2').rpe = 9; await B.saveSessions();
+    assert.strictEqual(net.server.sessions.new1.duration, 90);
+    assert.ok(net.server.sessions.nuevaA);
+    assert.strictEqual(net.server.sessions.new2.rpe, 9);
+});
+test('antes de la primera lectura no se escribe nada', async () => {
+    const net = makeNet(); sembrar(net);
+    const A = boot(net, 'A'); A.sessions = [ses('x', '2026-09-30')];
+    assert.strictEqual(await A.saveSessions(), false); assert.strictEqual(A.writes().length, 0);
+});
+test('copia local: conserva lo anterior a la ventana mientras no hay histórico completo; con histórico, refleja los borrados', async () => {
+    const net = makeNet(); sembrar(net);
+    const A = boot(net, 'A'); await sync(net);
+    A.stored.sessions = [ses('old1', '2025-05-01'), ses('old2', '2025-11-10'), ses('new1', '2026-09-01')];   // lo que había guardado la app antes
+    A.sessions.push(ses('new2', '2026-09-02')); await A.saveSessions();
+    assert.deepStrictEqual(A.stored.sessions.map(x => x.id).sort(), ['new1', 'new2', 'old1', 'old2'], 'no se pierde el histórico local');
+    await A.ensureFull(); A.sessions = A.sessions.filter(x => x.id !== 'old1'); await A.saveSessions();
+    assert.ok(!A.stored.sessions.some(x => x.id === 'old1'), 'con el histórico en memoria la copia es fiel a lo que hay');
+});
+test('fallo de red al guardar sesiones: parche a la cola y aviso de guardado local', async () => {
+    const net = makeNet(); sembrar(net);
+    const A = boot(net, 'A'); await sync(net);
+    A.sessions.push(ses('n', '2026-09-30')); A.dev.failNext = true;
+    assert.strictEqual(await A.saveSessions(), false);
+    assert.strictEqual(A.enq[0].mode, 'patch'); assert.deepStrictEqual(Object.keys(A.enq[0].data), ['n']);
+    assert.ok(A.toasts.some(t => /sin conexión/.test(t[0])));
+});
+
+console.log('\nFase 3c: app.js y el interruptor');
+function saveSessionsDeApp(diffWrites) {
+    const fuente = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    const ini = fuente.indexOf('    async saveSessions() {');
+    let i = fuente.indexOf('{', ini), depth = 0;
+    for (; i < fuente.length; i++) { if (fuente[i] === '{') depth++; else if (fuente[i] === '}' && --depth === 0) break; }
+    const llamadas = { ensure: 0, guardadas: 0 };
+    const ctx = vm.createContext({ console, Promise, Store: { set() {} }, window: {} });
+    ctx.window.firebaseSync = { diffWrites, saveSessions: () => { llamadas.guardadas++; return Promise.resolve(); } };
+    const obj = vm.runInContext('({' + fuente.slice(ini, i + 1) + '})', ctx);
+    obj.sessions = []; obj.ensureFullSessionHistory = async () => { llamadas.ensure++; };
+    return obj.saveSessions().then(() => llamadas);
+}
+test('app.js: con escritura por diferencias, guardar sesiones ya NO descarga el histórico', async () => {
+    const r = await saveSessionsDeApp(true); assert.deepStrictEqual(r, { ensure: 0, guardadas: 1 });
+});
+test('app.js: con el interruptor apagado se vuelve a traer el histórico antes de guardar', async () => {
+    const r = await saveSessionsDeApp(false); assert.deepStrictEqual(r, { ensure: 1, guardadas: 1 });
+});
+test('firebaseSync.diffWrites refleja DIFF_WRITES_ENABLED', async () => {
+    const net = makeNet(); const A = boot(net, 'A'), B = boot(net, 'B', { diffOff: true });
+    assert.strictEqual(A.fs.diffWrites, true); assert.strictEqual(B.fs.diffWrites, false);
+});
+
+console.log('\nFase 3c: wellness');
+const wl = (id, extra) => Object.assign({ id, playerId: 'p1', date: '2026-10-05', sleep: 4, fatigue: 3, mood: 4, soreness: 4 }, extra);
+test('wellness: añadir, editar y borrar una entrada escribe solo esa', async () => {
+    const net = makeNet(); net.seed('wellness', { w_1: wl('w_1'), w_2: wl('w_2', { playerId: 'p2' }) });
+    const A = boot(net, 'A'); await sync(net);
+    await A.saveWell(); assert.strictEqual(A.writes().length, 0);
+    A.wellness.push(wl('w_3', { playerId: 'p3' })); await A.saveWell();
+    A.wellness.find(w => w.id === 'w_1').sleep = 2; await A.saveWell();
+    A.wellness = A.wellness.filter(w => w.id !== 'w_2'); await A.saveWell();
+    assert.deepStrictEqual(A.writes().map(w => Object.keys(w.value)), [['w_3'], ['w_1'], ['w_2']]);
+    assert.deepStrictEqual(Object.keys(net.server.wellness).sort(), ['w_1', 'w_3']);
+});
+test('wellness: dos dispositivos registran a la vez y se conservan los dos registros', async () => {
+    const net = makeNet(); net.seed('wellness', { w_1: wl('w_1') });
+    const A = boot(net, 'A'), B = boot(net, 'B'); await sync(net);
+    A.wellness.push(wl('w_A', { playerId: 'pA' })); await A.saveWell();
+    B.wellness.push(wl('w_B', { playerId: 'pB' })); await B.saveWell();
+    assert.deepStrictEqual(Object.keys(net.server.wellness).sort(), ['w_1', 'w_A', 'w_B']);
+});
+test('wellness: copias antiguas wp_ que ya no se persisten se limpian (null), como hacía el set()', async () => {
+    const net = makeNet(); net.seed('wellness', { w_1: wl('w_1'), wp_u1_2026_10_04: wl('wp_u1_2026_10_04', { source: 'player' }) });
+    const A = boot(net, 'A'); await sync(net);
+    A.wellness = A.wellness.filter(w => !String(w.id).startsWith('wp_'));      // lo que deja _wellnessToPersist()
+    await A.saveWell();
+    assert.deepStrictEqual(A.writes()[0].value, { wp_u1_2026_10_04: null });
+});
+test('wellness: antes de la primera lectura no se escribe nada', async () => {
+    const net = makeNet(); net.seed('wellness', { w_1: wl('w_1') });
+    const A = boot(net, 'A'); A.wellness = [];
+    assert.strictEqual(await A.saveWell(), false); assert.strictEqual(A.writes().length, 0);
+    assert.ok(net.server.wellness.w_1);
 });
 
 (async () => {

@@ -844,11 +844,12 @@ class RPETracker {
         // Invalidar caché de cálculos EWMA/AC al guardar sesiones
         if (typeof ACCache !== 'undefined') ACCache.invalidate();
         if (window.firebaseSync) {
-            // IMPORTANTE: saveSessions hace set() sobre /sessions completo.
-            // Si solo tenemos cargada la ventana de ~4 meses, debemos traer
-            // el histórico completo ANTES de guardar, o se borrarían las
-            // sesiones de meses anteriores fuera de la ventana actual.
-            await this.ensureFullSessionHistory();
+            // Con la escritura por diferencias (firebase-sync.js) solo se envían las sesiones
+            // que han cambiado, así que NO hace falta traer el histórico completo para guardar.
+            // Si esa escritura está desactivada (DIFF_WRITES_ENABLED = false) se vuelve a hacer
+            // set() sobre /sessions completo, y entonces sí hay que traerlo ANTES de guardar,
+            // o se borrarían las sesiones anteriores a la ventana de ~4 meses.
+            if (!window.firebaseSync.diffWrites) await this.ensureFullSessionHistory();
             // Activar flag para que el listener reactivo no sobreescriba el estado local
             // mientras el write está en vuelo. Se desactiva al resolverse la promesa.
             this._savingSessions = true;
