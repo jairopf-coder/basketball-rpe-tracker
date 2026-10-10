@@ -200,12 +200,11 @@ Ahí eliges el rol de cada cuenta. No hace falta tocar la consola.
 2. Cada persona entra con su propia cuenta y ve solo lo que permite su rol
 3. Los cambios aparecen en tiempo real para todos los usuarios
 
-### Migrar datos existentes (si ya tenías datos en local)
-1. Abre la app en tu navegador
-2. Abre la Consola (F12)
-3. Escribe: `firebaseSync.migrateFromLocalStorage()`
-4. Presiona Enter
-5. Tus datos locales se copiarán a Firebase
+### Pasar datos existentes (si ya tenías datos de una versión anterior)
+1. En la versión anterior, descarga una copia de seguridad desde el menú ⚙️
+2. En la app nueva, entra con tu cuenta de staff
+3. Abre ⚙️ → "Restaurar backup" y elige ese archivo
+4. Los datos se subirán a Firebase y aparecerán en todos los dispositivos
 
 ### Verificar que funciona en tiempo real
 1. Abre la app en dos pestañas diferentes (o dos dispositivos)

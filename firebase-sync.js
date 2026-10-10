@@ -112,12 +112,19 @@ const SyncDiff = {
         Object.keys(synced).forEach(p => {
             if (!Object.prototype.hasOwnProperty.call(next, p)) { patch[p] = null; count++; }
         });
+        // Firebase rechaza un update() con una ruta y otra que cuelga de ella (p. ej. "a" y "a/b").
+        // Puede pasar si una parte tiene forma de lista y otra de objeto: en ese caso, camino de siempre.
+        const rutas = new Set(Object.keys(patch));
+        for (const r of rutas) {
+            const partes = r.split('/');
+            for (let i = 1; i < partes.length; i++) if (rutas.has(partes.slice(0, i).join('/'))) return { ok: false };
+        }
         return { ok: true, patch, count, next };
     },
 };
 
 // Colecciones que no son "lista de elementos con id" sino objetos anidados
-const DIFF_PATH_NODES = { availability: true };
+const DIFF_PATH_NODES = { availability: true, weekPlan: true, gpsData: true, gpsPlayerMap: true };
 
 
 class FirebaseSync {
@@ -263,24 +270,6 @@ class FirebaseSync {
         this.listeners = { sessions: [], players: [] };
     }
 
-    // Migrar datos de localStorage a Firebase (usar una sola vez)
-    async migrateFromLocalStorage() {
-        const localSessions = Store.getString('sessions');
-        const localPlayers = Store.getString('players');
-        
-        if (localSessions) {
-            const sessions = JSON.parse(localSessions);
-            await this.saveSessions(sessions);
-            _dbg('✅ Sesiones migradas a Firebase');
-        }
-        
-        if (localPlayers) {
-            const players = JSON.parse(localPlayers);
-            await this.savePlayers(players);
-            _dbg('✅ Jugadores migrados a Firebase');
-        }
-    }
-
     // Verificar estado de conexión y actualizar indicador visual
     checkConnection() {
         if (!this.db) return;
@@ -389,21 +378,6 @@ FirebaseSync.prototype.onWellnessChange = function(callback) {
         const entries = data ? Object.values(data) : [];
         callback(entries);
     });
-};
-
-// ========== GYM/TEST/WELLNESS MIGRATION ==========
-
-FirebaseSync.prototype.migrateStrengthData = async function() {
-    const gymRaw  = Store.getString('gymSessions');
-    const testRaw = Store.getString('testSessions');
-    const wellRaw = Store.getString('wellness');
-    const injRaw  = Store.getString('injuries');
-    const planRaw = Store.getString('weekPlan');
-    if (gymRaw)  { await this.saveGymSessions(JSON.parse(gymRaw));   _dbg('✅ GymSessions migradas a Firebase'); }
-    if (testRaw) { await this.saveTestSessions(JSON.parse(testRaw)); _dbg('✅ TestSessions migradas a Firebase'); }
-    if (wellRaw) { await this.saveWellnessData(JSON.parse(wellRaw)); _dbg('✅ Wellness migrado a Firebase'); }
-    if (injRaw)  { await this.saveInjuries(JSON.parse(injRaw));      _dbg('✅ Lesiones migradas a Firebase'); }
-    if (planRaw) { await this.saveWeekPlan(JSON.parse(planRaw));     _dbg('✅ Plan semanal migrado a Firebase'); }
 };
 
 // ========== INJURIES (Firebase sync) ==========
@@ -538,6 +512,7 @@ FirebaseSync.prototype.saveWeekPlan = async function(weekPlan) {
     // antes de que la escritura remota termine, el respaldo local ya
     // ha quedado hecho y no se pierden cambios.
     Store.set('weekPlan', weekPlan);
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('weekPlan', weekPlan || {}, 'plan semanal');
     try {
         if (!this.db) return;
         await this.db.ref('weekPlan').set(weekPlan);
@@ -554,6 +529,7 @@ FirebaseSync.prototype.onWeekPlanChange = function(callback) {
     if (!this.db) return;
     this.db.ref('weekPlan').on('value', snapshot => {
         const data = snapshot.val();
+        this._diffObserve('weekPlan', data);
         if (data) callback(data);
     });
 };
@@ -938,6 +914,7 @@ FirebaseSync.prototype.onMatchesChange = function(callback) {
 // sessionGroupId es el id de la sesión interna a la que se vincula el CSV.
 
 FirebaseSync.prototype.saveGpsData = async function(gpsData) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('gpsData', gpsData || {}, 'datos GPS');
     try {
         if (!this.db) { Store.set('gpsData', gpsData || {}); return; }
         await this.db.ref('gpsData').set(gpsData || {});
@@ -952,6 +929,7 @@ FirebaseSync.prototype.saveGpsData = async function(gpsData) {
 FirebaseSync.prototype.onGpsDataChange = function(callback) {
     if (!this.db) return;
     this.db.ref('gpsData').on('value', snapshot => {
+        this._diffObserve('gpsData', snapshot.val());
         callback(snapshot.exists() ? (snapshot.val() || {}) : null);
     });
 };
@@ -962,6 +940,7 @@ FirebaseSync.prototype.onGpsDataChange = function(callback) {
 // en futuros imports de la misma jugadora.
 
 FirebaseSync.prototype.saveGpsPlayerMap = async function(gpsPlayerMap) {
+    if (DIFF_WRITES_ENABLED) return this._saveByDiff('gpsPlayerMap', gpsPlayerMap || {}, 'mapeo GPS');
     try {
         if (!this.db) { Store.set('gpsPlayerMap', gpsPlayerMap || {}); return; }
         await this.db.ref('gpsPlayerMap').set(gpsPlayerMap || {});
@@ -993,6 +972,7 @@ FirebaseSync.prototype.updateGpsPlayerMapEntries = async function(entries, fullM
 FirebaseSync.prototype.onGpsPlayerMapChange = function(callback) {
     if (!this.db) return;
     this.db.ref('gpsPlayerMap').on('value', snapshot => {
+        this._diffObserve('gpsPlayerMap', snapshot.val());
         callback(snapshot.exists() ? (snapshot.val() || {}) : null);
     });
 };

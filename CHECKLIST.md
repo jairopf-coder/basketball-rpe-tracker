@@ -64,7 +64,7 @@ Sigue estos pasos en orden. Marca cada uno cuando lo completes.
 
 ## 📱 EXTRAS (opcional)
 
-- [ ] Si tenías datos locales, migrarlos con: `firebaseSync.migrateFromLocalStorage()`
+- [ ] Si tenías datos de una versión anterior: ⚙️ → "Restaurar backup" con el archivo de copia de seguridad
 - [ ] Hacer backup: Firebase → Realtime Database → Exportar JSON
 - [ ] Guardar el enlace en favoritos
 

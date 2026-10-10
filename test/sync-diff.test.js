@@ -132,6 +132,13 @@ function boot(net, name, opts = {}) {
     app.ensureFull = async () => { const all = await fs_.loadAllSessions(); app.sessions = mergeById(all, app.sessions); app.fullLoaded = true; };
     app.saveSessions = async () => { app.savingSess = true; try { return await fs_.saveSessions(app.sessions); } finally { app.savingSess = false; } };
     app.saveWell = () => fs_.saveWellnessData(app.wellness);
+    app.weekPlan = { weekOffset: 0, weeks: {}, legacyTemplate: null }; app.gpsData = {}; app.gpsPlayerMap = {};
+    fs_.onWeekPlanChange(d => { app.weekPlan = JSON.parse(JSON.stringify(d)); });                       // como la app: solo si hay datos
+    fs_.onGpsDataChange(d => { if (app.savingGps) return; app.gpsNull = d === null; app.gpsData = d === null ? {} : JSON.parse(JSON.stringify(d)); });
+    fs_.onGpsPlayerMapChange(d => { app.mapNull = d === null; app.gpsPlayerMap = d === null ? {} : JSON.parse(JSON.stringify(d)); });
+    app.saveWeekPlan = () => fs_.saveWeekPlan(app.weekPlan);
+    app.saveGps = () => { app.savingGps = true; return fs_.saveGpsData(app.gpsData).finally(() => { app.savingGps = false; }); };
+    app.saveMap = () => fs_.saveGpsPlayerMap(app.gpsPlayerMap);
     app.saveInjuries = () => { app.savingInj = true; return fs_.saveInjuries(app.injuries).finally(() => { app.savingInj = false; }); };
     app.saveNotes = () => fs_.saveClinicalNotes(app.clinicalNotes);
     app.writes = () => net.log.filter(l => l.device === name);
@@ -609,6 +616,122 @@ test('wellness: antes de la primera lectura no se escribe nada', async () => {
     const A = boot(net, 'A'); A.wellness = [];
     assert.strictEqual(await A.saveWell(), false); assert.strictEqual(A.writes().length, 0);
     assert.ok(net.server.wellness.w_1);
+});
+
+
+console.log('\nFase 3d: plan semanal, GPS y limpieza');
+const semana = (extra) => Object.assign({ days: [{ enabled: true, type: 'training' }, { enabled: false, type: 'rest' }], savedAt: '2026-10-05T10:00:00.000Z' }, extra);
+const planBase = () => ({ weekOffset: 0, weeks: { '2026-10-05': semana(), '2026-10-12': semana({ savedAt: '2026-10-06T10:00:00.000Z' }) } });
+test('plan semanal: sin cambios no escribe (legacyTemplate:null local = ausente en el servidor)', async () => {
+    const net = makeNet(); net.seed('weekPlan', planBase());
+    const A = boot(net, 'A'); await sync(net);
+    A.weekPlan.legacyTemplate = null; await A.saveWeekPlan();
+    assert.strictEqual(A.writes().length, 0);
+});
+test('plan semanal: guardar una semana escribe solo esa semana', async () => {
+    const net = makeNet(); net.seed('weekPlan', planBase());
+    const A = boot(net, 'A'); await sync(net);
+    A.weekPlan.weeks['2026-10-05'].days[1] = { enabled: true, type: 'match' }; await A.saveWeekPlan();
+    assert.deepStrictEqual(Object.keys(A.writes()[0].value), ['weeks/2026-10-05']);
+    assert.strictEqual(net.server.weekPlan.weeks['2026-10-05'].days[1].type, 'match');
+    assert.strictEqual(net.server.weekPlan.weeks['2026-10-12'].savedAt, '2026-10-06T10:00:00.000Z', 'la otra semana intacta');
+});
+test('plan semanal: dos dispositivos guardan semanas distintas y se conservan las dos', async () => {
+    const net = makeNet(); net.seed('weekPlan', planBase());
+    const A = boot(net, 'A'), B = boot(net, 'B'); await sync(net);
+    A.weekPlan.weeks['2026-10-19'] = semana(); await A.saveWeekPlan();
+    B.weekPlan.weeks['2026-10-26'] = semana(); await B.saveWeekPlan();
+    assert.deepStrictEqual(Object.keys(net.server.weekPlan.weeks).sort(), ['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26']);
+});
+test('plan semanal: un dispositivo desfasado no revierte la semana editada en otro', async () => {
+    const net = makeNet(); net.seed('weekPlan', planBase());
+    const A = boot(net, 'A'), B = boot(net, 'B'); await sync(net);
+    A.weekPlan.weeks['2026-10-05'].savedAt = 'EDITADA EN A'; await A.saveWeekPlan();
+    B.weekPlan.weeks['2026-10-12'].days[0].type = 'gym'; await B.saveWeekPlan();
+    assert.strictEqual(net.server.weekPlan.weeks['2026-10-05'].savedAt, 'EDITADA EN A');
+    assert.strictEqual(net.server.weekPlan.weeks['2026-10-12'].days[0].type, 'gym');
+});
+test('plan semanal: la migración de claves (domingo → lunes) se escribe sin choque de rutas', async () => {
+    const net = makeNet(); net.seed('weekPlan', { weeks: { '2026-10-04': semana() } });      // clave de domingo, del bug antiguo
+    const A = boot(net, 'A'); await sync(net);
+    A.weekPlan.weeks = { '2026-10-05': A.weekPlan.weeks['2026-10-04'] };                    // lo que hace _fixWeekKeysTimezoneBug
+    await A.saveWeekPlan();
+    assert.deepStrictEqual(A.writes()[0].value['weeks/2026-10-04'], null);
+    assert.ok(A.writes()[0].value['weeks/2026-10-05']);
+    assert.deepStrictEqual(Object.keys(net.server.weekPlan.weeks), ['2026-10-05']);
+});
+test('plan semanal: rutas solapadas (lista vs objeto) → camino de siempre, sin error', async () => {
+    const net = makeNet(); net.seed('weekPlan', { weeks: ['a', 'b'] });                     // el servidor lo devuelve como lista
+    const A = boot(net, 'A'); await sync(net);
+    A.weekPlan = { weeks: { 0: 'a', 1: 'b', 2: 'c' } };                                      // la app lo tiene como objeto
+    const ok = await A.saveWeekPlan();
+    assert.strictEqual(ok, true);
+    assert.strictEqual(A.writes()[0].op, 'set', 'se usó el set() completo, que Firebase acepta');
+});
+test('plan semanal: el respaldo local se hace aunque aún no haya primera lectura, y no se escribe en el servidor', async () => {
+    const net = makeNet(); net.seed('weekPlan', planBase());
+    const A = boot(net, 'A'); A.weekPlan = { weeks: { '2026-11-02': semana() } };
+    assert.strictEqual(await A.saveWeekPlan(), false);
+    assert.strictEqual(A.writes().length, 0);
+    assert.deepStrictEqual(Object.keys(A.stored.weekPlan.weeks), ['2026-11-02']);
+});
+test('plan semanal: con el nodo sin crear (null) la lectura habilita el guardado', async () => {
+    const net = makeNet();
+    const A = boot(net, 'A'); await sync(net);
+    A.weekPlan = { weekOffset: 0, weeks: { '2026-10-05': semana() } };
+    assert.strictEqual(await A.saveWeekPlan(), true);
+    assert.ok(net.server.weekPlan.weeks['2026-10-05']);
+});
+
+const rec = (extra) => Object.assign({ distance: 5200, hsr: 310, sprints: 12, acc: 40 }, extra);
+test('GPS: importar una sesión nueva escribe solo sus registros (antes reescribía todo el histórico)', async () => {
+    const net = makeNet(); net.seed('gpsData', { s1: { p1: rec(), p2: rec() }, s2: { p1: rec(), p2: rec() } });
+    const A = boot(net, 'A'); await sync(net);
+    await A.saveGps(); assert.strictEqual(A.writes().length, 0);
+    A.gpsData.s3 = { p1: rec(), p2: rec({ distance: 6100 }) }; await A.saveGps();
+    assert.deepStrictEqual(Object.keys(A.writes()[0].value).sort(), ['s3/p1', 's3/p2']);
+    assert.strictEqual(Object.keys(net.server.gpsData).length, 3);
+});
+test('GPS: dos dispositivos importan sesiones distintas y se conservan las dos; borrar una sesión escribe solo sus nulls', async () => {
+    const net = makeNet(); net.seed('gpsData', { s1: { p1: rec() } });
+    const A = boot(net, 'A'), B = boot(net, 'B'); await sync(net);
+    A.gpsData.sA = { p1: rec() }; await A.saveGps();
+    B.gpsData.sB = { p1: rec() }; await B.saveGps();
+    assert.deepStrictEqual(Object.keys(net.server.gpsData).sort(), ['s1', 'sA', 'sB']);
+    delete A.gpsData.s1; await A.saveGps();
+    assert.deepStrictEqual(A.writes().pop().value, { 's1/p1': null });
+});
+test('GPS: primer arranque con el nodo sin crear: no escribe antes de la lectura y luego sube lo local', async () => {
+    const net = makeNet(); const A = boot(net, 'A');
+    A.gpsData = { s1: { p1: rec() } };
+    assert.strictEqual(await A.saveGps(), false);
+    await sync(net); assert.strictEqual(A.gpsNull, true);
+    A.gpsData = { s1: { p1: rec() } };
+    assert.strictEqual(await A.saveGps(), true);
+    assert.ok(net.server.gpsData.s1.p1);
+});
+test('mapeo GPS: añadir un emparejamiento escribe solo esa clave; el update puntual existente sigue funcionando', async () => {
+    const net = makeNet(); net.seed('gpsPlayerMap', { oli1: 'p1' });
+    const A = boot(net, 'A'); await sync(net);
+    A.gpsPlayerMap.oli2 = 'p2'; await A.saveMap();
+    assert.deepStrictEqual(A.writes()[0].value, { oli2: 'p2' });
+    await A.fs.updateGpsPlayerMapEntries({ oli3: 'p3' }, Object.assign({}, A.gpsPlayerMap, { oli3: 'p3' }));
+    await sync(net);
+    A.gpsPlayerMap = JSON.parse(JSON.stringify(net.server.gpsPlayerMap));
+    await A.saveMap(); assert.strictEqual(A.writes().filter(w => w.op === 'update' && w.path === 'gpsPlayerMap').length >= 1, true);
+    assert.deepStrictEqual(Object.keys(net.server.gpsPlayerMap).sort(), ['oli1', 'oli2', 'oli3']);
+});
+test('con el interruptor apagado, plan semanal y GPS vuelven al set() completo', async () => {
+    const net = makeNet(); net.seed('weekPlan', planBase()); net.seed('gpsData', { s1: { p1: rec() } });
+    const A = boot(net, 'A', { diffOff: true }); await sync(net);
+    A.weekPlan.weeks['2026-10-19'] = semana(); await A.saveWeekPlan();
+    A.gpsData.s2 = { p1: rec() }; await A.saveGps();
+    assert.deepStrictEqual(A.writes().map(w => [w.op, w.path]), [['set', 'weekPlan'], ['set', 'gpsData']]);
+});
+test('limpieza: ya no existen las funciones de migración desde localStorage', async () => {
+    const A = boot(makeNet(), 'A');
+    assert.strictEqual(typeof A.fs.migrateFromLocalStorage, 'undefined');
+    assert.strictEqual(typeof A.fs.migrateStrengthData, 'undefined');
 });
 
 (async () => {
