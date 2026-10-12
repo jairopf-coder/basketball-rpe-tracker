@@ -104,7 +104,14 @@ RPETracker.prototype._renderColorPicker = function(containerId, hiddenInputId, s
         </div>`).join('');
 };
 
+// La eliminación completa (jugadora + TODOS sus datos, solo staff) vive en player-data.js.
 RPETracker.prototype.deletePlayer = function(playerId) {
+    if (typeof this._pdDeleteFlow === 'function') return this._pdDeleteFlow(playerId);
+    return this._deletePlayerBasic(playerId);
+};
+
+// Modo local (sin Firebase): solo la ficha y sus sesiones, como siempre.
+RPETracker.prototype._deletePlayerBasic = function(playerId) {
     const player = this.players.find(p => p.id === playerId);
     const name = player ? player.name : 'esta jugadora';
     const sessionCount = this.sessions.filter(s => s.playerId === playerId).length;

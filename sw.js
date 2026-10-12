@@ -1,6 +1,6 @@
 // Service Worker — BasketballRPE-Web
 // Bump CACHE_VERSION whenever you deploy new code to invalidate stale caches.
-const CACHE_VERSION = 'v141';
+const CACHE_VERSION = 'v142';
 const CACHE_NAME = `rpe-basketball-${CACHE_VERSION}`;
 
 // Rutas RELATIVAS al scope del service worker (la app vive en /basketball-rpe-tracker/,
@@ -17,6 +17,7 @@ const urlsToCache = [
   'app.js',
   'app-sessions.js',
   'app-players.js',
+  'player-data.js',
   'app-presession.js',
   'app-comparisons.js',
   'app-analytics.js',
