@@ -775,8 +775,15 @@ class RPETracker {
                 if (this._savingSessions) return;
                 // Si ya se cargó el histórico completo, fusionar para no perder
                 // sesiones antiguas que el listener filtrado no incluye.
+                // OJO: la lectura filtrada es la verdad solo DENTRO de la ventana. Lo que ya no está
+                // en ella (borrado en otro dispositivo) no debe conservarse, o al guardar
+                // volvería a crearse. Solo se conservan las sesiones anteriores a la ventana.
                 if (this._fullHistoryLoaded) {
-                    this.sessions = this._mergeSessionsById(updatedSessions, this.sessions);
+                    const inicio = this._sessionsWindowStart;
+                    const anteriores = inicio
+                        ? (this.sessions || []).filter(s => !(typeof s.date === 'string' && s.date >= inicio))
+                        : (this.sessions || []);
+                    this.sessions = this._mergeSessionsById(updatedSessions, anteriores);
                 } else {
                     this.sessions = updatedSessions;
                 }

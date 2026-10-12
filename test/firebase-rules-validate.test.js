@@ -38,6 +38,10 @@ const base = {
     uC: { role: 'player', playerId: 'p9' },          // relinked: sus entradas antiguas llevan otro playerId
     uD: { role: 'player' },                          // sin vincular
   },
+  pushSubscriptions: { uA: { endpoint: 'https://push.example/abc', keys: { p256dh: 'k1', auth: 'k2' }, updatedAt: '2026-10-05T10:00:00.000Z' } },
+  pushStatus: { uA: { active: true, updatedAt: '2026-10-05T10:00:00.000Z' } },
+  anamnesis: { p1: { zones: ['knee'] } },
+  players: { p1: { id: 'p1', name: 'Ana', authUid: 'uA' } },
   playerRpeReports: { uA: { '2026-10-05': { match: { uid: 'uA', date: '2026-10-05', sessionType: 'match', rpe: 6, playerId: 'p1', ts: '2026-10-05T09:00:00.000Z' } } }, uC: { '2026-10-04': { match: { uid: 'uC', date: '2026-10-04', sessionType: 'match', rpe: 7, playerId: 'p1', ts: '2026-10-04T10:00:00.000Z' } } } },
   wellnessPlayer: { uC: { '2026-10-04': { uid: 'uC', date: '2026-10-04', sleep: 3, fatigue: 3, mood: 3, pain: 2, playerId: 'p1', ts: '2026-10-04T08:00:00.000Z' } } },
 };
@@ -76,7 +80,24 @@ check('jugadora lee su rol', as('uA').read('/users/uA/role'), true);
 check('staff lee todo wellnessPlayer', as('staff1').read('/wellnessPlayer'), true);
 check('fisio lee playerRpeReports', as('fisio1').read('/playerRpeReports'), true);
 
+// Eliminar una jugadora (solo staff): borrar su rastro, sin poder leer ni escribir avisos push
+check('staff borra su suscripción push', as('staff1').write('/pushSubscriptions/uA', null), true);
+check('staff borra su estado push', as('staff1').write('/pushStatus/uA', null), true);
+check('la dueña sigue pudiendo borrar su suscripción', as('uA').write('/pushSubscriptions/uA', null), true);
+check('staff borra su ficha de usuario', as('staff1').write('/users/uA', null), true);
+check('staff borra su ficha de jugadora', as('staff1').write('/players/p1', null), true);
+check('staff borra su anamnesis', as('staff1').write('/anamnesis/p1', null), true);
+check('staff borra su buzón de RPE y de wellness', as('staff1').write('/playerRpeReports/uA', null), true);
+
 // ===== ATAQUES (deben seguir denegados) =====
+check('staff NO puede escribir una suscripción push ajena', as('staff1').write('/pushSubscriptions/uA', { endpoint: 'https://x.example/y', keys: { p256dh: 'a', auth: 'b' }, updatedAt: 'ahora' }), false);
+check('staff NO puede escribir el estado push ajeno', as('staff1').write('/pushStatus/uA', { active: false, updatedAt: 'ahora' }), false);
+check('staff NO puede leer suscripciones push', as('staff1').read('/pushSubscriptions/uA'), false);
+check('el fisio NO puede borrar suscripciones push', as('fisio1').write('/pushSubscriptions/uA', null), false);
+check('una jugadora NO puede borrar las de otra', as('uB').write('/pushSubscriptions/uA', null), false);
+check('el fisio NO puede borrar fichas de usuario', as('fisio1').write('/users/uA', null), false);
+check('una jugadora NO puede borrar su ficha de jugadora', as('uA').write('/players/p1', null), false);
+check('una jugadora NO puede borrar su anamnesis', as('uA').write('/anamnesis/p1', null), false);
 check('playerId de OTRA jugadora en wellness', as('uA').write('/wellnessPlayer/uA/2026-10-05', W({ playerId: 'p2' })), false);
 check('playerId de OTRA jugadora en RPE', as('uA').write('/playerRpeReports/uA/2026-10-05/match', R({ playerId: 'p2' })), false);
 check('cuenta sin vincular intenta poner un playerId', as('uD').write('/wellnessPlayer/uD/2026-10-05', W({ uid: 'uD', playerId: 'p1' })), false);

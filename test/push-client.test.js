@@ -591,15 +591,16 @@ test('index.html carga push-client.js, antes de player-view.js y de app.js', () 
 test('app.js registra el listener de /pushStatus junto al de RPE', () => {
     assert.ok(/_registerPushStatusListener\(\)/.test(read('app.js')));
 });
-test('reglas: suscripciones solo de su dueña (sin acceso del staff); estado legible por staff', () => {
+test('reglas: suscripciones y estado push solo de su dueña; el staff solo puede BORRAR (nunca leer ni escribir)', () => {
     const r = JSON.parse(read('firebase-rules.json')).rules;
     const subs = r.pushSubscriptions.$uid;
     assert.strictEqual(subs['.read'], 'auth != null && auth.uid === $uid');
-    assert.strictEqual(subs['.write'], 'auth != null && auth.uid === $uid');
-    assert.ok(!/role/.test(JSON.stringify(r.pushSubscriptions)), 'las suscripciones no deben depender del rol (el staff no las lee)');
+    const soloBorraStaff = w => /auth\.uid === \$uid/.test(w) && /=== 'staff'/.test(w) && /!newData\.exists\(\)/.test(w) && !/'fisio'|'player'/.test(w);
+    assert.ok(soloBorraStaff(subs['.write']), 'escribe la dueña; el staff solo puede borrar (para eliminar a una jugadora)');
+    assert.ok(!/role/.test(subs['.read']) && !/role/.test(JSON.stringify(r.pushSubscriptions).replace(subs['.write'], '')), 'el rol solo interviene en el borrado: el staff no lee las suscripciones');
     assert.ok(!r.pushSubscriptions['.read'] && !r.pushSubscriptions['.write'], 'sin permisos a nivel de nodo');
     assert.ok(/=== 'staff'/.test(r.pushStatus['.read']) && /=== 'fisio'/.test(r.pushStatus['.read']) && !/'player'/.test(r.pushStatus['.read']), 'staff y fisio leen pushStatus (lista blanca)');
-    assert.strictEqual(r.pushStatus.$uid['.write'], 'auth != null && auth.uid === $uid');
+    assert.ok(soloBorraStaff(r.pushStatus.$uid['.write']), 'estado push: escribe la dueña; el staff solo borra');
     assert.strictEqual(subs.$other['.validate'], false); assert.strictEqual(r.pushStatus.$uid.$other['.validate'], false);
     assert.ok(r.$other, 'el comodín $other sigue ahí (no se ha tocado lo demás)');
 });

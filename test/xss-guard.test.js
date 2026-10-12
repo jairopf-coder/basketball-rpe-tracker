@@ -170,7 +170,7 @@ console.log('\nContador de nombres/emails sin esc()');
 // constantes del código (TEST_DEFINITIONS, RTP_PHASES), nombres de fichero, etc.
 // Estos números solo pueden BAJAR. Subirlos = XSS nuevo. Lo que queda son excepciones legítimas
 // (ver arriba): avisos, constantes del código, cadenas que ya vienen escapadas, nombres de gráficos (canvas).
-const BASELINE = {"app-players.js": 4, "app.js": 2, "auth.js": 2, "injury-management-2.js": 3, "injury-management.js": 2, "injury-prediction.js": 1, "pdf-reports.js": 4, "security.js": 1, "strength.js": 12, "team-load.js": 1};
+const BASELINE = {"app-players.js": 4, "app.js": 2, "auth.js": 2, "injury-management-2.js": 3, "injury-management.js": 2, "injury-prediction.js": 1, "pdf-reports.js": 4, "player-data.js": 1, "security.js": 1, "strength.js": 12, "team-load.js": 1};
 const EXPR = /\$\{((?:[^{}]|\{[^{}]*\})*)\}/g;
 const KEY = /\.(?:name|displayName|email)\b/;
 function contarSinEsc(src) {

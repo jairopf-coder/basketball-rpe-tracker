@@ -114,8 +114,17 @@ window.csvCell = csvCell;
 const AppConfirm = {
     _resolve: null,
 
+    // Compara lo escrito con lo exigido sin distinguir mayúsculas, tildes ni espacios de más
+    matches(typed, required) {
+        const n = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase().replace(/\s+/g, ' ').trim();
+        return n(required) !== '' && n(typed) === n(required);
+    },
+
+    // requireText: si se indica, el botón de confirmar solo se activa al escribir ese texto
+    // (para acciones irreversibles; p. ej. el nombre de la jugadora que se va a eliminar).
     show({ title = '¿Confirmar acción?', message = '', confirmText = 'Confirmar',
-           cancelText = 'Cancelar', danger = false } = {}) {
+           cancelText = 'Cancelar', danger = false, requireText = '' } = {}) {
         return new Promise(resolve => {
             this._resolve = resolve;
             const existing = document.getElementById('appConfirmModal');
@@ -134,7 +143,9 @@ const AppConfirm = {
                         <h2 id="appConfirmTitle">${esc(title)}</h2>
                     </div>
                     <div style="padding:1rem 1.5rem">
-                        <p style="color:var(--text-secondary);line-height:1.5">${esc(message)}</p>
+                        <p style="color:var(--text-secondary);line-height:1.5${requireText ? ';white-space:pre-line' : ''}">${esc(message)}</p>
+                        ${requireText ? `<label for="appConfirmInput" style="display:block;margin-top:1rem;font-size:0.9rem;color:var(--text-secondary)">Para confirmar, escribe: <strong>${esc(requireText)}</strong></label>
+                        <input type="text" id="appConfirmInput" class="form-input" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;margin-top:0.5rem">` : ''}
                     </div>
                     <div class="modal-footer" style="gap:0.75rem">
                         <button class="btn-secondary" id="appConfirmCancel">${esc(cancelText)}</button>
@@ -143,15 +154,24 @@ const AppConfirm = {
                 </div>`;
             document.body.appendChild(modal);
 
-            document.getElementById('appConfirmOk').addEventListener('click', () => this._done(true));
+            const okBtn = document.getElementById('appConfirmOk');
+            if (requireText) {
+                const input = document.getElementById('appConfirmInput');
+                okBtn.disabled = true; okBtn.style.opacity = '0.5';
+                input.addEventListener('input', () => {
+                    const ok = this.matches(input.value, requireText);
+                    okBtn.disabled = !ok; okBtn.style.opacity = ok ? '1' : '0.5';
+                });
+            }
+            okBtn.addEventListener('click', () => { if (!okBtn.disabled) this._done(true); });
             document.getElementById('appConfirmCancel').addEventListener('click', () => this._done(false));
             modal.addEventListener('click', e => { if (e.target === modal) this._done(false); });
             this._escHandler = (e) => { if (e.key === 'Escape') this._done(false); };
             document.addEventListener('keydown', this._escHandler);
             setTimeout(() => {
-                const btn = danger
-                    ? document.getElementById('appConfirmOk')
-                    : document.getElementById('appConfirmCancel');
+                const btn = requireText
+                    ? document.getElementById('appConfirmInput')
+                    : (danger ? document.getElementById('appConfirmOk') : document.getElementById('appConfirmCancel'));
                 btn?.focus();
             }, 50);
         });

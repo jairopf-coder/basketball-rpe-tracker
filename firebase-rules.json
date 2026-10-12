@@ -80,7 +80,7 @@
     "pushSubscriptions": {
       "$uid": {
         ".read":  "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (auth.uid === $uid || (root.child('users').child(auth.uid).child('role').val() === 'staff' && !newData.exists()))",
         ".validate": "newData.hasChildren(['endpoint', 'keys', 'updatedAt'])",
         "endpoint": { ".validate": "newData.isString() && newData.val().matches(/^https:\\/\\/.+/) && newData.val().length < 1000" },
         "keys": {
@@ -97,7 +97,7 @@
       ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
       "$uid": {
         ".read":  "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (auth.uid === $uid || (root.child('users').child(auth.uid).child('role').val() === 'staff' && !newData.exists()))",
         ".validate": "newData.hasChildren(['active', 'updatedAt'])",
         "active":    { ".validate": "newData.isBoolean()" },
         "updatedAt": { ".validate": "newData.isString() && newData.val().length < 40" },
