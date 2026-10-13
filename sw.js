@@ -1,5 +1,7 @@
 // Service Worker — BasketballRPE-Web
-// Bump CACHE_VERSION whenever you deploy new code to invalidate stale caches.
+// CACHE_VERSION invalida las cachés antiguas cuando cambia. YA NO HAY QUE SUBIRLA A MANO:
+// el despliegue (.github/workflows/deploy.yml) le añade un sufijo único "-bNN" (nº de ejecución),
+// p. ej. 'v143' se publica como 'v143-b87'. El número de aquí es solo la base.
 const CACHE_VERSION = 'v143';
 const CACHE_NAME = `rpe-basketball-${CACHE_VERSION}`;
 

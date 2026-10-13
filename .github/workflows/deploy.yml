@@ -27,6 +27,18 @@ jobs:
           ls -la firebase-config.js
           head -2 firebase-config.js
 
+      - name: Stamp service worker version (unique per deploy)
+        run: |
+          # sw.js: CACHE_VERSION = 'v143' pasa a 'v143-b87' (b + nº de ejecución de este despliegue).
+          # Cada despliegue deja una versión distinta: los móviles reinstalan el service worker y
+          # refrescan su caché sin tener que subir la versión a mano.
+          sed -i -E "s/^(const CACHE_VERSION = '[^']*)(';)/\1-b${GITHUB_RUN_NUMBER}\2/" sw.js
+          if grep -q -E "^const CACHE_VERSION = '[^']*-b${GITHUB_RUN_NUMBER}';" sw.js; then
+            grep -n "^const CACHE_VERSION" sw.js
+          else
+            echo "::warning::No se pudo sellar CACHE_VERSION en sw.js (¿ha cambiado su formato?). El despliegue sigue con la versión del repositorio."
+          fi
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
