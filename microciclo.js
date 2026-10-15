@@ -1,7 +1,8 @@
 // ========== MICROCICLO (microciclo.js) ==========
 // Vista Carga → Microciclo  (#microcicloView → #microcicloContent)
-//   1. Gráfico "Carga diaria" que compara DOS semanas a elegir.
-//      Por defecto: la semana actual frente a la anterior.
+//   1. Gráfico que compara DOS semanas a elegir (por defecto: la actual frente
+//      a la anterior), en Carga UA o en RPE medio, con tarjetas-resumen por semana
+//      y el detalle de cada sesión (turno, tipo, RPE, UA) al pulsar una barra.
 //   2. Tabla Jugadora × Día de la semana actual (UA real frente al plan).
 // Esta vista solo LEE datos (sesiones y plan semanal): no guarda nada.
 // La selección de semanas se recuerda mientras la app está abierta y
@@ -13,6 +14,11 @@
     const DAY_KEYS   = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'];
     const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     const ISO_DATE   = /^\d{4}-\d{2}-\d{2}/;
+
+    // Mismos iconos que el Historial de sesiones
+    const TYPE_ICONS = { training: '🏀', match: '🏟️', shooting: '🎯', gym: '🏋️', recovery: '💪' };
+    const TYPE_ORDER = ['training', 'match', 'shooting', 'gym', 'recovery'];
+    const TIME_ICONS = { morning: '☀️', afternoon: '🌙' };
 
     // ── Fechas (siempre en hora local, nunca toISOString) ──────────────
     function dateFromISO(iso) {
@@ -33,22 +39,41 @@
         return toLocalISODate(d);
     }
 
-    function formatRange(mondayKey) {
-        const fmt = d => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-        return `${fmt(dateFromISO(mondayKey))} – ${fmt(dateFromISO(addDays(mondayKey, 6)))}`;
+    // Fecha corta día/mes, sin ceros a la izquierda (igual que las cabeceras de la tabla)
+    function formatDM(iso) {
+        const d = dateFromISO(iso);
+        return `${d.getDate()}/${d.getMonth() + 1}`;
     }
 
-    // Texto corto con el que se reconoce una semana: bloque de temporada,
-    // nº de entrenos/partidos y carga total. Ej.: "🏗️ Pretemporada · 4 ent + 1 part · 3200 UA"
+    function formatRange(mondayKey) {
+        return `${formatDM(mondayKey)} – ${formatDM(addDays(mondayKey, 6))}`;
+    }
+
+    // RPE con una decimal y coma ("6,5"); "—" si no hay dato
+    function fmtRpe(v) {
+        return v === null || v === undefined ? '—' : v.toFixed(1).replace('.', ',');
+    }
+
+    // Redondeo a 1 decimal para dibujar (null = día sin RPE, no se pinta barra)
+    function roundRpe(v) {
+        return v === null ? null : Math.round(v * 10) / 10;
+    }
+
+    // Composición de una semana solo con iconos: "🏀 4 + 🏟️ 1"
+    function compositionText(counts) {
+        const parts = TYPE_ORDER.filter(t => counts[t]).map(t => `${TYPE_ICONS[t]} ${counts[t]}`);
+        return parts.length ? parts.join(' + ') : 'sin sesiones';
+    }
+
+    // Texto corto con el que se reconoce una semana (para los desplegables):
+    // icono del bloque de temporada, sesiones, carga total y RPE medio.
+    // Ej.: "🏗️ · 🏀 4 + 🏟️ 1 · 3200 UA · RPE 6,5"
     function describeWeek(s) {
-        const parts = [];
-        if (s.trainings) parts.push(`${s.trainings} ent`);
-        if (s.matches)   parts.push(`${s.matches} part`);
-        if (s.others)    parts.push(`${s.others} otras`); // tiro, gimnasio, recuperación
         const bits = [];
-        if (s.block) bits.push(`${s.block.icon} ${s.block.label}`);
-        bits.push(parts.length ? parts.join(' + ') : 'sin sesiones');
+        if (s.block) bits.push(s.block.icon);
+        bits.push(compositionText(s.counts));
         bits.push(`${s.totalUA} UA`);
+        if (s.rpeMean !== null) bits.push(`RPE ${fmtRpe(s.rpeMean)}`);
         return bits.join(' · ');
     }
 
@@ -77,33 +102,69 @@
         return meta ? { icon: meta.icon, label: meta.label } : null;
     };
 
-    // Resumen de una semana: UA por día, totales y composición
+    // Resumen de una semana: UA y RPE por día, sesiones de equipo, totales y composición.
+    // RPE medio = media simple de los RPE registrados (por sesión, por día y por semana).
     RPETracker.prototype._mcWeekSummary = function (mondayKey, sessionsOfWeek) {
         const uaByDate = {};
-        // Una "sesión de equipo" = fecha + turno + tipo (mismo criterio que el Historial)
-        const teamSessions = new Set();
-        let trainings = 0, matches = 0, others = 0;
+        const rpeByDate = {};                 // fecha → { sum, n }
+        const teamSessions = new Map();       // fecha + turno + tipo (criterio del Historial)
+        const weekRpe = { sum: 0, n: 0 };
 
         sessionsOfWeek.forEach(s => {
             const date = s.date.slice(0, 10);
-            uaByDate[date] = (uaByDate[date] || 0) + (s.load || 0);
+            const type = TYPE_ICONS[s.type] ? s.type : 'training';
+            const load = s.load || 0;
+            uaByDate[date] = (uaByDate[date] || 0) + load;
 
-            const type = s.type || 'training';
             const key = `${date}_${s.timeOfDay || 'unknown'}_${type}`;
-            if (teamSessions.has(key)) return;
-            teamSessions.add(key);
-            if (type === 'match') matches++;
-            else if (type === 'training') trainings++;
-            else others++;
+            let g = teamSessions.get(key);
+            if (!g) {
+                g = { date, timeOfDay: s.timeOfDay || null, type, ua: 0, rpeSum: 0, rpeN: 0 };
+                teamSessions.set(key, g);
+            }
+            g.ua += load;
+
+            const rpe = Number(s.rpe);
+            if (rpe > 0) {
+                g.rpeSum += rpe; g.rpeN++;
+                weekRpe.sum += rpe; weekRpe.n++;
+                const d = rpeByDate[date] || (rpeByDate[date] = { sum: 0, n: 0 });
+                d.sum += rpe; d.n++;
+            }
         });
 
-        const uaPerDay = DAY_KEYS.map((_, i) => Math.round(uaByDate[addDays(mondayKey, i)] || 0));
+        const counts = {};
+        const sessionsPerDay = DAY_KEYS.map(() => []);
+        teamSessions.forEach(g => {
+            counts[g.type] = (counts[g.type] || 0) + 1;
+            const dayIdx = DAY_KEYS.findIndex((_, i) => addDays(mondayKey, i) === g.date);
+            if (dayIdx >= 0) {
+                sessionsPerDay[dayIdx].push({
+                    timeOfDay: g.timeOfDay,
+                    type: g.type,
+                    ua: Math.round(g.ua),
+                    rpe: g.rpeN ? g.rpeSum / g.rpeN : null
+                });
+            }
+        });
+        const turn = { morning: 0, afternoon: 1 };
+        sessionsPerDay.forEach(arr => arr.sort((x, y) =>
+            ((turn[x.timeOfDay] ?? 2) - (turn[y.timeOfDay] ?? 2)) ||
+            (TYPE_ORDER.indexOf(x.type) - TYPE_ORDER.indexOf(y.type))));
+
+        const dates = DAY_KEYS.map((_, i) => addDays(mondayKey, i));
+        const uaPerDay  = dates.map(ds => Math.round(uaByDate[ds] || 0));
+        const rpePerDay = dates.map(ds => rpeByDate[ds] ? rpeByDate[ds].sum / rpeByDate[ds].n : null);
         return {
             mondayKey,
             label: formatRange(mondayKey),
             uaPerDay,
+            rpePerDay,
+            sessionsPerDay,
             totalUA: uaPerDay.reduce((a, b) => a + b, 0),
-            trainings, matches, others,
+            rpeMean: weekRpe.n ? weekRpe.sum / weekRpe.n : null,
+            counts,
+            totalSessions: teamSessions.size,
             block: this._mcBlockForWeek(mondayKey)
         };
     };
@@ -132,6 +193,7 @@
             b: summaries.get(keyB),
             weeks: [...keys].sort().reverse().map(k => summaries.get(k)), // más reciente primero
             isCustom: !!(sel.a || sel.b),
+            metric: this._mcMetric === 'rpe' ? 'rpe' : 'ua',
             // Solo se ofrece si hay Firebase y aún no se ha traído todo el histórico
             canLoadOlder: !!window.firebaseSync && !this._fullHistoryLoaded
         };
@@ -152,6 +214,13 @@
 
     RPETracker.prototype._mcResetCompare = function () {
         this._mcCompare = { a: null, b: null };
+        this.renderMicrociclo();
+    };
+
+    // metric: 'ua' (carga) | 'rpe' (RPE medio). Solo se recuerda mientras la app está abierta.
+    RPETracker.prototype._mcSetMetric = function (metric) {
+        if (metric !== 'ua' && metric !== 'rpe') return;
+        this._mcMetric = metric;
         this.renderMicrociclo();
     };
 
@@ -341,15 +410,40 @@
             actions.push(`<button class="btn-secondary mc-compare-btn" onclick="window.rpeTracker?._mcLoadOlderWeeks()" title="Trae las sesiones de temporadas anteriores para poder compararlas">📜 Cargar temporadas anteriores</button>`);
         }
 
-        const chartTitle = model.isCustom
-            ? 'Carga diaria: comparación de semanas'
-            : 'Carga diaria: semana actual vs anterior';
+        const isRpe = model.metric === 'rpe';
+        const chartTitle = (isRpe ? 'RPE medio diario' : 'Carga diaria') + (model.isCustom
+            ? ': comparación de semanas'
+            : ': semana actual vs anterior');
 
-        const chartLegend = [model.a, model.b].map((s, i) => `
-            <span class="mc-legend-item">
-                <span class="mc-swatch mc-swatch-${i === 0 ? 'a' : 'b'}"></span>
-                <span><strong>${esc(s.label)}</strong> · ${esc(describeWeek(s))}</span>
-            </span>`).join('');
+        const metricChips = [['ua', 'Carga UA'], ['rpe', 'RPE medio']].map(([key, text]) => {
+            const active = model.metric === key;
+            return `<button type="button" class="player-filter-chip ${active ? 'player-filter-chip--selected' : ''}"
+                style="--chip-color:var(--primary)"
+                onclick="window.rpeTracker?._mcSetMetric('${key}')">
+                ${text}
+                ${active ? '<span class="player-filter-chip-check">✓</span>' : ''}
+            </button>`;
+        }).join('');
+
+        // Una tarjeta por semana comparada (sustituye a la antigua leyenda del gráfico)
+        const weekCards = [['a', model.a], ['b', model.b]].map(([slot, w]) => {
+            const blockIcon = w.block
+                ? `<span title="${esc(w.block.label)}" aria-label="${esc(w.block.label)}">${w.block.icon}</span>`
+                : '';
+            return `
+            <div class="mc-week-card">
+                <div class="mc-week-card-head">
+                    <span class="mc-swatch mc-swatch-${slot}"></span>
+                    <strong>${esc(w.label)}</strong>
+                    ${blockIcon}
+                </div>
+                <div class="mc-week-stats">
+                    <div class="mc-stat"><span class="mc-stat-val">${w.totalUA}</span><span class="mc-stat-lbl">UA totales</span></div>
+                    <div class="mc-stat"><span class="mc-stat-val">${fmtRpe(w.rpeMean)}</span><span class="mc-stat-lbl">RPE medio</span></div>
+                    <div class="mc-stat"><span class="mc-stat-val">${esc(compositionText(w.counts))}</span><span class="mc-stat-lbl">Sesiones</span></div>
+                </div>
+            </div>`;
+        }).join('');
 
         // ── Styles ────────────────────────────────────────────────
         const styles = `
@@ -363,8 +457,14 @@
     .mc-swatch{display:inline-block;width:14px;height:10px;border-radius:3px;vertical-align:middle;flex-shrink:0}
     .mc-swatch-a{background:var(--primary-color,#ff9800)}
     .mc-swatch-b{background:rgba(160,160,160,.5);border:1px solid rgba(120,120,120,.5)}
-    .mc-chart-legend{display:flex;flex-direction:column;gap:.35rem;margin-top:.65rem;font-size:.76rem;color:var(--text-secondary)}
-    .mc-legend-item{display:flex;align-items:center;gap:.4rem}
+    .mc-metric-chips{margin-bottom:.7rem}
+    .mc-week-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.6rem;margin-top:.8rem}
+    .mc-week-card{background:var(--bg-subtle);border-radius:.6rem;padding:.6rem .75rem;min-width:0}
+    .mc-week-card-head{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;font-size:.8rem;color:var(--text-primary);margin-bottom:.45rem}
+    .mc-week-stats{display:flex;flex-wrap:wrap;gap:.4rem 1.3rem}
+    .mc-stat{display:flex;flex-direction:column;min-width:0}
+    .mc-stat-val{font-size:.95rem;font-weight:700;color:var(--text-primary);white-space:nowrap}
+    .mc-stat-lbl{font-size:.66rem;color:var(--text-secondary)}
 
     /* ── Table (mismo patrón visual que Carga-Equipo: celdas
        separadas con aire, cada una con su propio radio) ──── */
@@ -405,10 +505,11 @@
         </div>
         <div class="wellness-card" style="margin-bottom:1.5rem">
             <h3 class="wellness-section-title">📊 ${chartTitle}</h3>
+            <div class="player-filter-chips mc-metric-chips">${metricChips}</div>
             <div class="mc-compare-pickers">${pickers}</div>
             ${actions.length ? `<div class="mc-compare-actions">${actions.join('')}</div>` : ''}
             <canvas id="mcWeekCompareChart" class="chart-canvas"></canvas>
-            <div class="mc-chart-legend">${chartLegend}</div>
+            <div class="mc-week-cards">${weekCards}</div>
         </div>
         ${table}`;
 
@@ -435,14 +536,14 @@
                     datasets: [
                         {
                             label: model.a.label,
-                            data: model.a.uaPerDay,
+                            data: isRpe ? model.a.rpePerDay.map(roundRpe) : model.a.uaPerDay,
                             backgroundColor: primaryColor,
                             borderRadius: 4,
                             borderSkipped: false
                         },
                         {
                             label: model.b.label,
-                            data: model.b.uaPerDay,
+                            data: isRpe ? model.b.rpePerDay.map(roundRpe) : model.b.uaPerDay,
                             backgroundColor: prevColor,
                             borderColor: prevBorder,
                             borderWidth: 1,
@@ -458,7 +559,16 @@
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} UA`
+                                // Línea principal + una línea por sesión de ese día
+                                label: ctx => {
+                                    const w = ctx.datasetIndex === 0 ? model.a : model.b;
+                                    const head = isRpe
+                                        ? ` ${ctx.dataset.label}: RPE ${fmtRpe(ctx.parsed.y)}`
+                                        : ` ${ctx.dataset.label}: ${ctx.parsed.y} UA`;
+                                    const lines = (w.sessionsPerDay[ctx.dataIndex] || []).map(x =>
+                                        `   ${TIME_ICONS[x.timeOfDay] || ''} ${TYPE_ICONS[x.type]} RPE ${fmtRpe(x.rpe)} · ${x.ua} UA`);
+                                    return [head, ...lines];
+                                }
                             }
                         }
                     },
@@ -467,12 +577,18 @@
                             grid: { color: gridColor },
                             ticks: { color: textColor, font: { size: 11 } }
                         },
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: gridColor },
-                            ticks: { color: textColor, font: { size: 11 },
-                                callback: v => v + ' UA' }
-                        }
+                        y: isRpe
+                            ? {
+                                min: 0, max: 10,
+                                grid: { color: gridColor },
+                                ticks: { color: textColor, font: { size: 11 }, stepSize: 2 }
+                            }
+                            : {
+                                beginAtZero: true,
+                                grid: { color: gridColor },
+                                ticks: { color: textColor, font: { size: 11 },
+                                    callback: v => v + ' UA' }
+                            }
                     }
                 }
             });
