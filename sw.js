@@ -52,6 +52,7 @@ const urlsToCache = [
   'objectives.js',
   'ui-helpers.js',
   'weekplan-medical.js',
+  'microciclo.js',
   'wellness.js',
   'export-fisio.js',
   'xlsx.mini.min.js',

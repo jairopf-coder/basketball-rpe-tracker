@@ -135,7 +135,9 @@ Salud
                                     envían las jugadoras
 
 Planificación y entrenamiento
-├── 🗓️ weekplan-medical.js       → Planificación semanal (microciclo)
+├── 🗓️ weekplan-medical.js       → Planificación semanal
+├── 📆 microciclo.js             → Carga-Microciclo: comparador de semanas y
+│                                   tabla Jugadora × Día (solo lectura)
 ├── 📅 calendar.js               → Calendario y bloques de temporada
 ├── 🎯 objectives.js             → Próximos partidos
 └── 🏋️ strength.js               → Gimnasio y tests físicos
