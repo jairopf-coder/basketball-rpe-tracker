@@ -249,6 +249,11 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
 
     const weekRealSessions = this._getWeekRealSessions(weekStart);
     const plannedLoad = this._plannedWeekLoad(activeDays);
+    const plannedSessions = this._plannedWeekSessions(activeDays);
+    // Cumplimiento: solo tiene sentido si hay carga planificada y carga real
+    const compliancePct = (plannedLoad > 0 && weekRealSessions.totalLoad > 0)
+        ? Math.round(weekRealSessions.totalLoad / plannedLoad * 100)
+        : null;
 
     const typeLabel = {training:'🏀 Entreno', shooting:'🎯 Tiro', gym:'🏋️ Gym', match:'🏟️ Partido', recovery:'💪 Recuperación'};
     const typeColors = {training:'#2196f3', match:'#f44336', recovery:'#4caf50', shooting:'#9c27b0', gym:'#795548'};
@@ -377,14 +382,17 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                     <span class="wp-sum-label">Carga real</span>
                 </div>
                 <div class="wp-sum-card">
-                    <span class="wp-sum-val">${weekRealSessions.sessions}</span>
-                    <span class="wp-sum-label">Sesiones registradas</span>
+                    <span class="wp-sum-val">${weekRealSessions.sessions}<span style="font-size:.85rem;font-weight:400;color:var(--text-secondary)">/${plannedSessions}</span></span>
+                    <span class="wp-sum-label">Sesiones registradas / planificadas</span>
                 </div>
                 <div class="wp-sum-card">
                     <span class="wp-sum-val" style="color:${this._wpDiffColor(plannedLoad, weekRealSessions.totalLoad)}">
-                        ${weekRealSessions.totalLoad > 0 ? (weekRealSessions.totalLoad/(plannedLoad||1)*100).toFixed(0)+'%' : '—'}
+                        ${compliancePct !== null ? compliancePct + '%' : '—'}
                     </span>
                     <span class="wp-sum-label">Cumplimiento</span>
+                    <div style="width:100%;height:.4rem;background:var(--border-color);border-radius:.25rem;margin-top:.4rem;overflow:hidden" title="Carga real frente a planificada">
+                        <div style="height:100%;width:${Math.min(compliancePct || 0, 100)}%;background:${this._wpDiffColor(plannedLoad, weekRealSessions.totalLoad)};border-radius:.25rem"></div>
+                    </div>
                 </div>
             </div>
 
@@ -645,11 +653,26 @@ RPETracker.prototype._plannedWeekLoad = function(days) {
     return Math.round(total * playerCount);
 };
 
+// Semáforo de cumplimiento: verde 85-115%, naranja 60-140%, rojo fuera.
+// Sin carga planificada o sin carga real no hay nada que comparar (gris).
+// Sesiones planificadas de la semana a nivel de equipo:
+// turnos activados × número de jugadoras (igual criterio que la carga planificada).
+RPETracker.prototype._plannedWeekSessions = function(days) {
+    const plan = days || this.getWeekPlanDays();
+    let slots = 0;
+    Object.values(plan).forEach(d => {
+        ['morning','afternoon'].forEach(slot => {
+            if (d[slot] && d[slot].enabled) slots++;
+        });
+    });
+    return slots * Math.max(this.players.length, 1);
+};
+
 RPETracker.prototype._wpDiffColor = function(planned, real) {
-    if (!real) return 'var(--text-secondary)';
-    const pct = real / (planned||1);
+    if (!real || !planned) return 'var(--text-secondary)';
+    const pct = real / planned;
     if (pct >= 0.85 && pct <= 1.15) return '#4caf50';
-    if (pct >= 0.7 && pct <= 1.3) return '#ff9800';
+    if (pct >= 0.6 && pct <= 1.4) return '#ff9800';
     return '#f44336';
 };
 
@@ -1798,13 +1821,6 @@ RPETracker.prototype.renderMicrociclo = function() {
     const plan = this.getWeekPlanDays(weekStart);
     const playerCount = Math.max(this.players.length, 1);
 
-    // Planned sessions per day (team level = slots enabled × players)
-    const plannedSessPerDay = dayKeys.map(dk => {
-        const d = plan[dk] || {};
-        let slots = 0;
-        ['morning','afternoon'].forEach(sl => { if (d[sl] && d[sl].enabled) slots++; });
-        return slots;
-    });
     const plannedUAPerDay = dayKeys.map((dk, i) => {
         const d = plan[dk] || {};
         let load = 0;
@@ -1815,7 +1831,6 @@ RPETracker.prototype.renderMicrociclo = function() {
         return Math.round(load * playerCount);
     });
 
-    const totalPlannedSess = plannedSessPerDay.reduce((a,b) => a + b, 0) * playerCount;
     const totalPlannedUA   = plannedUAPerDay.reduce((a,b) => a + b, 0);
 
     // ── Real ─────────────────────────────────────────────────
@@ -1825,12 +1840,7 @@ RPETracker.prototype.renderMicrociclo = function() {
     const realUAPerDay = realSessByDay.map(sArr =>
         Math.round(sArr.reduce((sum, s) => sum + (s.load || 0), 0))
     );
-    const totalRealSess = realSessByDay.reduce((sum, arr) => sum + arr.length, 0);
     const totalRealUA   = realUAPerDay.reduce((a, b) => a + b, 0);
-
-    const compliance = totalPlannedUA > 0
-        ? Math.round(totalRealUA / totalPlannedUA * 100)
-        : null;
 
     // ── Semáforo helper ───────────────────────────────────────
     const trafficLight = (real, planned) => {
@@ -1841,54 +1851,6 @@ RPETracker.prototype.renderMicrociclo = function() {
         if (pct >= 0.6  && pct <= 1.4)  return 'mc-cell-warn';
         return 'mc-cell-bad';
     };
-
-    // ── Tarjetas resumen ──────────────────────────────────────
-    const compColor = compliance === null ? '' :
-        compliance >= 85 && compliance <= 115 ? 'mc-kpi-ok' :
-        compliance >= 60 && compliance <= 140 ? 'mc-kpi-warn' : 'mc-kpi-bad';
-
-    const kpiCards = `
-    <div class="mc-kpi-row">
-        <div class="mc-kpi-card">
-            <div class="mc-kpi-label">Sesiones</div>
-            <div class="mc-kpi-value">${totalRealSess}<span class="mc-kpi-of">/${totalPlannedSess}</span></div>
-            <div class="mc-kpi-sub">completadas&nbsp;/&nbsp;planificadas</div>
-        </div>
-        <div class="mc-kpi-card">
-            <div class="mc-kpi-label">Carga UA</div>
-            <div class="mc-kpi-value">${totalRealUA}<span class="mc-kpi-of">/${totalPlannedUA}</span></div>
-            <div class="mc-kpi-sub">real&nbsp;/&nbsp;planificada</div>
-        </div>
-        <div class="mc-kpi-card ${compColor}">
-            <div class="mc-kpi-label">Cumplimiento</div>
-            <div class="mc-kpi-value">${compliance !== null ? compliance + '%' : '—'}</div>
-            <div class="mc-kpi-sub">carga real vs planificada</div>
-        </div>
-    </div>`;
-
-    // ── Barra de progreso equipo ──────────────────────────────
-    const barPct = totalPlannedUA > 0
-        ? Math.min(Math.round(totalRealUA / totalPlannedUA * 100), 130)
-        : 0;
-    const barClass = barPct >= 85 && barPct <= 115 ? 'mc-bar-ok' :
-                     barPct >= 60 && barPct <= 140 ? 'mc-bar-warn' : 'mc-bar-bad';
-
-    const progressBar = `
-    <div class="wellness-card mc-bar-card">
-        <div class="mc-bar-header">
-            <span class="wellness-section-title" style="margin:0">⚡ Progreso UA equipo</span>
-            <span class="mc-bar-pct">${barPct}%</span>
-        </div>
-        <div class="mc-bar-track">
-            <div class="mc-bar-fill ${barClass}" style="width:${Math.min(barPct, 100)}%"></div>
-            <div class="mc-bar-target-line" title="100% planificado"></div>
-        </div>
-        <div class="mc-bar-labels">
-            <span>0</span>
-            <span>${Math.round(totalPlannedUA / 2)} UA</span>
-            <span>${totalPlannedUA} UA planificadas</span>
-        </div>
-    </div>`;
 
     // ── Tabla jugadora × día ──────────────────────────────────
     // For each player, for each day: real UA vs planned (per-player share of daily plan)
@@ -1978,31 +1940,6 @@ RPETracker.prototype.renderMicrociclo = function() {
     const styles = `
     <style>
     /* ── Microciclo Layout ─────────────────────────────── */
-    .mc-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-bottom:1.5rem}
-    @media(max-width:480px){.mc-kpi-row{grid-template-columns:1fr 1fr;}}
-    @media(max-width:320px){.mc-kpi-row{grid-template-columns:1fr;}}
-
-    .mc-kpi-card{background:var(--card-bg,var(--bg-secondary));border:1px solid var(--border-color);border-radius:.75rem;padding:.85rem .9rem;text-align:center}
-    .mc-kpi-label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:.2rem}
-    .mc-kpi-value{font-size:1.6rem;font-weight:700;color:var(--text-primary);line-height:1.1}
-    .mc-kpi-of{font-size:1rem;font-weight:400;color:var(--text-secondary)}
-    .mc-kpi-sub{font-size:.65rem;color:var(--text-secondary);margin-top:.15rem}
-    .mc-kpi-ok  {border-color:var(--success-color,#4caf50);background:color-mix(in srgb,var(--success-color,#4caf50) 10%,transparent)}
-    .mc-kpi-warn{border-color:var(--warning-color,#ff9800);background:color-mix(in srgb,var(--warning-color,#ff9800) 10%,transparent)}
-    .mc-kpi-bad {border-color:var(--danger-color,#f44336);background:color-mix(in srgb,var(--danger-color,#f44336) 10%,transparent)}
-
-    /* ── Progress bar ──────────────────────────────────── */
-    .mc-bar-card{margin-bottom:1.5rem}
-    .mc-bar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem}
-    .mc-bar-pct{font-size:1.1rem;font-weight:700;color:var(--text-primary)}
-    .mc-bar-track{position:relative;height:.75rem;background:var(--border-color);border-radius:.4rem;overflow:visible}
-    .mc-bar-fill{height:100%;border-radius:.4rem;transition:width .5s ease}
-    .mc-bar-ok  {background:var(--success-color,#4caf50)}
-    .mc-bar-warn{background:var(--warning-color,#ff9800)}
-    .mc-bar-bad {background:var(--danger-color,#f44336)}
-    .mc-bar-target-line{position:absolute;top:-4px;bottom:-4px;left:100%;transform:translateX(-1px);width:2px;background:var(--text-secondary);opacity:.4;border-radius:1px}
-    .mc-bar-labels{display:flex;justify-content:space-between;font-size:.65rem;color:var(--text-secondary);margin-top:.25rem}
-
     /* ── Table (mismo patrón visual que Carga-Equipo: celdas
        separadas con aire, cada una con su propio radio) ──── */
     .mc-table{width:100%;border-collapse:separate;border-spacing:3px;font-size:.78rem;min-width:560px}
@@ -2065,8 +2002,6 @@ RPETracker.prototype.renderMicrociclo = function() {
                 <button class="btn-secondary" style="font-size:.8rem;padding:.4rem .85rem" onclick="window.rpeTracker?.generateTeamWeeklyReport()" title="Informe de equipo" aria-label="Informe de equipo">📊</button>
             </div>
         </div>
-        ${kpiCards}
-        ${progressBar}
         <div class="wellness-card" style="margin-bottom:1.5rem">
             <h3 class="wellness-section-title">📊 Carga diaria: semana actual vs anterior</h3>
             <canvas id="mcWeekCompareChart" class="chart-canvas"></canvas>
