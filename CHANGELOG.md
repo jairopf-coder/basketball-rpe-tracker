@@ -1,5 +1,122 @@
 # 📝 Changelog - Basketball RPE Tracker
 
+## [3.1.0] - 2026-10-14 — Auditoría externa de octubre: seguridad, integridad de datos y privacidad
+
+Una auditoría externa (informe del 2026-10-02: 4 hallazgos críticos, 7 altos,
+9 medios y 6 bajos) se contrastó punto por punto con el código real. Se
+corrigieron todos los que se confirmaron. Dos no se sostenían: la
+configuración real de Firebase ya no se versiona (`.gitignore`) y `test/` ya
+se excluía del despliegue. Se trabajó por fases, cada una confirmada en
+producción antes de la siguiente.
+
+> Nota: los cambios entre la 3.0.0 (junio) y esta versión (avisos push a las
+> jugadoras, exportación para el fisio, vista de iPhone, GPS, etc.) no se
+> registraron en este archivo.
+
+### 🔐 Seguridad
+- **Reglas de Firebase en lista blanca** (`firebase-rules.json`): todos los
+  nodos, incluido el comodín `$other`, exigen explícitamente rol `staff` o
+  `fisio`. Antes bastaba con *no ser* `player`, así que cualquier cuenta sin
+  rol (la clave de Firebase es pública y cualquiera puede crear una cuenta)
+  leía y escribía lesiones, notas clínicas y wellness. Nodo `matches` con
+  regla explícita.
+- **Reglas `.validate`** en `wellnessPlayer`, `playerRpeReports` y `users`:
+  tipos y rangos, clave de fecha `AAAA-MM-DD`, turno `morning|afternoon|match`,
+  `uid`/`date`/`sessionType` iguales a los de la ruta, `playerId` igual al
+  vinculado en `/users` (staff y fisio exentos), `role` solo
+  `staff|fisio|player` y longitudes máximas.
+- **Datos que escriben las jugadoras** (`SafeData` en `security.js`): lo que
+  llega de `/wellnessPlayer` y `/playerRpeReports` se valida al leerlo (números
+  reales en rango, fechas y turnos válidos, el uid sale de la ruta y no de la
+  entrada). Cerraba un XSS desde una cuenta de jugadora a la bandeja de RPE
+  pendientes del staff.
+- **XSS**: `esc()` escapa ahora también `"` y `'`. Barrido de nombres,
+  dorsales y textos libres sin escapar en lesiones, notas clínicas, gimnasio,
+  informes PDF, wellness, dashboard, estado del equipo, plan médico,
+  partidos, selectores y gestión de usuarios. Regla de oro nueva: **nunca
+  `esc()` dentro de un `onclick="..."`** (el navegador decodifica las
+  entidades antes de ejecutarlo); se pasa solo un id y el dato se lee de
+  memoria.
+- **Exportación CSV**: `csvCell()` duplica comillas y antepone `'` a los
+  valores que empiezan por `=`, `+`, `-`, `@` para que Excel no los ejecute
+  como fórmula.
+- `AppConfirm` admite `requireText` (confirmar escribiendo un texto) para
+  acciones irreversibles.
+- `INSTRUCCIONES-FIREBASE.md` (Parte 4) ya no manda publicar reglas abiertas ni
+  usar el modo de prueba; `CHECKLIST.md` y `README.md` corregidos.
+
+### 🧬 Integridad de datos (escritura por diferencias)
+- `firebase-sync.js` deja de reescribir colecciones enteras con `set()`:
+  compara con lo último sincronizado y envía solo lo que cambió (`update()`
+  con `null` para los borrados). Dos dispositivos que editan elementos
+  distintos ya no se pisan, y uno desfasado no revierte lo ajeno.
+  - Por elemento (`id`): `injuries`, `clinicalNotes`, `players`,
+    `gymSessions`, `testSessions`, `seasonBlocks`, `matches`, `sessions`,
+    `wellness`.
+  - Por ruta anidada: `availability` (jugadora/fecha), `weekPlan`
+    (`weeks/<lunes>`), `gpsData` (sesión/jugadora) y `gpsPlayerMap`.
+  - Siguen con `set()`: `exerciseLibrary`, `gymTemplates`, `templates`
+    (listas pequeñas) y `anamnesis` (ya va por jugadora).
+- **No se guarda nada antes de la primera lectura** de cada colección (aviso
+  "Aún sincronizando…"), como ya hacía wellness desde la v124.
+- Interruptor de emergencia `DIFF_WRITES_ENABLED` (`firebase-sync.js`): en
+  `false` vuelve al `set()` completo de siempre.
+- La cola offline guarda **parches** (`mode: 'patch'`) en lugar de fotos
+  completas de la colección.
+- **Sesiones**: guardar ya no descarga el histórico completo
+  (`app.js` consulta `firebaseSync.diffWrites`). La copia local conserva lo
+  anterior a la ventana de temporada. La fusión del histórico ya no mantiene
+  sesiones de la ventana borradas en otro dispositivo (antes podían
+  reaparecer al guardar).
+- Eliminado código muerto que sobrescribiría Firebase con el almacenamiento
+  local: `migrateFromLocalStorage` y `migrateStrengthData`. La guía de
+  instalación indica ahora "Restaurar backup" para pasar datos antiguos.
+
+### 🗑️ Privacidad
+- **Eliminar una jugadora borra todos sus datos** (`player-data.js`, nuevo),
+  solo para el rol `staff`: sesiones, wellness, lesiones, notas clínicas,
+  gimnasio, tests, disponibilidad, GPS y su emparejamiento, anamnesis, lo que
+  envió desde su cuenta, avisos push, cuentas (`/users`) y ficha.
+  - Ofrece antes una **copia en JSON** de sus datos.
+  - Pide **escribir su nombre** para confirmar y muestra el recuento de lo
+    que se borrará.
+  - La ficha y las cuentas se borran las últimas y solo si todo lo anterior
+    salió bien: si algo falla, la jugadora sigue en la lista y se puede
+    reintentar.
+  - Las reglas dejan al staff **borrar** (no leer ni escribir)
+    `pushSubscriptions` y `pushStatus`.
+  - Queda un paso manual: eliminar su cuenta en Firebase Authentication.
+
+### 🚀 Despliegue y mantenimiento
+- `deploy.yml` **sella `CACHE_VERSION`** de `sw.js` con un sufijo único por
+  despliegue (`v143` se publica como `v143-b215`): ya no hay que subir la
+  versión a mano. Si el formato de `sw.js` cambia, avisa y no rompe el
+  despliegue.
+- Quitado el bloque de depuración "TEMPORAL" de `index.html`.
+- Documentación actualizada (`ARQUITECTURA.md`, `INSTRUCCIONES-FIREBASE.md`,
+  `CHECKLIST.md`, `README.md`).
+
+### 🧪 Tests
+- 20 ficheros de test en `test/` (se ejecutan con `node test/<nombre>.test.js`).
+  Nuevos en esta versión: `firebase-rules.test.js` y
+  `firebase-rules-validate.test.js` (reglas; el segundo usa `targaryen` si
+  está instalado fuera del proyecto), `xss-guard.test.js` (contador que no
+  deja aumentar los textos sin escapar), `xss-lote1/2/3.test.js`,
+  `auth-user-list.test.js`, `sync-diff.test.js` (escritura por diferencias con
+  un Firebase falso de varios dispositivos), `player-data.test.js` y
+  `deploy-version.test.js`.
+
+### ⏸️ Decisiones y pendientes
+- **Contraseñas de las cuentas**: se deja como está. Las cuentas usan correos
+  `@rpe.app` (no reciben mensajes), así que forzar un cambio de contraseña
+  dejaría sin recuperación a quien la olvide.
+- **Modularización** (ES modules / empaquetador): descartada por ahora; el
+  coste y el riesgo superan el beneficio.
+- El resto de pendientes de mantenimiento está en `ARQUITECTURA.md`
+  (sección "Pendientes conocidos").
+
+---
+
 ## [3.0.0] - 2026-06-12 — Auditoría V23-V25: seguridad, accesibilidad y estabilidad
 
 Tras una auditoría completa que identificó 97 bugs (17 críticos, 31 altos,
@@ -221,10 +338,10 @@ entregas.
 
 ## 📊 Estadísticas del Proyecto
 
-- **Versión**: 3.0.0
-- **Líneas de código JS**: ~19,400 (25 archivos `.js`)
+- **Versión**: 3.1.0
+- **Líneas de código JS**: ~28,300 (38 archivos `.js` propios)
 - **Dependencias**: 0 (Chart.js y SDK de Firebase vía CDN)
-- **Autenticación**: Firebase Authentication (roles `staff` / `player`)
+- **Autenticación**: Firebase Authentication (roles `staff` / `fisio` / `player`)
 - **Navegadores soportados**: Safari 14+, Chrome 90+, Firefox 88+, Edge 90+
 
 ---
