@@ -1,8 +1,10 @@
 // ========== MICROCICLO (microciclo.js) ==========
 // Vista Carga → Microciclo  (#microcicloView → #microcicloContent)
 //   1. Gráfico que compara DOS semanas a elegir (por defecto: la actual frente
-//      a la anterior), en Carga UA o en RPE medio, con tarjetas-resumen por semana
-//      y el detalle de cada sesión (turno, tipo, RPE, UA) al pulsar una barra.
+//      a la anterior), en Carga UA o en RPE medio, con el detalle de cada sesión
+//      (turno, tipo, RPE, UA) al pulsar una barra.
+//   1b. Tabla "Comparación día a día": valor de cada semana, diferencia A − B y
+//       resumen semanal (UA, RPE medio, sesiones).
 //   2. Tabla Jugadora × Día de la semana actual (UA real frente al plan).
 // Esta vista solo LEE datos (sesiones y plan semanal): no guarda nada.
 // La selección de semanas se recuerda mientras la app está abierta y
@@ -57,6 +59,26 @@
     // Redondeo a 1 decimal para dibujar (null = día sin RPE, no se pinta barra)
     function roundRpe(v) {
         return v === null ? null : Math.round(v * 10) / 10;
+    }
+
+    // Diferencia A − B con flecha neutra (sin rojo/verde: más carga no es buena ni mala por sí sola).
+    //   kind 'ua'    → número entero y % respecto a B (si B = 0 no hay %)
+    //   kind 'rpe'   → puntos de RPE con 1 decimal, sin %
+    //   kind 'count' → número entero (nº de sesiones)
+    // Si falta alguno de los dos datos (null) devuelve "–".
+    function deltaHTML(a, b, kind) {
+        if (a === null || b === null) return '–';
+        const diff = a - b;
+        const isRpe = kind === 'rpe';
+        if (Math.abs(diff) < (isRpe ? 0.05 : 0.5)) return '<span class="mc-delta mc-delta-eq">=</span>';
+        const up = diff > 0;
+        const amount = isRpe ? fmtRpe(Math.abs(diff)) : String(Math.round(Math.abs(diff)));
+        let pct = '';
+        if (kind === 'ua' && b > 0) {
+            const p = Math.round(diff / b * 100);
+            pct = ` <span class="mc-delta-pct">(${p > 0 ? '+' : p < 0 ? '−' : ''}${Math.abs(p)}%)</span>`;
+        }
+        return `<span class="mc-delta ${up ? 'mc-delta-up' : 'mc-delta-down'}">${up ? '▲' : '▼'} ${amount}${pct}</span>`;
     }
 
     // Composición de una semana solo con iconos: "🏀 4 + 🏟️ 1"
@@ -425,25 +447,72 @@
             </button>`;
         }).join('');
 
-        // Una tarjeta por semana comparada (sustituye a la antigua leyenda del gráfico)
-        const weekCards = [['a', model.a], ['b', model.b]].map(([slot, w]) => {
+        // Cabecera de columna de una semana: color, rango y (si hay) icono del bloque de temporada
+        const weekHead = (slot, w) => {
             const blockIcon = w.block
-                ? `<span title="${esc(w.block.label)}" aria-label="${esc(w.block.label)}">${w.block.icon}</span>`
+                ? ` <span title="${esc(w.block.label)}" aria-label="${esc(w.block.label)}">${w.block.icon}</span>`
                 : '';
+            return `<span class="mc-swatch mc-swatch-${slot}"></span> ${esc(w.label)}${blockIcon}`;
+        };
+
+        // Celda de un día: valor principal + una línea pequeña por sesión (☀️/🌙 + tipo + valor)
+        const dayCell = (w, i) => {
+            const sessions = w.sessionsPerDay[i];
+            if (!sessions.length) return '<span class="mc-cmp-empty">–</span>';
+            const main = isRpe ? fmtRpe(w.rpePerDay[i]) : w.uaPerDay[i];
+            const detail = sessions.map(x =>
+                `${TIME_ICONS[x.timeOfDay] || ''}${TYPE_ICONS[x.type]} ${isRpe ? fmtRpe(x.rpe) : x.ua}`).join(' · ');
+            return `<span class="mc-cmp-main">${main}</span><span class="mc-cmp-sub">${detail}</span>`;
+        };
+
+        const dayRows = DAY_LABELS.map((lbl, i) => {
+            const hasA = model.a.sessionsPerDay[i].length > 0;
+            const hasB = model.b.sessionsPerDay[i].length > 0;
+            let delta = '–';
+            if (hasA || hasB) {
+                delta = isRpe
+                    ? deltaHTML(hasA ? model.a.rpePerDay[i] : null, hasB ? model.b.rpePerDay[i] : null, 'rpe')
+                    : deltaHTML(model.a.uaPerDay[i], model.b.uaPerDay[i], 'ua');
+            }
             return `
-            <div class="mc-week-card">
-                <div class="mc-week-card-head">
-                    <span class="mc-swatch mc-swatch-${slot}"></span>
-                    <strong>${esc(w.label)}</strong>
-                    ${blockIcon}
-                </div>
-                <div class="mc-week-stats">
-                    <div class="mc-stat"><span class="mc-stat-val">${w.totalUA}</span><span class="mc-stat-lbl">UA totales</span></div>
-                    <div class="mc-stat"><span class="mc-stat-val">${fmtRpe(w.rpeMean)}</span><span class="mc-stat-lbl">RPE medio</span></div>
-                    <div class="mc-stat"><span class="mc-stat-val">${esc(compositionText(w.counts))}</span><span class="mc-stat-lbl">Sesiones</span></div>
-                </div>
-            </div>`;
+            <tr>
+                <td class="mc-cmp-day"><strong>${lbl}</strong><span class="mc-cmp-sub">${formatDM(addDays(model.a.mondayKey, i))} · ${formatDM(addDays(model.b.mondayKey, i))}</span></td>
+                <td class="mc-cell">${dayCell(model.a, i)}</td>
+                <td class="mc-cell">${dayCell(model.b, i)}</td>
+                <td class="mc-cell mc-cmp-delta">${delta}</td>
+            </tr>`;
         }).join('');
+
+        // Resumen de la semana: siempre las tres cifras, sea cual sea la métrica de arriba
+        const footRow = (label, a, b, delta) => `
+            <tr class="mc-cmp-foot-row">
+                <td class="mc-cmp-day"><strong>${label}</strong></td>
+                <td class="mc-cell">${a}</td>
+                <td class="mc-cell">${b}</td>
+                <td class="mc-cell mc-cmp-delta">${delta}</td>
+            </tr>`;
+        const footRows =
+            footRow('Total UA', model.a.totalUA, model.b.totalUA, deltaHTML(model.a.totalUA, model.b.totalUA, 'ua')) +
+            footRow('RPE medio', fmtRpe(model.a.rpeMean), fmtRpe(model.b.rpeMean), deltaHTML(model.a.rpeMean, model.b.rpeMean, 'rpe')) +
+            footRow('Sesiones', esc(compositionText(model.a.counts)), esc(compositionText(model.b.counts)),
+                deltaHTML(model.a.totalSessions, model.b.totalSessions, 'count'));
+
+        const comparisonTable = `
+        <div class="wellness-card" style="margin-bottom:1.5rem;overflow-x:auto">
+            <h3 class="wellness-section-title">🔁 Comparación día a día — ${isRpe ? 'RPE medio' : 'carga UA'}</h3>
+            <table class="mc-cmp-table">
+                <thead>
+                    <tr>
+                        <th class="mc-th-player">Día</th>
+                        <th class="mc-th-day">${weekHead('a', model.a)}</th>
+                        <th class="mc-th-day">${weekHead('b', model.b)}</th>
+                        <th class="mc-th-day">Diferencia<br><span class="mc-th-date">A − B</span></th>
+                    </tr>
+                </thead>
+                <tbody>${dayRows}</tbody>
+                <tbody class="mc-cmp-foot">${footRows}</tbody>
+            </table>
+        </div>`;
 
         // ── Styles ────────────────────────────────────────────────
         const styles = `
@@ -458,13 +527,26 @@
     .mc-swatch-a{background:var(--primary-color,#ff9800)}
     .mc-swatch-b{background:rgba(160,160,160,.5);border:1px solid rgba(120,120,120,.5)}
     .mc-metric-chips{margin-bottom:.7rem}
-    .mc-week-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.6rem;margin-top:.8rem}
-    .mc-week-card{background:var(--bg-subtle);border-radius:.6rem;padding:.6rem .75rem;min-width:0}
-    .mc-week-card-head{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;font-size:.8rem;color:var(--text-primary);margin-bottom:.45rem}
-    .mc-week-stats{display:flex;flex-wrap:wrap;gap:.4rem 1.3rem}
-    .mc-stat{display:flex;flex-direction:column;min-width:0}
-    .mc-stat-val{font-size:.95rem;font-weight:700;color:var(--text-primary);white-space:nowrap}
-    .mc-stat-lbl{font-size:.66rem;color:var(--text-secondary)}
+    /* Caja propia del gráfico: Chart.js dibuja con el alto de ESTA caja (no de toda la tarjeta) */
+    .mc-chart-box{position:relative;width:100%;height:300px}
+    @media (max-width:640px){.mc-chart-box{height:260px}}
+
+    /* Tabla comparativa día a día */
+    .mc-cmp-table{width:100%;border-collapse:separate;border-spacing:3px;font-size:.8rem}
+    .mc-cmp-table .mc-th-day{white-space:normal}
+    .mc-cmp-day{padding:.4rem .4rem;background:var(--bg-surface);border-radius:.4rem;white-space:nowrap;color:var(--text-primary)}
+    .mc-cmp-day strong{display:block;font-size:.78rem}
+    .mc-cmp-main{display:block;font-weight:700;color:var(--text-primary);font-size:.85rem}
+    .mc-cmp-sub{display:block;font-size:.66rem;font-weight:400;color:var(--text-secondary);line-height:1.25}
+    .mc-cmp-empty{color:var(--text-secondary);font-weight:400}
+    .mc-cmp-table .mc-cell{background:var(--bg-subtle);vertical-align:middle}
+    .mc-cmp-delta{white-space:nowrap}
+    .mc-delta{font-weight:700;color:var(--text-primary)}
+    .mc-delta-up,.mc-delta-down{color:var(--text-primary)}
+    .mc-delta-eq{color:var(--text-secondary)}
+    .mc-delta-pct{font-weight:400;font-size:.72rem;color:var(--text-secondary)}
+    .mc-cmp-foot-row td{background:color-mix(in srgb,var(--border-color) 30%,transparent) !important}
+    .mc-cmp-foot-row .mc-cmp-day{background:color-mix(in srgb,var(--border-color) 30%,transparent)}
 
     /* ── Table (mismo patrón visual que Carga-Equipo: celdas
        separadas con aire, cada una con su propio radio) ──── */
@@ -508,9 +590,9 @@
             <div class="player-filter-chips mc-metric-chips">${metricChips}</div>
             <div class="mc-compare-pickers">${pickers}</div>
             ${actions.length ? `<div class="mc-compare-actions">${actions.join('')}</div>` : ''}
-            <canvas id="mcWeekCompareChart" class="chart-canvas"></canvas>
-            <div class="mc-week-cards">${weekCards}</div>
+            <div class="mc-chart-box"><canvas id="mcWeekCompareChart"></canvas></div>
         </div>
+        ${comparisonTable}
         ${table}`;
 
         // Draw bar chart after DOM is ready
@@ -558,6 +640,9 @@
                     plugins: {
                         legend: { display: false },
                         tooltip: {
+                            padding: 10,
+                            titleFont: { size: 13 },
+                            bodyFont: { size: 13 },
                             callbacks: {
                                 // Línea principal + una línea por sesión de ese día
                                 label: ctx => {
@@ -575,19 +660,20 @@
                     scales: {
                         x: {
                             grid: { color: gridColor },
-                            ticks: { color: textColor, font: { size: 11 } }
+                            ticks: { color: textColor, font: { size: 12 } }
                         },
                         y: isRpe
                             ? {
                                 min: 0, max: 10,
                                 grid: { color: gridColor },
-                                ticks: { color: textColor, font: { size: 11 }, stepSize: 2 }
+                                title: { display: true, text: 'RPE', color: textColor, font: { size: 12 } },
+                                ticks: { color: textColor, font: { size: 12 }, stepSize: 2 }
                             }
                             : {
                                 beginAtZero: true,
                                 grid: { color: gridColor },
-                                ticks: { color: textColor, font: { size: 11 },
-                                    callback: v => v + ' UA' }
+                                title: { display: true, text: 'UA', color: textColor, font: { size: 12 } },
+                                ticks: { color: textColor, font: { size: 12 } }
                             }
                     }
                 }
