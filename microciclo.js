@@ -455,13 +455,18 @@
             return `<span class="mc-swatch mc-swatch-${slot}"></span> ${esc(w.label)}${blockIcon}`;
         };
 
-        // Celda de un día: valor principal + una línea pequeña por sesión (☀️/🌙 + tipo + valor)
+        // Celda de un día: valor del día en grande.
+        //  · 1 sesión  → iconos (☀️/🌙 + tipo) al lado del valor; nada más (no se repite el número)
+        //  · 2+ sesiones → debajo, el reparto por sesión (icono + valor), que sí aporta información
         const dayCell = (w, i) => {
             const sessions = w.sessionsPerDay[i];
             if (!sessions.length) return '<span class="mc-cmp-empty">–</span>';
             const main = isRpe ? fmtRpe(w.rpePerDay[i]) : w.uaPerDay[i];
-            const detail = sessions.map(x =>
-                `${TIME_ICONS[x.timeOfDay] || ''}${TYPE_ICONS[x.type]} ${isRpe ? fmtRpe(x.rpe) : x.ua}`).join(' · ');
+            const icons = x => `${TIME_ICONS[x.timeOfDay] || ''}${TYPE_ICONS[x.type]}`;
+            if (sessions.length === 1) {
+                return `<span class="mc-cmp-main">${main}</span> <span class="mc-cmp-icons">${icons(sessions[0])}</span>`;
+            }
+            const detail = sessions.map(x => `${icons(x)} ${isRpe ? fmtRpe(x.rpe) : x.ua}`).join(' · ');
             return `<span class="mc-cmp-main">${main}</span><span class="mc-cmp-sub">${detail}</span>`;
         };
 
@@ -536,7 +541,8 @@
     .mc-cmp-table .mc-th-day{white-space:normal}
     .mc-cmp-day{padding:.4rem .4rem;background:var(--bg-surface);border-radius:.4rem;white-space:nowrap;color:var(--text-primary)}
     .mc-cmp-day strong{display:block;font-size:.78rem}
-    .mc-cmp-main{display:block;font-weight:700;color:var(--text-primary);font-size:.85rem}
+    .mc-cmp-main{font-weight:700;color:var(--text-primary);font-size:.85rem}
+    .mc-cmp-icons{font-size:.78rem;margin-left:.15rem;white-space:nowrap}
     .mc-cmp-sub{display:block;font-size:.66rem;font-weight:400;color:var(--text-secondary);line-height:1.25}
     .mc-cmp-empty{color:var(--text-secondary);font-weight:400}
     .mc-cmp-table .mc-cell{background:var(--bg-subtle);vertical-align:middle}
