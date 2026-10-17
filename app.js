@@ -813,9 +813,9 @@ class RPETracker {
 
     // Asegura que this.sessions contiene el histórico completo (todas las
     // temporadas), no solo la ventana de ~4 meses cargada al iniciar.
-    // Usado por pdf-reports.js, app-comparisons.js e injury-prediction.js
-    // antes de calcular sobre rangos largos. Idempotente: si ya se cargó,
-    // resuelve inmediatamente.
+    // Usado por pdf-reports.js, app-comparisons.js, injury-prediction.js,
+    // export-fisio.js y microciclo.js antes de calcular sobre rangos largos.
+    // Idempotente: si ya se cargó, resuelve inmediatamente.
     async ensureFullSessionHistory() {
         if (this._fullHistoryLoaded) return this.sessions;
         if (!window.firebaseSync) {
@@ -826,25 +826,6 @@ class RPETracker {
         this.sessions = this._mergeSessionsById(all, this.sessions);
         this._fullHistoryLoaded = true;
         return this.sessions;
-    }
-
-    // Handler del botón "Cargar histórico" del dashboard.
-    async loadFullHistoryFromButton() {
-        const btn = document.getElementById('loadFullHistoryBtn');
-        if (this._fullHistoryLoaded) {
-            this.showToast('✅ El histórico completo ya está cargado');
-            if (btn) btn.style.display = 'none';
-            return;
-        }
-        if (btn) {
-            btn.disabled = true;
-            btn.querySelector('.dqa-label').textContent = 'Cargando…';
-        }
-        await this.ensureFullSessionHistory();
-        this.renderSessions();
-        if (this.currentView === 'dashboard') this.renderDashboard();
-        this.showToast(`📜 Histórico completo cargado (${this.sessions.length} sesiones)`);
-        if (btn) btn.style.display = 'none';
     }
 
     async saveSessions() {

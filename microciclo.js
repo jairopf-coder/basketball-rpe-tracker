@@ -9,6 +9,7 @@
 // Esta vista solo LEE datos (sesiones y plan semanal): no guarda nada.
 // La selección de semanas se recuerda mientras la app está abierta y
 // no se persiste (al recargar vuelve a "actual vs anterior").
+// El selector solo ofrece semanas de la temporada activa (Store.getActiveSeason()).
 
 (function () {
     'use strict';
@@ -200,8 +201,11 @@
         const keyA  = sel.a || currentKey;
         const keyB  = sel.b || previousKey;
 
-        // Semanas con sesiones + la actual y la anterior (aunque estén vacías) + las elegidas
-        const keys = new Set([...byWeek.keys(), currentKey, previousKey, keyA, keyB]);
+        // Solo semanas de la temporada activa (que terminan a partir de su inicio), más la
+        // actual y la anterior (aunque estén vacías) y las elegidas.
+        const seasonStart = this._mcSeasonStart();
+        const inSeason = key => !seasonStart || addDays(key, 6) >= seasonStart;
+        const keys = new Set([...[...byWeek.keys()].filter(inSeason), currentKey, previousKey, keyA, keyB]);
         const summaries = new Map();
         [...keys].forEach(key => {
             const s = this._mcWeekSummary(key, byWeek.get(key) || []);
@@ -217,6 +221,32 @@
             isCustom: !!(sel.a || sel.b),
             metric: this._mcMetric === 'rpe' ? 'rpe' : 'ua'
         };
+    };
+
+    // ── Temporada activa ───────────────────────────────────────────────
+
+    // Primer día de la temporada activa de la app (p. ej. "2026-27" → "2026-08-01").
+    // null si no se puede determinar (entonces no se filtra ni se carga nada extra).
+    RPETracker.prototype._mcSeasonStart = function () {
+        const label = (typeof Store !== 'undefined' && Store.getActiveSeason) ? Store.getActiveSeason() : '';
+        const m = /^(\d{4})/.exec(label || '');
+        return m ? `${m[1]}-08-01` : null;
+    };
+
+    // La app solo carga las sesiones desde el inicio de una ventana (1/8 de agosto a
+    // diciembre, 1/1 de enero a julio). A partir de enero la pretemporada de la temporada
+    // activa queda fuera, así que se trae el histórico en segundo plano (mismo patrón que
+    // Predicción de lesiones) y se redibuja al terminar. En agosto-diciembre no hace nada.
+    RPETracker.prototype._mcEnsureSeasonHistory = function () {
+        const seasonStart = this._mcSeasonStart();
+        if (!seasonStart || this._fullHistoryLoaded || this._mcHistoryRequested) return;
+        if (!window.firebaseSync || !this._sessionsWindowStart) return;
+        if (seasonStart >= this._sessionsWindowStart) return;   // la ventana ya cubre la temporada
+
+        this._mcHistoryRequested = true;                        // un solo intento por sesión de uso
+        this.ensureFullSessionHistory()
+            .then(() => { if (this.currentView === 'microciclo') this.renderMicrociclo(); })
+            .catch(e => console.error('Microciclo: no se pudo cargar el histórico', e));
     };
 
     // ── Acciones de los controles ──────────────────────────────────────
@@ -251,6 +281,7 @@
         if (!container) return;
 
         if (!this.weekPlan) this.loadWeekPlan();
+        this._mcEnsureSeasonHistory();
 
         // Liberar el gráfico anterior antes de sustituir el HTML
         const oldCanvas = document.getElementById('mcWeekCompareChart');
