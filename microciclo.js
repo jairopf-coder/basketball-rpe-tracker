@@ -215,9 +215,7 @@
             b: summaries.get(keyB),
             weeks: [...keys].sort().reverse().map(k => summaries.get(k)), // más reciente primero
             isCustom: !!(sel.a || sel.b),
-            metric: this._mcMetric === 'rpe' ? 'rpe' : 'ua',
-            // Solo se ofrece si hay Firebase y aún no se ha traído todo el histórico
-            canLoadOlder: !!window.firebaseSync && !this._fullHistoryLoaded
+            metric: this._mcMetric === 'rpe' ? 'rpe' : 'ua'
         };
     };
 
@@ -244,23 +242,6 @@
         if (metric !== 'ua' && metric !== 'rpe') return;
         this._mcMetric = metric;
         this.renderMicrociclo();
-    };
-
-    // Trae el histórico completo (mismo mecanismo que el botón del dashboard)
-    // para poder elegir semanas de temporadas anteriores.
-    RPETracker.prototype._mcLoadOlderWeeks = async function () {
-        if (this._mcLoadingHistory) return;
-        this._mcLoadingHistory = true;
-        try {
-            await this.ensureFullSessionHistory();
-            this.showToast(`📜 Histórico cargado (${this.sessions.length} sesiones)`);
-        } catch (e) {
-            console.error('Microciclo: no se pudo cargar el histórico', e);
-            this.showToast('❌ No se pudo cargar el histórico');
-        } finally {
-            this._mcLoadingHistory = false;
-            this.renderMicrociclo();
-        }
     };
 
     // ── Vista ──────────────────────────────────────────────────────────
@@ -325,6 +306,16 @@
             return 'mc-cell-bad';
         };
 
+        // Variación de la carga real respecto al plan: (real − plan) / plan, en %.
+        // Sin plan no hay base para calcularla: "extra" si hubo sesión, "–" si no.
+        const variationText = (real, plan) => {
+            if (plan === 0) return real === 0 ? '–' : 'extra';
+            const p = Math.round((real - plan) / plan * 100);
+            return `${p > 0 ? '+' : p < 0 ? '−' : ''}${Math.abs(p)}%`;
+        };
+        // Los valores absolutos quedan en el tooltip de cada celda
+        const cellTitle = (real, plan) => `Real ${real} UA · Plan ${plan} UA`;
+
         // ── Tabla jugadora × día ──────────────────────────────────
         // For each player, for each day: real UA vs planned (per-player share of daily plan)
         const plannedUAPerDayPerPlayer = plannedUAPerDay.map(ua => Math.round(ua / playerCount));
@@ -348,10 +339,7 @@
                 const realUA  = Math.round(daySessions.reduce((sum, s) => sum + (s.load || 0), 0));
                 const planUA  = plannedUAPerDayPerPlayer[i];
                 const cls     = trafficLight(realUA, planUA);
-                const symbol  = planUA === 0 && realUA === 0 ? '–' :
-                                planUA === 0 ? `${realUA}` :
-                                `${realUA}<span class="mc-plan-of">/${planUA}</span>`;
-                return `<td class="mc-cell ${cls}">${symbol}</td>`;
+                return `<td class="mc-cell ${cls}" title="${cellTitle(realUA, planUA)}">${variationText(realUA, planUA)}</td>`;
             }).join('');
 
             const playerTotal = dayDateStrs.reduce((sum, ds) => {
@@ -371,7 +359,7 @@
                 </div>
             </td>
             ${cells}
-            <td class="mc-cell mc-cell-total ${totalCls}">${playerTotal}<span class="mc-plan-of">/${playerPlannedTotal}</span></td>
+            <td class="mc-cell mc-cell-total ${totalCls}" title="${cellTitle(playerTotal, playerPlannedTotal)}">${variationText(playerTotal, playerPlannedTotal)}</td>
         </tr>`;
         }).join('');
 
@@ -380,24 +368,24 @@
             const ua  = realUAPerDay[i];
             const pua = plannedUAPerDay[i];
             const cls = trafficLight(ua, pua);
-            const sym = pua === 0 && ua === 0 ? '–' : `${ua}<span class="mc-plan-of">/${pua}</span>`;
-            return `<td class="mc-cell mc-cell-team ${cls}">${sym}</td>`;
+            return `<td class="mc-cell mc-cell-team ${cls}" title="${cellTitle(ua, pua)}">${variationText(ua, pua)}</td>`;
         }).join('');
         const teamTotalCls = trafficLight(totalRealUA, totalPlannedUA);
         const teamTotalRow = `
     <tr class="mc-team-total-row">
         <td class="mc-td-player"><strong>Equipo</strong></td>
         ${teamTotalCells}
-        <td class="mc-cell mc-cell-total mc-cell-team ${teamTotalCls}"><strong>${totalRealUA}<span class="mc-plan-of">/${totalPlannedUA}</span></strong></td>
+        <td class="mc-cell mc-cell-total mc-cell-team ${teamTotalCls}" title="${cellTitle(totalRealUA, totalPlannedUA)}"><strong>${variationText(totalRealUA, totalPlannedUA)}</strong></td>
     </tr>`;
 
         const table = `
     <div class="wellness-card" style="overflow-x:auto">
-        <h3 class="wellness-section-title">📋 Jugadora × Día — UA real / planificada</h3>
+        <h3 class="wellness-section-title">📋 Jugadora × Día — UA real vs planificada (% de variación)</h3>
         <div style="font-size:.72rem;color:var(--text-secondary);margin-bottom:.6rem;display:flex;gap:1rem;flex-wrap:wrap">
             <span><span class="mc-legend mc-cell-ok"></span> ±15% del plan</span>
             <span><span class="mc-legend mc-cell-warn"></span> ±15–40%</span>
-            <span><span class="mc-legend mc-cell-bad"></span> &gt;40% desviación</span>
+            <span><span class="mc-legend mc-cell-bad"></span> &gt;40% de desviación</span>
+            <span><span class="mc-legend mc-cell-extra"></span> Extra (sin plan)</span>
             <span><span class="mc-legend mc-cell-neutral"></span> Sin sesión</span>
         </div>
         <table class="mc-table">
@@ -424,13 +412,9 @@
             </label>`;
         }).join('');
 
-        const actions = [];
-        if (model.isCustom) {
-            actions.push(`<button class="btn-secondary mc-compare-btn" onclick="window.rpeTracker?._mcResetCompare()">↺ Actual vs anterior</button>`);
-        }
-        if (model.canLoadOlder) {
-            actions.push(`<button class="btn-secondary mc-compare-btn" onclick="window.rpeTracker?._mcLoadOlderWeeks()" title="Trae las sesiones de temporadas anteriores para poder compararlas">📜 Cargar temporadas anteriores</button>`);
-        }
+        const resetButton = model.isCustom
+            ? `<div class="mc-compare-actions"><button class="btn-secondary mc-compare-btn" onclick="window.rpeTracker?._mcResetCompare()">↺ Actual vs anterior</button></div>`
+            : '';
 
         const isRpe = model.metric === 'rpe';
         const chartTitle = (isRpe ? 'RPE medio diario' : 'Carga diaria') + (model.isCustom
@@ -564,7 +548,6 @@
     .mc-td-player{padding:.4rem .4rem;white-space:nowrap;background:var(--bg-surface);border-radius:.4rem}
     .mc-player-name{font-size:.78rem;font-weight:500;color:var(--text-primary)}
     .mc-cell{text-align:center;padding:.4rem .3rem;font-size:.75rem;font-weight:600;border-radius:.4rem;color:var(--text-primary)}
-    .mc-plan-of{font-weight:400;font-size:.68rem;color:var(--text-secondary)}
     .mc-cell-ok     {background:color-mix(in srgb,var(--success-color,#4caf50) 18%,transparent)}
     .mc-cell-warn   {background:color-mix(in srgb,var(--warning-color,#ff9800) 18%,transparent)}
     .mc-cell-bad    {background:color-mix(in srgb,var(--danger-color,#f44336) 18%,transparent)}
@@ -579,6 +562,7 @@
     .mc-legend.mc-cell-ok     {background:color-mix(in srgb,var(--success-color,#4caf50) 40%,transparent);border:1px solid var(--success-color,#4caf50)}
     .mc-legend.mc-cell-warn   {background:color-mix(in srgb,var(--warning-color,#ff9800) 40%,transparent);border:1px solid var(--warning-color,#ff9800)}
     .mc-legend.mc-cell-bad    {background:color-mix(in srgb,var(--danger-color,#f44336) 40%,transparent);border:1px solid var(--danger-color,#f44336)}
+    .mc-legend.mc-cell-extra  {background:color-mix(in srgb,var(--accent-color,#2196f3) 40%,transparent);border:1px solid var(--accent-color,#2196f3)}
     .mc-legend.mc-cell-neutral{background:var(--border-color);border:1px solid var(--text-secondary)}
     </style>`;
 
@@ -595,7 +579,7 @@
             <h3 class="wellness-section-title">📊 ${chartTitle}</h3>
             <div class="player-filter-chips mc-metric-chips">${metricChips}</div>
             <div class="mc-compare-pickers">${pickers}</div>
-            ${actions.length ? `<div class="mc-compare-actions">${actions.join('')}</div>` : ''}
+            ${resetButton}
             <div class="mc-chart-box"><canvas id="mcWeekCompareChart"></canvas></div>
         </div>
         ${comparisonTable}
