@@ -669,14 +669,14 @@ RPETracker.prototype.renderEvolutionCharts = function() {
                             ${[7,14,30,90].map(d => `<button class="chart-period-btn${(this._chartPeriods?.[p.id]||30)===d?' active':''}" onclick="window.rpeTracker?.setChartPeriod('${p.id}',${d})">${d}d</button>`).join('')}
                         </div>
                     </div>
-                    <canvas id="chart-${p.id}" class="chart-canvas"></canvas>
+                    <div class="chart-box"><canvas id="chart-${p.id}"></canvas></div>
                     ${this._renderFosterBlock(p)}
                 </div>
                 <div class="chart-container">
                     <div class="chart-header">
                         <h4>${esc(p.name)}${p.number ? ` #${esc(p.number)}` : ''} — Temporada</h4>
                     </div>
-                    <canvas id="season-chart-${p.id}" class="chart-canvas"></canvas>
+                    <div class="chart-box"><canvas id="season-chart-${p.id}"></canvas></div>
                 </div>
             </div>
         `).join('');
