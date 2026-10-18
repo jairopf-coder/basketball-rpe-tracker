@@ -16,10 +16,21 @@ RPETracker.prototype.readinessLabel = function(score) {
 };
 
 // ── calculateAcuteChronicRatio ─────────────────────────────────────────────
-RPETracker.prototype.calculateAcuteChronicRatio = function(playerId, minSessions = 7) {
+// asOfDate (opcional): calcula el ratio "tal como estaba" al final de ese día,
+// usando solo las sesiones hasta esa fecha (p. ej. para el calendario).
+// Sin asOfDate se comporta exactamente igual que siempre (ratio de hoy).
+RPETracker.prototype.calculateAcuteChronicRatio = function(playerId, minSessions = 7, asOfDate = null) {
+        // Fin del día de referencia (solo en modo histórico) y clave de caché propia
+        let asOfEnd = null, cacheId = playerId;
+        if (asOfDate) {
+            asOfEnd = new Date(asOfDate);
+            asOfEnd.setHours(23, 59, 59, 999);
+            const pad = n => String(n).padStart(2, '0');
+            cacheId = `${playerId}@${asOfEnd.getFullYear()}-${pad(asOfEnd.getMonth() + 1)}-${pad(asOfEnd.getDate())}`;
+        }
         // Memoize result (invalidated via ACCache.invalidate() on save/delete)
         if (typeof ACCache !== 'undefined') {
-            const cached = ACCache.get(playerId, this.sessions);
+            const cached = ACCache.get(cacheId, this.sessions);
             if (cached !== null) return cached;
         }
         const MATCH_MULT = RPETracker.MATCH_LOAD_MULTIPLIER;
@@ -32,6 +43,8 @@ RPETracker.prototype.calculateAcuteChronicRatio = function(playerId, minSessions
             }))
             // Descartar sesiones con load no numérico o no positivo (datos corruptos/NaN)
             .filter(s => Number.isFinite(s.load) && s.load > 0)
+            // Modo histórico: ignorar sesiones posteriores al día de referencia
+            .filter(s => !asOfEnd || s.date <= asOfEnd)
             .sort((a, b) => a.date - b.date); // Sort chronologically
         
         if (playerSessions.length === 0) {
@@ -49,7 +62,7 @@ RPETracker.prototype.calculateAcuteChronicRatio = function(playerId, minSessions
         }
 
         // Sesiones en los últimos 28 días, usadas para el chequeo de confianza
-        const now = new Date();
+        const now = asOfEnd ? new Date(asOfEnd) : new Date();
         const twentyEightDaysAgoCheck = new Date(now);
         twentyEightDaysAgoCheck.setDate(twentyEightDaysAgoCheck.getDate() - 28);
         const recentSessionsCount = playerSessions.filter(s => s.date >= twentyEightDaysAgoCheck).length;
@@ -142,7 +155,7 @@ RPETracker.prototype.calculateAcuteChronicRatio = function(playerId, minSessions
             totalLoad21d: Math.round(totalLoad28d)
         };
         // Store in cache for this render cycle
-        if (typeof ACCache !== 'undefined') ACCache.set(playerId, this.sessions, result);
+        if (typeof ACCache !== 'undefined') ACCache.set(cacheId, this.sessions, result);
         return result;
     };
 

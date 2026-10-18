@@ -1305,6 +1305,13 @@ header h1 {
 .calendar-day-sessions {
     font-size: 0.8rem;
     color: var(--gray);
+    text-align: center;
+}
+
+/* Tarjeta de info bajo el calendario: separarla de la rejilla */
+.ewma-info-box.cal-info-box {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
 }
 
 .session-count {

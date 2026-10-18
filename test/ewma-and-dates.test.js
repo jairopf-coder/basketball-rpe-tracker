@@ -201,6 +201,54 @@ section('calculateAcuteChronicRatio (ewma-calculator.js)');
         assert.strictEqual(t.high, 1.5);
     });
 
+    // ── Ratio "tal como estaba" en una fecha (asOfDate, usado por el calendario) ──
+    // 30 días de entreno L-V con carga alta y una semana final ligera.
+    function buildHistory() {
+        const sessions = [];
+        for (let i = 40; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const light = i <= 6;                       // última semana ligera
+            sessions.push({
+                playerId: 'p1', date: daysAgo(i),
+                rpe: light ? 2 : 7, duration: light ? 30 : 90
+            });
+        }
+        return sessions;
+    }
+
+    test('sin asOfDate el resultado es el de siempre (ratio de hoy)', () => {
+        const tracker = new RPETracker(buildHistory(), []);
+        const a = tracker.calculateAcuteChronicRatio('p1');
+        const b = tracker.calculateAcuteChronicRatio('p1', 7, null);
+        assert.strictEqual(a.ratio, b.ratio);
+        assert.ok(parseFloat(a.ratio) < 0.8, 'tras una semana ligera el ratio de hoy debe ser bajo');
+    });
+
+    test('con asOfDate el ratio cambia según el día (ya no es el de hoy para todos)', () => {
+        const tracker = new RPETracker(buildHistory(), []);
+        const hoy = parseFloat(tracker.calculateAcuteChronicRatio('p1').ratio);
+        const hace12 = new Date(); hace12.setDate(hace12.getDate() - 12);
+        const pasado = parseFloat(tracker.calculateAcuteChronicRatio('p1', 7, hace12).ratio);
+        assert.ok(pasado > hoy, `ratio hace 12 días (${pasado}) debe ser mayor que hoy (${hoy})`);
+        assert.ok(pasado >= 0.8 && pasado <= 1.3, 'con carga estable el ratio histórico debe ser ~1');
+    });
+
+    test('con asOfDate ignora las sesiones posteriores a esa fecha', () => {
+        const tracker = new RPETracker(buildHistory(), []);
+        const hace12 = new Date(); hace12.setDate(hace12.getDate() - 12);
+        // Misma fecha con y sin sesiones futuras añadidas: debe dar igual
+        const base = tracker.calculateAcuteChronicRatio('p1', 7, hace12).ratio;
+        const conFuturo = new RPETracker(
+            buildHistory().concat([{ playerId: 'p1', date: daysAgo(2), rpe: 10, duration: 200 }]), []);
+        assert.strictEqual(conFuturo.calculateAcuteChronicRatio('p1', 7, hace12).ratio, base);
+    });
+
+    test('con asOfDate y pocas sesiones previas devuelve N/A', () => {
+        const tracker = new RPETracker(buildHistory(), []);
+        const muyAntes = new Date(); muyAntes.setDate(muyAntes.getDate() - 38);
+        assert.strictEqual(tracker.calculateAcuteChronicRatio('p1', 7, muyAntes).ratio, 'N/A');
+    });
+
     test('getPlayerThresholds respeta umbrales personalizados de la jugadora', () => {
         const tracker = new RPETracker([], [{ id: 'p1', acThresholdLow: 0.6, acThresholdOpt: 1.1, acThresholdHigh: 1.4 }]);
         const t = tracker.getPlayerThresholds('p1');
