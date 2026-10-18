@@ -203,6 +203,15 @@ RPETracker.prototype._wpMondayForOffset = function(offset) {
     return toLocalISODate(d);
 };
 
+// Date (a las 00:00 locales) del lunes de la semana desplazada "offset" semanas.
+// Deriva de _wpMondayForOffset para que las fechas que se pintan y el plan que
+// se lee/guarda sean SIEMPRE de la misma semana (antes, los domingos las fechas
+// saltaban a la semana siguiente porque getDay() vale 0 en domingo).
+RPETracker.prototype._wpWeekStartForOffset = function(offset) {
+    const [y, m, d] = this._wpMondayForOffset(offset).split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
 // Lectura de solo consulta (calendario, analíticas, modo partido...): usa el
 // plan guardado de esa semana concreta; si no existe, semana en blanco
 // (todo Descanso). No se usa "legacyTemplate" como fallback: una semana
@@ -234,8 +243,8 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     const howToOpen = typeof Store !== 'undefined' && Store.getString('wpHowToOpen') === 'true';
 
     const offset = this.weekPlan.weekOffset || 0;
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1 + offset * 7);
+    // Fechas, plan y sesiones reales salen de la misma semana (mismo lunes).
+    const weekStart = this._wpWeekStartForOffset(offset);
 
     // Cada semana es independiente: se identifica por la fecha (ISO) de su lunes.
     const mondayKey  = this._wpMondayForOffset(offset);
@@ -1193,7 +1202,7 @@ RPETracker.prototype._buildCorrelationData = function(injuries) {
     const injuryWeeks = new Set();
 
     for (let i=weeks-1; i>=0; i--) {
-        const wStart = new Date(); wStart.setDate(wStart.getDate() - wStart.getDay() + 1 - i*7);
+        const wStart = this._wpWeekStartForOffset(-i);
         const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate()+7);
         const wSessions = this.sessions.filter(s => {
             const d=new Date(s.date); return d>=wStart && d<wEnd;

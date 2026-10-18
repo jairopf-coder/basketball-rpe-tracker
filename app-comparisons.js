@@ -517,7 +517,7 @@ RPETracker.prototype.getTeamWeeklyRPESeries = function() {
 RPETracker.prototype.getWeekKey = function(date) {
     const d = new Date(date);
     d.setHours(0,0,0,0);
-    d.setDate(d.getDate() - d.getDay() + 1); // Monday
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // Lunes (en domingo getDay() = 0: retrocede 6 días)
     return toLocalISODate(d);
 };
 
