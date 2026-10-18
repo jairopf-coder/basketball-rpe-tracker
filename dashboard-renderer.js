@@ -247,14 +247,13 @@ RPETracker.prototype.renderDashboard = function() {
             let nextMatchHtml = '—';
             let nextMatchSub  = 'próximo partido';
             if (nm) {
-                const { day, month, weekday } = (() => {
+                const { dm, weekday } = (() => {
                     const [y,mo,d] = nm.date.split('-').map(Number);
                     const dt = new Date(y, mo-1, d);
-                    const days   = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-                    const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-                    return { day: dt.getDate(), month: months[dt.getMonth()], weekday: days[dt.getDay()] };
+                    const days = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+                    return { dm: formatDM(dt), weekday: days[dt.getDay()] };
                 })();
-                nextMatchHtml = `${weekday} ${day} ${month}`;
+                nextMatchHtml = `${weekday} ${dm}`;
                 nextMatchSub  = `vs ${esc(nm.rival || '—')}`;
             }
             return `
@@ -823,7 +822,7 @@ RPETracker.prototype.renderDashboardCalendar = function() {
         mon.setDate(now2.getDate() - todayDow2 + weekOffset * 7);
         const sun = new Date(mon);
         sun.setDate(mon.getDate() + 6);
-        navLabel = `${mon.getDate()} – ${sun.getDate()} ${monthNames[sun.getMonth()]}`;
+        navLabel = formatDMRange(mon, sun);
     }
 
     // Build content

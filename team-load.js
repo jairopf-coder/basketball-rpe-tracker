@@ -44,8 +44,7 @@
 
     function formatWeekLabel(monday) {
         const sunday = addDays(monday, 6);
-        const opts = { day: 'numeric', month: 'short' };
-        return `${monday.toLocaleDateString('es-ES', opts)} – ${sunday.toLocaleDateString('es-ES', opts)}`;
+        return formatDMRange(monday, sunday);
     }
 
     const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];

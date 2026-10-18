@@ -488,7 +488,7 @@ RPETracker.prototype._renderSessionsNavChips = function() {
         const weekChips = weeks.map(w => {
             const iso = toLocalISODate(w.start);
             const active = this._sessionsWeekFilter && toLocalISODate(this._sessionsWeekFilter.start) === iso;
-            const label = `${w.start.getDate()}-${w.end.getDate()} ${MONTH_NAMES_ES[w.end.getMonth()].slice(0,3).toLowerCase()}`;
+            const label = formatDMRange(w.start, w.end);
             return `<button type="button" class="player-filter-chip ${active ? 'player-filter-chip--selected' : ''}"
                     style="--chip-color:var(--secondary,#1a6fff)"
                     onclick="window.rpeTracker._sessionsSelectWeek('${iso}')">
@@ -1290,8 +1290,7 @@ RPETracker.prototype._priTurnLabel = function(sessionType) {
 };
 
 RPETracker.prototype._priDateLabel = function(isoDate) {
-    const d = new Date(isoDate + 'T12:00:00'); // mediodía: evita desfases de zona horaria
-    return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+    return formatWeekdayDM(isoDate);
 };
 
 RPETracker.prototype._priInputId = function(key) {

@@ -87,7 +87,7 @@ RPETracker.prototype._drawACCurveChart = function() {
     for (let d = days - 1; d >= 0; d--) {
         const dt = new Date(now);
         dt.setDate(now.getDate() - d);
-        labels.push(dt.toLocaleDateString('es-ES', { day:'numeric', month:'short' }));
+        labels.push(formatDM(dt));
     }
 
     const excluded = this._acExcluded || new Set();

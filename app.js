@@ -742,13 +742,7 @@ class RPETracker {
 
     formatDate(dateString) {
         const date = new Date(dateString);
-        const options = { 
-            weekday: 'short', 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric'
-        };
-        const dateStr = date.toLocaleDateString('es-ES', options);
+        const dateStr = formatWeekdayDM(date, true);
         
         // Extract time of day from the date or session data
         const hour = date.getHours();
