@@ -37,10 +37,11 @@ RPETracker.prototype.renderCalendar = function(year, month) {
         </div>
     `;
 
-    // Recopila y calcula, para cada día del mes, exactamente los mismos
-    // datos que antes (slots, RPE medio, ratio, color) — se usan igual
-    // tanto para la rejilla de escritorio como para la agenda de móvil,
-    // así que solo se calculan una vez.
+    // Recopila y calcula, para cada día del mes, los datos que se pintan
+    // (slots, RPE medio, ratio, color) — se usan igual tanto para la
+    // rejilla de escritorio como para la agenda de móvil, así que solo se
+    // calculan una vez. El ratio A:C de cada día se calcula "tal como
+    // estaba" ese día (con las sesiones hasta esa fecha), no el de hoy.
     const slotLabel = { morning: 'Mañana', afternoon: 'Tarde', evening: 'Noche' };
     const dayData = [];
     for (let day = 1; day <= daysInMonth; day++) {
@@ -56,7 +57,7 @@ RPETracker.prototype.renderCalendar = function(year, month) {
         let avgRatio = 0, ratioColor = '#eee';
         if (dayEntries.length > 0) {
             const ratios = dayEntries.map(s => {
-                const r = this.calculateAcuteChronicRatio(s.playerId);
+                const r = this.calculateAcuteChronicRatio(s.playerId, 7, currentDate);
                 return parseFloat(r.ratio) || 0;
             }).filter(r => r > 0);
             if (ratios.length) {
@@ -71,7 +72,8 @@ RPETracker.prototype.renderCalendar = function(year, month) {
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
     container.innerHTML = header + (isMobile
         ? this._renderCalendarAgenda(year, month, dayData, slotLabel)
-        : this._renderCalendarGrid(year, month, dayData, slotLabel, startingDayOfWeek));
+        : this._renderCalendarGrid(year, month, dayData, slotLabel, startingDayOfWeek))
+        + this._renderCalendarInfoCard();
 
     // Repintar si el ancho de pantalla cruza el breakpoint móvil/escritorio
     // (p.ej. al girar el móvil), para cambiar entre agenda y rejilla sin
@@ -201,6 +203,41 @@ RPETracker.prototype._renderCalendarAgenda = function(year, month, dayData, slot
     return html;
 };
 
+// Tarjeta desplegable "info" bajo el calendario: explica cada dato que se
+// ve en un día de entreno. Reutiliza el estilo .ewma-info-box. Recuerda si
+// estaba abierta al cambiar de mes (this._calInfoOpen).
+RPETracker.prototype._renderCalendarInfoCard = function() {
+    const open = this._calInfoOpen ? 'open' : '';
+    return `
+        <details class="ewma-info-box cal-info-box" id="calInfoDetails" ${open}
+                 ontoggle="if (window.rpeTracker) window.rpeTracker._calInfoOpen = this.open">
+            <summary class="ewma-summary">
+                <span>ℹ️ ¿Qué significa cada dato del calendario?</span>
+                <span class="ewma-toggle-hint">ver más</span>
+            </summary>
+            <div class="ewma-body">
+                <ul style="margin-left:1.25rem;color:var(--gray);line-height:1.5">
+                    <li><strong>🏀 / 🏟️ + número:</strong> tipo de sesión (entrenamiento o partido) y cuántas jugadoras tienen RPE registrado ese día.</li>
+                    <li><strong>RPE 6.2:</strong> media del esfuerzo percibido (escala 1–10) de esas jugadoras en la sesión.</li>
+                    <li><strong>2 sesiones:</strong> si hay más de una sesión el mismo día, aparece una línea por turno (Mañana, Tarde o Noche) con su RPE medio.</li>
+                    <li><strong>Etiqueta de color (ej. 1.1):</strong> ratio A:C medio de las jugadoras que entrenaron ese día, calculado con las sesiones hasta esa fecha. Compara la carga reciente (agudo) con la habitual (crónico).
+                        <div style="margin-top:0.25rem">
+                            <span style="color:#1565c0;font-weight:700">&lt;0.8 azul</span> · descarga &nbsp;
+                            <span style="color:#2e7d32;font-weight:700">0.8–1.3 verde</span> · óptimo &nbsp;
+                            <span style="color:#ef6c00;font-weight:700">1.3–1.5 naranja</span> · precaución &nbsp;
+                            <span style="color:#c62828;font-weight:700">&gt;1.5 rojo</span> · peligro
+                        </div>
+                    </li>
+                    <li><strong>Fondo del día:</strong> tinte suave del mismo color que la etiqueta del ratio.</li>
+                    <li><strong>Sin etiqueta de ratio:</strong> todavía no hay datos suficientes (menos de 7 sesiones en los 28 días anteriores).</li>
+                    <li><strong>Borde naranja grueso:</strong> es el día de hoy.</li>
+                    <li><strong>Al pulsar un día</strong> se abre el detalle por jugadora: RPE, carga (RPE × minutos) y ratio A:C de ese día.</li>
+                </ul>
+            </div>
+        </details>
+    `;
+};
+
 // ========== DAY MODAL ==========
 
 RPETracker.prototype.showDaySessions = function(year, month, day) {
@@ -255,7 +292,7 @@ RPETracker.prototype.showDaySessions = function(year, month, day) {
                 const name   = player
                     ? `${esc(player.name)}${player.number ? ' <span class="db-num">#' + esc(player.number) + '</span>' : ''}`
                     : 'Desconocida';
-                const ratio  = this.calculateAcuteChronicRatio(entry.playerId);
+                const ratio  = this.calculateAcuteChronicRatio(entry.playerId, 7, date);
                 const rColor = this.getRatioColor(ratio.ratio);
                 const load   = entry.load || entry.rpe * (entry.duration || 60);
 
