@@ -975,8 +975,7 @@ RPETracker.prototype._wTrend = function(playerId) {
 };
 
 RPETracker.prototype._wFmtDate = function(dateStr) {
-    const d=new Date(dateStr+'T12:00:00');
-    return d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
+    return formatWeekdayDM(dateStr);
 };
 
 // ========== INJECT STYLES ==========

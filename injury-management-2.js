@@ -585,7 +585,7 @@ RPETracker.prototype._renderClinicalNotesPanel = function(container, filterPlaye
             <div class="cn-note-row" id="cn-row-${n.id}">
                 <div class="cn-note-meta">
                     <span class="cn-note-player">${typeof PlayerTokens !== 'undefined' ? PlayerTokens.avatar(player, 22, '0.65rem') : ''} ${esc(player.name)}</span>
-                    <span class="cn-note-date">${new Date(n.date).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})}</span>
+                    <span class="cn-note-date">${formatDMY(n.date)}</span>
                     <button class="cn-note-del" onclick="window.rpeTracker?._deleteClinicalNote('${n.id}')" title="Eliminar">🗑</button>
                 </div>
                 <div class="cn-note-text" id="cn-text-${n.id}">${esc(n.text).replace(/\n/g,'<br>')}</div>

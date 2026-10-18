@@ -414,7 +414,7 @@ RPETracker.prototype._drawGpsComparisonChart = function() {
             return;
         }
 
-        const labels = data.map(d => new Date(d.session.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }));
+        const labels = data.map(d => formatDM(d.session.date));
         const internalLoad = data.map(d => d.session.load ?? null);
         const externalLoad = data.map(d => d.gps && d.gps.distanceM != null ? d.gps.distanceM : null);
 
@@ -494,7 +494,7 @@ RPETracker.prototype._drawGpsComparisonChart = function() {
         return;
     }
 
-    const labels = allDates.map(d => new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }));
+    const labels = allDates.map(d => formatDM(d));
 
     const datasets = perPlayerData.map(({ player, data }) => {
         const color = PlayerTokens.get(player);

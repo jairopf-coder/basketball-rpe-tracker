@@ -120,6 +120,43 @@ function toLocalISODate(d) {
 }
 window.toLocalISODate = toLocalISODate;
 
+/* ==== FECHAS: formato día/mes (inicio) ====
+   Formato de la app para fechas cortas: día/mes sin ceros a la izquierda ("5/10", "15/10/2026").
+   Aceptan un Date o un texto 'AAAA-MM-DD' (con o sin hora). Un texto sin zona horaria se
+   interpreta como fecha LOCAL (nunca por UTC), así no se desplaza un día. Fecha no válida → ''.
+   Los informes PDF y los títulos largos ("octubre 2026") NO usan esto: llevan el mes en letra.
+   Este bloque solo declara funciones (globales en un script clásico) para que los tests puedan
+   cargarlo suelto con test/store-dates.js. */
+function parseDateLocal(d) {
+    if (Object.prototype.toString.call(d) === '[object Date]') return isNaN(d.getTime()) ? null : d;
+    if (typeof d !== 'string') return null;
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
+    if (m && !/(Z|[+-]\d{2}:?\d{2})$/.test(d)) return new Date(+m[1], +m[2] - 1, +m[3]);
+    var p = new Date(d);
+    return isNaN(p.getTime()) ? null : p;
+}
+// 15/10
+function formatDM(d) {
+    var x = parseDateLocal(d);
+    return x ? x.getDate() + '/' + (x.getMonth() + 1) : '';
+}
+// 15/10/2026
+function formatDMY(d) {
+    var x = parseDateLocal(d);
+    return x ? formatDM(x) + '/' + x.getFullYear() : '';
+}
+// jue 15/10   (con withYear: jue 15/10/2026)
+function formatWeekdayDM(d, withYear) {
+    var x = parseDateLocal(d);
+    if (!x) return '';
+    return x.toLocaleDateString('es-ES', { weekday: 'short' }) + ' ' + (withYear ? formatDMY(x) : formatDM(x));
+}
+// 12/10 – 18/10
+function formatDMRange(a, b) {
+    return formatDM(a) + ' – ' + formatDM(b);
+}
+/* ==== FECHAS: formato día/mes (fin) ==== */
+
 // ── Ventanas de carga inicial de sesiones (paginación por temporada) ──────────
 // La temporada va de finales de agosto a mediados de mayo. Se divide en dos
 // bloques de ~4 meses para limitar la carga inicial de /sessions:

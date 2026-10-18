@@ -879,8 +879,8 @@ RPETracker.prototype._calcMedStats = function(injuries) {
 RPETracker.prototype._renderMedCard = function(inj) {
     const player = this.players.find(p=>p.id===inj.playerId);
     if (!player) return '';
-    const startDate = new Date(inj.startDate).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
-    const endDate = inj.endDate ? new Date(inj.endDate).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : null;
+    const startDate = formatDMY(inj.startDate);
+    const endDate = inj.endDate ? formatDMY(inj.endDate) : null;
     const days = inj.endDate
         ? Math.ceil((new Date(inj.endDate)-new Date(inj.startDate))/(1000*60*60*24))
         : Math.ceil((new Date()-new Date(inj.startDate))/(1000*60*60*24));
@@ -1236,7 +1236,7 @@ RPETracker.prototype._buildCorrelationData = function(injuries) {
         rows.push({
             player,
             type: typeLabel,
-            date: injDate.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}),
+            date: formatDMY(injDate),
             load1, load2, ratioPrev: ratioPrev ? parseFloat(ratioPrev) : null, avgLoad
         });
     });
@@ -1752,7 +1752,7 @@ RPETracker.prototype._renderInjCorrelationCompact = function() {
         const ratioPrev = load4w > 0 ? (load1w / (load4w/4)).toFixed(2) : null;
         if (!ratioPrev) return;
         rows.push({ player, ratioPrev: parseFloat(ratioPrev),
-            date: injDate.toLocaleDateString('es-ES',{day:'numeric',month:'short'}),
+            date: formatDM(injDate),
             type: this.getTypeName?.(inj.type)||inj.type });
     });
 

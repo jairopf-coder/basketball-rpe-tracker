@@ -42,14 +42,9 @@
         return toLocalISODate(d);
     }
 
-    // Fecha corta día/mes, sin ceros a la izquierda (igual que las cabeceras de la tabla)
-    function formatDM(iso) {
-        const d = dateFromISO(iso);
-        return `${d.getDate()}/${d.getMonth() + 1}`;
-    }
-
+    // formatDM / formatDMRange vienen de store.js (formato día/mes común a toda la app)
     function formatRange(mondayKey) {
-        return `${formatDM(mondayKey)} – ${formatDM(addDays(mondayKey, 6))}`;
+        return formatDMRange(mondayKey, addDays(mondayKey, 6));
     }
 
     // RPE con una decimal y coma ("6,5"); "—" si no hay dato
