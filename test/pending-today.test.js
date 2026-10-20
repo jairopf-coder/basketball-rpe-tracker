@@ -34,6 +34,8 @@ vm.runInContext(`
     }
 `, ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'dashboard-renderer.js'), 'utf8'), ctx);
+// getPlayerParticipation(): qué jugadoras participan hoy (lesión en fases 1-4 / no disponible = fuera)
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'injury-management.js'), 'utf8'), ctx);
 
 const iso = off => { const d = new Date(); d.setDate(d.getDate() - off); return vm.runInContext('toLocalISODate', ctx)(d); };
 function make() {
@@ -99,6 +101,25 @@ test('las lesionadas (lesión activa) no salen en la línea de RPE', () => {
     const t = make(); t.sessions = [s('p1')];
     t.injuries = [{ playerId: 'p2', status: 'active' }, { playerId: 'p3', status: 'resolved' }];
     assert.deepStrictEqual(names(t._pendingToday().rpe), ['p3']);
+});
+test('lesión en fases 1-4: no se le pide RPE; en fase 5 o 6 (entrena con el grupo) SÍ', () => {
+    const t = make(); t.sessions = [s('p1')];
+    [1, 2, 3, 4].forEach(ph => {
+        t.injuries = [{ playerId: 'p2', status: 'active', rtpPhase: ph }];
+        assert.ok(!names(t._pendingToday().rpe).includes('p2'), `fase ${ph}`);
+    });
+    [5, 6].forEach(ph => {
+        t.injuries = [{ playerId: 'p2', status: 'active', rtpPhase: ph }];
+        assert.ok(names(t._pendingToday().rpe).includes('p2'), `fase ${ph}`);
+    });
+});
+test('marcada "no disponible" hoy: sin RPE pendiente, pero el wellness sí se le pide', () => {
+    const t = make(); t.sessions = [s('p1')];
+    t.availability = { p2: { [iso(0)]: 'unavailable' } };
+    assert.ok(!names(t._pendingToday().rpe).includes('p2'));
+    assert.ok(names(t._pendingToday().wellness).includes('p2'));
+    t.availability = { p2: { [iso(0)]: 'limited' } };      // limitada: participa, se le pide
+    assert.ok(names(t._pendingToday().rpe).includes('p2'));
 });
 test('el wellness pendiente NO excluye a las lesionadas', () => {
     const t = make(); t.injuries = [{ playerId: 'p2', status: 'active' }];

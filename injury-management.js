@@ -449,10 +449,11 @@ RPETracker.prototype.getPlayerParticipation = function(playerId, dateISO) {
 
     // 2) Lesiones vigentes ese día
     (this.injuries || []).forEach(inj => {
-        if (!inj || inj.playerId !== playerId || !inj.startDate) return;
-        if (day < String(inj.startDate).slice(0, 10)) return;
+        if (!inj || inj.playerId !== playerId) return;
+        const start = inj.startDate ? String(inj.startDate).slice(0, 10) : null;
+        if (start && day < start) return;
         if (inj.status === 'recovered') {
-            if (!inj.endDate || day >= String(inj.endDate).slice(0, 10)) return;
+            if (!start || !inj.endDate || day >= String(inj.endDate).slice(0, 10)) return;
         } else if (inj.status !== 'active') {
             return; // otros estados no cambian el comportamiento actual de la app
         }

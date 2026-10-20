@@ -176,6 +176,36 @@ test('RPE mañana: sesión del staff o RPE enviado por ella = hecho; lesionadas 
     assert.strictEqual(summary.noAccount, 1); assert.strictEqual(summary.noPush, 1);
     assert.deepStrictEqual(sender.calls.map(c => c.s.endpoint), ['https://web.push.apple.com/endpoint-uF']);
 });
+test('RPE: lesión en fase 5 o 6 NO excluye (entrena con el grupo); en fases 1-4 sí', async () => {
+    const con = ph => world({ injuries: { i1: { id: 'i1', playerId: 'p5', status: 'active', rtpPhase: ph } } });
+    const f5 = await go({ tipo: 'rpe', turno: 'mañana' }, con(5));
+    assert.strictEqual(f5.summary.excluded, 0);
+    assert.ok(f5.sender.calls.some(c => c.s.endpoint.endsWith('endpoint-uE')), 'p5 en fase 5 recibe el aviso');
+    const f6 = await go({ tipo: 'rpe', turno: 'mañana' }, con(6));
+    assert.strictEqual(f6.summary.excluded, 0);
+    const f3 = await go({ tipo: 'rpe', turno: 'mañana' }, con(3));
+    assert.strictEqual(f3.summary.excluded, 1);
+    assert.ok(!f3.sender.calls.some(c => c.s.endpoint.endsWith('endpoint-uE')));
+});
+test('RPE: una jugadora marcada "no disponible" ese día queda excluida', async () => {
+    const data = world({ availability: { p6: { [D]: 'unavailable' }, p1: { [D]: 'limited' } } });
+    const { summary, sender } = await go({ tipo: 'rpe', turno: 'mañana' }, data);
+    assert.strictEqual(summary.excluded, 2);                                         // p5 (lesión fase 1) y p6
+    assert.ok(!sender.calls.some(c => c.s.endpoint.endsWith('endpoint-uF')));        // p6 no recibe aviso
+    assert.ok(sender.calls.some(c => c.s.endpoint.endsWith('endpoint-uA')));         // p1 "limitada" sí
+});
+test('isOutOn: fecha de inicio, fecha de fin, historial de fases y datos incompletos', () => {
+    const inj = o => Object.assign({ playerId: 'a', status: 'active', rtpPhase: 1 }, o);
+    assert.strictEqual(R.isOutOn([inj({ startDate: '2026-10-10' })], {}, 'a', '2026-10-09'), false);   // aún no lesionada
+    assert.strictEqual(R.isOutOn([inj({ startDate: '2026-10-10' })], {}, 'a', '2026-10-10'), true);
+    assert.strictEqual(R.isOutOn([inj({})], {}, 'a', '2026-10-10'), true);                              // activa sin fecha: vigente
+    assert.strictEqual(R.isOutOn([inj({ startDate: '2026-10-01', status: 'recovered', endDate: '2026-10-08' })], {}, 'a', '2026-10-05'), true);
+    assert.strictEqual(R.isOutOn([inj({ startDate: '2026-10-01', status: 'recovered', endDate: '2026-10-08' })], {}, 'a', '2026-10-08'), false);
+    const hist = [{ date: '2026-10-08T10:00:00.000Z', phase: 5 }];
+    assert.strictEqual(R.isOutOn([inj({ startDate: '2026-10-01', rtpPhase: 5, history: hist })], {}, 'a', '2026-10-07'), true);   // antes: fase 1
+    assert.strictEqual(R.isOutOn([inj({ startDate: '2026-10-01', rtpPhase: 5, history: hist })], {}, 'a', '2026-10-09'), false);  // fase 5
+    assert.strictEqual(R.isOutOn(null, null, 'a', '2026-10-09'), false);
+});
 test('RPE: una lesión YA RESUELTA no excluye a la jugadora', async () => {
     const { sender } = await go({ tipo: 'rpe', turno: 'mañana' });
     assert.ok(sender.calls.some(c => c.s.endpoint.endsWith('endpoint-uF')));
