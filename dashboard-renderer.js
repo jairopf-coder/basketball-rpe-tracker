@@ -547,7 +547,8 @@ RPETracker.prototype._shortPlayerName = function(player) {
 //  - rpe: solo se calcula si hoy ya hay alguna sesión registrada (que no sea descanso);
 //    así no se marca a todo el equipo en días sin entreno. Cuenta como "con RPE" quien
 //    tiene sesión hoy o ha enviado su RPE (aunque el staff lo haya descartado).
-//    Se excluyen las jugadoras con una lesión activa.
+//    Se excluyen las jugadoras que hoy no participan en el trabajo de equipo (lesión en fases
+//    1-4 o marcada "no disponible"); en fase 5 o 6 de la readaptación sí se les pide el RPE.
 RPETracker.prototype._pendingToday = function() {
     const today = toLocalISODate(new Date());
     const players = this.players || [];
@@ -565,9 +566,7 @@ RPETracker.prototype._pendingToday = function() {
                 : players.find(p => p.authUid && p.authUid === e.uid);
             if (linked) done.add(linked.id);
         });
-        const injured = new Set((this.injuries || [])
-            .filter(i => i.status === 'active').map(i => i.playerId));
-        rpe = players.filter(p => !done.has(p.id) && !injured.has(p.id));
+        rpe = players.filter(p => !done.has(p.id) && this.getPlayerParticipation(p.id, today) !== 'out');
     }
     return { date: today, wellness, rpe, hasSessionToday: sessionsToday.length > 0 };
 };

@@ -10,6 +10,9 @@ RPETracker.prototype.openNewSessionModal = function() {
     _modal1.classList.add('active');
     this._ftRelease = trapFocus(_modal1);
     this.setDefaultDateTime();
+    // Si se cambia la fecha, se vuelve a evaluar quién está lesionada/no disponible ese día
+    const _dateInput = document.getElementById('sessionDate');
+    if (_dateInput) _dateInput.onchange = () => this.renderPlayerButtonsMulti();
     this._populateSeasonSelector();
     this.renderPlayerButtonsMulti();
     document.getElementById('sessionDuration').value = 60;
@@ -28,13 +31,42 @@ RPETracker.prototype.renderPlayerButtons = function() {
     this.renderPlayerButtonsMulti();
 };
 
+// Fecha (YYYY-MM-DD) de la sesión que se está creando; si no hay, hoy.
+RPETracker.prototype._newSessionDate = function() {
+    const el = document.getElementById('sessionDate');
+    return (el && el.value) ? el.value.slice(0, 10) : toLocalISODate(new Date());
+};
+
+// 'full' | 'partial' | 'out' de una jugadora para la fecha de la nueva sesión.
+// Si el módulo de lesiones no estuviera disponible, no se bloquea nada (todas 'full').
+RPETracker.prototype._sessionParticipation = function(playerId, dateISO) {
+    return typeof this.getPlayerParticipation === 'function'
+        ? this.getPlayerParticipation(playerId, dateISO)
+        : 'full';
+};
+
+// Jugadoras que pueden participar en la sesión (todas menos las que están fuera ese día)
+RPETracker.prototype._eligiblePlayerIds = function() {
+    const date = this._newSessionDate();
+    return this.players.filter(p => this._sessionParticipation(p.id, date) !== 'out').map(p => p.id);
+};
+
 RPETracker.prototype.renderPlayerButtonsMulti = function() {
     const container = document.getElementById('playerButtons');
     if (!container) return;
+    const date = this._newSessionDate();
     container.innerHTML = this.players.map(player => {
         const color = PlayerTokens.get(player);
+        const part = this._sessionParticipation(player.id, date);
+        const selected = (this.selectedPlayerIds || []).includes(player.id);
+        const flag = part === 'out'
+            ? '<span class="player-btn-flag" title="Lesionada o no disponible ese día" aria-label="Lesionada o no disponible ese día">🏥</span>'
+            : part === 'partial'
+                ? '<span class="player-btn-flag" title="Participa con limitaciones ese día" aria-label="Participa con limitaciones ese día">🩹</span>'
+                : '';
         return `
-        <button type="button" class="player-btn" data-player-id="${player.id}" style="--player-token:${color}">
+        <button type="button" class="player-btn${selected ? ' multi-selected' : ''}${part === 'out' ? ' player-btn--out' : ''}" data-player-id="${player.id}" style="--player-token:${color}">
+            ${flag}
             ${PlayerTokens.avatar(player, 50, '1.3rem', 'player-btn-avatar')}
             <div class="player-btn-name">${esc(player.name)}</div>
             ${player.number ? `<div class="player-btn-number">#${esc(player.number)}</div>` : ''}
@@ -81,6 +113,12 @@ RPETracker.prototype.togglePlayerSelection = function(playerId) {
     const idx = this.selectedPlayerIds.indexOf(playerId);
     if (idx === -1) {
         this.selectedPlayerIds.push(playerId);
+        // Aviso (sin bloquear): puede que haga trabajo individual y el staff quiera registrarlo
+        if (this._sessionParticipation(playerId, this._newSessionDate()) === 'out') {
+            const p = this.players.find(x => x.id === playerId);
+            // showToast pinta con textContent (no HTML): el nombre no necesita esc()
+            this.showToast('🏥 ' + (p ? p.name : 'Esta jugadora') + ' figura como lesionada o no disponible ese día. Se registrará su sesión; comprueba que es correcto.', 'warning');
+        }
     } else {
         this.selectedPlayerIds.splice(idx, 1);
     }
@@ -96,7 +134,6 @@ RPETracker.prototype.updateSelectedCount = function() {
     const el = document.getElementById('selectedCount');
     if (!el) return;
     const n = (this.selectedPlayerIds || []).length;
-    const total = this.players.length;
     el.textContent = n === 0 ? '0 jugadoras seleccionadas'
         : n === 1 ? '1 jugadora seleccionada'
         : `${n} jugadoras seleccionadas`;
@@ -105,7 +142,10 @@ RPETracker.prototype.updateSelectedCount = function() {
     // Update select-all button
     const btn = document.getElementById('selectAllBtn');
     if (!btn) return;
-    if (n === total) {
+    // "Todas" = todas las que pueden participar ese día (las lesionadas/no disponibles no cuentan)
+    const eligible = this._eligiblePlayerIds();
+    const allSelected = eligible.length > 0 && eligible.every(id => this.selectedPlayerIds.includes(id));
+    if (allSelected) {
         btn.textContent = 'Deseleccionar todas';
         btn.classList.add('active');
     } else {
@@ -116,11 +156,18 @@ RPETracker.prototype.updateSelectedCount = function() {
 
 RPETracker.prototype.selectAllPlayers = function() {
     if (!this.selectedPlayerIds) this.selectedPlayerIds = [];
-    const allSelected = this.selectedPlayerIds.length === this.players.length;
+    // "Todas" = las que pueden participar ese día: una lesionada (o no disponible) no entrena y
+    // el RPE es obligatorio para cada seleccionada, así que se le tendría que inventar un valor.
+    const eligible = this._eligiblePlayerIds();
+    const allSelected = eligible.length > 0 && eligible.every(id => this.selectedPlayerIds.includes(id));
     if (allSelected) {
         this.selectedPlayerIds = [];
     } else {
-        this.selectedPlayerIds = this.players.map(p => p.id);
+        this.selectedPlayerIds = eligible;
+        const skipped = this.players.length - eligible.length;
+        if (skipped > 0) {
+            this.showToast(`🏥 ${skipped === 1 ? '1 jugadora no se ha seleccionado' : skipped + ' jugadoras no se han seleccionado'} (lesionada o no disponible ese día). Puedes añadirla a mano.`, 'info');
+        }
     }
     document.querySelectorAll('.player-btn').forEach(btn => {
         btn.classList.toggle('multi-selected', this.selectedPlayerIds.includes(btn.dataset.playerId));
