@@ -200,7 +200,12 @@ RPETracker.prototype.renderDashboard = function() {
     const matchDayBtnLabel = this._matchDayMode ? '← Vista normal' : '🏟️ Modo partido';
 
     // ── KPI: Ratio A:C medio del equipo (últimos 7 días) ──────────
-    const _acValues = this.players
+    // Solo cuentan las jugadoras que participan hoy: el ratio de una lesionada cae por falta de
+    // carga (no por descarga planificada) y bajaría la media del equipo.
+    const _acRoster = typeof this.getParticipatingPlayers === 'function'
+        ? this.getParticipatingPlayers(toLocalISODate(new Date()))
+        : this.players;
+    const _acValues = _acRoster
         .map(p => this.calculateAcuteChronicRatio(p.id))
         .filter(r => r.confidence !== 'low' && r.ratio !== 'N/A')
         .map(r => parseFloat(r.ratio))
@@ -257,7 +262,7 @@ RPETracker.prototype.renderDashboard = function() {
                 nextMatchSub  = `vs ${esc(nm.rival || '—')}`;
             }
             return `
-            <div class="db-kpi db-kpi--${teamACStatus} db-kpi--7d" title="Ratio A:C medio del equipo (jugadoras con datos suficientes: ${_acValues.length}/${this.players.length})">
+            <div class="db-kpi db-kpi--${teamACStatus} db-kpi--7d" title="Ratio A:C medio del equipo (jugadoras con datos suficientes: ${_acValues.length}/${_acRoster.length})">
                 <span class="db-kpi-val">${teamAC}</span>
                 <span class="db-kpi-lbl">ratio A:C 7d</span>
             </div>
