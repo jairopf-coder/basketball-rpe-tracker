@@ -459,21 +459,32 @@ RPETracker.prototype.getCompStats = function(playerId) {
 };
 
 RPETracker.prototype.getTeamAvgStats = function() {
-    if (!this.players.length) return { sessions:0, sessions28:0, avgRPE:0, rpe7:0, ratio:0, totalLoad:0, load28:0, load7:0, avgLoad:0, avgDuration:0, trend:0 };
-    const all = this.players.map(p => this.getCompStats(p.id));
+    const empty = { sessions:0, sessions28:0, avgRPE:0, rpe7:0, ratio:0, totalLoad:0, load28:0, load7:0, avgLoad:0, avgDuration:0, trend:0 };
+    if (!this.players.length) return empty;
+    // La media del equipo solo cuenta a las jugadoras que participan hoy en el trabajo de
+    // equipo: una lesionada (o no disponible) no entrena y aportaría ceros que falsean la media.
+    const roster = this.getParticipatingPlayers(toLocalISODate(new Date()));
+    if (!roster.length) return empty;
+    const all = roster.map(p => this.getCompStats(p.id));
+    // Totales y recuentos: una jugadora sana sin carga reciente sí es un 0 real.
     const avg = key => all.reduce((s,x)=>s+(x[key]||0),0) / all.length;
+    // RPE, ratio, medias y tendencia: un 0 significa "sin datos", no "valor 0"; se omite.
+    const avgWithData = key => {
+        const vals = all.map(x => x[key] || 0).filter(v => v !== 0);
+        return vals.length ? vals.reduce((s,v)=>s+v,0) / vals.length : 0;
+    };
     return {
         sessions:    Math.round(avg('sessions')),
         sessions28:  Math.round(avg('sessions28')),
-        avgRPE:      avg('avgRPE'),
-        rpe7:        avg('rpe7'),
-        ratio:       avg('ratio'),
+        avgRPE:      avgWithData('avgRPE'),
+        rpe7:        avgWithData('rpe7'),
+        ratio:       avgWithData('ratio'),
         totalLoad:   avg('totalLoad'),
         load28:      avg('load28'),
         load7:       avg('load7'),
-        avgLoad:     avg('avgLoad'),
-        avgDuration: avg('avgDuration'),
-        trend:       avg('trend'),
+        avgLoad:     avgWithData('avgLoad'),
+        avgDuration: avgWithData('avgDuration'),
+        trend:       avgWithData('trend'),
     };
 };
 

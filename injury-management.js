@@ -427,6 +427,61 @@ RPETracker.prototype.saveAvailability = function() {
     }
 };
 
+// ========== PARTICIPACIÓN EN EL TRABAJO DE EQUIPO ==========
+//
+// Cómo participa una jugadora en la dinámica del grupo en una FECHA (YYYY-MM-DD):
+//   'out'     → no entrena con el grupo (lesión en fases 1-4, o marcada "no disponible").
+//               No debe contar en medias de carga ni en comparaciones con el plan.
+//   'partial' → participa con limitaciones (lesión en fase 5, o marcada "limitada"). SÍ cuenta.
+//   'full'    → participa con normalidad.
+// Se calcula con las fechas de la lesión y la fase que tenía ESE día (historial),
+// no con el estado de hoy, así las semanas pasadas siguen siendo correctas.
+// El wellness NO usa esta función: cuenta para todas las jugadoras.
+RPETracker.prototype.getPlayerParticipation = function(playerId, dateISO) {
+    const day = String(dateISO || toLocalISODate(new Date())).slice(0, 10);
+    let result = 'full';
+    const raise = level => { if (level === 'out' || (level === 'partial' && result === 'full')) result = level; };
+
+    // 1) Disponibilidad marcada a mano para ese día
+    const mark = this.availability && this.availability[playerId] ? this.availability[playerId][day] : null;
+    if (mark === 'unavailable') raise('out');
+    else if (mark === 'limited') raise('partial');
+
+    // 2) Lesiones vigentes ese día
+    (this.injuries || []).forEach(inj => {
+        if (!inj || inj.playerId !== playerId || !inj.startDate) return;
+        if (day < String(inj.startDate).slice(0, 10)) return;
+        if (inj.status === 'recovered') {
+            if (!inj.endDate || day >= String(inj.endDate).slice(0, 10)) return;
+        } else if (inj.status !== 'active') {
+            return; // otros estados no cambian el comportamiento actual de la app
+        }
+        const phase = this._injuryPhaseOn(inj, day);
+        if (phase <= 4) raise('out');
+        else if (phase === 5) raise('partial');
+    });
+    return result;
+};
+
+// Fase de Return to Play que tenía una lesión en una fecha. Sin historial usa la
+// fase actual; con historial, la última registrada hasta ese día (antes de la
+// primera actualización, la fase 1).
+RPETracker.prototype._injuryPhaseOn = function(inj, day) {
+    const hist = (inj.history || [])
+        .filter(h => h && h.date && h.phase)
+        .map(h => ({ d: String(h.date).slice(0, 10), phase: parseInt(h.phase) || 1 }))
+        .sort((a, b) => a.d.localeCompare(b.d));
+    if (!hist.length) return parseInt(inj.rtpPhase) || 1;
+    let phase = 1;
+    hist.forEach(h => { if (h.d <= day) phase = h.phase; });
+    return phase;
+};
+
+// Jugadoras de la plantilla que participan en el trabajo de equipo en una fecha.
+RPETracker.prototype.getParticipatingPlayers = function(dateISO) {
+    return (this.players || []).filter(p => this.getPlayerParticipation(p.id, dateISO) !== 'out');
+};
+
 // ========== ADD/EDIT INJURY ==========
 
 RPETracker.prototype.openAddInjuryModal = function(playerId = null) {

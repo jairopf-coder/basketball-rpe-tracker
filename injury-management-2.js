@@ -57,7 +57,7 @@ RPETracker.prototype.renderAvailabilityRow = function(player, dates) {
     `;
     
     dates.forEach(date => {
-        const dateKey = date.toISOString().split('T')[0];
+        const dateKey = toLocalISODate(date); // día local (toISOString daba el día UTC)
         const availability = this.availability[player.id]?.[dateKey];
         
         let icon = '✅';

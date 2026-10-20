@@ -299,23 +299,34 @@
         // ── Planificado ───────────────────────────────────────────
         const intensityRPE = { none: 0, low: 4.5, medium: 5.5, high: 7.5, max: 9.5 };
         const plan = this.getWeekPlanDays(weekStart);
-        const playerCount = Math.max(this.players.length, 1);
 
-        const plannedUAPerDay = DAY_KEYS.map(dk => {
+        // Solo cuentan las jugadoras que participan ese día: una lesionada (o marcada
+        // como no disponible) no entrena, así que no hay plan que cumplir por su parte.
+        const outMap = {};   // playerId → [true si está fuera del grupo ese día, por cada día]
+        this.players.forEach(p => {
+            outMap[p.id] = dayDateStrs.map(ds => this.getPlayerParticipation(p.id, ds) === 'out');
+        });
+        const participantsPerDay = dayDateStrs.map((_, i) => this.players.filter(p => !outMap[p.id][i]).length);
+
+        // Carga planificada para UNA jugadora cada día
+        const plannedLoadPerPlayer = DAY_KEYS.map(dk => {
             const d = plan[dk] || {};
             let load = 0;
             ['morning', 'afternoon'].forEach(sl => {
                 const s = d[sl];
                 if (s && s.enabled) load += (intensityRPE[s.intensity || 'none'] || 0) * (s.duration || 0);
             });
-            return Math.round(load * playerCount);
+            return load;
         });
+        const plannedUAPerDay = plannedLoadPerPlayer.map((load, i) => Math.round(load * participantsPerDay[i]));
 
         const totalPlannedUA = plannedUAPerDay.reduce((a, b) => a + b, 0);
 
         // ── Real ─────────────────────────────────────────────────
-        const realSessByDay = dayDateStrs.map(ds =>
-            this.sessions.filter(s => s.date && s.date.slice(0, 10) === ds)
+        // Las sesiones de jugadoras fuera del grupo ese día (p. ej. readaptación) no se
+        // comparan con el plan del equipo; siguen en su ficha y en su historial.
+        const realSessByDay = dayDateStrs.map((ds, i) =>
+            this.sessions.filter(s => s.date && s.date.slice(0, 10) === ds && !(outMap[s.playerId] && outMap[s.playerId][i]))
         );
         const realUAPerDay = realSessByDay.map(sArr =>
             Math.round(sArr.reduce((sum, s) => sum + (s.load || 0), 0))
@@ -344,7 +355,7 @@
 
         // ── Tabla jugadora × día ──────────────────────────────────
         // For each player, for each day: real UA vs planned (per-player share of daily plan)
-        const plannedUAPerDayPerPlayer = plannedUAPerDay.map(ua => Math.round(ua / playerCount));
+        const plannedUAPerDayPerPlayer = plannedLoadPerPlayer.map(load => Math.round(load));
 
         const tableHead = `
     <thead>
@@ -361,6 +372,10 @@
 
         const tableRows = this.players.map(player => {
             const cells = dayDateStrs.map((ds, i) => {
+                // Fuera del grupo ese día (lesión o no disponible): no hay plan que comparar
+                if (outMap[player.id][i]) {
+                    return `<td class="mc-cell mc-cell-neutral" title="Fuera del grupo ese día (lesión o no disponible): no se compara con el plan">–</td>`;
+                }
                 const daySessions = this.sessions.filter(s => s.playerId === player.id && s.date && s.date.slice(0, 10) === ds);
                 const realUA  = Math.round(daySessions.reduce((sum, s) => sum + (s.load || 0), 0));
                 const planUA  = plannedUAPerDayPerPlayer[i];
@@ -368,12 +383,14 @@
                 return `<td class="mc-cell ${cls}" title="${cellTitle(realUA, planUA)}">${variationText(realUA, planUA)}</td>`;
             }).join('');
 
-            const playerTotal = dayDateStrs.reduce((sum, ds) => {
+            // El total semanal solo suma los días en que participó
+            const playerTotal = dayDateStrs.reduce((sum, ds, i) => {
+                if (outMap[player.id][i]) return sum;
                 return sum + Math.round(this.sessions
                     .filter(s => s.playerId === player.id && s.date && s.date.slice(0, 10) === ds)
                     .reduce((a, s) => a + (s.load || 0), 0));
             }, 0);
-            const playerPlannedTotal = plannedUAPerDayPerPlayer.reduce((a, b) => a + b, 0);
+            const playerPlannedTotal = plannedUAPerDayPerPlayer.reduce((a, b, i) => outMap[player.id][i] ? a : a + b, 0);
             const totalCls = trafficLight(playerTotal, playerPlannedTotal);
 
             return `
@@ -412,7 +429,7 @@
             <span><span class="mc-legend mc-cell-warn"></span> ±15–40%</span>
             <span><span class="mc-legend mc-cell-bad"></span> &gt;40% de desviación</span>
             <span><span class="mc-legend mc-cell-extra"></span> Extra (sin plan)</span>
-            <span><span class="mc-legend mc-cell-neutral"></span> Sin sesión</span>
+            <span><span class="mc-legend mc-cell-neutral"></span> Sin sesión o fuera del grupo (lesión)</span>
         </div>
         <table class="mc-table">
             ${tableHead}

@@ -31,6 +31,9 @@ function load(files) {
     ctx.window = ctx;
     vm.runInContext(secSrc + '\n;globalThis.esc = esc;', ctx);
     vm.runInContext('function RPETracker() {}', ctx);
+    require('./store-dates')(vm, ctx);   // formatDM/formatDMY reales de store.js
+    // toLocalISODate real de store.js (la fila de disponibilidad la usa para la clave del día)
+    vm.runInContext(/function toLocalISODate\(d\) \{[\s\S]*?\n\}/.exec(fs.readFileSync(path.join(ROOT, 'store.js'), 'utf8'))[0], ctx);
     files.forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f }));
     const T = vm.runInContext('new RPETracker()', ctx);
     T.showToast = () => {};

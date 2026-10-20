@@ -257,8 +257,8 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     const dayLabels = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
     const weekRealSessions = this._getWeekRealSessions(weekStart);
-    const plannedLoad = this._plannedWeekLoad(activeDays);
-    const plannedSessions = this._plannedWeekSessions(activeDays);
+    const plannedLoad = this._plannedWeekLoad(activeDays, weekStart);
+    const plannedSessions = this._plannedWeekSessions(activeDays, weekStart);
     // Cumplimiento: solo tiene sentido si hay carga planificada y carga real
     const compliancePct = (plannedLoad > 0 && weekRealSessions.totalLoad > 0)
         ? Math.round(weekRealSessions.totalLoad / plannedLoad * 100)
@@ -268,7 +268,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
     const typeColors = {training:'#2196f3', match:'#f44336', recovery:'#4caf50', shooting:'#9c27b0', gym:'#795548'};
 
     const intensityRPE_slot = {none:0,low:4.5,medium:5.5,high:7.5,max:9.5};
-    const buildSlotHTML = (dayKey, slot, s) => {
+    const buildSlotHTML = (dayKey, slot, s, dateStr) => {
         const active = !!s.enabled;
         const headerHTML =
             `<div class="wp-session-header">
@@ -310,7 +310,7 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
             <input type="text" class="wp-input-focus" placeholder="Foco..."
                 value="${esc(s.focus||'')}"
                 data-wp-day="${dayKey}" data-wp-slot="${slot}" data-wp-field="focus">
-            ${this._renderProjectedACRow((intensityRPE_slot[s.intensity||'none']||0) * (s.duration||0))}
+            ${this._renderProjectedACRow((intensityRPE_slot[s.intensity||'none']||0) * (s.duration||0), dateStr)}
         </div>`;
     };
 
@@ -348,8 +348,8 @@ RPETracker.prototype.renderWeeklyPlanning = function() {
                 <span class="wp-day-date">${date.getDate()}/${date.getMonth()+1}</span>
                 ${isToday ? '<span class="wp-today-badge">HOY</span>' : ''}
             </div>
-            ${buildSlotHTML(dayKey, 'morning', morning)}
-            ${buildSlotHTML(dayKey, 'afternoon', afternoon)}
+            ${buildSlotHTML(dayKey, 'morning', morning, dateStr)}
+            ${buildSlotHTML(dayKey, 'afternoon', afternoon, dateStr)}
             ${realHTML}
         </div>`;
     }).join('');
@@ -600,10 +600,12 @@ RPETracker.prototype._projectedACRatio = function(playerId, extraLoad) {
  * Renderiza una fila compacta de badges A:C proyectados por jugadora.
  * sessionLoad = RPE × duración calculado desde intensidad y duración del slot.
  */
-RPETracker.prototype._renderProjectedACRow = function(sessionLoad) {
+RPETracker.prototype._renderProjectedACRow = function(sessionLoad, dateStr) {
     if (!this.players.length || sessionLoad <= 0) return '';
 
-    const badges = this.players.map(p => {
+    // Con fecha, solo las jugadoras que participan ese día (una lesionada no hará la sesión)
+    const roster = dateStr ? this.getParticipatingPlayers(dateStr) : this.players;
+    const badges = roster.map(p => {
         const ratio = this._projectedACRatio(p.id, sessionLoad);
         if (ratio === null) return '';
         const t = this.getPlayerThresholds(p.id);
@@ -630,7 +632,10 @@ RPETracker.prototype._getWeekRealSessions = function(weekStart) {
     for (let i=0;i<7;i++) {
         const d = new Date(weekStart); d.setDate(d.getDate()+i);
         const dateStr = toLocalISODate(d);
-        byDay[dateStr] = this.sessions.filter(s => s.date && s.date.slice(0,10)===dateStr);
+        // Las sesiones de jugadoras fuera del grupo ese día (lesión/no disponible) no cuentan
+        // en el total del equipo ni en el cumplimiento del plan.
+        byDay[dateStr] = this.sessions.filter(s => s.date && s.date.slice(0,10)===dateStr
+            && this.getPlayerParticipation(s.playerId, dateStr) !== 'out');
         const dayLoad = byDay[dateStr].reduce((sum,s)=>sum+(s.load||0),0);
         totalLoad += dayLoad;
         sessions += byDay[dateStr].length;
@@ -638,26 +643,48 @@ RPETracker.prototype._getWeekRealSessions = function(weekStart) {
     return { byDay, totalLoad: Math.round(totalLoad), sessions };
 };
 
-RPETracker.prototype._plannedWeekLoad = function(days) {
+// Carga (RPE × minutos) que un día del plan supone para UNA jugadora.
+RPETracker.prototype._wpDayLoad = function(d) {
     const intensityRPE = {none:0,low:4.5,medium:5.5,high:7.5,max:9.5};
-    const plan = days || this.getWeekPlanDays();
     let total = 0;
-    Object.values(plan).forEach(d => {
-        // Nuevo formato: morning/afternoon
-        if (d.morning || d.afternoon) {
-            ['morning','afternoon'].forEach(slot => {
-                const s = d[slot];
-                if (s && s.enabled) {
-                    const rpe = intensityRPE[s.intensity||'none'] || 0;
-                    total += rpe * (s.duration||0);
-                }
-            });
-        } else {
-            // Formato legacy
-            const rpe = intensityRPE[d.intensity||'none'] || 0;
-            total += rpe * (d.duration||0);
-        }
-    });
+    // Nuevo formato: morning/afternoon
+    if (d.morning || d.afternoon) {
+        ['morning','afternoon'].forEach(slot => {
+            const s = d[slot];
+            if (s && s.enabled) {
+                const rpe = intensityRPE[s.intensity||'none'] || 0;
+                total += rpe * (s.duration||0);
+            }
+        });
+    } else {
+        // Formato legacy
+        const rpe = intensityRPE[d.intensity||'none'] || 0;
+        total += rpe * (d.duration||0);
+    }
+    return total;
+};
+
+// Fecha local (YYYY-MM-DD) del día i (0 = lunes) de la semana que empieza en weekStart.
+RPETracker.prototype._wpDateStrOf = function(weekStart, i) {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return toLocalISODate(d);
+};
+
+// Con weekStart, cada día se multiplica solo por las jugadoras que participan ese día
+// (no lesionadas ni marcadas como no disponibles). Sin weekStart, por toda la plantilla.
+RPETracker.prototype._plannedWeekLoad = function(days, weekStart) {
+    const plan = days || this.getWeekPlanDays();
+    if (weekStart) {
+        let total = 0;
+        ['lun','mar','mie','jue','vie','sab','dom'].forEach((dk, i) => {
+            if (!plan[dk]) return;
+            total += this._wpDayLoad(plan[dk]) * this.getParticipatingPlayers(this._wpDateStrOf(weekStart, i)).length;
+        });
+        return Math.round(total);
+    }
+    let total = 0;
+    Object.values(plan).forEach(d => { total += this._wpDayLoad(d); });
     const playerCount = Math.max(this.players.length, 1);
     return Math.round(total * playerCount);
 };
@@ -666,8 +693,19 @@ RPETracker.prototype._plannedWeekLoad = function(days) {
 // Sin carga planificada o sin carga real no hay nada que comparar (gris).
 // Sesiones planificadas de la semana a nivel de equipo:
 // turnos activados × número de jugadoras (igual criterio que la carga planificada).
-RPETracker.prototype._plannedWeekSessions = function(days) {
+RPETracker.prototype._plannedWeekSessions = function(days, weekStart) {
     const plan = days || this.getWeekPlanDays();
+    if (weekStart) {
+        let total = 0;
+        ['lun','mar','mie','jue','vie','sab','dom'].forEach((dk, i) => {
+            const d = plan[dk];
+            if (!d) return;
+            let slots = 0;
+            ['morning','afternoon'].forEach(slot => { if (d[slot] && d[slot].enabled) slots++; });
+            total += slots * this.getParticipatingPlayers(this._wpDateStrOf(weekStart, i)).length;
+        });
+        return total;
+    }
     let slots = 0;
     Object.values(plan).forEach(d => {
         ['morning','afternoon'].forEach(slot => {
