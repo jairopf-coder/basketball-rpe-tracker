@@ -100,7 +100,8 @@
     // Agrupa todas las sesiones cargadas por semana (clave = lunes)
     RPETracker.prototype._mcSessionsByWeek = function () {
         const weeks = new Map();
-        (this.sessions || []).forEach(s => {
+        // Solo trabajo de equipo, igual que la tabla Jugadora × Día (sin readaptación individual)
+        this.getTeamSessions(this.sessions || []).forEach(s => {
             if (!s || typeof s.date !== 'string' || !ISO_DATE.test(s.date)) return;
             const key = mondayOf(s.date);
             if (!weeks.has(key)) weeks.set(key, []);

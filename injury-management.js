@@ -478,6 +478,31 @@ RPETracker.prototype._injuryPhaseOn = function(inj, day) {
     return phase;
 };
 
+// ¿Esta sesión cuenta como trabajo de EQUIPO? No cuenta si la jugadora estaba fuera del grupo
+// ese día (lesión en fases 1-4 o no disponible): suele ser readaptación o trabajo individual.
+// Esas sesiones se conservan en su ficha y su historial, pero no entran en medias ni totales
+// de equipo (RPE medio del día, carga del equipo, comparación con el plan...).
+RPETracker.prototype.isTeamSession = function(s) {
+    if (!s || !s.playerId || !s.date) return true;
+    return this.getPlayerParticipation(s.playerId, String(s.date).slice(0, 10)) !== 'out';
+};
+
+// Lista de sesiones sin las que no cuentan como trabajo de equipo (ver isTeamSession).
+// Sin lesiones ni marcas de disponibilidad devuelve la misma lista, sin recorrerla.
+RPETracker.prototype.getTeamSessions = function(sessions) {
+    const list = sessions || this.sessions || [];
+    const hasMarks = this.availability && Object.keys(this.availability).length > 0;
+    if (!(this.injuries && this.injuries.length) && !hasMarks) return list;
+    const memo = new Map();   // una comprobación por jugadora y día, no por sesión
+    return list.filter(s => {
+        if (!s || !s.playerId || !s.date) return true;
+        const key = s.playerId + '|' + String(s.date).slice(0, 10);
+        let out = memo.get(key);
+        if (out === undefined) { out = !this.isTeamSession(s); memo.set(key, out); }
+        return !out;
+    });
+};
+
 // Jugadoras de la plantilla que participan en el trabajo de equipo en una fecha.
 RPETracker.prototype.getParticipatingPlayers = function(dateISO) {
     return (this.players || []).filter(p => this.getPlayerParticipation(p.id, dateISO) !== 'out');

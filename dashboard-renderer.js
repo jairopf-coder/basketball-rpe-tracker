@@ -18,24 +18,27 @@ RPETracker.prototype.renderDashboard = function() {
     }
 
     // Stats
-    const totalSessions = this.countUniqueSessions(this.sessions);
-    const trainingCount = this.countUniqueSessions(this.sessions.filter(s => s.type === 'training'));
-    const matchCount    = this.countUniqueSessions(this.sessions.filter(s => s.type === 'match'));
-    const avgRPE = this.sessions.length > 0
-        ? (this.sessions.reduce((sum, s) => sum + s.rpe, 0) / this.sessions.length).toFixed(1) : '—';
+    // Medias y recuentos de EQUIPO: sin las sesiones de jugadoras que ese día estaban fuera del
+    // grupo (readaptación / trabajo individual). Siguen en su ficha y en su historial.
+    const _teamSessions = typeof this.getTeamSessions === 'function' ? this.getTeamSessions(this.sessions) : this.sessions;
+    const totalSessions = this.countUniqueSessions(_teamSessions);
+    const trainingCount = this.countUniqueSessions(_teamSessions.filter(s => s.type === 'training'));
+    const matchCount    = this.countUniqueSessions(_teamSessions.filter(s => s.type === 'match'));
+    const avgRPE = _teamSessions.length > 0
+        ? (_teamSessions.reduce((sum, s) => sum + s.rpe, 0) / _teamSessions.length).toFixed(1) : '—';
     const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recent7 = this.sessions.filter(s => new Date(s.date) >= sevenDaysAgo);
+    const recent7 = _teamSessions.filter(s => new Date(s.date) >= sevenDaysAgo);
     const recentUnique = this.countUniqueSessions(recent7);
     const avgRPE7 = recent7.length > 0
         ? (recent7.reduce((s, x) => s + x.rpe, 0) / recent7.length).toFixed(1) : '—';
 
     // RPE medio de la última sesión (agrupando por fecha+turno+tipo, igual que countUniqueSessions)
     let avgRPELastSession = '—';
-    if (this.sessions.length > 0) {
-        const sortedByDate = [...this.sessions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (_teamSessions.length > 0) {
+        const sortedByDate = [..._teamSessions].sort((a, b) => new Date(b.date) - new Date(a.date));
         const last = sortedByDate[0];
         const lastKey = `${last.date.slice(0, 10)}_${last.timeOfDay || 'unknown'}_${last.type || 'training'}`;
-        const lastSessionEntries = this.sessions.filter(s =>
+        const lastSessionEntries = _teamSessions.filter(s =>
             `${s.date.slice(0, 10)}_${s.timeOfDay || 'unknown'}_${s.type || 'training'}` === lastKey
         );
         avgRPELastSession = (lastSessionEntries.reduce((sum, s) => sum + s.rpe, 0) / lastSessionEntries.length).toFixed(1);
@@ -415,7 +418,7 @@ RPETracker.prototype.renderDashboard = function() {
             for (let d = 6; d >= 0; d--) {
                 const dayStart = new Date(now); dayStart.setDate(dayStart.getDate() - d); dayStart.setHours(0,0,0,0);
                 const dayEnd   = new Date(dayStart); dayEnd.setHours(23,59,59,999);
-                const dayLoad  = this.sessions
+                const dayLoad  = _teamSessions
                     .filter(s => { const sd = new Date(s.date); return sd >= dayStart && sd <= dayEnd; })
                     .reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
                 teamData.push(dayLoad);
@@ -999,7 +1002,9 @@ RPETracker.prototype.showDashboardDaySummary = function(dateStr) {
     const today = toLocalISODate(new Date());
 
     const match   = (this.matches || []).find(m => m.date === dateStr) || null;
-    const entries = this.sessions.filter(s => s.date === dateStr);
+    const _dayAll = this.sessions.filter(s => s.date === dateStr);
+    // Solo trabajo de equipo: las sesiones individuales de jugadoras fuera ese día no entran en la media
+    const entries = typeof this.getTeamSessions === 'function' ? this.getTeamSessions(_dayAll) : _dayAll;
 
     let html = '';
 

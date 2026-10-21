@@ -1327,6 +1327,14 @@ header h1 {
     margin-bottom: 1rem;
 }
 
+/* Calendario: sesiones individuales (jugadoras fuera del grupo) */
+.cal-individual {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.7rem;
+    opacity: 0.8;
+}
+
 .session-count {
     display: block;
     margin-bottom: 0.2rem;

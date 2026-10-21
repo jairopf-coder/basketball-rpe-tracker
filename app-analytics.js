@@ -414,7 +414,8 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
     // Build rows: for each session in last 8 weeks, try to match to plan slot
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 56); // 8 weeks back
-    const recentSessions = this.sessions.filter(s => {
+    // Se compara con el plan del EQUIPO: sin las sesiones de jugadoras fuera del grupo ese día
+    const recentSessions = this.getTeamSessions(this.sessions).filter(s => {
         if (!s.date || !s.rpe) return false;
         return new Date(s.date) >= cutoff;
     });

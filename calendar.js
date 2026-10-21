@@ -46,10 +46,14 @@ RPETracker.prototype.renderCalendar = function(year, month) {
     const dayData = [];
     for (let day = 1; day <= daysInMonth; day++) {
         const currentDate = new Date(year, month, day);
-        const dayEntries  = this.sessions.filter(s => {
+        const allDayEntries = this.sessions.filter(s => {
             const d = new Date(s.date);
             return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
         });
+        // Medias y ratio del día: solo trabajo de equipo. Las sesiones de jugadoras fuera del
+        // grupo ese día (lesión / no disponible) se cuentan aparte y se ven en el detalle.
+        const dayEntries = this.getTeamSessions(allDayEntries);
+        const individualCount = allDayEntries.length - dayEntries.length;
 
         const isToday = new Date().toDateString() === currentDate.toDateString();
         const slots   = this.groupSessionsBySlot(dayEntries);
@@ -66,7 +70,7 @@ RPETracker.prototype.renderCalendar = function(year, month) {
             }
         }
 
-        dayData.push({ day, isToday, slots, avgRatio, ratioColor });
+        dayData.push({ day, isToday, slots, avgRatio, ratioColor, individualCount });
     }
 
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
@@ -109,7 +113,7 @@ RPETracker.prototype._renderCalendarGrid = function(year, month, dayData, slotLa
         html += '<div class="calendar-day empty"></div>';
     }
 
-    dayData.forEach(({ day, isToday, slots, avgRatio, ratioColor }) => {
+    dayData.forEach(({ day, isToday, slots, avgRatio, ratioColor, individualCount }) => {
         const dayClass = 'calendar-day' + (isToday ? ' today' : '') + (slots.length > 0 ? ' has-sessions' : '');
 
         let sessionHTML = '';
@@ -134,6 +138,7 @@ RPETracker.prototype._renderCalendarGrid = function(year, month, dayData, slotLa
         if (avgRatio > 0 && slots.length > 0) {
             sessionHTML += `<span class="ratio-badge" style="background:${ratioColor};color:white;">${avgRatio.toFixed(1)}</span>`;
         }
+        sessionHTML += this._calIndividualBadge(individualCount);
 
         html += `
             <div class="${dayClass}" onclick="window.rpeTracker?.showDaySessions(${year},${month},${day})"
@@ -158,13 +163,13 @@ RPETracker.prototype._renderCalendarAgenda = function(year, month, dayData, slot
 
     let html = '<div class="calendar-agenda">';
 
-    dayData.forEach(({ day, isToday, slots, avgRatio, ratioColor }) => {
+    dayData.forEach(({ day, isToday, slots, avgRatio, ratioColor, individualCount }) => {
         const dow = (new Date(year, month, day).getDay() + 6) % 7;
         const rowClass = 'cal-agenda-row' + (isToday ? ' today' : '') + (slots.length > 0 ? ' has-sessions' : '');
 
         let sessionHTML = '';
         if (slots.length === 0) {
-            sessionHTML = '<span class="cal-agenda-empty">—</span>';
+            sessionHTML = individualCount > 0 ? '' : '<span class="cal-agenda-empty">—</span>';
         } else if (slots.length === 1) {
             const slot   = slots[0];
             const avgRPE = (slot.entries.reduce((s, x) => s + x.rpe, 0) / slot.entries.length).toFixed(1);
@@ -186,6 +191,7 @@ RPETracker.prototype._renderCalendarAgenda = function(year, month, dayData, slot
         if (avgRatio > 0 && slots.length > 0) {
             sessionHTML += `<span class="ratio-badge" style="background:${ratioColor};color:white;">${avgRatio.toFixed(1)}</span>`;
         }
+        sessionHTML += this._calIndividualBadge(individualCount);
 
         html += `
             <div class="${rowClass}" onclick="window.rpeTracker?.showDaySessions(${year},${month},${day})"
@@ -201,6 +207,14 @@ RPETracker.prototype._renderCalendarAgenda = function(year, month, dayData, slot
 
     html += '</div>';
     return html;
+};
+
+// Marca pequeña en un día con sesiones INDIVIDUALES (jugadoras lesionadas o no disponibles ese
+// día): no cuentan en las medias del equipo, pero así se sabe que existen.
+RPETracker.prototype._calIndividualBadge = function(count) {
+    if (!count) return '';
+    const txt = count === 1 ? '1 sesión individual' : count + ' sesiones individuales';
+    return `<span class="cal-individual" title="${txt} (jugadora lesionada o no disponible): no cuenta en las medias del equipo">🏥 ${count}</span>`;
 };
 
 // Tarjeta desplegable "info" bajo el calendario: explica cada dato que se
@@ -230,6 +244,7 @@ RPETracker.prototype._renderCalendarInfoCard = function() {
                     </li>
                     <li><strong>Fondo del día:</strong> tinte suave del mismo color que la etiqueta del ratio.</li>
                     <li><strong>Sin etiqueta de ratio:</strong> todavía no hay datos suficientes (menos de 7 sesiones en los 28 días anteriores).</li>
+                    <li><strong>🏥 + número:</strong> sesiones individuales de jugadoras lesionadas o no disponibles ese día. Se guardan en su ficha, pero no cuentan en los promedios del equipo (RPE, ratio); se ven en el detalle del día.</li>
                     <li><strong>Borde naranja grueso:</strong> es el día de hoy.</li>
                     <li><strong>Al pulsar un día</strong> se abre el detalle por jugadora: RPE, carga (RPE × minutos) y ratio A:C de ese día.</li>
                 </ul>
@@ -252,13 +267,16 @@ RPETracker.prototype.showDaySessions = function(year, month, day) {
     slots.sort((a, b) => (slotOrder[a.timeOfDay] ?? 9) - (slotOrder[b.timeOfDay] ?? 9));
 
     let html = '';
+    let anyOut = false;   // ¿hay alguna jugadora fuera del grupo ese día?
 
     slots.forEach(slot => {
         const label    = slotLabel[slot.timeOfDay] || slot.timeOfDay;
         const icon     = slot.type === 'match' ? '🏟️' : '🏀';
         const typeName = slot.type === 'match' ? 'Partido' : 'Entrenamiento';
-        const avgRPE   = (slot.entries.reduce((s, x) => s + x.rpe, 0) / slot.entries.length).toFixed(1);
-        const avgLoad  = Math.round(slot.entries.reduce((s, x) => s + (x.load || x.rpe * (x.duration || 60)), 0) / slot.entries.length);
+        // Medias del turno: solo trabajo de equipo (las jugadoras fuera ese día se listan, pero no cuentan)
+        const teamEntries = slot.entries.filter(e => this.isTeamSession(e));
+        const avgRPE   = teamEntries.length ? (teamEntries.reduce((s, x) => s + x.rpe, 0) / teamEntries.length).toFixed(1) : '—';
+        const avgLoad  = teamEntries.length ? Math.round(teamEntries.reduce((s, x) => s + (x.load || x.rpe * (x.duration || 60)), 0) / teamEntries.length) : '—';
         const dur      = slot.entries[0].duration || 60;
         const hasNotes = slot.entries.some(e => e.notes);
 
@@ -289,15 +307,17 @@ RPETracker.prototype.showDaySessions = function(year, month, day) {
             })
             .forEach(entry => {
                 const player = this.players.find(p => p.id === entry.playerId);
-                const name   = player
+                const isOut  = !this.isTeamSession(entry);
+                anyOut = anyOut || isOut;
+                const name   = (player
                     ? `${esc(player.name)}${player.number ? ' <span class="db-num">#' + esc(player.number) + '</span>' : ''}`
-                    : 'Desconocida';
+                    : 'Desconocida') + (isOut ? ' <span title="Fuera del grupo ese día: no cuenta en las medias del equipo">🏥</span>' : '');
                 const ratio  = this.calculateAcuteChronicRatio(entry.playerId, 7, date);
                 const rColor = this.getRatioColor(ratio.ratio);
                 const load   = entry.load || entry.rpe * (entry.duration || 60);
 
                 html += `
-                    <tr onclick="window.rpeTracker?.showSessionDetail('${entry.id}')" style="cursor:pointer;">
+                    <tr onclick="window.rpeTracker?.showSessionDetail('${entry.id}')" style="cursor:pointer;${isOut ? 'opacity:0.6;' : ''}">
                         <td>${name}</td>
                         <td><span style="color:${this.getRPEColor(entry.rpe)};font-weight:700;">${entry.rpe}</span></td>
                         <td>${load}</td>
@@ -311,14 +331,18 @@ RPETracker.prototype.showDaySessions = function(year, month, day) {
     });
 
     // Media global del día si hay más de una sesión
-    if (slots.length > 1) {
-        const dayAvgRPE  = (entries.reduce((s, x) => s + x.rpe, 0) / entries.length).toFixed(1);
-        const dayAvgLoad = Math.round(entries.reduce((s, x) => s + (x.load || x.rpe * (x.duration || 60)), 0) / entries.length);
+    const teamDay = this.getTeamSessions(entries);
+    if (slots.length > 1 && teamDay.length > 0) {
+        const dayAvgRPE  = (teamDay.reduce((s, x) => s + x.rpe, 0) / teamDay.length).toFixed(1);
+        const dayAvgLoad = Math.round(teamDay.reduce((s, x) => s + (x.load || x.rpe * (x.duration || 60)), 0) / teamDay.length);
         html += `
             <div class="cal-modal-day-avg">
                 Media del día &nbsp;·&nbsp; RPE <strong>${dayAvgRPE}</strong> &nbsp;·&nbsp; Carga <strong>${dayAvgLoad}</strong>
             </div>
         `;
+    }
+    if (anyOut) {
+        html += `<div class="cal-modal-day-avg" style="font-size:0.8rem;">🏥 Jugadora fuera del grupo ese día (lesión o no disponible): su sesión se guarda, pero no cuenta en las medias del equipo.</div>`;
     }
 
     const MODAL_ID = 'daySessionsModal';
