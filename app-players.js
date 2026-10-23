@@ -1,5 +1,40 @@
 // app-players.js — Módulo de gestión de jugadoras: alta, edición, borrado, listado (extraído de app.js V25)
 
+// ─── Nombre y apellido ─────────────────────────────────────────────────────────
+// `name` es el nombre (lo único que se ve en la app) y `lastName` el apellido o apellidos,
+// en un campo libre. Para identificar a la jugadora en datos externos (CSV de Oli, export al
+// fisio) se usa el nombre completo: nombre + apellido, escrito como lo escribe Oli.
+
+RPETracker.prototype.playerFullName = function(player) {
+    if (!player) return '';
+    return [player.name, player.lastName]
+        .map(s => String(s || '').trim())
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ');
+};
+
+// Propuesta para separar un texto completo: primera palabra = nombre, el resto = apellido.
+// Es solo una propuesta (no sirve con nombres compuestos como "María José"): el staff la revisa.
+RPETracker.prototype._splitFullName = function(fullName) {
+    const clean = String(fullName || '').trim().replace(/\s+/g, ' ');
+    const i = clean.indexOf(' ');
+    return i === -1 ? { name: clean, lastName: '' } : { name: clean.slice(0, i), lastName: clean.slice(i + 1) };
+};
+
+RPETracker.prototype._playersMissingLastName = function() {
+    return this.players.filter(p => !String(p.lastName || '').trim());
+};
+
+// Busca otra jugadora con el mismo nombre completo (sin distinguir mayúsculas ni acentos).
+// _normalizePlayerName vive en gps-tracking.js.
+RPETracker.prototype._findPlayerByFullName = function(fullName, exceptId) {
+    const key = this._normalizePlayerName(fullName);
+    if (!key) return null;
+    return this.players.find(p => p.id !== exceptId
+        && this._normalizePlayerName(this.playerFullName(p)) === key) || null;
+};
+
 RPETracker.prototype.openAddPlayerModal = function() {
     const _modal2 = document.getElementById('addPlayerModal');
     _modal2.classList.add('active');
@@ -34,25 +69,27 @@ RPETracker.prototype.handlePlayerSubmit = function(e) {
         playerNumber = String(num);
     }
 
-    // Detectar nombre duplicado (case-insensitive)
-    const duplicate = this.players.find(p => p.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    const trimmedLastName = (document.getElementById('playerLastName')?.value || '').trim().slice(0, 60);
+
+    // Detectar jugadora duplicada: mismo nombre y apellido (sin distinguir mayúsculas ni acentos)
+    const duplicate = this._findPlayerByFullName(this.playerFullName({ name: trimmedName, lastName: trimmedLastName }));
     if (duplicate) {
         AppConfirm.show({
             title: 'Nombre duplicado',
-            message: `Ya existe una jugadora llamada "${duplicate.name}". ¿Deseas añadir igualmente?`,
+            message: `Ya existe una jugadora llamada "${this.playerFullName(duplicate)}". ¿Deseas añadir igualmente?`,
             confirmText: 'Añadir',
             cancelText: 'Cancelar'
         }).then(ok => {
             if (!ok) return;
-            this._doAddPlayer(trimmedName, playerNumber);
+            this._doAddPlayer(trimmedName, playerNumber, trimmedLastName);
         });
         return;
     }
 
-    this._doAddPlayer(trimmedName, playerNumber);
+    this._doAddPlayer(trimmedName, playerNumber, trimmedLastName);
 };
 
-RPETracker.prototype._doAddPlayer = function(name, number) {
+RPETracker.prototype._doAddPlayer = function(name, number, lastName) {
     const chosenColor = document.getElementById('playerColor').value;
     const usedColors = this.players.map(p => p.color).filter(Boolean);
     const fallback = PlayerTokens.PALETTE.find(c => !usedColors.includes(c)) || PlayerTokens.PALETTE[this.players.length % PlayerTokens.PALETTE.length];
@@ -60,6 +97,7 @@ RPETracker.prototype._doAddPlayer = function(name, number) {
     const player = {
         id: Date.now().toString(),
         name: name,
+        lastName: lastName || '',
         number: number,
         color: chosenColor || fallback,
         createdAt: new Date().toISOString()
@@ -137,6 +175,8 @@ RPETracker.prototype._deletePlayerBasic = function(playerId) {
 RPETracker.prototype.renderPlayers = function() {
     const container = document.getElementById('playersList');
     if (!container) return;
+
+    this._renderPlayersNamesBanner();
 
     if (this.players.length === 0) {
         container.innerHTML = `
@@ -361,6 +401,8 @@ RPETracker.prototype.editPlayer = function(playerId) {
 
     document.getElementById('editPlayerId').value = player.id;
     document.getElementById('editPlayerName').value = player.name;
+    const lastNameInput = document.getElementById('editPlayerLastName');
+    if (lastNameInput) lastNameInput.value = player.lastName || '';
     document.getElementById('editPlayerNumber').value = player.number || '';
 
     // ID de Oli (se lee del mapeo gpsPlayerMap; ver gps-tracking.js)
@@ -403,6 +445,17 @@ RPETracker.prototype.handleEditPlayerSubmit = function(e) {
         return;
     }
 
+    // El nombre completo (nombre + apellido) identifica a la jugadora al importar y exportar datos,
+    // así que no puede coincidir con el de otra jugadora.
+    const sameName = this._findPlayerByFullName(this.playerFullName({
+        name: document.getElementById('editPlayerName').value,
+        lastName: document.getElementById('editPlayerLastName')?.value
+    }), playerId);
+    if (sameName) {
+        this.showToast(`❌ Ya existe otra jugadora llamada "${this.playerFullName(sameName)}"`, 'error');
+        return;
+    }
+
     // ID de Oli: solo se toca si el usuario lo ha cambiado. Se valida ANTES de guardar nada.
     const oliInput = document.getElementById('editPlayerOliId');
     let oliChange = null; // null = sin cambios; si no, { value }
@@ -429,6 +482,8 @@ RPETracker.prototype.handleEditPlayerSubmit = function(e) {
 
 RPETracker.prototype._applyEditPlayer = function(player, oliChange) {
     player.name = document.getElementById('editPlayerName').value;
+    const lastNameField = document.getElementById('editPlayerLastName');
+    if (lastNameField) player.lastName = lastNameField.value.trim().slice(0, 60);
     player.number = document.getElementById('editPlayerNumber').value || null;
     const chosenColor = document.getElementById('editPlayerColor').value;
     if (chosenColor) player.color = chosenColor;
@@ -465,7 +520,9 @@ RPETracker.prototype.showBulkImportPlayersModal = function() {
         <div class="clear-confirm-modal" style="text-align:left;max-width:480px">
             <h2 class="clear-confirm-title" style="text-align:center">📋 Importar lista de jugadoras</h2>
             <p class="clear-confirm-desc" style="text-align:center">
-                Pega una jugadora por línea. El dorsal es opcional, sepáralo con una coma.
+                Pega una jugadora por línea, con nombre y apellidos. El dorsal es opcional, sepáralo con una coma.
+                La primera palabra será el nombre y el resto el apellido; si algún nombre es compuesto
+                (por ejemplo María José), corrígelo después en su ficha.
             </p>
             <div class="form-group">
                 <textarea id="bulkImportTextarea" class="form-input" rows="8"
@@ -514,7 +571,9 @@ RPETracker.prototype._confirmBulkImportPlayers = function() {
 
     lines.forEach(line => {
         const parts = line.split(',').map(p => p.trim());
-        const name = parts[0]?.slice(0, 60);
+        const split = this._splitFullName(parts[0]);
+        const name = split.name.slice(0, 60);
+        const lastName = split.lastName.slice(0, 60);
         if (!name) return;
 
         let number = null;
@@ -523,12 +582,13 @@ RPETracker.prototype._confirmBulkImportPlayers = function() {
             if (!isNaN(num) && num >= 0 && num <= 99) number = String(num);
         }
 
-        const duplicate = this.players.find(p => p.name.trim().toLowerCase() === name.toLowerCase());
-        if (duplicate) { skipped.push(name); return; }
+        const fullName = this.playerFullName({ name, lastName });
+        if (this._findPlayerByFullName(fullName)) { skipped.push(fullName); return; }
 
         const player = {
             id: Date.now().toString() + '_' + Math.random().toString(36).slice(2, 7),
             name: name,
+            lastName: lastName,
             number: number,
             color: nextColor(),
             createdAt: new Date().toISOString()
@@ -552,3 +612,120 @@ RPETracker.prototype._confirmBulkImportPlayers = function() {
     }
 };
 
+// ─── Revisar nombres: separar nombre y apellido de las jugadoras que aún no tienen apellido ───
+
+RPETracker.prototype._renderPlayersNamesBanner = function() {
+    const el = document.getElementById('playersNamesBanner');
+    if (!el) return;
+    const n = this._playersMissingLastName().length;
+    el.innerHTML = n === 0 ? '' : `
+        <div role="status" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem;
+            padding:.6rem .8rem;margin-bottom:.75rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-subtle)">
+            <span>⚠️ ${n} jugadora${n === 1 ? '' : 's'} sin apellido</span>
+            <button type="button" class="btn-secondary" onclick="window.rpeTracker?.showReviewPlayerNamesModal()">Revisar nombres</button>
+        </div>`;
+};
+
+// Aplica la revisión. updates = [{ id, name, lastName }]. Si hay un error no cambia nada:
+// nombre vacío, o dos jugadoras que quedarían con el mismo nombre completo.
+RPETracker.prototype._applyPlayerNameReview = function(updates) {
+    const byId = new Map(updates.map(u => [u.id, u]));
+    const result = this.players.map(p => byId.has(p.id)
+        ? { name: byId.get(p.id).name, lastName: byId.get(p.id).lastName }
+        : p);
+
+    if (result.some(p => !String(p.name || '').trim())) {
+        return { ok: false, error: 'Todas las jugadoras necesitan un nombre.' };
+    }
+    const seen = new Set();
+    for (const p of result) {
+        const key = this._normalizePlayerName(this.playerFullName(p));
+        if (seen.has(key)) {
+            return { ok: false, error: `Hay dos jugadoras con el mismo nombre y apellido: ${this.playerFullName(p)}.` };
+        }
+        seen.add(key);
+    }
+
+    let changed = 0;
+    this.players.forEach(p => {
+        const u = byId.get(p.id);
+        if (!u) return;
+        if (p.name !== u.name || (p.lastName || '') !== u.lastName) {
+            p.name = u.name;
+            p.lastName = u.lastName;
+            changed++;
+        }
+    });
+    return { ok: true, changed };
+};
+
+RPETracker.prototype.showReviewPlayerNamesModal = function() {
+    const pending = this._playersMissingLastName();
+    if (!pending.length) {
+        this.showToast('✅ Todas las jugadoras ya tienen apellido', 'success');
+        return;
+    }
+
+    document.getElementById('reviewNamesOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'reviewNamesOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:3000;display:flex;align-items:center;justify-content:center;padding:1rem';
+
+    const cols = 'display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:.5rem';
+    const inputStyle = 'width:100%;box-sizing:border-box;padding:.5rem .6rem;border:2px solid var(--border-input);border-radius:8px;font:inherit;background:var(--bg-input);color:var(--text-primary)';
+    const rows = pending.map(p => {
+        const s = this._splitFullName(p.name);
+        return `
+            <div class="review-names-row" data-player-id="${esc(p.id)}" style="padding:.4rem 0">
+                <div style="${cols}">
+                    <input type="text" style="${inputStyle}" data-field="name" value="${esc(s.name)}" maxlength="60" aria-label="Nombre de ${esc(p.name)}">
+                    <input type="text" style="${inputStyle}" data-field="lastName" value="${esc(s.lastName)}" maxlength="60" placeholder="Apellido(s)" aria-label="Apellido de ${esc(p.name)}">
+                </div>
+            </div>`;
+    }).join('');
+
+    overlay.innerHTML = `
+        <div class="clear-confirm-modal" style="text-align:left;max-width:520px;width:100%;max-height:90vh;display:flex;flex-direction:column">
+            <h2 class="clear-confirm-title" style="text-align:center">✏️ Revisar nombres</h2>
+            <p class="clear-confirm-desc" style="text-align:center">
+                Separa el nombre del apellido de cada jugadora. En la app solo se verá el nombre; el apellido sirve para identificarla al importar el GPS y exportar al fisio.
+                Escríbelos igual que en el CSV de Oli.
+            </p>
+            <div style="${cols};font-size:.8rem;opacity:.7;padding-bottom:.25rem"><span>Nombre</span><span>Apellido(s)</span></div>
+            <div style="overflow-y:auto;min-height:0;flex:1">${rows}</div>
+            <div id="reviewNamesError" class="login-error" style="display:none"></div>
+            <div class="clear-confirm-actions">
+                <button class="btn-secondary" onclick="document.getElementById('reviewNamesOverlay').remove()">Cancelar</button>
+                <button class="btn-primary" onclick="window.rpeTracker?._confirmReviewPlayerNames()">Guardar</button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+};
+
+RPETracker.prototype._confirmReviewPlayerNames = function() {
+    const rows = document.querySelectorAll('#reviewNamesOverlay .review-names-row');
+    const updates = Array.from(rows).map(row => ({
+        id: row.getAttribute('data-player-id'),
+        name: row.querySelector('[data-field="name"]').value.trim().slice(0, 60),
+        lastName: row.querySelector('[data-field="lastName"]').value.trim().slice(0, 60)
+    }));
+
+    const result = this._applyPlayerNameReview(updates);
+    if (!result.ok) {
+        const errorEl = document.getElementById('reviewNamesError');
+        if (errorEl) { errorEl.textContent = result.error; errorEl.style.display = 'block'; }
+        return;
+    }
+
+    document.getElementById('reviewNamesOverlay')?.remove();
+    if (result.changed) {
+        this.savePlayers();
+        this.renderPlayers();
+        this.renderSessions();
+        this.populatePlayerSelects();
+        this.showToast(`✅ ${result.changed} jugadora(s) actualizada(s)`, 'success');
+    } else {
+        this.showToast('No había cambios que guardar', 'info');
+    }
+};
