@@ -65,7 +65,9 @@ const ExportFisio = (function () {
             const pid = gpsPlayerMap[k];
             if (pid && !oliId.has(pid)) oliId.set(pid, String(k));
         });
-        const ident = (p) => ({ Jugadora: String(p.name || '').trim(), 'ID Oliver': oliId.get(p.id) || '' });
+        // El nombre completo (nombre + apellido) es lo que identifica a la jugadora fuera de la app.
+        const nombreCompleto = (p) => [p.name, p.lastName].map(s => String(s || '').trim()).filter(Boolean).join(' ');
+        const ident = (p) => ({ Jugadora: nombreCompleto(p), 'ID Oliver': oliId.get(p.id) || '' });
         const ordenar = (a, b) => a.Fecha.localeCompare(b.Fecha)
             || a.Jugadora.localeCompare(b.Jugadora, 'es') || String(a['ID Oliver']).localeCompare(String(b['ID Oliver']));
 

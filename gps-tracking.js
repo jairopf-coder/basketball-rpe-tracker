@@ -177,7 +177,7 @@ RPETracker.prototype._matchGpsPlayerByName = function(oliName) {
     if (!normalized) return { player: null, confidence: null };
 
     // Coincidencia exacta de nombre completo
-    let match = this.players.find(p => this._normalizePlayerName(p.name) === normalized);
+    let match = this.players.find(p => this._normalizePlayerName(this.playerFullName(p)) === normalized);
     if (match) return { player: match, confidence: 'exact' };
 
     // Coincidencia parcial: todas las palabras del nombre de Oli están
@@ -185,7 +185,7 @@ RPETracker.prototype._matchGpsPlayerByName = function(oliName) {
     // "Elba Garfella Béjar" vs "Elba Garfella").
     const oliWords = normalized.split(/\s+/).filter(Boolean);
     match = this.players.find(p => {
-        const internal = this._normalizePlayerName(p.name);
+        const internal = this._normalizePlayerName(this.playerFullName(p));
         return oliWords.every(w => internal.includes(w)) || internal.split(/\s+/).every(w => normalized.includes(w));
     });
     if (match) return { player: match, confidence: 'partial' };
@@ -499,7 +499,7 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
     }
 
     const playerOptions = (selectedId) => this.players.map(p =>
-        `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(p.name)}</option>`
+        `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(this.playerFullName(p))}</option>`
     ).join('') + `<option value="">— Ignorar esta fila —</option>`;
 
     const rowHtml = (item, idx) => {
@@ -524,7 +524,7 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
                     <div class="gps-match-oli-name">${esc(rec.oliPlayerName)}</div>
                     <select class="gps-match-select" id="gpsMatchSelect-u${idx}">
                         <option value="">— Ignorar esta fila —</option>
-                        ${this.players.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+                        ${this.players.map(p => `<option value="${p.id}">${esc(this.playerFullName(p))}</option>`).join('')}
                     </select>
                 </div>
             `).join('')}
@@ -639,12 +639,12 @@ RPETracker.prototype._confirmGpsImport = function(sessionGroupId) {
         // jugadora no tenga sesión de RPE (y por tanto no se guarde su GPS).
         if (oliPlayerId) newMappings[oliPlayerId] = playerId;
         if (!targetSession) {
-            skippedPlayerNames.push(player ? player.name : playerId);
+            skippedPlayerNames.push(player ? this.playerFullName(player) : playerId);
             return;
         }
         if (!this.gpsData[targetSession.id]) this.gpsData[targetSession.id] = {};
         this.gpsData[targetSession.id][playerId] = record;
-        savedPlayerNames.push(player ? player.name : playerId);
+        savedPlayerNames.push(player ? this.playerFullName(player) : playerId);
     });
 
     if (savedPlayerNames.length > 0) {
