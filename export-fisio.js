@@ -6,17 +6,19 @@
 //  • Bienestar: "Estrés" lleva el ESTADO DE ÁNIMO (mood); la app no recoge estrés.
 //  • RPE: una fila por jugadora y DÍA con la media (redondeada) de las sesiones de ese día.
 //  • Regla: solo se exportan los días con la regla marcada (Activa = Sí). Sin fila = sin regla.
+//  • Identificación (formato 2): sin IDs. Jugadora = nombre + apellido de la ficha (como el «Nombre del
+//    Jugador» del export de Oli); Apellido va aparte para no tener que adivinar dónde acaba el nombre.
 
 const ExportFisio = (function () {
     'use strict';
 
-    const FORMATO_VERSION = 1;
+    const FORMATO_VERSION = 2;
     const INCLUIR_HOJA_LEEME = true;          // pon false si el importador del fisio rechaza hojas extra
     const MAX_DIAS_RANGO = 366;
 
-    const COLS_BIENESTAR = ['Jugadora', 'ID Oliver', 'Fecha', 'Sueño', 'Estrés', 'Fatiga', 'Dolor muscular'];
-    const COLS_RPE       = ['Jugadora', 'ID Oliver', 'Fecha', 'Sesión', 'RPE', 'Nº sesiones', 'Detalle'];
-    const COLS_REGLA     = ['Jugadora', 'ID Oliver', 'Fecha', 'Activa'];
+    const COLS_BIENESTAR = ['Jugadora', 'Apellido', 'Fecha', 'Sueño', 'Estrés', 'Fatiga', 'Dolor muscular'];
+    const COLS_RPE       = ['Jugadora', 'Apellido', 'Fecha', 'Sesión', 'RPE', 'Nº sesiones', 'Detalle'];
+    const COLS_REGLA     = ['Jugadora', 'Apellido', 'Fecha', 'Activa'];
     const COLS_LEEME     = ['Clave', 'Valor'];
 
     const TURNO = { morning: 'Mañana', afternoon: 'Tarde' };
@@ -49,9 +51,9 @@ const ExportFisio = (function () {
     }
 
     // Construye las hojas. Pura: recibe los datos y devuelve filas + avisos.
-    //   datos = { players, sessions, wellness, gpsPlayerMap, desde, hasta }
+    //   datos = { players, sessions, wellness, desde, hasta }
     function construir(datos) {
-        const { players = [], sessions = [], wellness = [], gpsPlayerMap = {}, desde, hasta } = datos;
+        const { players = [], sessions = [], wellness = [], desde, hasta } = datos;
         const avisos = [];
         const errorRango = validarRango(desde, hasta);
         if (errorRango) return { error: errorRango };
@@ -59,17 +61,20 @@ const ExportFisio = (function () {
         const enRango = (f) => ISO_RE.test(f) && f >= desde && f <= hasta;
         const porId = new Map(players.map(p => [p.id, p]));
 
-        // ID de Oli por jugadora (búsqueda inversa en gpsPlayerMap; si hay varios, el menor).
-        const oliId = new Map();
-        Object.keys(gpsPlayerMap).sort().forEach(k => {
-            const pid = gpsPlayerMap[k];
-            if (pid && !oliId.has(pid)) oliId.set(pid, String(k));
-        });
         // El nombre completo (nombre + apellido) es lo que identifica a la jugadora fuera de la app.
+        // Se apunta quién sale en el archivo para avisar de fichas sin apellido o con el mismo nombre.
         const nombreCompleto = (p) => [p.name, p.lastName].map(s => String(s || '').trim()).filter(Boolean).join(' ');
-        const ident = (p) => ({ Jugadora: nombreCompleto(p), 'ID Oliver': oliId.get(p.id) || '' });
-        const ordenar = (a, b) => a.Fecha.localeCompare(b.Fecha)
-            || a.Jugadora.localeCompare(b.Jugadora, 'es') || String(a['ID Oliver']).localeCompare(String(b['ID Oliver']));
+        const idsPorNombre = new Map();      // nombre completo → ids de las jugadoras que salen con ese nombre
+        const sinApellido = new Set();
+        const ident = (p) => {
+            const nombre = nombreCompleto(p);
+            const apellido = String(p.lastName || '').trim();
+            if (!idsPorNombre.has(nombre)) idsPorNombre.set(nombre, new Set());
+            idsPorNombre.get(nombre).add(p.id);
+            if (!apellido) sinApellido.add(nombre);
+            return { Jugadora: nombre, Apellido: apellido };
+        };
+        const ordenar = (a, b) => a.Fecha.localeCompare(b.Fecha) || a.Jugadora.localeCompare(b.Jugadora, 'es');
 
         // ---- Wellness: una entrada por jugadora y día (la más reciente) ----
         const grupos = new Map();
@@ -130,16 +135,17 @@ const ExportFisio = (function () {
         rpe.sort(ordenar);
 
         // ---- Avisos de identificación ----
-        const conDatos = new Set([...bienestar, ...rpe, ...regla].map(r => r.Jugadora));
-        const sinId = Array.from(new Set([...bienestar, ...rpe, ...regla].filter(r => !r['ID Oliver']).map(r => r.Jugadora))).sort();
-        if (sinId.length) avisos.push(`${sinId.length} jugadora(s) sin ID de Oli (se identificarán solo por nombre): ${sinId.join(', ')}.`);
-        const nombres = new Map();
-        [...bienestar, ...rpe, ...regla].forEach(r => { nombres.set(r.Jugadora, (nombres.get(r.Jugadora) || new Set()).add(r['ID Oliver'])); });
-        nombres.forEach((ids, n) => { if (ids.size > 1) avisos.push(`El ID de ${n} no es el mismo en todas las filas (revisa su ficha).`); });
+        const faltan = Array.from(sinApellido).sort((a, b) => a.localeCompare(b, 'es'));
+        if (faltan.length) avisos.push(`${faltan.length} jugadora(s) sin apellido en su ficha (solo se identificarán por el nombre): ${faltan.join(', ')}.`);
+        Array.from(idsPorNombre.keys()).sort((a, b) => a.localeCompare(b, 'es')).forEach(n => {
+            if (idsPorNombre.get(n).size > 1) avisos.push(`Hay ${idsPorNombre.get(n).size} jugadoras que salen como «${n}»: no se podrán distinguir en el archivo. Cambia el nombre o el apellido de una.`);
+        });
 
+        const jugadorasConDatos = new Set();
+        idsPorNombre.forEach(ids => ids.forEach(id => jugadorasConDatos.add(id)));
         const stats = {
             filasBienestar: bienestar.length, filasRPE: rpe.length, filasRegla: regla.length,
-            jugadoras: conDatos.size, diasDobles, desde, hasta,
+            jugadoras: jugadorasConDatos.size, diasDobles, desde, hasta,
         };
         const leeme = construirLeeme(stats);
         return { bienestar, rpe, regla, leeme, avisos, stats, nombreArchivo: `ensino-bienestar-rpe-regla-${desde}-a-${hasta}.xlsx` };
@@ -160,7 +166,7 @@ const ExportFisio = (function () {
             f('Estrés', 'La app NO recoge estrés: la columna Estrés lleva el ESTADO DE ÁNIMO (mood). 1 = muy bajo, 5 = excelente.'),
             f('RPE', 'Media aritmética de las sesiones del día de cada jugadora, redondeada al entero (x,5 sube). Una fila por jugadora y día; Sesión vacía. Las columnas Nº sesiones y Detalle (extra) traen el desglose por turno.'),
             f('Regla', 'Solo se exportan los días con la regla marcada (Activa = Sí). NO hay filas con No: un día de la ventana sin fila para una jugadora significa que no la tenía marcada.'),
-            f('ID Oliver', 'Es el "ID del Jugador" del export de Oli. Vacío si la jugadora aún no tiene ID en la app.'),
+            f('Identificación', 'Sin IDs. Jugadora = nombre + apellido de la ficha, escrito como el "Nombre del Jugador" del export de Oli. Apellido lleva solo el apellido (o apellidos) de la ficha: el nombre es Jugadora sin el Apellido del final. Si Apellido va vacío, la ficha aún no lo tiene y la jugadora solo se identifica por el nombre.'),
         ];
     }
 
@@ -173,9 +179,9 @@ const ExportFisio = (function () {
 
     function crearLibro(XLSX, r) {
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, aHoja(XLSX, COLS_BIENESTAR, r.bienestar, [26, 12, 12, 8, 8, 8, 15]), 'Bienestar');
-        XLSX.utils.book_append_sheet(wb, aHoja(XLSX, COLS_RPE, r.rpe, [26, 12, 12, 10, 6, 12, 26]), 'RPE');
-        XLSX.utils.book_append_sheet(wb, aHoja(XLSX, COLS_REGLA, r.regla, [26, 12, 12, 8]), 'Regla');
+        XLSX.utils.book_append_sheet(wb, aHoja(XLSX, COLS_BIENESTAR, r.bienestar, [26, 22, 12, 8, 8, 8, 15]), 'Bienestar');
+        XLSX.utils.book_append_sheet(wb, aHoja(XLSX, COLS_RPE, r.rpe, [26, 22, 12, 10, 6, 12, 26]), 'RPE');
+        XLSX.utils.book_append_sheet(wb, aHoja(XLSX, COLS_REGLA, r.regla, [26, 22, 12, 8]), 'Regla');
         if (INCLUIR_HOJA_LEEME) XLSX.utils.book_append_sheet(wb, aHoja(XLSX, COLS_LEEME, r.leeme, [22, 120]), 'LEEME');
         return wb;
     }
@@ -184,11 +190,12 @@ const ExportFisio = (function () {
     function mensajeEntrega(r) {
         const s = r.stats;
         return [
-            `Export BasketballRPE-Web · ${s.desde} a ${s.hasta}`,
+            `Export BasketballRPE-Web · formato ${FORMATO_VERSION} · ${s.desde} a ${s.hasta}`,
             `Filas: Bienestar ${s.filasBienestar} · RPE ${s.filasRPE} · Regla ${s.filasRegla} · Jugadoras ${s.jugadoras}`,
             '1) Escala de bienestar: 1 = peor, 5 = mejor, sin transformar. La columna Estrés lleva el ESTADO DE ÁNIMO (no recogemos estrés).',
             '2) Regla: solo los días con la regla marcada (Activa = Sí); NO hay filas con No. Día sin fila = sin regla.',
             '3) RPE: media diaria por jugadora (redondeada), Sesión vacía; desglose en las columnas Nº sesiones y Detalle.',
+            '4) Jugadoras: sin ID. Jugadora = nombre + apellido (como en el CSV de Oli); Apellido va aparte para no tener que separar el nombre.',
             'Detalles: GUIA-EXPORT-FISIO.md',
         ].join('\n');
     }
@@ -296,7 +303,7 @@ RPETracker.prototype._exportFisioRefresh = async function() {
 
     const r = ExportFisio.construir({
         players: this.players, sessions: this.sessions, wellness: this.wellnessData || [],
-        gpsPlayerMap: this.gpsPlayerMap || {}, desde, hasta,
+        desde, hasta,
     });
     if (r.error) { box.innerHTML = `<div class="login-error" style="display:block">${esc(r.error)}</div>`; return; }
 

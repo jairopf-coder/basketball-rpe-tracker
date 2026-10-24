@@ -1,5 +1,6 @@
 // test/export-fisio.test.js
-// Exportación .xlsx para el fisio: hojas Bienestar, RPE (media diaria) y Regla (solo días marcados).
+// Exportación .xlsx para el fisio (formato 2): hojas Bienestar, RPE (media diaria) y Regla (solo días marcados).
+// Las jugadoras se identifican por nombre y apellido (sin IDs).
 // Ejecutar con:  node test/export-fisio.test.js
 // Si se pasa una ruta como argumento, además escribe ahí un .xlsx de ejemplo (lo usa verificar_export.py).
 'use strict';
@@ -25,12 +26,11 @@ const EF = ctx.window.ExportFisio;
 const J = x => JSON.parse(JSON.stringify(x));
 
 const players = [
-    { id: 'p1', name: 'Kristin Williams' }, { id: 'p2', name: 'Matilda Ekh' }, { id: 'p3', name: 'Ana Sin Id' },
+    { id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }, { id: 'p2', name: 'Ingrid', lastName: 'Van Dijk' }, { id: 'p3', name: 'Ana' },
 ];
-const mapa = { '47162': 'p1', '47164': 'p2' };
 const w = (playerId, date, s, f, m, d, extra) => Object.assign({ playerId, date, sleep: s, fatigue: f, mood: m, soreness: d }, extra || {});
 const ses = (playerId, date, timeOfDay, rpe) => ({ id: playerId + date + timeOfDay, playerId, date: date + (timeOfDay === 'morning' ? 'T10:00:00' : 'T18:00:00'), timeOfDay, type: 'training', rpe });
-const run = (o) => EF.construir(Object.assign({ players, sessions: [], wellness: [], gpsPlayerMap: mapa, desde: '2026-09-28', hasta: '2026-10-04' }, o));
+const run = (o) => EF.construir(Object.assign({ players, sessions: [], wellness: [], desde: '2026-09-28', hasta: '2026-10-04' }, o));
 
 console.log('\nRango');
 test('rango válido e inválido', () => {
@@ -44,7 +44,7 @@ test('rango válido e inválido', () => {
 console.log('\nBienestar');
 test('mapea sin transformar: Ánimo→Estrés, Energía→Fatiga, Muscular→Dolor muscular', () => {
     const r = run({ wellness: [w('p1', '2026-09-29', 4, 2, 5, 1)] });
-    assert.deepStrictEqual(J(r.bienestar), [{ Jugadora: 'Kristin Williams', 'ID Oliver': '47162', Fecha: '2026-09-29',
+    assert.deepStrictEqual(J(r.bienestar), [{ Jugadora: 'Carla Mendes Rocha', Apellido: 'Mendes Rocha', Fecha: '2026-09-29',
         'Sueño': 4, 'Estrés': 5, Fatiga: 2, 'Dolor muscular': 1 }]);
 });
 test('descarta incompletos y fuera de 1–5, y avisa', () => {
@@ -69,7 +69,7 @@ console.log('\nRPE (media diaria)');
 test('dos sesiones el mismo día → una fila con la media redondeada', () => {
     const r = run({ sessions: [ses('p1', '2026-09-29', 'morning', 6), ses('p1', '2026-09-29', 'afternoon', 8)] });
     assert.strictEqual(r.rpe.length, 1);
-    assert.deepStrictEqual(J(r.rpe[0]), { Jugadora: 'Kristin Williams', 'ID Oliver': '47162', Fecha: '2026-09-29', 'Sesión': '', RPE: 7,
+    assert.deepStrictEqual(J(r.rpe[0]), { Jugadora: 'Carla Mendes Rocha', Apellido: 'Mendes Rocha', Fecha: '2026-09-29', 'Sesión': '', RPE: 7,
         'Nº sesiones': 2, Detalle: 'Mañana 6 · Tarde 8' });
     assert.strictEqual(r.stats.diasDobles, 1);
 });
@@ -102,7 +102,7 @@ test('solo Sí; period false/undefined no genera fila', () => {
     const r = run({ wellness: [w('p1', '2026-09-28', 3, 3, 3, 3, { period: true }), w('p1', '2026-09-29', 3, 3, 3, 3, { period: true }),
         w('p1', '2026-09-30', 3, 3, 3, 3), w('p1', '2026-10-01', 3, 3, 3, 3, { period: false }), w('p2', '2026-09-28', 3, 3, 3, 3)] });
     assert.deepStrictEqual(J(r.regla.map(x => [x.Jugadora, x.Fecha, x.Activa])),
-        [['Kristin Williams', '2026-09-28', 'Sí'], ['Kristin Williams', '2026-09-29', 'Sí']]);
+        [['Carla Mendes Rocha', '2026-09-28', 'Sí'], ['Carla Mendes Rocha', '2026-09-29', 'Sí']]);
     assert.ok(!r.regla.some(x => x.Activa !== 'Sí'), 'nunca filas No');
 });
 test('una jugadora sin ninguna marca no aparece en la hoja', () => {
@@ -115,19 +115,65 @@ test('la regla marcada en un cuestionario incompleto sí se exporta, pero el bie
     assert.strictEqual(r.bienestar.length, 0);
 });
 
-console.log('\nIdentificación');
-test('mismo nombre e ID de Oli en las tres hojas', () => {
+console.log('\nIdentificación (nombre + apellido, sin IDs)');
+test('mismo nombre y apellido en las tres hojas', () => {
     const r = run({ wellness: [w('p1', '2026-09-28', 3, 3, 3, 3, { period: true })], sessions: [ses('p1', '2026-09-28', 'morning', 5)] });
-    [r.bienestar[0], r.rpe[0], r.regla[0]].forEach(f => { assert.strictEqual(f.Jugadora, 'Kristin Williams'); assert.strictEqual(f['ID Oliver'], '47162'); });
+    [r.bienestar[0], r.rpe[0], r.regla[0]].forEach(f => {
+        assert.strictEqual(f.Jugadora, 'Carla Mendes Rocha');
+        assert.strictEqual(f.Apellido, 'Mendes Rocha');
+    });
 });
-test('jugadora sin ID: sale con ID vacío y se avisa', () => {
+test('Jugadora = nombre + apellido, y quitando Apellido del final queda el nombre', () => {
+    const r = run({ players: [{ id: 'p1', name: 'María José', lastName: 'García' }], wellness: [w('p1', '2026-09-28', 3, 3, 3, 3)] });
+    assert.strictEqual(r.bienestar[0].Jugadora, 'María José García');
+    assert.strictEqual(r.bienestar[0].Apellido, 'García');
+    assert.ok(r.bienestar[0].Jugadora.endsWith(' ' + r.bienestar[0].Apellido));
+});
+test('los espacios sobrantes no cuelan en el archivo', () => {
+    const r = run({ players: [{ id: 'p1', name: ' Carla ', lastName: '  Mendes Rocha ' }], wellness: [w('p1', '2026-09-28', 3, 3, 3, 3)] });
+    assert.strictEqual(r.bienestar[0].Jugadora, 'Carla Mendes Rocha');
+    assert.strictEqual(r.bienestar[0].Apellido, 'Mendes Rocha');
+});
+test('ficha sin apellido: Apellido vacío, Jugadora solo el nombre, y se avisa', () => {
     const r = run({ wellness: [w('p3', '2026-09-28', 3, 3, 3, 3)] });
-    assert.strictEqual(r.bienestar[0]['ID Oliver'], '');
-    assert.ok(r.avisos.some(a => a.includes('sin ID de Oli') && a.includes('Ana Sin Id')));
+    assert.strictEqual(r.bienestar[0].Jugadora, 'Ana');
+    assert.strictEqual(r.bienestar[0].Apellido, '');
+    assert.ok(r.avisos.some(a => a.includes('sin apellido') && a.includes('Ana')));
 });
-test('si una jugadora tiene varios ID, usa siempre el mismo (el menor)', () => {
-    const r = run({ gpsPlayerMap: { '999': 'p1', '47162': 'p1' }, wellness: [w('p1', '2026-09-28', 3, 3, 3, 3)] });
-    assert.strictEqual(r.bienestar[0]['ID Oliver'], '47162');
+test('ficha antigua con el nombre completo en `name`: sale igual y se avisa de que falta el apellido', () => {
+    const r = run({ players: [{ id: 'p1', name: 'Carla Mendes Rocha' }], wellness: [w('p1', '2026-09-28', 3, 3, 3, 3)] });
+    assert.strictEqual(r.bienestar[0].Jugadora, 'Carla Mendes Rocha');
+    assert.strictEqual(r.bienestar[0].Apellido, '');
+    assert.ok(r.avisos.some(a => a.includes('sin apellido')));
+});
+test('solo se avisa de las fichas sin apellido que SALEN en el archivo', () => {
+    const r = run({ wellness: [w('p1', '2026-09-28', 3, 3, 3, 3)] });   // Ana (p3) no tiene datos
+    assert.ok(!r.avisos.some(a => a.includes('sin apellido')));
+});
+test('dos jugadoras con el mismo nombre completo: se avisa y cuentan como dos', () => {
+    const r = run({
+        players: [{ id: 'p1', name: 'Sara', lastName: 'López' }, { id: 'p2', name: 'Sara', lastName: 'López' }],
+        wellness: [w('p1', '2026-09-28', 3, 3, 3, 3), w('p2', '2026-09-28', 4, 4, 4, 4)],
+    });
+    assert.ok(r.avisos.some(a => a.includes('2 jugadoras') && a.includes('Sara López')));
+    assert.strictEqual(r.stats.jugadoras, 2);
+});
+test('el formato ya no lleva ID de Oli: ni columna ni uso del mapa de IDs', () => {
+    [EF.COLS_BIENESTAR, EF.COLS_RPE, EF.COLS_REGLA].forEach(cols => {
+        assert.ok(!cols.includes('ID Oliver'));
+        assert.deepStrictEqual(J(cols.slice(0, 2)), ['Jugadora', 'Apellido']);
+    });
+    const conMapa = run({ gpsPlayerMap: { '47162': 'p1' }, wellness: [w('p1', '2026-09-28', 3, 3, 3, 3)] });
+    const sinMapa = run({ wellness: [w('p1', '2026-09-28', 3, 3, 3, 3)] });
+    assert.deepStrictEqual(J(conMapa), J(sinMapa));
+    assert.ok(!Object.keys(conMapa.bienestar[0]).includes('ID Oliver'));
+});
+test('no hay ninguna columna llamada «Nombre» (el importador del fisio la tomaría por Jugadora)', () => {
+    [EF.COLS_BIENESTAR, EF.COLS_RPE, EF.COLS_REGLA].forEach(cols => assert.ok(!cols.some(c => /^nombre/i.test(c))));
+});
+test('el recuento de jugadoras cuenta personas, no nombres', () => {
+    const r = run({ wellness: [w('p1', '2026-09-28', 3, 3, 3, 3), w('p2', '2026-09-28', 3, 3, 3, 3), w('p1', '2026-09-29', 3, 3, 3, 3)] });
+    assert.strictEqual(r.stats.jugadoras, 2);
 });
 
 console.log('\nDeterminismo');
@@ -149,16 +195,19 @@ test('el libro tiene las 4 hojas, cabeceras exactas en la fila 1 y fechas como t
     const wb = EF.crearLibro(XLSX, r);
     assert.deepStrictEqual(wb.SheetNames, ['Bienestar', 'RPE', 'Regla', 'LEEME']);
     const filas = n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1 });
-    assert.deepStrictEqual(filas('Bienestar')[0], ['Jugadora', 'ID Oliver', 'Fecha', 'Sueño', 'Estrés', 'Fatiga', 'Dolor muscular']);
-    assert.deepStrictEqual(filas('Regla')[0], ['Jugadora', 'ID Oliver', 'Fecha', 'Activa']);
+    assert.deepStrictEqual(filas('Bienestar')[0], ['Jugadora', 'Apellido', 'Fecha', 'Sueño', 'Estrés', 'Fatiga', 'Dolor muscular']);
+    assert.deepStrictEqual(filas('RPE')[0], ['Jugadora', 'Apellido', 'Fecha', 'Sesión', 'RPE', 'Nº sesiones', 'Detalle']);
+    assert.deepStrictEqual(filas('Regla')[0], ['Jugadora', 'Apellido', 'Fecha', 'Activa']);
     assert.strictEqual(filas('Bienestar')[1][2], '2026-09-28');
     assert.strictEqual(typeof filas('Bienestar')[1][3], 'number');
+    assert.strictEqual(filas('Bienestar')[1][0], 'Carla Mendes Rocha');
+    assert.strictEqual(filas('Bienestar')[1][1], 'Mendes Rocha');
     assert.strictEqual(filas('Bienestar').length, 1 + r.bienestar.length);
 });
 test('una hoja sin filas conserva sus cabeceras', () => {
     const r = run({ wellness: [], sessions: [] });
     const wb = EF.crearLibro(XLSX, r);
-    assert.deepStrictEqual(XLSX.utils.sheet_to_json(wb.Sheets.Regla, { header: 1 }), [['Jugadora', 'ID Oliver', 'Fecha', 'Activa']]);
+    assert.deepStrictEqual(XLSX.utils.sheet_to_json(wb.Sheets.Regla, { header: 1 }), [['Jugadora', 'Apellido', 'Fecha', 'Activa']]);
 });
 test('la hoja LEEME refleja los recuentos reales', () => {
     const r = demo();
@@ -168,12 +217,17 @@ test('la hoja LEEME refleja los recuentos reales', () => {
     assert.strictEqual(get('Filas Regla'), r.regla.length);
     assert.ok(get('Estrés').includes('ESTADO DE ÁNIMO'));
     assert.ok(get('Regla').includes('NO hay filas con No'));
+    assert.ok(get('Formato').includes('versión 2'));
+    assert.ok(get('Identificación').includes('Sin IDs'));
+    assert.ok(!r.leeme.some(x => x.Clave === 'ID Oliver'));
 });
 test('mensaje de entrega declara escala, Estrés=ánimo y que no hay días No', () => {
     const m = EF.mensajeEntrega(demo());
     assert.ok(m.includes('1 = peor, 5 = mejor'));
     assert.ok(m.includes('ESTADO DE ÁNIMO'));
     assert.ok(m.includes('NO hay filas con No'));
+    assert.ok(m.includes('formato 2'));
+    assert.ok(m.includes('sin ID') && m.includes('Apellido'));
 });
 test('nombre de archivo según la especificación', () => {
     assert.strictEqual(demo().nombreArchivo, 'ensino-bienestar-rpe-regla-2026-09-28-a-2026-10-04.xlsx');
@@ -182,7 +236,7 @@ test('nombre de archivo según la especificación', () => {
 console.log('\nModal');
 function tracker(over) {
     const T = vm.runInContext('new RPETracker()', ctx);
-    Object.assign(T, { players, sessions: [], wellnessData: [w('p1', '2026-09-29', 4, 3, 5, 2)], gpsPlayerMap: mapa, showToast() {} }, over || {});
+    Object.assign(T, { players, sessions: [], wellnessData: [w('p1', '2026-09-29', 4, 3, 5, 2)], showToast() {} }, over || {});
     return T;
 }
 function dom() {

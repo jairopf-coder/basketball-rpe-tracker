@@ -2,9 +2,9 @@
 
 **Para:** Lucas y su IA (la que mantiene la app del estudio).
 **De:** Jairo, preparador físico del Ensino Lugo (app *BasketballRPE-Web*).
-**Complementa a:** `instrucciones-ia-export-prepa.md` (la especificación de Lucas). Este documento explica cómo funciona mi app, qué datos salen, **en qué tres puntos me aparto de la especificación y por qué**, cómo se identifican las jugadoras y cómo comprobamos entre los dos que los datos viajan bien.
+**Complementa a:** `instrucciones-ia-export-prepa.md` (la especificación de Lucas). Este documento explica cómo funciona mi app, qué datos salen, **en qué tres puntos me aparto de la especificación y por qué**, cómo se identifican las jugadoras y cómo comprobamos entre los dos que los datos viajan bien. **Para adaptar tu app al cambio de identificación del formato 2, empieza por `ADAPTACION-FISIO-FORMATO-2.md`.**
 
-**Versión del formato:** 1
+**Versión del formato:** 2 *(la 1 llevaba la columna `ID Oliver`; ver sección 11)*
 
 ---
 
@@ -12,7 +12,7 @@
 
 - Genero **un único `.xlsx`** con las hojas `Bienestar`, `RPE` y `Regla`, más una hoja informativa `LEEME`.
 - Lo genero con un botón de mi app (⚙️ → *Exportar para el fisio*), eligiendo un rango de fechas. Por defecto, los últimos 7 días. **La exportación solo lee datos; no modifica nada.**
-- Las jugadoras se identifican por el **`ID Oliver`** (el «ID del Jugador» del CSV de Oli). El nombre es secundario.
+- Las jugadoras se identifican por **nombre y apellido** (sin IDs, desde el formato 2): `Jugadora` = nombre + apellido, escrito como el «Nombre del Jugador» del CSV de Oli, y `Apellido` va aparte (sección 5).
 - Hay **tres diferencias respecto a la especificación** (sección 4). Las he acordado a propósito; tu importador tiene que tratarlas así:
   1. La columna `Estrés` lleva el **estado de ánimo**, porque mi app no recoge estrés.
   2. El `RPE` es la **media diaria** por jugadora (no un RPE por sesión).
@@ -46,8 +46,8 @@ Consecuencias que importan para ti:
 
 | Columna | Origen en mi app | Dominio |
 | --- | --- | --- |
-| `Jugadora` | Nombre de la ficha de la jugadora | texto |
-| `ID Oliver` | ID de Oli de la jugadora (sección 5) | texto, puede ir vacío |
+| `Jugadora` | Nombre + apellido de la ficha de la jugadora (sección 5) | texto |
+| `Apellido` | Apellido(s) de la ficha; es el final de `Jugadora` | texto, puede ir vacío |
 | `Fecha` | Día del cuestionario | `aaaa-mm-dd` |
 | `Sueño` | Sueño | entero 1–5 |
 | `Estrés` | **Estado de ánimo** (ver 4.1) | entero 1–5 |
@@ -60,7 +60,7 @@ Consecuencias que importan para ti:
 
 | Columna | Contenido |
 | --- | --- |
-| `Jugadora`, `ID Oliver`, `Fecha` | Como arriba |
+| `Jugadora`, `Apellido`, `Fecha` | Como arriba |
 | `Sesión` | **Siempre vacía** |
 | `RPE` | Media de los RPE de las sesiones de ese día, **redondeada al entero** (x,5 sube). Entero 0–10 |
 | `Nº sesiones` | *(columna extra)* cuántas sesiones entran en la media: 1 o 2 |
@@ -72,7 +72,7 @@ No se envían ni el s-RPE ni la duración.
 
 | Columna | Contenido |
 | --- | --- |
-| `Jugadora`, `ID Oliver`, `Fecha` | Como arriba |
+| `Jugadora`, `Apellido`, `Fecha` | Como arriba |
 | `Activa` | Siempre `Sí` |
 
 ### Hoja `LEEME` — informativa (cabeceras `Clave` / `Valor`)
@@ -85,22 +85,22 @@ Repite en el propio archivo las convenciones de este documento y trae un **contr
 
 `Bienestar`
 
-| Jugadora | ID Oliver | Fecha | Sueño | Estrés | Fatiga | Dolor muscular |
+| Jugadora | Apellido | Fecha | Sueño | Estrés | Fatiga | Dolor muscular |
 | --- | --- | --- | --- | --- | --- | --- |
-| María López | 10423 | 2026-09-29 | 4 | 5 | 3 | 2 |
+| María López | López | 2026-09-29 | 4 | 5 | 3 | 2 |
 
 `RPE` (día con doble sesión: 6 por la mañana y 8 por la tarde)
 
-| Jugadora | ID Oliver | Fecha | Sesión | RPE | Nº sesiones | Detalle |
+| Jugadora | Apellido | Fecha | Sesión | RPE | Nº sesiones | Detalle |
 | --- | --- | --- | --- | --- | --- | --- |
-| María López | 10423 | 2026-09-29 | | 7 | 2 | Mañana 6 · Tarde 8 |
+| María López | López | 2026-09-29 | | 7 | 2 | Mañana 6 · Tarde 8 |
 
 `Regla`
 
-| Jugadora | ID Oliver | Fecha | Activa |
+| Jugadora | Apellido | Fecha | Activa |
 | --- | --- | --- | --- |
-| María López | 10423 | 2026-09-28 | Sí |
-| María López | 10423 | 2026-09-29 | Sí |
+| María López | López | 2026-09-28 | Sí |
+| María López | López | 2026-09-29 | Sí |
 
 ---
 
@@ -141,23 +141,30 @@ Cómo debería leerlo tu importador:
 
 ---
 
-## 5. Identificación de jugadoras: cómo se organizan los ID
+## 5. Identificación de jugadoras: nombre y apellido (sin IDs)
 
-**El `ID Oliver` es el identificador** y es el mismo «ID del Jugador» que aparece en el CSV de Oliver Pro. Nombre e ID salen idénticos en las tres hojas.
+Desde el formato 2 **no hay ningún ID** en el archivo. La jugadora se identifica por su nombre y apellido:
+
+| Columna | Contenido |
+| --- | --- |
+| `Jugadora` | Nombre + apellido de la ficha, separados por un espacio y **escritos como los escribe Oli** en «Nombre del Jugador» (p. ej. `Carla Mendes Rocha`) |
+| `Apellido` | Solo el apellido o apellidos de la ficha (p. ej. `Mendes Rocha`). El nombre es `Jugadora` sin el `Apellido` del final. Puede ir **vacío** si la ficha aún no lo tiene |
 
 Cómo lo tiene mi app:
 
-- Cada jugadora tiene en su ficha un campo **«ID de Oli»**.
-- **Se rellena solo**: cuando importo un CSV de Oli y confirmo a qué jugadora corresponde cada fila, la app recuerda ese ID.
-- También puedo **escribirlo o corregirlo a mano**. Un ID solo puede pertenecer a una jugadora (si intento asignar uno que ya tiene otra, la app me avisa antes de reasignarlo).
-- Una jugadora que aún no se ha importado por GPS puede salir con `ID Oliver` vacío. La app me avisa antes de descargar.
+- Cada ficha tiene **Nombre** y **Apellido(s)** por separado (el apellido es un campo libre: admite uno o dos). En pantalla solo se ve el nombre; el apellido sirve para identificar a la jugadora al importar y exportar datos.
+- Los mismos datos se usan para importar el CSV de Oli: se emparejan las filas por nombre y apellido, comparando **palabras enteras**, sin acentos ni mayúsculas.
+- Me encargo de que no haya dos jugadoras con el mismo nombre. Si ocurriera, el modal de exportación lo avisa antes de descargar.
+- Una ficha sin apellido sale con `Apellido` vacío y `Jugadora` solo con el nombre. La app me avisa antes de descargar.
 
-Cómo debería usarlo tu app:
+Por qué dejo de usar el `ID Oliver`: un ID no distingue personas si el club reasigna el dispositivo (por ejemplo, cuando una jugadora se marcha y la que llega hereda su GPS), y solo existía para las jugadoras ya importadas por GPS. El nombre y el apellido sí son comunes a los dos lados.
 
-1. **Cruza primero por `ID Oliver`.** Si el ID existe en tu base, esa es la jugadora, aunque el nombre difiera (acentos, segundo apellido, apodo). No crees una jugadora nueva por una diferencia de nombre.
-2. Si el ID no existe pero el nombre coincide, es una jugadora nueva para tu app o con ID aún no vinculado: **avísame** en lugar de crear un duplicado.
-3. Si `ID Oliver` viene vacío, cruza por nombre y marca esas filas como «identificada solo por nombre».
-4. `Jugadora` es el nombre de **mi** ficha, no necesariamente el de Oliver Pro. Si necesitas el nombre oficial, sácalo de tu lado a partir del ID.
+Cómo debería usarlo tu app: **el algoritmo recomendado, con ejemplos y un archivo de prueba, está en `ADAPTACION-FISIO-FORMATO-2.md`.** En resumen:
+
+1. Compara `Jugadora` con tus jugadoras sin acentos ni mayúsculas y **por palabras enteras**, no por trozos de texto.
+2. Si coincide todo en el mismo orden, es esa jugadora. Si coincide solo en parte (un apellido de más o de menos), propónla y **pide confirmación**.
+3. Si no encaja con nadie, **no crees una jugadora nueva sola**: avísame.
+4. `Jugadora` es el nombre de **mi** ficha. Si lo corrijo, cambiará en los envíos siguientes: no dupliques a la jugadora por eso.
 
 ---
 
@@ -167,7 +174,7 @@ Hay cuatro controles. Los dos primeros son míos; los dos últimos, tuyos.
 
 ### Control 1 — Antes de descargar (mi app)
 
-El modal de exportación muestra, para el rango elegido: filas por hoja, jugadoras con datos, días de doble sesión y **avisos**: cuestionarios descartados por incompletos, jugadoras sin ID de Oli, RPE pendientes de revisar. Si algo no cuadra, lo corrijo antes de enviarte nada.
+El modal de exportación muestra, para el rango elegido: filas por hoja, jugadoras con datos, días de doble sesión y **avisos**: cuestionarios descartados por incompletos, fichas sin apellido, jugadoras con el mismo nombre, RPE pendientes de revisar. Si algo no cuadra, lo corrijo antes de enviarte nada.
 
 ### Control 2 — El mensaje de entrega
 
@@ -182,7 +189,7 @@ pip install openpyxl
 python3 verificar_export.py ensino-bienestar-rpe-regla-2026-09-28-a-2026-10-04.xlsx
 ```
 
-Comprueba la checklist de tu especificación (§8) y las convenciones de esta guía: tres hojas reconocidas por cabeceras, sin celdas combinadas, fórmulas ni filas en blanco, fechas ISO, dominios (bienestar 1–5, RPE 0–10), duplicados, mismo nombre e ID en las tres hojas, **coherencia de la media diaria con `Detalle`**, filas contra los recuentos de `LEEME` y fechas dentro de la ventana. Imprime también los **períodos de regla** que tu importador debería reconstruir y una línea `RESUMEN:` con los recuentos.
+Comprueba la checklist de tu especificación (§8) y las convenciones de esta guía: tres hojas reconocidas por cabeceras, sin celdas combinadas, fórmulas ni filas en blanco, fechas ISO, dominios (bienestar 1–5, RPE 0–10), duplicados, mismo nombre y apellido en las tres hojas (con `Jugadora` terminada en `Apellido`), **coherencia de la media diaria con `Detalle`**, filas contra los recuentos de `LEEME` y fechas dentro de la ventana. Imprime también los **períodos de regla** que tu importador debería reconstruir y una línea `RESUMEN:` con los recuentos.
 
 Códigos de salida: `0` correcto · `1` el archivo tiene errores (no importar y avisarme) · `2` el archivo está bien pero lo importado no coincide.
 
@@ -195,7 +202,7 @@ ACUSE · archivo: ensino-bienestar-rpe-regla-2026-09-28-a-2026-10-04.xlsx
 Importado: Bienestar=__ RPE=__ Regla=__
 Descartadas / pendientes (con motivo): __
 Períodos de regla creados o actualizados: __
-Jugadoras sin vincular por ID: __
+Jugadoras nuevas o sin coincidencia por nombre y apellido: __
 ```
 
 Y contrasta los recuentos con el archivo:
@@ -215,7 +222,7 @@ En el primer envío, antes de automatizar nada:
 - [ ] Elegid **2 o 3 jugadoras** y comparad a mano un día cada una: un bienestar (los cuatro valores), un RPE de día de doble sesión (la media y el `Detalle`) y un período de regla (primera y última fecha).
 - [ ] Una jugadora con regla marcada tiene el período con las fechas correctas, y la que no la ha marcado nunca no tiene ninguno.
 - [ ] Reenviar el mismo rango no duplica nada.
-- [ ] Todas las jugadoras quedan vinculadas por ID (ninguna duplicada por diferencia de nombre).
+- [ ] Todas las jugadoras quedan vinculadas por nombre y apellido (ninguna duplicada).
 
 ### Si algo no cuadra
 
@@ -223,7 +230,7 @@ En el primer envío, antes de automatizar nada:
 | --- | --- |
 | Faltan filas de `Bienestar` | Cuestionarios incompletos (la app ya los descarta y avisa) o la jugadora no respondió ese día |
 | Faltan filas de `RPE` en días de doble sesión | `Sesión` vacía a propósito: es la decisión del punto 4.2 |
-| Una jugadora duplicada | Su `ID Oliver` está vacío o es distinto al de tu base |
+| Una jugadora duplicada | Su nombre o apellido en mi ficha no coincide con el de tu base (acentos, un apellido de más o de menos): corrígelo en una de las dos |
 | Períodos de regla partidos o abiertos de más | No se está usando la ventana de `LEEME` para cerrar períodos, o la jugadora saltó un día de cuestionario (4.3.4) |
 | El importador falla al abrir el archivo | Probablemente la hoja `LEEME`: avísame para desactivarla |
 | Fechas desplazadas un día | No debería ocurrir (hora de Madrid); avísame con un ejemplo |
@@ -242,7 +249,7 @@ GPS y carga externa (los traes directamente de Oliver Pro), s-RPE y duraciones, 
 2. **RPE diario:** ¿cómo tratas una fila con `Sesión` vacía en un día de doble sesión?
 3. **Regla:** ¿puedes interpretar «día de la ventana sin fila = No» usando la ventana de `LEEME`? Sin eso, los períodos no se cierran bien.
 4. **Estrés = ánimo:** ¿te vale así o prefieres que deje la columna vacía y no se importe esa serie?
-5. ¿Confirmas que el `ID Oliver` que esperas es el «ID del Jugador» del CSV de Oliver Pro?
+5. **Identificación (formato 2):** ¿tu app puede cruzar a las jugadoras por `Jugadora` (nombre + apellido) y `Apellido`, en lugar de por ID? El algoritmo propuesto y las preguntas concretas están en `ADAPTACION-FISIO-FORMATO-2.md`.
 
 ---
 
@@ -251,8 +258,9 @@ GPS y carga externa (los traes directamente de Oliver Pro), s-RPE y duraciones, 
 ```
 Contexto: recibes un .xlsx generado por BasketballRPE-Web (app de Jairo, Ensino Lugo).
 Reglas:
-- Identifica a la jugadora por «ID Oliver» (ID del Jugador de Oliver Pro). El nombre es secundario.
-  Si el ID existe, esa es la jugadora aunque el nombre difiera. No crees duplicados por nombre.
+- Identifica a la jugadora por nombre y apellido (formato 2, sin IDs): «Jugadora» = nombre + apellido y
+  «Apellido» va aparte. Compara sin acentos ni mayúsculas y por PALABRAS ENTERAS. Si no hay coincidencia
+  exacta, propón y pide confirmación; no crees una jugadora nueva por tu cuenta. Ver ADAPTACION-FISIO-FORMATO-2.md.
 - Bienestar: escala 1=peor, 5=mejor, sin invertir. La columna «Estrés» contiene el ESTADO DE ÁNIMO.
 - RPE: es la MEDIA DIARIA por jugadora (entera, redondeada). «Sesión» va vacía a propósito.
   «Nº sesiones» y «Detalle» (p. ej. «Mañana 6 · Tarde 8») son columnas extra con el desglose.
@@ -282,3 +290,10 @@ El archivo contiene **datos de salud de las jugadoras** (bienestar y regla). Por
 ## 11. Versionado y cambios
 
 El formato lleva una versión (`LEEME` → `Formato`). Si cambio algo que afecte a tu importador (columnas, convenciones, una fila por sesión en el RPE…), subiré el número y te avisaré **antes** de enviarte un archivo nuevo.
+
+### Historial
+
+| Versión | Cambio |
+| --- | --- |
+| 2 | Se elimina la columna `ID Oliver` y se añade `Apellido` en las tres hojas. `Jugadora` pasa a ser nombre + apellido. LEEME: nueva clave `Identificación`, sin la clave `ID Oliver`. El verificador exige `Apellido` y comprueba que `Jugadora` termina en él. |
+| 1 | Versión inicial: `Jugadora` + `ID Oliver` como identificador. |

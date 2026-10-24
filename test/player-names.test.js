@@ -385,19 +385,20 @@ test('ya no existe la confianza "recordado"', () => {
 console.log('\nExport al fisio: la columna Jugadora no cambia al separar el nombre');
 const ses = (playerId) => ({ id: playerId + 'a', playerId, date: '2026-09-29T10:00:00', timeOfDay: 'morning', type: 'training', rpe: 6 });
 const runExport = (players) => EF.construir({
-    players, sessions: [ses('p1'), ses('p2')], wellness: [], gpsPlayerMap: { '47162': 'p1' },
+    players, sessions: [ses('p1'), ses('p2')], wellness: [],
     desde: '2026-09-28', hasta: '2026-10-04',
 });
 test('nombre completo en `name` o dividido en name + lastName → misma Jugadora', () => {
-    const joined = runExport([{ id: 'p1', name: 'Carla Mendes Rocha' }, { id: 'p2', name: 'Ana Sin Id' }]);
-    const split = runExport([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }, { id: 'p2', name: 'Ana', lastName: 'Sin Id' }]);
+    const joined = runExport([{ id: 'p1', name: 'Carla Mendes Rocha' }, { id: 'p2', name: 'Ana Sin Apellido' }]);
+    const split = runExport([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }, { id: 'p2', name: 'Ana', lastName: 'Sin Apellido' }]);
     assert.deepStrictEqual(J(split.rpe.map(r => r.Jugadora)), J(joined.rpe.map(r => r.Jugadora)));
-    assert.deepStrictEqual(J(split.rpe.map(r => r.Jugadora)), ['Ana Sin Id', 'Carla Mendes Rocha']);
+    assert.deepStrictEqual(J(split.rpe.map(r => r.Jugadora)), ['Ana Sin Apellido', 'Carla Mendes Rocha']);
 });
-test('el ID Oliver sigue saliendo igual (se retira en una fase posterior)', () => {
-    const r = runExport([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }, { id: 'p2', name: 'Ana', lastName: 'Sin Id' }]);
-    assert.strictEqual(r.rpe.find(x => x.Jugadora === 'Carla Mendes Rocha')['ID Oliver'], '47162');
-    assert.strictEqual(r.rpe.find(x => x.Jugadora === 'Ana Sin Id')['ID Oliver'], '');
+test('al separar el nombre, la columna Apellido se rellena (y sin separar va vacía)', () => {
+    const joined = runExport([{ id: 'p1', name: 'Carla Mendes Rocha' }, { id: 'p2', name: 'Ana Gil' }]);
+    const split = runExport([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }, { id: 'p2', name: 'Ana', lastName: 'Gil' }]);
+    assert.deepStrictEqual(J(joined.rpe.map(r => r.Apellido)), ['', '']);
+    assert.deepStrictEqual(J(split.rpe.map(r => r.Apellido)), ['Gil', 'Mendes Rocha']);
 });
 
 (async () => {
