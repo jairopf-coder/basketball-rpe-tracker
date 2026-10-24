@@ -2027,7 +2027,7 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId, editSessionId)
     const results = editSession ? (editSession.results || {}) : {};
 
     const playerOpts = this.players.map(p =>
-        `<option value="${p.id}" ${p.id === (editSession ? editSession.playerId : preselectedPlayerId) ? 'selected' : ''}>${esc(p.name)}${p.number ? ' #'+p.number : ''}</option>`
+        `<option value="${p.id}" ${p.id === (editSession ? editSession.playerId : preselectedPlayerId) ? 'selected' : ''}>${esc(this.playerDisplayName(p))}${p.number ? ' #'+p.number : ''}</option>`
     ).join('');
     const today = toLocalISODate(new Date());
     const dateVal = editSession ? editSession.date : today;

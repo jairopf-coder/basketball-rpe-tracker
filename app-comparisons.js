@@ -132,7 +132,7 @@ RPETracker.prototype.renderComparisonModule = function() {
     }
 
     const playerOptions = this.players.map(p =>
-        `<option value="${p.id}">${esc(p.name)}${p.number ? ' #'+esc(p.number) : ''}</option>`
+        `<option value="${p.id}">${esc(this.playerDisplayName(p))}${p.number ? ' #'+esc(p.number) : ''}</option>`
     ).join('');
 
     container.innerHTML = `
@@ -161,7 +161,7 @@ RPETracker.prototype.renderComparisonModule = function() {
                     <label class="comp-label" id="labelB">Jugadora B</label>
                     <select class="comp-select" id="compPlayerB" onchange="window.rpeTracker?.updateComparison()">
                         ${this.players.map((p, i) =>
-                            `<option value="${p.id}" ${i===1?'selected':''}>${esc(p.name)}${p.number ? ' #'+esc(p.number) : ''}</option>`
+                            `<option value="${p.id}" ${i===1?'selected':''}>${esc(this.playerDisplayName(p))}${p.number ? ' #'+esc(p.number) : ''}</option>`
                         ).join('')}
                     </select>
                 </div>

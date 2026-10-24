@@ -484,7 +484,7 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
 
     const playerOptions = this.players
         .filter(p => rows.some(r => r.player.id === p.id))
-        .map(p => `<option value="${p.id}"${filterPlayer === p.id ? ' selected' : ''}>${esc(p.name)}</option>`)
+        .map(p => `<option value="${p.id}"${filterPlayer === p.id ? ' selected' : ''}>${esc(this.playerDisplayName(p))}</option>`)
         .join('');
 
     const tableRows = filteredRows.length === 0

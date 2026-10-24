@@ -569,7 +569,7 @@ RPETracker.prototype._renderClinicalNotesPanel = function(container, filterPlaye
     const today = new Date().toISOString().split('T')[0];
 
     const playerOptions = this.players
-        .map(p => `<option value="${p.id}" ${fp === p.id ? 'selected' : ''}>${esc(p.name)}</option>`)
+        .map(p => `<option value="${p.id}" ${fp === p.id ? 'selected' : ''}>${esc(this.playerDisplayName(p))}</option>`)
         .join('');
 
     let notes = [...(this.clinicalNotes || [])].sort((a, b) => b.date.localeCompare(a.date));
@@ -598,7 +598,7 @@ RPETracker.prototype._renderClinicalNotesPanel = function(container, filterPlaye
             <div class="cn-form-row">
                 <select class="filter-select" id="cnNewPlayer" style="flex:1">
                     <option value="">— Seleccionar jugadora —</option>
-                    ${this.players.map(p => `<option value="${p.id}" ${fp===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}
+                    ${this.players.map(p => `<option value="${p.id}" ${fp===p.id?'selected':''}>${esc(this.playerDisplayName(p))}</option>`).join('')}
                 </select>
                 <input type="date" id="cnNewDate" class="filter-select" value="${today}" style="flex:0 0 auto">
             </div>

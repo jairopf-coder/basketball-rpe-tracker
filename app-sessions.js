@@ -1001,7 +1001,7 @@ RPETracker.prototype.editSession = function(sessionId) {
     // Populate player select
     const playerSelect = document.getElementById('editSessionPlayer');
     playerSelect.innerHTML = this.players.map(p => 
-        `<option value="${p.id}" ${p.id === session.playerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ` #${esc(p.number)}` : ''}</option>`
+        `<option value="${p.id}" ${p.id === session.playerId ? 'selected' : ''}>${esc(this.playerDisplayName(p))}${p.number ? ` #${esc(p.number)}` : ''}</option>`
     ).join('');
     
     // Open modal

@@ -27,6 +27,11 @@ const ctx = vm.createContext({
 vm.runInContext('function RPETracker() {}', ctx);
 ['gps-tracking.js', 'app-players.js', 'export-fisio.js'].forEach(f =>
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), ctx));
+// dashboard-renderer.js toca el DOM al cargarse: de ahí solo se prueba _shortPlayerName
+const dashSrc = fs.readFileSync(path.join(__dirname, '..', 'dashboard-renderer.js'), 'utf8');
+const shortFn = dashSrc.match(/RPETracker\.prototype\._shortPlayerName = function[\s\S]*?\n};\n/);
+assert.ok(shortFn, 'no se encuentra _shortPlayerName en dashboard-renderer.js');
+vm.runInContext(shortFn[0], ctx);
 const EF = ctx.window.ExportFisio;
 const J = x => JSON.parse(JSON.stringify(x));
 
@@ -214,6 +219,53 @@ test('rechaza dos jugadoras con el mismo nombre completo (también contra las ya
     assert.strictEqual(r.ok, false);
     assert.ok(r.error.includes('mismo nombre'));
     assert.strictEqual(T.players[0].name, 'Sara López', 'no cambia nada');
+});
+
+console.log('\nFase 2: nombre para mostrar (nombres repetidos)');
+test('sin nombres repetidos se muestra solo el nombre', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }, { id: 'p2', name: 'Ingrid', lastName: 'Van Dijk' }]);
+    assert.strictEqual(T.playerDisplayName(T.players[0]), 'Carla');
+    assert.strictEqual(T.playerDisplayName(T.players[1]), 'Ingrid');
+});
+test('dos con el mismo nombre: se añade la inicial del primer apellido', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Sara', lastName: 'López Gil' }, { id: 'p2', name: 'sara', lastName: 'Marín' }]);
+    assert.strictEqual(T.playerDisplayName(T.players[0]), 'Sara L.');
+    assert.strictEqual(T.playerDisplayName(T.players[1]), 'sara M.');
+});
+test('misma inicial: se alargan las letras hasta distinguirlas', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Sara', lastName: 'López' }, { id: 'p2', name: 'Sara', lastName: 'Lara' }, { id: 'p3', name: 'Sara', lastName: 'Marín' }]);
+    assert.strictEqual(T.playerDisplayName(T.players[0]), 'Sara Ló.');
+    assert.strictEqual(T.playerDisplayName(T.players[1]), 'Sara La.');
+    assert.strictEqual(T.playerDisplayName(T.players[2]), 'Sara M.');
+});
+test('mismo primer apellido: se muestra completo y no falla', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Sara', lastName: 'Gil Ruiz' }, { id: 'p2', name: 'Sara', lastName: 'Gil Soto' }]);
+    assert.strictEqual(T.playerDisplayName(T.players[0]), 'Sara Gil');
+});
+test('ficha sin apellido se muestra tal cual, aunque haya otra con su nombre', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Sara', lastName: 'López' }, { id: 'p2', name: 'Sara' }, { id: 'p3', name: 'Ana Gil' }]);
+    assert.strictEqual(T.playerDisplayName(T.players[0]), 'Sara L.');
+    assert.strictEqual(T.playerDisplayName(T.players[1]), 'Sara');
+    assert.strictEqual(T.playerDisplayName(T.players[2]), 'Ana Gil');
+});
+test('acentos y mayúsculas no esconden el nombre repetido', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Inés', lastName: 'Pérez' }, { id: 'p2', name: 'INES', lastName: 'Ruiz' }]);
+    assert.strictEqual(T.playerDisplayName(T.players[0]), 'Inés P.');
+});
+test('_shortPlayerName: fichas antiguas sin apellido siguen igual', () => {
+    const T = makeTracker([{ id: 'p1', name: 'María García' }, { id: 'p2', name: 'Lucía Pons' }]);
+    assert.strictEqual(T._shortPlayerName(T.players[0]), 'María');
+    const T2 = makeTracker([{ id: 'p1', name: 'María García' }, { id: 'p2', name: 'María Soto' }]);
+    assert.strictEqual(T2._shortPlayerName(T2.players[0]), 'María G.');
+});
+test('_shortPlayerName: con apellido separado usa el nombre para mostrar', () => {
+    const T = makeTracker([{ id: 'p1', name: 'María', lastName: 'García' }, { id: 'p2', name: 'María', lastName: 'Soto' }, { id: 'p3', name: 'Lucía', lastName: 'Pons' }]);
+    assert.strictEqual(T._shortPlayerName(T.players[0]), 'María G.');
+    assert.strictEqual(T._shortPlayerName(T.players[2]), 'Lucía');
+});
+test('un nombre compuesto no se corta', () => {
+    const T = makeTracker([{ id: 'p1', name: 'María José', lastName: 'García' }]);
+    assert.strictEqual(T.playerDisplayName(T.players[0]), 'María José');
 });
 
 console.log('\nCSV de Oli: emparejado por nombre completo');

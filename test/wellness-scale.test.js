@@ -60,6 +60,8 @@ function make(wellness) {
     t.getRatioColor = () => '#2e7d32'; // uno de los 4 colores reales de getRatioColor
     t.getPlayerThresholds = () => ({ low: 0.8, opt: 1.3, high: 1.5 });
     t.showToast = () => {};
+    t.playerFullName = p => [p.name, p.lastName].filter(Boolean).join(' ');   // en la app real: app-players.js
+    t._shortPlayerName = p => String(p.name || '').split(' ')[0];
     t.weekPlan = {}; t.loadWeekPlan = () => {}; t.getLocationName = () => '';
     return t;
 }

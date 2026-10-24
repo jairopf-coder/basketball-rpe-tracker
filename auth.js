@@ -360,13 +360,20 @@ const AppAuth = {
         this._loadUserList();
     },
 
+    // Nombre completo (nombre + apellido) para identificar a la jugadora al vincular cuentas.
+    // La app solo muestra el nombre; aquí hace falta el apellido para no vincular a la equivocada.
+    _playerFullLabel(p) {
+        const t = window.rpeTracker;
+        return t && typeof t.playerFullName === 'function' ? t.playerFullName(p) : String((p && p.name) || '');
+    },
+
     // Devuelve las <option> del roster de jugadoras para los selectores de vínculo
     _playerOptionsHtml(selectedId) {
         const players = (window.rpeTracker && window.rpeTracker.players) || [];
         return players
             .slice()
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(p.name || '')}${p.number ? ` #${esc(p.number)}` : ''}</option>`)
+            .sort((a, b) => this._playerFullLabel(a).localeCompare(this._playerFullLabel(b)))
+            .map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(this._playerFullLabel(p))}${p.number ? ` #${esc(p.number)}` : ''}</option>`)
             .join('');
     },
 
@@ -512,7 +519,7 @@ const AppAuth = {
             this._umUsers = users;
             const roleLabel = { staff: '🏋️ Staff', fisio: '🩺 Fisio', player: '👤 Jugadora' };
             const playersById = {};
-            ((window.rpeTracker && window.rpeTracker.players) || []).forEach(p => { playersById[p.id] = p.name; });
+            ((window.rpeTracker && window.rpeTracker.players) || []).forEach(p => { playersById[p.id] = this._playerFullLabel(p); });
             const rows = Object.entries(users).map(([uid, u]) => `
                 <div class="um-user-row">
                     <div class="um-user-info">

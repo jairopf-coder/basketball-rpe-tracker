@@ -35,6 +35,26 @@ RPETracker.prototype._findPlayerByFullName = function(fullName, exceptId) {
         && this._normalizePlayerName(this.playerFullName(p)) === key) || null;
 };
 
+// Nombre para mostrar en la app: el nombre de la ficha. Si otra jugadora tiene el mismo nombre, se le
+// añade el principio de su apellido ("Sara L."), con las letras justas para distinguirlas ("Sara Lóp.").
+// Las fichas sin apellido se muestran tal cual, como hasta ahora.
+RPETracker.prototype.playerDisplayName = function(player) {
+    if (!player) return '';
+    const name = String(player.name || '').trim().replace(/\s+/g, ' ');
+    const firstSurname = String(player.lastName || '').trim().split(/\s+/)[0];
+    if (!firstSurname) return name;
+
+    const key = this._normalizePlayerName(name);
+    const sameName = (this.players || []).filter(p => p.id !== player.id && this._normalizePlayerName(p.name) === key);
+    if (!sameName.length) return name;
+
+    const others = sameName.map(p => this._normalizePlayerName(String(p.lastName || '').trim().split(/\s+/)[0]));
+    const mine = this._normalizePlayerName(firstSurname);
+    let n = 1;
+    while (n < firstSurname.length && others.some(o => o.slice(0, n) === mine.slice(0, n))) n++;
+    return n >= firstSurname.length ? `${name} ${firstSurname}` : `${name} ${firstSurname.slice(0, n)}.`;
+};
+
 RPETracker.prototype.openAddPlayerModal = function() {
     const _modal2 = document.getElementById('addPlayerModal');
     _modal2.classList.add('active');
@@ -151,7 +171,7 @@ RPETracker.prototype.deletePlayer = function(playerId) {
 // Modo local (sin Firebase): solo la ficha y sus sesiones, como siempre.
 RPETracker.prototype._deletePlayerBasic = function(playerId) {
     const player = this.players.find(p => p.id === playerId);
-    const name = player ? player.name : 'esta jugadora';
+    const name = player ? this.playerFullName(player) : 'esta jugadora';
     const sessionCount = this.sessions.filter(s => s.playerId === playerId).length;
     AppConfirm.show({
         title: `¿Eliminar ${name}?`,
@@ -201,7 +221,7 @@ RPETracker.prototype.renderPlayers = function() {
     if (chipFilterActive) {
         playersToShow = this.players.filter(p => this._playerFilterSelected.has(p.id));
     } else if (searchTerm) {
-        playersToShow = this.players.filter(p => p.name.toLowerCase().includes(searchTerm) || (p.number && String(p.number).includes(searchTerm)));
+        playersToShow = this.players.filter(p => this._normalizePlayerName(this.playerFullName(p)).includes(this._normalizePlayerName(searchTerm)) || (p.number && String(p.number).includes(searchTerm)));
     }
 
     if (playersToShow.length === 0 && searchTerm) {
@@ -268,7 +288,7 @@ RPETracker.prototype.renderPlayers = function() {
                 <div class="player-info">
                     ${PlayerTokens.avatar(player, 56, '1.4rem')}
                     <div class="player-details">
-                        <h3>${esc(player.name)}${player.number ? ` <span style="opacity:0.5;font-size:0.85em">#${esc(player.number)}</span>` : ''}${trendHTML}</h3>
+                        <h3>${esc(this.playerDisplayName(player))}${player.number ? ` <span style="opacity:0.5;font-size:0.85em">#${esc(player.number)}</span>` : ''}${trendHTML}</h3>
                         <p class="player-meta">${playerSessions.length} registros · ${rpeTracker ? rpeTracker.countUniqueSessions(playerSessions) : playerSessions.length} sesiones<span class="player-meta-last">${lastSessionLabel}</span></p>
                     </div>
                 </div>
@@ -347,9 +367,9 @@ RPETracker.prototype._renderPlayerFilterChips = function() {
             return `
             <button type="button" class="player-filter-chip ${isSel ? 'player-filter-chip--selected' : ''}"
                 style="--chip-color:${color}"
-                title="${esc(player.name)}${player.number ? ' #' + esc(player.number) : ''}"
+                title="${esc(this.playerFullName(player))}${player.number ? ' #' + esc(player.number) : ''}"
                 onclick="window.rpeTracker?._playerFilterToggle('${player.id}')">
-                ${esc(player.name.split(' ')[0])}
+                ${esc(this._shortPlayerName(player))}
                 ${isSel ? '<span class="player-filter-chip-check">✓</span>' : ''}
             </button>`;
         }).join('')}
@@ -377,7 +397,7 @@ RPETracker.prototype.populatePlayerSelects = function() {
     
     if (filterSelect) {
         filterSelect.innerHTML = '<option value="all">Todas las jugadoras</option>' +
-            this.players.map(p => `<option value="${p.id}">${esc(p.name)}${p.number ? ` #${esc(p.number)}` : ''}</option>`).join('');
+            this.players.map(p => `<option value="${p.id}">${esc(this.playerDisplayName(p))}${p.number ? ` #${esc(p.number)}` : ''}</option>`).join('');
     }
 };
 
