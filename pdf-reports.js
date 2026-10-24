@@ -29,7 +29,7 @@ RPETracker.prototype.exportAllCharts = function() {
     this.players.forEach((player, index) => {
         setTimeout(() => {
             const canvasId = `chart-${player.id}`;
-            const filename = `grafico_${player.name.replace(/\s+/g, '_')}_${Date.now()}.png`;
+            const filename = `grafico_${this.playerFullName(player).replace(/\s+/g, '_')}_${Date.now()}.png`;
             this.exportChartAsImage(canvasId, filename);
         }, index * 500); // Stagger downloads
     });
@@ -146,7 +146,7 @@ RPETracker.prototype.buildReportHTML = function(player, report, reportType) {
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Informe ${reportTitle} - ${esc(player.name)}</title>
+    <title>Informe ${reportTitle} - ${esc(this.playerFullName(player))}</title>
     <style>
         @media print {
             @page { margin: 2cm; }
@@ -299,7 +299,7 @@ RPETracker.prototype.buildReportHTML = function(player, report, reportType) {
     </div>
     <div class="header">
         <h1>🏀 Informe ${reportTitle}</h1>
-        <div class="subtitle">${esc(player.name)}${player.number ? ` #${esc(player.number)}` : ''}</div>
+        <div class="subtitle">${esc(this.playerFullName(player))}${player.number ? ` #${esc(player.number)}` : ''}</div>
         <div class="date-range">
             ${report.startDate.toLocaleDateString('es-ES')} - ${report.endDate.toLocaleDateString('es-ES')}
         </div>
@@ -567,7 +567,7 @@ RPETracker.prototype.exportSessionsHistoryPDF = function() {
         const ratio = this.calculateAcuteChronicRatio(p.id);
         const ratioCol = this.getRatioColor(ratio.ratio);
         return `<tr>
-            <td><strong>${esc(p.name)}</strong>${p.number?` #${esc(p.number)}`:''}</td>
+            <td><strong>${esc(this.playerFullName(p))}</strong>${p.number?` #${esc(p.number)}`:''}</td>
             <td style="text-align:center">${ps.length}</td>
             <td style="text-align:center">${avgRPE}</td>
             <td style="text-align:center">${totalLoad.toLocaleString('es-ES')}</td>
@@ -577,7 +577,7 @@ RPETracker.prototype.exportSessionsHistoryPDF = function() {
 
     const sessionRows = sorted.map(s => {
         const player = this.players.find(p => p.id === s.playerId);
-        const pName = player ? player.name + (player.number ? ` #${player.number}` : '') : '—';
+        const pName = player ? this.playerFullName(player) + (player.number ? ` #${player.number}` : '') : '—';
         const load = s.load || (s.rpe * (s.duration || 60));
         const date = new Date(s.date).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric' });
         const time = s.timeOfDay === 'morning' ? 'Mañana' : 'Tarde';
@@ -671,7 +671,7 @@ RPETracker.prototype.showPlayerReportMenu = function(playerId) {
     overlay.innerHTML = `
         <div style="background:var(--bg-card);border-radius:16px;padding:1.5rem;min-width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.25)">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
-                <h3 style="margin:0;font-size:1rem">📄 Informe — ${esc(player.name)}</h3>
+                <h3 style="margin:0;font-size:1rem">📄 Informe — ${esc(this.playerFullName(player))}</h3>
                 <button onclick="document.getElementById('reportMenuOverlay').remove()"
                     style="background:none;border:none;font-size:1.25rem;cursor:pointer;color:var(--text-secondary)">✕</button>
             </div>
@@ -764,7 +764,7 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
     const activeInj   = (this.injuries || []).filter(i => i.status === 'active');
 
     // ── Chart data (JSON embedded, rendered client-side via Chart.js CDN) ──
-    const chartLabels = JSON.stringify(playerData.map(d => d.player.name.split(' ')[0]));
+    const chartLabels = JSON.stringify(playerData.map(d => this._shortPlayerName(d.player)));
     const chartData   = JSON.stringify(playerData.map(d => d.ua7d));
     const chartColors = JSON.stringify(playerData.map(d => {
         // returns semantic color string — no hardcoded business logic, uses threshold classification
@@ -783,7 +783,7 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
         const injNote   = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
         const injLabel  = injNote ? (injNote.location ? this.getLocationName(injNote.location) : 'lesión activa') : '';
         return `<tr>
-            <td class="td-name">${esc(player.name)}${player.number ? ` <span class="num">#${esc(player.number)}</span>` : ''}</td>
+            <td class="td-name">${esc(this.playerFullName(player))}${player.number ? ` <span class="num">#${esc(player.number)}</span>` : ''}</td>
             <td class="td-num">${ua7d ? ua7d.toLocaleString('es-ES') : '—'}</td>
             <td class="td-ratio ${ratioCls}">${ratio.ratio !== 'N/A' ? ratio.ratio : '—'}</td>
             <td class="td-num">${wsDisplay}</td>
@@ -1082,7 +1082,7 @@ RPETracker.prototype.generatePlayerReport = function(playerId) {
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Informe — ${esc(player.name)}</title>
+<title>Informe — ${esc(this.playerFullName(player))}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"><\/script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1157,7 +1157,7 @@ RPETracker.prototype.generatePlayerReport = function(playerId) {
 <div class="rpt-header">
   <div class="rpt-avatar">${avatarLetter}</div>
   <div>
-    <div class="rpt-name">${esc(player.name)}${player.number ? ` <span style="opacity:.6;font-size:.8em">#${esc(player.number)}</span>` : ''}</div>
+    <div class="rpt-name">${esc(this.playerFullName(player))}${player.number ? ` <span style="opacity:.6;font-size:.8em">#${esc(player.number)}</span>` : ''}</div>
     <div class="rpt-sub">Informe individual · ${new Date().toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' })}</div>
   </div>
   <div class="rpt-meta">
@@ -1248,7 +1248,7 @@ RPETracker.prototype.showTestsReportMenu = function() {
     const earliestDate = dates[0] || today;
 
     const playerOpts = this.players.map(p =>
-        `<option value="${p.id}">${esc(p.name)}${p.number ? ' #' + esc(p.number) : ''}</option>`
+        `<option value="${p.id}">${esc(this.playerDisplayName(p))}${p.number ? ' #' + esc(p.number) : ''}</option>`
     ).join('');
 
     const testChecks = TEST_DEFINITIONS.map(def => `
@@ -1405,10 +1405,10 @@ RPETracker.prototype.buildTestsReportHTML = function(data) {
             };
             const rows = perPlayer.map(p => {
                 if (!p.hasData) {
-                    return `<tr><td>${esc(p.player.name)}</td><td colspan="${colCount}" style="color:#999">Sin datos en el rango</td></tr>`;
+                    return `<tr><td>${esc(this.playerFullName(p.player))}</td><td colspan="${colCount}" style="color:#999">Sin datos en el rango</td></tr>`;
                 }
                 return `<tr>
-                    <td>${esc(p.player.name)}</td>
+                    <td>${esc(this.playerFullName(p.player))}</td>
                     <td>${fmtVal(def, p.first.repValue)} <span style="color:#999;font-size:0.8em">(${fmtDate(p.first.date)})</span></td>
                     <td>${fmtVal(def, p.last.repValue)} <span style="color:#999;font-size:0.8em">(${fmtDate(p.last.date)})</span></td>
                     <td>${p.delta != null ? (p.delta > 0 ? '+' : '') + p.delta + def.unit : '—'}</td>

@@ -537,7 +537,9 @@ RPETracker.prototype.cycleDashSort = function() {
 // ── "Faltan hoy": quién no ha cubierto wellness / RPE ─────────────────
 // Nombre corto para listas: solo el nombre de pila; si dos jugadoras comparten
 // nombre, se añade la inicial del primer apellido ("María G.").
+// Si la ficha ya tiene el apellido separado, manda playerDisplayName (app-players.js).
 RPETracker.prototype._shortPlayerName = function(player) {
+    if (String(player.lastName || '').trim()) return this.playerDisplayName(player);
     const parts = String(player.name || '').trim().split(/\s+/);
     const first = parts[0] || '';
     const sameFirst = (this.players || []).filter(p =>

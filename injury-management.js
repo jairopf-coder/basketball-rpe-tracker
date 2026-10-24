@@ -515,7 +515,7 @@ RPETracker.prototype.openAddInjuryModal = function(playerId = null) {
     modal.className = 'modal active';
     
     const playerOptions = this.players.map(p => 
-        `<option value="${p.id}" ${p.id === playerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ` #${esc(p.number)}` : ''}</option>`
+        `<option value="${p.id}" ${p.id === playerId ? 'selected' : ''}>${esc(this.playerDisplayName(p))}${p.number ? ` #${esc(p.number)}` : ''}</option>`
     ).join('');
     
     modal.innerHTML = `
@@ -668,7 +668,7 @@ RPETracker.prototype.editInjuryModal = function(injuryId) {
     modal.className = 'modal active';
 
     const playerOptions = this.players.map(p =>
-        `<option value="${p.id}" ${p.id === injury.playerId ? 'selected' : ''}>${esc(p.name)}${p.number ? ` #${p.number}` : ''}</option>`
+        `<option value="${p.id}" ${p.id === injury.playerId ? 'selected' : ''}>${esc(this.playerDisplayName(p))}${p.number ? ` #${p.number}` : ''}</option>`
     ).join('');
 
     const typeOptions = { muscle: 'Muscular', joint: 'Articular', bone: 'Ósea', tendon: 'Tendón/Ligamento', other: 'Otra' };
