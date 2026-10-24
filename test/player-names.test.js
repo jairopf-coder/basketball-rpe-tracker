@@ -294,6 +294,94 @@ test('ficha dividida o sin dividir da el mismo resultado de emparejado', () => {
     });
 });
 
+console.log('\nFase 3: importación del CSV de Oli solo por nombre y apellido');
+const rec = (name, id) => ({ oliPlayerName: name, oliPlayerId: id || '0' });
+const roster = () => makeTracker([
+    { id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' },
+    { id: 'p2', name: 'Ingrid', lastName: 'Van Dijk' },
+    { id: 'p3', name: 'Marta', lastName: 'Ferrer' },
+    { id: 'p4', name: 'Lucía', lastName: 'Ferrer' },
+    { id: 'p5', name: 'Ana' },
+]);
+const ids = list => list.map(m => m.player.id);
+test('_nameTokens: palabras sin acentos, mayúsculas ni signos', () => {
+    const T = makeTracker();
+    assert.deepStrictEqual(J(T._nameTokens('  Ingrid  VAN-Dijk ')), ['ingrid', 'van', 'dijk']);
+    assert.deepStrictEqual(J(T._nameTokens("María José O'Brien")), ['maria', 'jose', 'o', 'brien']);
+    assert.deepStrictEqual(J(T._nameTokens('')), []);
+});
+test('se comparan palabras enteras: "Ana" NO está dentro de "Tetiana"', () => {
+    const T = roster();
+    assert.strictEqual(T._matchGpsPlayerByName('Tetiana Kovalenko').player, null);
+    assert.strictEqual(T._matchGpsPlayerByName('Anabel Soto').player, null);
+});
+test('exacta: mismas palabras en el mismo orden, aunque cambien signos o acentos', () => {
+    const T = roster();
+    assert.strictEqual(T._matchGpsPlayerByName('Ingrid Van-Dijk').confidence, 'exact');
+    assert.strictEqual(T._matchGpsPlayerByName('LUCIA FERRER').player.id, 'p4');
+});
+test('parcial: Oli con un apellido de menos o de más, o en otro orden', () => {
+    const T = roster();
+    let r = T._matchGpsPlayerByName('Carla Mendes');
+    assert.deepStrictEqual([r.player.id, r.confidence], ['p1', 'partial']);
+    r = T._matchGpsPlayerByName('Mendes Rocha Carla');
+    assert.deepStrictEqual([r.player.id, r.confidence], ['p1', 'partial']);
+    const T2 = makeTracker([{ id: 'q1', name: 'Carla', lastName: 'Mendes' }]);
+    r = T2._matchGpsPlayerByName('Carla Mendes Rocha');
+    assert.deepStrictEqual([r.player.id, r.confidence], ['q1', 'partial']);
+});
+test('ficha sin apellido (solo "Ana") se propone como parcial para "Ana Gil" y el staff confirma', () => {
+    const T = roster();
+    const r = T._matchGpsPlayerByName('Ana Gil');
+    assert.deepStrictEqual([r.player.id, r.confidence], ['p5', 'partial']);
+});
+test('solo el apellido, compartido por dos jugadoras → no elige ninguna', () => {
+    const T = roster();
+    assert.strictEqual(T._matchGpsPlayerByName('Ferrer').player, null);
+});
+test('mismo apellido, distinto nombre: cada fila con la suya', () => {
+    const T = roster();
+    const { matched, unmatched } = T._matchGpsRecords([rec('Marta Ferrer'), rec('Lucía Ferrer')]);
+    assert.deepStrictEqual(J(ids(matched)), ['p3', 'p4']);
+    assert.strictEqual(unmatched.length, 0);
+});
+test('dos filas para la misma jugadora: gana la exacta, la otra queda sin identificar', () => {
+    const T = roster();
+    const { matched, unmatched } = T._matchGpsRecords([rec('Carla Mendes', '1'), rec('Carla Mendes Rocha', '2')]);
+    assert.deepStrictEqual(J(matched.map(m => [m.player.id, m.record.oliPlayerId, m.confidence])), [['p1', '2', 'exact']]);
+    assert.deepStrictEqual(J(unmatched.map(r => r.oliPlayerId)), ['1']);
+});
+test('dos filas parciales para la misma jugadora: ninguna se asigna sola', () => {
+    const T = roster();
+    const { matched, unmatched } = T._matchGpsRecords([rec('Carla Mendes', '1'), rec('Rocha Carla', '2')]);
+    assert.strictEqual(matched.length, 0);
+    assert.strictEqual(unmatched.length, 2);
+});
+test('el ID de Oli ya no identifica: manda el nombre (caso de la jugadora que hereda el GPS)', () => {
+    // el ID 47162 estaba recordado para la jugadora que se fue (p1); la fichaje (p9) llega con el mismo ID
+    const T = makeTracker([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }, { id: 'p9', name: 'Nora', lastName: 'Pons' }]);
+    T.gpsPlayerMap = { '47162': 'p1' };
+    T.parseOliGpsCsv = () => [rec('Nora Pons', '47162')];
+    T._showGpsImportConfirmModal = (g, matched, unmatched) => { T.shown = { matched, unmatched }; };
+    T._handleGpsCsvLoaded('x', 'g1');
+    assert.strictEqual(T.shown.matched.length, 1);
+    assert.strictEqual(T.shown.matched[0].player.id, 'p9');
+    assert.strictEqual(T.shown.matched[0].confidence, 'exact');
+});
+test('un ID recordado ya no empareja si el nombre no coincide', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }]);
+    T.gpsPlayerMap = { '47999': 'p1' };
+    T.parseOliGpsCsv = () => [rec('Persona Desconocida', '47999')];
+    T._showGpsImportConfirmModal = (g, matched, unmatched) => { T.shown = { matched, unmatched }; };
+    T._handleGpsCsvLoaded('x', 'g1');
+    assert.strictEqual(T.shown.matched.length, 0);
+    assert.strictEqual(T.shown.unmatched.length, 1);
+});
+test('ya no existe la confianza "recordado"', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'gps-tracking.js'), 'utf8');
+    assert.ok(!src.includes("'remembered'"));
+});
+
 console.log('\nExport al fisio: la columna Jugadora no cambia al separar el nombre');
 const ses = (playerId) => ({ id: playerId + 'a', playerId, date: '2026-09-29T10:00:00', timeOfDay: 'morning', type: 'training', rpe: 6 });
 const runExport = (players) => EF.construir({

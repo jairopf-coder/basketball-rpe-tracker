@@ -4,7 +4,7 @@
 //  Qué hace este módulo:
 //   1. Importa el CSV que exporta Oli por sesión.
 //   2. Empareja cada fila (jugadora de Oli) con una jugadora del
-//      roster interno, recordando el mapeo para no repetirlo.
+//      roster interno por nombre y apellido (el ID de Oli ya no identifica).
 //   3. Guarda los datos GPS vinculados a una sesión interna
 //      concreta (sessionGroupId, ver más abajo) en Firebase.
 //   4. Muestra un resumen compacto en la ficha de sesión ya
@@ -17,7 +17,8 @@
 //
 //  Estructura en Firebase:
 //   gpsData/{sessionGroupId}/{playerId} = { ...métricas... }
-//   gpsPlayerMap/{oliPlayerId} = playerId interno (mapeo recordado)
+//   gpsPlayerMap/{oliPlayerId} = playerId interno (ya NO se usa para emparejar; solo alimenta
+//                                 la columna ID Oliver del export al fisio mientras exista)
 //
 //  sessionGroupId: todas las filas guardadas por RPETracker al
 //  pulsar "Guardar sesión" comparten el mismo `baseId` como prefijo
@@ -170,27 +171,68 @@ RPETracker.prototype._normalizePlayerName = function(name) {
         .replace(/[\u0300-\u036f]/g, ''); // quita acentos
 };
 
+// Palabras de un nombre, sin acentos, mayúsculas ni signos ("Van-Dijk" → ["van", "dijk"]).
+RPETracker.prototype._nameTokens = function(name) {
+    return this._normalizePlayerName(name).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+};
+
+// Jugadoras que pueden corresponder a un nombre de Oli, comparando nombre completo (nombre + apellido):
+//   exact   → mismas palabras en el mismo orden ("Elba Garfella Béjar" = "elba garfella bejar")
+//   partial → todas las palabras de un nombre están, COMPLETAS, en el otro (Oli con un apellido de más
+//             o de menos), o son las mismas palabras en otro orden
+// Se comparan palabras enteras, no trozos de texto: "Ana" no está dentro de "Tetiana".
+RPETracker.prototype._gpsNameCandidates = function(oliName) {
+    const out = { exact: [], partial: [] };
+    const oli = this._nameTokens(oliName);
+    if (!oli.length) return out;
+    const oliSet = new Set(oli);
+    this.players.forEach(p => {
+        const mine = this._nameTokens(this.playerFullName(p));
+        if (!mine.length) return;
+        if (mine.length === oli.length && mine.every((w, i) => w === oli[i])) { out.exact.push(p); return; }
+        const mineSet = new Set(mine);
+        if (oli.every(w => mineSet.has(w)) || mine.every(w => oliSet.has(w))) out.partial.push(p);
+    });
+    return out;
+};
+
 // Intenta encontrar la jugadora interna que corresponde a un nombre de Oli.
 // Devuelve { player, confidence } donde confidence es 'exact' | 'partial' | null.
+// Si hay más de una candidata posible no elige ninguna: que decida el staff en el modal.
 RPETracker.prototype._matchGpsPlayerByName = function(oliName) {
-    const normalized = this._normalizePlayerName(oliName);
-    if (!normalized) return { player: null, confidence: null };
-
-    // Coincidencia exacta de nombre completo
-    let match = this.players.find(p => this._normalizePlayerName(this.playerFullName(p)) === normalized);
-    if (match) return { player: match, confidence: 'exact' };
-
-    // Coincidencia parcial: todas las palabras del nombre de Oli están
-    // contenidas en el nombre interno, o viceversa (cubre casos como
-    // "Elba Garfella Béjar" vs "Elba Garfella").
-    const oliWords = normalized.split(/\s+/).filter(Boolean);
-    match = this.players.find(p => {
-        const internal = this._normalizePlayerName(this.playerFullName(p));
-        return oliWords.every(w => internal.includes(w)) || internal.split(/\s+/).every(w => normalized.includes(w));
-    });
-    if (match) return { player: match, confidence: 'partial' };
-
+    const c = this._gpsNameCandidates(oliName);
+    if (c.exact.length === 1) return { player: c.exact[0], confidence: 'exact' };
+    if (c.exact.length === 0 && c.partial.length === 1) return { player: c.partial[0], confidence: 'partial' };
     return { player: null, confidence: null };
+};
+
+// Empareja las filas del CSV con la plantilla SOLO por nombre y apellido (el ID de Oli ya no identifica).
+// Una jugadora no puede quedar asignada a dos filas: si dos filas la reclaman, se queda la coincidencia
+// exacta (si hay una sola) y las demás pasan a "sin identificar" para que el staff las asigne.
+RPETracker.prototype._matchGpsRecords = function(records) {
+    const picks = records.map(rec => this._matchGpsPlayerByName(rec.oliPlayerName));
+    const rowsByPlayer = new Map();
+    picks.forEach((pk, i) => {
+        if (!pk.player) return;
+        const rows = rowsByPlayer.get(pk.player.id) || [];
+        rows.push(i);
+        rowsByPlayer.set(pk.player.id, rows);
+    });
+
+    const keep = new Set();
+    rowsByPlayer.forEach(rows => {
+        if (rows.length === 1) { keep.add(rows[0]); return; }
+        const exact = rows.filter(i => picks[i].confidence === 'exact');
+        if (exact.length === 1) keep.add(exact[0]);
+    });
+
+    const matched = [];
+    const unmatched = [];
+    records.forEach((record, i) => {
+        if (keep.has(i)) matched.push({ record, player: picks[i].player, confidence: picks[i].confidence });
+        else unmatched.push(record);
+    });
+    return { matched, unmatched };
 };
 
 // ========== Parseo del CSV de Oli ==========
@@ -463,27 +505,8 @@ RPETracker.prototype._handleGpsCsvLoaded = function(csvText, sessionGroupId) {
         return;
     }
 
-    // Emparejar cada fila con una jugadora interna, usando primero el
-    // mapeo ya recordado (por oliPlayerId), y si no existe, por nombre.
-    const matched = [];
-    const unmatched = [];
-
-    records.forEach(rec => {
-        const mappedPlayerId = this.gpsPlayerMap[rec.oliPlayerId];
-        if (mappedPlayerId) {
-            const player = this.players.find(p => p.id === mappedPlayerId);
-            if (player) {
-                matched.push({ record: rec, player, confidence: 'remembered' });
-                return;
-            }
-        }
-        const { player, confidence } = this._matchGpsPlayerByName(rec.oliPlayerName);
-        if (player) {
-            matched.push({ record: rec, player, confidence });
-        } else {
-            unmatched.push(rec);
-        }
-    });
+    // Emparejar cada fila con una jugadora interna por nombre y apellido.
+    const { matched, unmatched } = this._matchGpsRecords(records);
 
     this._showGpsImportConfirmModal(sessionGroupId, matched, unmatched);
 };
@@ -504,7 +527,6 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
 
     const rowHtml = (item, idx) => {
         const badge = item.confidence === 'exact' ? '✅ Coincidencia exacta'
-            : item.confidence === 'remembered' ? '🔁 Recordado de antes'
             : '❓ Verifica esta jugadora';
         return `
         <div class="gps-match-row" data-oli-id="${esc(item.record.oliPlayerId)}" data-idx="${idx}">
@@ -561,7 +583,7 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
             <div class="modal-body">
                 ${dateWarningHtml}
                 <p style="font-size:0.9rem;color:var(--text-secondary,#666);margin-bottom:12px;">
-                    Revisa que cada jugadora del archivo de Oli esté bien asociada a tu plantilla. Puedes corregirlo con el desplegable.
+                    Revisa que cada jugadora del archivo de Oli esté bien asociada a tu plantilla (se emparejan por nombre y apellido). Puedes corregirlo con el desplegable.
                     ${(matched.length + unmatched.length) > 6 ? '<br><strong>⬇ Desplázate para ver todas las jugadoras</strong>' : ''}
                 </p>
                 ${matched.map((item, idx) => rowHtml(item, idx)).join('')}
@@ -635,8 +657,8 @@ RPETracker.prototype._confirmGpsImport = function(sessionGroupId) {
     rowsToProcess.forEach(({ playerId, record, oliPlayerId }) => {
         const targetSession = this._findPlayerSessionInGroup(sessionGroupId, playerId);
         const player = this.players.find(p => p.id === playerId);
-        // El ID de Oli se aprende siempre que el staff confirma la fila, aunque ese día la
-        // jugadora no tenga sesión de RPE (y por tanto no se guarde su GPS).
+        // El ID de Oli se sigue aprendiendo al confirmar la fila (aunque ese día la jugadora no tenga
+        // sesión de RPE), pero ya no sirve para emparejar: solo alimenta la columna ID Oliver del export.
         if (oliPlayerId) newMappings[oliPlayerId] = playerId;
         if (!targetSession) {
             skippedPlayerNames.push(player ? this.playerFullName(player) : playerId);
