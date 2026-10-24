@@ -15,7 +15,7 @@ const inputs = {};   // id -> { value, textContent, remove }
 const ctx = vm.createContext({
     console, Date, Math, JSON, Set, Map, Object, Array, Number, String, parseInt, parseFloat, isNaN, Promise, setTimeout,
     document: { getElementById: id => inputs[id] || null },
-    localStorage: { _d: {}, getItem(k) { return this._d[k] || null; }, setItem(k, v) { this._d[k] = v; } },
+    localStorage: { _d: {}, getItem(k) { return this._d[k] || null; }, setItem(k, v) { this._d[k] = v; }, removeItem(k) { delete this._d[k]; } },
     window: { firebaseSync: null, _devMode: false },
     AppConfirm: { answer: true, calls: [], show(o) { this.calls.push(o); return Promise.resolve(this.answer); } },
     AppAlert: { show() {} },
@@ -380,6 +380,75 @@ test('un ID recordado ya no empareja si el nombre no coincide', () => {
 test('ya no existe la confianza "recordado"', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'gps-tracking.js'), 'utf8');
     assert.ok(!src.includes("'remembered'"));
+});
+
+console.log('\nFase 5: sin ID de Oli (limpieza)');
+const sesion = (id, playerId) => ({ id, playerId, date: '2026-09-26T10:00:00', timeOfDay: 'morning', type: 'training' });
+const preparaImport = (T, matched, unmatched) => {
+    T.gpsData = {}; T.saveGpsData = () => { T.gpsSaved = (T.gpsSaved || 0) + 1; };
+    T.currentSessionId = null;
+    T._pendingGpsImport = { sessionGroupId: 's1', matched, unmatched: unmatched || [] };
+    inputs.gpsImportModal = { classList: { remove() {} } };
+};
+test('confirmar la importación guarda el GPS de quien tiene sesión y avisa a quien no, sin tocar ningún mapa de IDs', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }, { id: 'p2', name: 'Ingrid', lastName: 'Van Dijk' }]);
+    ctx.window.firebaseSync = { saveGpsPlayerMap() { throw new Error('ya no debe guardarse el mapa'); }, updateGpsPlayerMapEntries() { throw new Error('ya no debe guardarse el mapa'); } };
+    T.sessions = [sesion('s1', 'p1')];            // p1 tiene sesión ese día; p2 no
+    setupForm({ 'gpsMatchSelect-0': 'p1', 'gpsMatchSelect-1': 'p2' });
+    preparaImport(T, [
+        { player: T.players[0], record: { oliPlayerId: '47162', oliPlayerName: 'Carla Mendes Rocha' } },
+        { player: T.players[1], record: { oliPlayerId: '47164', oliPlayerName: 'Ingrid Van Dijk' } },
+    ]);
+    inputs.gpsImportModal = { classList: { remove() {} } };
+    T._confirmGpsImport('s1');
+    ctx.window.firebaseSync = null;
+    assert.ok(T.gpsData.s1 && T.gpsData.s1.p1, 'el GPS de p1 se guarda');
+    assert.ok(!(T.gpsData.s1 && T.gpsData.s1.p2), 'el GPS de p2 no se guarda (no tiene sesión)');
+    assert.strictEqual(T.gpsPlayerMap, undefined, 'no se crea ningún mapa de IDs');
+    assert.ok(T.toasts.some(([m]) => m.includes('Sin sesión registrada') && m.includes('Ingrid Van Dijk')));
+    assert.ok(T.toasts.some(([m]) => m.includes('guardados para 1')));
+});
+test('una fila ignorada en el desplegable no se guarda', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }]);
+    T.sessions = [sesion('s1', 'p1')];
+    setupForm({ 'gpsMatchSelect-0': '' });
+    preparaImport(T, [{ player: T.players[0], record: { oliPlayerId: '47162', oliPlayerName: 'Carla Mendes Rocha' } }]);
+    T._confirmGpsImport('s1');
+    assert.deepStrictEqual(J(T.gpsData), {});
+    assert.ok(T.toasts.some(([m]) => m.includes('No se guardó ninguna fila')));
+});
+test('una fila sin identificar que el staff asigna a mano se guarda en su jugadora', () => {
+    const T = makeTracker([{ id: 'p1', name: 'Carla', lastName: 'Mendes Rocha' }]);
+    T.sessions = [sesion('s1', 'p1')];
+    setupForm({ 'gpsMatchSelect-u0': 'p1' });
+    preparaImport(T, [], [{ oliPlayerId: '1', oliPlayerName: 'Carla M.' }]);
+    T._confirmGpsImport('s1');
+    assert.ok(T.gpsData.s1 && T.gpsData.s1.p1);
+});
+test('al iniciar el GPS se limpia la copia local del antiguo mapa y no se carga ninguno', () => {
+    const T = makeTracker();
+    ctx.localStorage.setItem('basketballGpsPlayerMap', '{"47162":"p1"}');
+    ctx.window.firebaseSync = null;
+    T.initializeGpsTracking();
+    assert.strictEqual(ctx.localStorage.getItem('basketballGpsPlayerMap'), null);
+    assert.strictEqual(T.gpsPlayerMap, undefined);
+});
+test('la ficha ya no tiene campo de ID de Oli y editar una jugadora funciona sin él', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert.ok(!html.includes('editPlayerOliId') && !html.includes('ID de Oli'));
+    const T = makeTracker([{ id: 'p1', name: 'Sara', lastName: '', number: '5' }]);
+    setupForm(editForm({ editPlayerLastName: 'López' }));
+    T.handleEditPlayerSubmit({ preventDefault() {} });
+    assert.strictEqual(T.players[0].lastName, 'López');
+    assert.strictEqual(T.saved, 1);
+});
+test('ningún módulo de la app usa ya el mapa de IDs de Oli', () => {
+    ['gps-tracking.js', 'app-players.js', 'firebase-sync.js', 'index.html', 'export-fisio.js'].forEach(f => {
+        const src = fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+        assert.ok(!/gpsPlayerMap|OliId|oliId|editPlayerOliId/.test(src), f + ' aún menciona el ID de Oli');
+    });
+    ['getOliIdsForPlayer', 'getOliIdForPlayer', 'setOliIdForPlayer', 'validateOliId', 'findOliIdOwner', 'loadGpsPlayerMap', 'saveGpsPlayerMap']
+        .forEach(fn => assert.strictEqual(makeTracker()[fn], undefined, fn + ' debería haberse retirado'));
 });
 
 console.log('\nExport al fisio: la columna Jugadora no cambia al separar el nombre');

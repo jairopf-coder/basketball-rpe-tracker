@@ -132,13 +132,11 @@ function boot(net, name, opts = {}) {
     app.ensureFull = async () => { const all = await fs_.loadAllSessions(); app.sessions = mergeById(all, app.sessions); app.fullLoaded = true; };
     app.saveSessions = async () => { app.savingSess = true; try { return await fs_.saveSessions(app.sessions); } finally { app.savingSess = false; } };
     app.saveWell = () => fs_.saveWellnessData(app.wellness);
-    app.weekPlan = { weekOffset: 0, weeks: {}, legacyTemplate: null }; app.gpsData = {}; app.gpsPlayerMap = {};
+    app.weekPlan = { weekOffset: 0, weeks: {}, legacyTemplate: null }; app.gpsData = {};
     fs_.onWeekPlanChange(d => { app.weekPlan = JSON.parse(JSON.stringify(d)); });                       // como la app: solo si hay datos
     fs_.onGpsDataChange(d => { if (app.savingGps) return; app.gpsNull = d === null; app.gpsData = d === null ? {} : JSON.parse(JSON.stringify(d)); });
-    fs_.onGpsPlayerMapChange(d => { app.mapNull = d === null; app.gpsPlayerMap = d === null ? {} : JSON.parse(JSON.stringify(d)); });
     app.saveWeekPlan = () => fs_.saveWeekPlan(app.weekPlan);
     app.saveGps = () => { app.savingGps = true; return fs_.saveGpsData(app.gpsData).finally(() => { app.savingGps = false; }); };
-    app.saveMap = () => fs_.saveGpsPlayerMap(app.gpsPlayerMap);
     app.saveInjuries = () => { app.savingInj = true; return fs_.saveInjuries(app.injuries).finally(() => { app.savingInj = false; }); };
     app.saveNotes = () => fs_.saveClinicalNotes(app.clinicalNotes);
     app.writes = () => net.log.filter(l => l.device === name);
@@ -709,17 +707,6 @@ test('GPS: primer arranque con el nodo sin crear: no escribe antes de la lectura
     A.gpsData = { s1: { p1: rec() } };
     assert.strictEqual(await A.saveGps(), true);
     assert.ok(net.server.gpsData.s1.p1);
-});
-test('mapeo GPS: añadir un emparejamiento escribe solo esa clave; el update puntual existente sigue funcionando', async () => {
-    const net = makeNet(); net.seed('gpsPlayerMap', { oli1: 'p1' });
-    const A = boot(net, 'A'); await sync(net);
-    A.gpsPlayerMap.oli2 = 'p2'; await A.saveMap();
-    assert.deepStrictEqual(A.writes()[0].value, { oli2: 'p2' });
-    await A.fs.updateGpsPlayerMapEntries({ oli3: 'p3' }, Object.assign({}, A.gpsPlayerMap, { oli3: 'p3' }));
-    await sync(net);
-    A.gpsPlayerMap = JSON.parse(JSON.stringify(net.server.gpsPlayerMap));
-    await A.saveMap(); assert.strictEqual(A.writes().filter(w => w.op === 'update' && w.path === 'gpsPlayerMap').length >= 1, true);
-    assert.deepStrictEqual(Object.keys(net.server.gpsPlayerMap).sort(), ['oli1', 'oli2', 'oli3']);
 });
 test('con el interruptor apagado, plan semanal y GPS vuelven al set() completo', async () => {
     const net = makeNet(); net.seed('weekPlan', planBase()); net.seed('gpsData', { s1: { p1: rec() } });

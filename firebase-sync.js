@@ -124,7 +124,7 @@ const SyncDiff = {
 };
 
 // Colecciones que no son "lista de elementos con id" sino objetos anidados
-const DIFF_PATH_NODES = { availability: true, weekPlan: true, gpsData: true, gpsPlayerMap: true };
+const DIFF_PATH_NODES = { availability: true, weekPlan: true, gpsData: true };
 
 
 class FirebaseSync {
@@ -930,49 +930,6 @@ FirebaseSync.prototype.onGpsDataChange = function(callback) {
     if (!this.db) return;
     this.db.ref('gpsData').on('value', snapshot => {
         this._diffObserve('gpsData', snapshot.val());
-        callback(snapshot.exists() ? (snapshot.val() || {}) : null);
-    });
-};
-
-// ========== GPS PLAYER MAP — mapeo ID Oli -> playerId interno ==========
-// Estructura: { [oliPlayerId]: playerId }
-// Se recuerda una vez confirmado el emparejamiento para no repetirlo
-// en futuros imports de la misma jugadora.
-
-FirebaseSync.prototype.saveGpsPlayerMap = async function(gpsPlayerMap) {
-    if (DIFF_WRITES_ENABLED) return this._saveByDiff('gpsPlayerMap', gpsPlayerMap || {}, 'mapeo GPS');
-    try {
-        if (!this.db) { Store.set('gpsPlayerMap', gpsPlayerMap || {}); return; }
-        await this.db.ref('gpsPlayerMap').set(gpsPlayerMap || {});
-        Store.set('gpsPlayerMap', gpsPlayerMap || {});
-    } catch (e) {
-        console.error('Error saving gpsPlayerMap to Firebase:', e);
-        Store.set('gpsPlayerMap', gpsPlayerMap || {});
-        await this._enqueueWrite('gpsPlayerMap', gpsPlayerMap || {});
-    }
-};
-
-// Cambios puntuales del mapeo (edición manual del ID Oli en la ficha de la jugadora).
-// A diferencia de saveGpsPlayerMap (que hace set() de TODO el nodo), update() solo toca
-// las claves indicadas: { [oliPlayerId]: playerId | null } — null borra esa clave.
-// Así no se pisan mapeos que otro dispositivo haya añadido mientras tanto.
-// Si falla (sin conexión), cae al guardado completo con cola offline de siempre.
-FirebaseSync.prototype.updateGpsPlayerMapEntries = async function(entries, fullMap) {
-    try {
-        if (!this.db) { Store.set('gpsPlayerMap', fullMap || {}); return; }
-        await this.db.ref('gpsPlayerMap').update(entries);
-        Store.set('gpsPlayerMap', fullMap || {});
-    } catch (e) {
-        console.error('Error updating gpsPlayerMap in Firebase:', e);
-        Store.set('gpsPlayerMap', fullMap || {});
-        await this._enqueueWrite('gpsPlayerMap', fullMap || {});
-    }
-};
-
-FirebaseSync.prototype.onGpsPlayerMapChange = function(callback) {
-    if (!this.db) return;
-    this.db.ref('gpsPlayerMap').on('value', snapshot => {
-        this._diffObserve('gpsPlayerMap', snapshot.val());
         callback(snapshot.exists() ? (snapshot.val() || {}) : null);
     });
 };

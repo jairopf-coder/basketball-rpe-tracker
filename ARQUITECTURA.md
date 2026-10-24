@@ -297,7 +297,7 @@ pisan, y uno desfasado no revierte los cambios de otro.
 | Tipo | Colecciones |
 |---|---|
 | Por elemento (`id`) | `injuries`, `clinicalNotes`, `players`, `gymSessions`, `testSessions`, `seasonBlocks`, `matches`, `sessions`, `wellness` |
-| Por ruta anidada | `availability` (jugadora/fecha), `weekPlan` (`weeks/<lunes>`), `gpsData` (sesión/jugadora), `gpsPlayerMap` |
+| Por ruta anidada | `availability` (jugadora/fecha), `weekPlan` (`weeks/<lunes>`), `gpsData` (sesión/jugadora) |
 | `set()` completo | `exerciseLibrary`, `gymTemplates`, `templates` (listas pequeñas), `anamnesis` (por jugadora) |
 
 Cómo funciona por dentro (por colección, en `_diffState`):
