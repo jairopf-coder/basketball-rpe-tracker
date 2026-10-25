@@ -1,7 +1,7 @@
 // app-sessions.js — Módulo de sesiones de equipo: creación, listado, detalle, edición (extraído de app.js V25)
 
 RPETracker.prototype.openNewSessionModal = function() {
-    if (this.players.length === 0) {
+    if (this.activePlayers.length === 0) {
         AppAlert.show('⚠️ Primero debes añadir jugadoras en la sección "Jugadoras"');
         return;
     }
@@ -48,14 +48,14 @@ RPETracker.prototype._sessionParticipation = function(playerId, dateISO) {
 // Jugadoras que pueden participar en la sesión (todas menos las que están fuera ese día)
 RPETracker.prototype._eligiblePlayerIds = function() {
     const date = this._newSessionDate();
-    return this.players.filter(p => this._sessionParticipation(p.id, date) !== 'out').map(p => p.id);
+    return this.getPlayersActiveOn(date).filter(p => this._sessionParticipation(p.id, date) !== 'out').map(p => p.id);
 };
 
 RPETracker.prototype.renderPlayerButtonsMulti = function() {
     const container = document.getElementById('playerButtons');
     if (!container) return;
     const date = this._newSessionDate();
-    container.innerHTML = this.players.map(player => {
+    container.innerHTML = this.getPlayersActiveOn(date).map(player => {
         const color = PlayerTokens.get(player);
         const part = this._sessionParticipation(player.id, date);
         const selected = (this.selectedPlayerIds || []).includes(player.id);
@@ -164,7 +164,7 @@ RPETracker.prototype.selectAllPlayers = function() {
         this.selectedPlayerIds = [];
     } else {
         this.selectedPlayerIds = eligible;
-        const skipped = this.players.length - eligible.length;
+        const skipped = this.getPlayersActiveOn(this._newSessionDate()).length - eligible.length;
         if (skipped > 0) {
             this.showToast(`🏥 ${skipped === 1 ? '1 jugadora no se ha seleccionado' : skipped + ' jugadoras no se han seleccionado'} (lesionada o no disponible ese día). Puedes añadirla a mano.`, 'info');
         }
@@ -1000,7 +1000,9 @@ RPETracker.prototype.editSession = function(sessionId) {
     
     // Populate player select
     const playerSelect = document.getElementById('editSessionPlayer');
-    playerSelect.innerHTML = this.players.map(p => 
+    // Una sesión antigua de una jugadora ya de baja debe poder editarse: se mantiene su jugadora en la lista
+    const _sessionDay = String(session.date || '').slice(0, 10);
+    playerSelect.innerHTML = this.players.filter(p => p.id === session.playerId || this.isPlayerActiveOn(p, _sessionDay)).map(p => 
         `<option value="${p.id}" ${p.id === session.playerId ? 'selected' : ''}>${esc(this.playerDisplayName(p))}${p.number ? ` #${esc(p.number)}` : ''}</option>`
     ).join('');
     

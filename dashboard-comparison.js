@@ -57,12 +57,12 @@ function _avgWellness(wellnessData, playerId, days) {
 
 // ── Sección principal (tabla + controles del radar) ───────────────────────
 RPETracker.prototype._renderPlayerComparisonSection = function() {
-    if (this.players.length === 0) return '';
+    if (this.activePlayers.length === 0) return '';
 
     const wData = this.wellnessData || [];
 
     // Construir filas: ratio + wellness medio 7d
-    const rows = this.players.map(player => {
+    const rows = this.activePlayers.map(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
         const w = _avgWellness(wData, player.id, 7);
         return { player, ratio, wellness: w };
