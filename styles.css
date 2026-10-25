@@ -718,6 +718,25 @@ header h1 {
     overflow: hidden;
 }
 
+/* Añadir / Editar jugadora: el <form> cuelga directo de .modal-content (que tiene max-height y
+   overflow:hidden), así que cuando los campos no cabían se cortaban sin scroll y el botón Guardar
+   quedaba fuera de la pantalla. El <form> hace de zona con scroll y los botones se quedan fijos abajo. */
+#playerForm,
+#editPlayerForm {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
+#playerForm .modal-footer,
+#editPlayerForm .modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-surface);
+}
+
 .modal-footer {
     flex-shrink: 0;
 }
