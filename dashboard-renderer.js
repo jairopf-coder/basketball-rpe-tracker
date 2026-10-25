@@ -50,7 +50,7 @@ RPETracker.prototype.renderDashboard = function() {
     // Wellness data — hoy
     const _wToday = toLocalISODate(new Date());
     const _wData  = this.wellnessData || [];
-    const _pendingW = this.players.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
+    const _pendingW = this.activePlayers.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
 
     // Sort order — persisted on instance
     if (!this._dashSort) this._dashSort = 'risk'; // 'risk' | 'safe' | 'name'
@@ -66,7 +66,7 @@ RPETracker.prototype.renderDashboard = function() {
         return           { icon: '🟢', color: '#4caf50', risk: 2 };
     };
 
-    let players = this.players.map(player => {
+    let players = this.activePlayers.map(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
         const st = getStatus(ratio.ratio, player.id);
         return { player, ratio, st, r: parseFloat(ratio.ratio) || 0 };
@@ -114,7 +114,7 @@ RPETracker.prototype.renderDashboard = function() {
 
     // Availability groups (same logic as renderTeamStatus)
     const availGroups = { ok: [], caution: [], out: [] };
-    this.players.forEach(player => {
+    this.activePlayers.forEach(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
         const r = parseFloat(ratio.ratio);
         const activeInjury = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
@@ -207,7 +207,7 @@ RPETracker.prototype.renderDashboard = function() {
     // carga (no por descarga planificada) y bajaría la media del equipo.
     const _acRoster = typeof this.getParticipatingPlayers === 'function'
         ? this.getParticipatingPlayers(toLocalISODate(new Date()))
-        : this.players;
+        : this.activePlayers;
     const _acValues = _acRoster
         .map(p => this.calculateAcuteChronicRatio(p.id))
         .filter(r => r.confidence !== 'low' && r.ratio !== 'N/A')
@@ -278,11 +278,11 @@ RPETracker.prototype.renderDashboard = function() {
                 <span class="db-kpi-lbl">alertas A:C</span>
             </div>
             <div class="db-kpi db-kpi--${availGroups.out.length > 0 ? 'warn' : 'ok'}" onclick="window.rpeTracker?.switchView('injury')" title="Ver lesiones">
-                <span class="db-kpi-val">${availGroups.ok.length}/${this.players.length}</span>
+                <span class="db-kpi-val">${availGroups.ok.length}/${this.activePlayers.length}</span>
                 <span class="db-kpi-lbl">aptas hoy</span>
             </div>
             <div class="db-kpi db-kpi--${pendingCount > 0 ? 'warn' : 'ok'} db-kpi--pending" onclick="window.rpeTracker?.openWellnessQuick()" title="Wellness del equipo hoy">
-                <span class="db-kpi-val">${this.players.length - pendingCount}/${this.players.length}</span>
+                <span class="db-kpi-val">${this.activePlayers.length - pendingCount}/${this.activePlayers.length}</span>
                 <span class="db-kpi-lbl">wellness hoy</span>
             </div>
             <div class="db-kpi db-kpi--match" onclick="window.rpeTracker?.switchView('objectives')" title="Ver próximos objetivos">
@@ -336,7 +336,7 @@ RPETracker.prototype.renderDashboard = function() {
                     </div>
                     <div class="db-metric-row">
                         <span class="db-metric-lbl">Jugadoras</span>
-                        <span class="db-metric-val">${this.players.length}</span>
+                        <span class="db-metric-val">${this.activePlayers.length}</span>
                     </div>
                     ${activeInjuries > 0 ? `
                     <div class="db-metric-row">
@@ -372,7 +372,7 @@ RPETracker.prototype.renderDashboard = function() {
                     </div>
                 </div><!-- /db-right-sticky -->
                 <div class="db-players">
-                    ${this.players.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
+                    ${this.activePlayers.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
                 </div>
                 <div class="db-right-legend">
                     <span style="color:#4caf50">● óptimo</span>
@@ -556,7 +556,7 @@ RPETracker.prototype._shortPlayerName = function(player) {
 //    1-4 o marcada "no disponible"); en fase 5 o 6 de la readaptación sí se les pide el RPE.
 RPETracker.prototype._pendingToday = function() {
     const today = toLocalISODate(new Date());
-    const players = this.players || [];
+    const players = this.activePlayers || [];
     const wellnessData = this.wellnessData || [];
     const wellness = players.filter(p => !wellnessData.some(e => e.playerId === p.id && e.date === today));
 
@@ -666,7 +666,7 @@ RPETracker.prototype._renderRightWidgets = function() {
         const pct = (val) => Math.round((parseFloat(val)||0) / 5 * 100);
         return `<div class="db-rw-section">
             <div class="db-rw-label">Wellness hoy
-                <span class="db-rw-coverage">${todayEntries.length}/${this.players.length}</span>
+                <span class="db-rw-coverage">${todayEntries.length}/${this.activePlayers.length}</span>
             </div>
             <div class="db-rw-bars">
                 ${[['😴 Sueño', sleep],['⚡ Energía', fatigue],['😊 Humor', mood],['💪 Muscular', soreness]]
@@ -681,8 +681,8 @@ RPETracker.prototype._renderRightWidgets = function() {
     })();
 
     // Fatigue index
-    const _tfResult = (typeof calcTeamFatigueIndex === 'function' && this.players.length > 0)
-        ? calcTeamFatigueIndex(this.players, (pid) => this.calculateAcuteChronicRatio(pid), _wData)
+    const _tfResult = (typeof calcTeamFatigueIndex === 'function' && this.activePlayers.length > 0)
+        ? calcTeamFatigueIndex(this.activePlayers, (pid) => this.calculateAcuteChronicRatio(pid), _wData)
         : null;
     const fatigueHTML = _tfResult ? `<div class="db-rw-section">
         <div class="db-rw-label">Fatiga del equipo</div>
@@ -1141,7 +1141,7 @@ RPETracker.prototype._dbCalGoDayDetail = function(dateStr) {
 
 // ── renderTeamRatios ─────────────────────────────────────────────────
 RPETracker.prototype.renderTeamRatios = function() {
-    if (this.players.length === 0) {
+    if (this.activePlayers.length === 0) {
         return '<p style="color: var(--gray); text-align: center;">No hay jugadoras registradas</p>';
     }
 
@@ -1155,7 +1155,7 @@ RPETracker.prototype.renderTeamRatios = function() {
         return           { label: 'Óptimo',    cls: 'status-ok',      icon: '🟢' };
     };
 
-    const cards = this.players.map(player => {
+    const cards = this.activePlayers.map(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
         const st = getStatus(ratio.ratio, player.id);
         const num = player.number ? `<span class="rcard-number">#${esc(player.number)}</span>` : '';

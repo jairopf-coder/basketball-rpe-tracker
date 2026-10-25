@@ -14,6 +14,31 @@ RPETracker.prototype.playerFullName = function(player) {
         .replace(/\s+/g, ' ');
 };
 
+// ─── Jugadoras activas y bajas ─────────────────────────────────────────────────────────────────
+// Dar de baja = `archived: true` + `archivedAt` (último día con el equipo, "AAAA-MM-DD"). Sus datos no
+// se tocan. Sigue activa hasta ese día incluido (para registrar el RPE y el wellness de su último día)
+// y deja de aparecer en formularios y resúmenes desde el día siguiente. Las fechas anteriores a la baja
+// siguen contándola, así que el historial no cambia.
+
+RPETracker.prototype.isPlayerActiveOn = function(player, dateISO) {
+    if (!player) return false;
+    if (!player.archived) return true;
+    if (!player.archivedAt) return false;
+    const day = String(dateISO || toLocalISODate(new Date())).slice(0, 10);
+    return day <= player.archivedAt;
+};
+
+RPETracker.prototype.getPlayersActiveOn = function(dateISO) {
+    return (this.players || []).filter(p => this.isPlayerActiveOn(p, dateISO));
+};
+
+// Jugadoras activas hoy: úsala para listas de registro y resúmenes del día. Para buscar una jugadora
+// por id o para mostrar historial se sigue usando this.players (todas).
+Object.defineProperty(RPETracker.prototype, 'activePlayers', {
+    get() { return this.getPlayersActiveOn(); },
+    configurable: true
+});
+
 // Propuesta para separar un texto completo: primera palabra = nombre, el resto = apellido.
 // Es solo una propuesta (no sirve con nombres compuestos como "María José"): el staff la revisa.
 RPETracker.prototype._splitFullName = function(fullName) {
@@ -23,7 +48,7 @@ RPETracker.prototype._splitFullName = function(fullName) {
 };
 
 RPETracker.prototype._playersMissingLastName = function() {
-    return this.players.filter(p => !String(p.lastName || '').trim());
+    return this.players.filter(p => !p.archived && !String(p.lastName || '').trim());
 };
 
 // Busca otra jugadora con el mismo nombre completo (sin distinguir mayúsculas ni acentos).
@@ -197,6 +222,7 @@ RPETracker.prototype.renderPlayers = function() {
     if (!container) return;
 
     this._renderPlayersNamesBanner();
+    this._renderPlayersBajas();
 
     if (this.players.length === 0) {
         container.innerHTML = `
@@ -217,11 +243,24 @@ RPETracker.prototype.renderPlayers = function() {
     this._renderPlayerFilterChips();
     const chipFilterActive = this._playerFilterSelected && this._playerFilterSelected.size > 0;
 
-    let playersToShow = this.players;
+    // Las jugadoras de baja no salen en el listado: están en la sección «Bajas» de abajo
+    const roster = this.players.filter(p => !p.archived);
+    let playersToShow = roster;
     if (chipFilterActive) {
-        playersToShow = this.players.filter(p => this._playerFilterSelected.has(p.id));
+        playersToShow = roster.filter(p => this._playerFilterSelected.has(p.id));
     } else if (searchTerm) {
-        playersToShow = this.players.filter(p => this._normalizePlayerName(this.playerFullName(p)).includes(this._normalizePlayerName(searchTerm)) || (p.number && String(p.number).includes(searchTerm)));
+        playersToShow = roster.filter(p => this._normalizePlayerName(this.playerFullName(p)).includes(this._normalizePlayerName(searchTerm)) || (p.number && String(p.number).includes(searchTerm)));
+    }
+
+    if (roster.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state active">
+                <div class="empty-icon">🚪</div>
+                <h3>Todas las jugadoras están de baja</h3>
+                <p>Reactívalas desde la sección «Bajas» o añade jugadoras nuevas</p>
+            </div>
+        `;
+        return;
     }
 
     if (playersToShow.length === 0 && searchTerm) {
@@ -316,6 +355,7 @@ RPETracker.prototype.renderPlayers = function() {
                     <button class="btn-icon" style="background: #7b1fa2; color: white;" onclick="window.rpeTracker?.generatePlayerReport('${player.id}')" title="Informe individual">📋</button>
                     <button class="btn-icon" style="background: #00897b; color: white;" onclick="window.AnamnesisModule?.open('${player.id}')" title="Anamnesis">🩺</button>
                     <button class="btn-icon" style="background: var(--primary); color: white;" onclick="window.rpeTracker?.editPlayer('${player.id}')" title="Editar">✏️</button>
+                    <button class="btn-icon" style="background: #ff9800; color: white;" onclick="window.rpeTracker?.openPlayerBajaModal('${player.id}')" title="Dar de baja">🚪</button>
                     <button class="btn-icon" style="background: #f44336; color: white;" onclick="window.rpeTracker?.deletePlayer('${player.id}')" title="Eliminar">🗑️</button>
                 </div>
             </div>
@@ -361,7 +401,7 @@ RPETracker.prototype._renderPlayerFilterChips = function() {
             title="Mostrar todas las jugadoras">
             ${allSelected ? '✓ Todas' : 'Todas'}
         </button>
-        ${this.players.map(player => {
+        ${this.players.filter(p => !p.archived).map(player => {
             const isSel = this._playerFilterSelected.has(player.id);
             const color = PlayerTokens.get(player);
             return `
@@ -711,4 +751,111 @@ RPETracker.prototype._confirmReviewPlayerNames = function() {
     } else {
         this.showToast('No había cambios que guardar', 'info');
     }
+};
+
+// ─── Dar de baja y reactivar ──────────────────────────────────────────────────────────────────
+
+RPETracker.prototype._fechaES = function(iso) { return String(iso || '').split('-').reverse().join('/'); };
+
+RPETracker.prototype._renderPlayersBajas = function() {
+    const el = document.getElementById('playersBajas');
+    if (!el) return;
+    const bajas = this.players.filter(p => p.archived)
+        .sort((a, b) => String(b.archivedAt || '').localeCompare(String(a.archivedAt || '')));
+    if (!bajas.length) { el.innerHTML = ''; return; }
+
+    const wasOpen = !!el.querySelector('details[open]');
+    const rows = bajas.map(p => `
+        <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem;padding:.6rem 0;border-top:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:.6rem;min-width:0">
+                ${PlayerTokens.avatar(p, 36, '1rem')}
+                <div style="min-width:0">
+                    <strong>${esc(this.playerFullName(p))}</strong>${p.number ? ` <span style="opacity:.5">#${esc(p.number)}</span>` : ''}
+                    <div style="font-size:.8rem;opacity:.7">${p.archivedAt ? `Último día: ${esc(this._fechaES(p.archivedAt))}` : 'De baja'}</div>
+                </div>
+            </div>
+            <button type="button" class="btn-secondary" onclick="window.rpeTracker?.reactivatePlayer('${esc(p.id)}')">↩️ Reactivar</button>
+        </div>`).join('');
+
+    el.innerHTML = `
+        <details${wasOpen ? ' open' : ''} style="margin-top:1rem;padding:.25rem 1rem;border:1px solid var(--border);border-radius:12px;background:var(--bg-surface)">
+            <summary style="cursor:pointer;font-weight:600;padding:.6rem 0">🚪 Bajas (${bajas.length})</summary>
+            <p style="margin:0 0 .5rem;font-size:.8rem;opacity:.7">Sus datos se conservan. No aparecen al registrar RPE y wellness ni en los resúmenes de Inicio.</p>
+            ${rows}
+        </details>`;
+};
+
+RPETracker.prototype.openPlayerBajaModal = function(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    document.getElementById('playerBajaOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'playerBajaOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:3000;display:flex;align-items:center;justify-content:center;padding:1rem';
+    const inputStyle = 'width:100%;box-sizing:border-box;padding:.5rem .6rem;border:2px solid var(--border-input);border-radius:8px;font:inherit;background:var(--bg-input);color:var(--text-primary)';
+
+    overlay.innerHTML = `
+        <div class="clear-confirm-modal" style="text-align:left;max-width:440px;width:100%">
+            <h2 class="clear-confirm-title" style="text-align:center">🚪 Dar de baja a ${esc(this.playerFullName(player))}</h2>
+            <p class="clear-confirm-desc">
+                Sus datos (RPE, wellness, GPS, lesiones…) se conservan y se siguen viendo en el historial.
+                Dejará de aparecer al registrar RPE y wellness y en los resúmenes de Inicio.
+                Podrás reactivarla desde la sección «Bajas».
+            </p>
+            <label for="playerBajaDate" style="display:block;font-weight:600;margin:.75rem 0 .35rem">Último día con el equipo</label>
+            <input type="date" id="playerBajaDate" value="${toLocalISODate(new Date())}" style="${inputStyle}">
+            <small style="display:block;margin-top:.35rem;opacity:.75">
+                Seguirá apareciendo hasta ese día incluido, para que puedas registrar su RPE y wellness de ese día.
+                Si ya no tiene que aparecer, pon la fecha de ayer.
+            </small>
+            <div id="playerBajaError" class="login-error" style="display:none"></div>
+            <div class="clear-confirm-actions" style="margin-top:1rem">
+                <button class="btn-secondary" onclick="document.getElementById('playerBajaOverlay').remove()">Cancelar</button>
+                <button class="btn-primary" onclick="window.rpeTracker?._confirmPlayerBaja('${esc(player.id)}')">Dar de baja</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+};
+
+RPETracker.prototype._confirmPlayerBaja = function(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) return;
+    const date = (document.getElementById('playerBajaDate')?.value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const errorEl = document.getElementById('playerBajaError');
+        if (errorEl) { errorEl.textContent = 'Elige el último día con el equipo.'; errorEl.style.display = 'block'; }
+        return;
+    }
+
+    player.archived = true;
+    player.archivedAt = date;
+    if (this._playerFilterSelected) this._playerFilterSelected.delete(player.id);
+    document.getElementById('playerBajaOverlay')?.remove();
+
+    this.savePlayers();
+    this.renderPlayers();
+    this.renderSessions();
+    this.populatePlayerSelects();
+    this.showToast(`🚪 ${this.playerFullName(player)} dada de baja (último día: ${this._fechaES(date)})`, 'success');
+};
+
+RPETracker.prototype.reactivatePlayer = function(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) return;
+    AppConfirm.show({
+        title: `¿Reactivar a ${this.playerFullName(player)}?`,
+        message: 'Volverá a aparecer al registrar RPE y wellness y en los resúmenes de Inicio.',
+        confirmText: 'Reactivar',
+        cancelText: 'Cancelar'
+    }).then(ok => {
+        if (!ok) return;
+        player.archived = false;
+        delete player.archivedAt;
+        this.savePlayers();
+        this.renderPlayers();
+        this.renderSessions();
+        this.populatePlayerSelects();
+        this.showToast(`↩️ ${this.playerFullName(player)} reactivada`, 'success');
+    });
 };

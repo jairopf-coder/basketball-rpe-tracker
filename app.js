@@ -950,7 +950,7 @@ class RPETracker {
         
         const alerts = [];
         
-        this.players.forEach(player => {
+        this.activePlayers.forEach(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
             const r = parseFloat(ratio.ratio);
             
@@ -1287,7 +1287,7 @@ class RPETracker {
     // ========== BATCH 3: NAV ALERT BADGE ==========
 
     _updateNavAlertBadge() {
-        const alertCount = this.players.filter(player => {
+        const alertCount = this.activePlayers.filter(player => {
             const ratio = this.calculateAcuteChronicRatio(player.id);
             const r = parseFloat(ratio.ratio);
             return !isNaN(r) && r > this.getPlayerThresholds(player.id).opt;

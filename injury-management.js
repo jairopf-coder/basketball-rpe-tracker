@@ -505,7 +505,7 @@ RPETracker.prototype.getTeamSessions = function(sessions) {
 
 // Jugadoras de la plantilla que participan en el trabajo de equipo en una fecha.
 RPETracker.prototype.getParticipatingPlayers = function(dateISO) {
-    return (this.players || []).filter(p => this.getPlayerParticipation(p.id, dateISO) !== 'out');
+    return this.getPlayersActiveOn(dateISO).filter(p => this.getPlayerParticipation(p.id, dateISO) !== 'out');
 };
 
 // ========== ADD/EDIT INJURY ==========

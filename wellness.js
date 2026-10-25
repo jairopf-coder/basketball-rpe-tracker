@@ -244,14 +244,14 @@ RPETracker.prototype._mountWellnessModal = function(today) {
 // ========== TODAY STATUS ==========
 
 RPETracker.prototype._renderWTodayStatus = function(filledIds, today) {
-    if (!this.players.length) return `<div class="wellness-card" style="text-align:center;padding:2rem;color:var(--text-secondary)">
+    if (!this.activePlayers.length) return `<div class="wellness-card" style="text-align:center;padding:2rem;color:var(--text-secondary)">
         <p style="font-size:2rem">👥</p><p>Añade jugadoras para registrar wellness.</p></div>`;
 
-    const done = this.players.filter(p=>filledIds.has(p.id)).length;
+    const done = this.activePlayers.filter(p=>filledIds.has(p.id)).length;
     return `<div class="wellness-card">
         <h3 class="wellness-section-title">📋 Registros de hoy</h3>
         <div class="wellness-today-grid">
-            ${this.players.map(p => {
+            ${this.activePlayers.map(p => {
                 const entry = (this.wellnessData||[]).find(w=>w.playerId===p.id && w.date===today);
                 const score = entry ? this._wOverall(entry) : null;
                 return `<div class="wellness-today-chip ${entry?'filled':'pending'}"
@@ -266,7 +266,7 @@ RPETracker.prototype._renderWTodayStatus = function(filledIds, today) {
             }).join('')}
         </div>
         <p style="margin:.75rem 0 0;font-size:.78rem;color:var(--text-secondary)">
-            ✅ ${done} registradas &nbsp;|&nbsp; ⏳ ${this.players.length-done} pendientes — clic para registrar
+            ✅ ${done} registradas &nbsp;|&nbsp; ⏳ ${this.activePlayers.length-done} pendientes — clic para registrar
         </p>
     </div>`;
 };
@@ -630,7 +630,7 @@ RPETracker.prototype._renderWCycleCard = function() {
     return `<div class="wellness-card">
         <h3 class="wellness-section-title">🩸 Ciclo menstrual</h3>
         <p style="margin:0 0 .75rem;font-size:.85rem;color:var(--text-secondary)">
-            Con la regla ahora: <strong style="color:var(--text-primary)">${activeCount}</strong> de ${this.players.length} jugadoras
+            Con la regla ahora: <strong style="color:var(--text-primary)">${activeCount}</strong> de ${this.activePlayers.length} jugadoras
         </p>
         ${body}
         <p style="margin:.5rem 0 0;font-size:.75rem;color:var(--text-secondary)">
@@ -713,7 +713,7 @@ RPETracker.prototype._renderWHistory = function() {
 // ========== MODAL ==========
 
 RPETracker.prototype._renderWModal = function(today) {
-    if(!this.players.length) return '';
+    if(!this.activePlayers.length) return '';
     return `<div id="wellnessModal" class="modal modal--top" style="display:none">
         <div class="modal-content" style="max-width:480px">
             <div class="modal-header">
@@ -726,7 +726,7 @@ RPETracker.prototype._renderWModal = function(today) {
                 <div class="form-group">
                     <label class="form-label">Jugadora</label>
                     <select id="wFormPlayer" class="form-select">
-                        ${this.players.map(p=>`<option value="${p.id}">${esc(this.playerDisplayName(p))}${p.number?` #${esc(p.number)}`:''}</option>`).join('')}
+                        ${this.activePlayers.map(p=>`<option value="${p.id}">${esc(this.playerDisplayName(p))}${p.number?` #${esc(p.number)}`:''}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">
@@ -1085,13 +1085,13 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 // ========== PASE RÁPIDO DE WELLNESS (BULK) ==========
 
 RPETracker.prototype.openWellnessBulk = function() {
-    if (!this.players.length) { this.showToast('Sin jugadoras registradas', 'warning'); return; }
+    if (!this.activePlayers.length) { this.showToast('Sin jugadoras registradas', 'warning'); return; }
     if (!this.wellnessData) this.wellnessData = this.loadWellnessData();
 
     const today = toLocalISODate(new Date());
     // Order: pending first, then already filled
-    const pending = this.players.filter(p => !this.wellnessData.some(w => w.playerId === p.id && w.date === today));
-    const done    = this.players.filter(p =>  this.wellnessData.some(w => w.playerId === p.id && w.date === today));
+    const pending = this.activePlayers.filter(p => !this.wellnessData.some(w => w.playerId === p.id && w.date === today));
+    const done    = this.activePlayers.filter(p =>  this.wellnessData.some(w => w.playerId === p.id && w.date === today));
     this._bulkQueue   = [...pending, ...done];
     this._bulkIndex   = 0;
     this._bulkDate    = today;
@@ -1270,7 +1270,7 @@ RPETracker.prototype._closeBulk = function(completed) {
 // ========== WELLNESS QUICK MODAL (grid: todas las jugadoras, 4 sliders por fila) ==========
 
 RPETracker.prototype.openWellnessQuick = function() {
-    if (!this.players.length) { this.showToast('Sin jugadoras registradas', 'warning'); return; }
+    if (!this.activePlayers.length) { this.showToast('Sin jugadoras registradas', 'warning'); return; }
     if (!this.wellnessData) this.wellnessData = this.loadWellnessData();
 
     const today = toLocalISODate(new Date());
@@ -1292,7 +1292,7 @@ RPETracker.prototype.openWellnessQuick = function() {
     };
 
     // Build rows – one per player (buttons 1-5 instead of sliders)
-    const buildRows = () => this.players.map(player => {
+    const buildRows = () => this.activePlayers.map(player => {
         const existing = (this.wellnessData||[]).find(w => w.playerId === player.id && w.date === today);
         const initials = metrics.map(m => existing ? (existing[m] || null) : null);
 
@@ -1394,7 +1394,7 @@ RPETracker.prototype.saveWellnessQuick = function() {
     if (!this._wellnessCanSave()) return; // el panel se queda abierto con lo marcado
 
     let count = 0;
-    this.players.forEach(player => {
+    this.activePlayers.forEach(player => {
         const get = m => {
             const active = overlay.querySelector(`#wqBtnRow_${player.id}_${m} .wq-val-btn--active`);
             return active ? parseInt(active.dataset.val) : null;
