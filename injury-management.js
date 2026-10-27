@@ -430,7 +430,8 @@ RPETracker.prototype.saveAvailability = function() {
 // ========== PARTICIPACIÓN EN EL TRABAJO DE EQUIPO ==========
 //
 // Cómo participa una jugadora en la dinámica del grupo en una FECHA (YYYY-MM-DD):
-//   'out'     → no entrena con el grupo (lesión en fases 1-4, o marcada "no disponible").
+//   'out'     → no entrena con el grupo (lesión en fases 1-4, marcada "no disponible", o ya de baja
+//               en el equipo desde el día siguiente a su último día).
 //               No debe contar en medias de carga ni en comparaciones con el plan.
 //   'partial' → participa con limitaciones (lesión en fase 5, o marcada "limitada"). SÍ cuenta.
 //   'full'    → participa con normalidad.
@@ -439,6 +440,11 @@ RPETracker.prototype.saveAvailability = function() {
 // El wellness NO usa esta función: cuenta para todas las jugadoras.
 RPETracker.prototype.getPlayerParticipation = function(playerId, dateISO) {
     const day = String(dateISO || toLocalISODate(new Date())).slice(0, 10);
+
+    // 0) Ya de baja en el equipo ese día (ver isPlayerActiveOn en app-players.js)
+    const owner = (this.players || []).find(p => p.id === playerId);
+    if (owner && typeof this.isPlayerActiveOn === 'function' && !this.isPlayerActiveOn(owner, day)) return 'out';
+
     let result = 'full';
     const raise = level => { if (level === 'out' || (level === 'partial' && result === 'full')) result = level; };
 
@@ -514,9 +520,9 @@ RPETracker.prototype.openAddInjuryModal = function(playerId = null) {
     const modal = document.createElement('div');
     modal.className = 'modal active';
     
-    const playerOptions = this.players.map(p => 
+    const playerOptions = this.playerOptionsHtml(p => 
         `<option value="${p.id}" ${p.id === playerId ? 'selected' : ''}>${esc(this.playerDisplayName(p))}${p.number ? ` #${esc(p.number)}` : ''}</option>`
-    ).join('');
+    );
     
     modal.innerHTML = `
         <div class="modal-content">
@@ -667,9 +673,9 @@ RPETracker.prototype.editInjuryModal = function(injuryId) {
     const modal = document.createElement('div');
     modal.className = 'modal active';
 
-    const playerOptions = this.players.map(p =>
+    const playerOptions = this.playerOptionsHtml(p =>
         `<option value="${p.id}" ${p.id === injury.playerId ? 'selected' : ''}>${esc(this.playerDisplayName(p))}${p.number ? ` #${p.number}` : ''}</option>`
-    ).join('');
+    );
 
     const typeOptions = { muscle: 'Muscular', joint: 'Articular', bone: 'Ósea', tendon: 'Tendón/Ligamento', other: 'Otra' };
     const locationOptions = { ankle: 'Tobillo', knee: 'Rodilla', hamstring: 'Isquiotibiales', quadriceps: 'Cuádriceps', calf: 'Gemelos', groin: 'Ingle', back: 'Espalda', shoulder: 'Hombro', wrist: 'Muñeca', finger: 'Dedos', other: 'Otra' };

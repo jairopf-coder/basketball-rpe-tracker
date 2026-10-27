@@ -297,6 +297,9 @@
         });
         const dayDateStrs = dayDates.map(d => toLocalISODate(d));
 
+        // La jugadora de baja sale de la tabla cuando ya no queda ningún día de esta semana en que estuviera
+        const roster = this.players.filter(p => this.hasActiveDaysFrom(p, dayDateStrs[0]));
+
         // ── Planificado ───────────────────────────────────────────
         const intensityRPE = { none: 0, low: 4.5, medium: 5.5, high: 7.5, max: 9.5 };
         const plan = this.getWeekPlanDays(weekStart);
@@ -304,10 +307,10 @@
         // Solo cuentan las jugadoras que participan ese día: una lesionada (o marcada
         // como no disponible) no entrena, así que no hay plan que cumplir por su parte.
         const outMap = {};   // playerId → [true si está fuera del grupo ese día, por cada día]
-        this.players.forEach(p => {
+        roster.forEach(p => {
             outMap[p.id] = dayDateStrs.map(ds => this.getPlayerParticipation(p.id, ds) === 'out');
         });
-        const participantsPerDay = dayDateStrs.map((_, i) => this.players.filter(p => !outMap[p.id][i]).length);
+        const participantsPerDay = dayDateStrs.map((_, i) => roster.filter(p => !outMap[p.id][i]).length);
 
         // Carga planificada para UNA jugadora cada día
         const plannedLoadPerPlayer = DAY_KEYS.map(dk => {
@@ -371,7 +374,7 @@
         </tr>
     </thead>`;
 
-        const tableRows = this.players.map(player => {
+        const tableRows = roster.map(player => {
             const cells = dayDateStrs.map((ds, i) => {
                 // Fuera del grupo ese día (lesión o no disponible): no hay plan que comparar
                 if (outMap[player.id][i]) {

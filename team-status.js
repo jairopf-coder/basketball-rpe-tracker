@@ -4,14 +4,14 @@ RPETracker.prototype.renderTeamStatus = function() {
     const container = document.getElementById('teamStatusView');
     if (!container) return;
 
-    if (this.players.length === 0) {
+    if (this.activePlayers.length === 0) {
         container.innerHTML = `<div class="empty-state active"><div class="empty-icon">📋</div><h3>No hay jugadoras registradas</h3></div>`;
         return;
     }
 
     const groups = { ok: [], caution: [], out: [] };
 
-    this.players.forEach(player => {
+    this.activePlayers.forEach(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
         const r = parseFloat(ratio.ratio);
         const activeInjury = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
@@ -131,6 +131,8 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
     const monday   = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7)); monday.setHours(0,0,0,0);
     const sunday   = new Date(monday); sunday.setDate(monday.getDate() + 6);
     const todayKey = toLocalISODate(now);
+    // Informe de la semana en curso: entra quien estuvo algún día de esta semana (una baja a mitad de semana sale en su semana)
+    const rosterWeek = this.players.filter(p => this.hasActiveDaysFrom(p, toLocalISODate(monday)));
     const dateRange = `${monday.toLocaleDateString('es-ES',{day:'numeric',month:'long'})} – ${sunday.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}`;
 
     const wData    = this.wellnessData || [];
@@ -167,7 +169,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
     };
 
     // ── Player data ──
-    const playerData = this.players.map(player => {
+    const playerData = rosterWeek.map(player => {
         const ratio  = this.calculateAcuteChronicRatio(player.id);
         const r      = parseFloat(ratio.ratio);
         const injury = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
@@ -227,7 +229,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
         </tr>`;
     }).join('') || `<tr><td colspan="4" style="padding:14px;color:var(--text-faint);text-align:center;font-style:italic">Ninguna jugadora lesionada</td></tr>`;
 
-    const wTeamRows = this.players.map(player => {
+    const wTeamRows = rosterWeek.map(player => {
         const e7 = wData.filter(x => x.playerId === player.id).slice(-7);
         const avg = f => e7.length ? (e7.reduce((s,x)=>s+(x[f]||0),0)/e7.length).toFixed(1) : '—';
         const todayE = wToday.find(x => x.playerId === player.id);
@@ -308,11 +310,11 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
     </div>
 
     <div class="kpi-row">
-        <div class="kpi"><div class="kpi-num">${this.players.length}</div><div class="kpi-lbl">Jugadoras</div></div>
+        <div class="kpi"><div class="kpi-num">${rosterWeek.length}</div><div class="kpi-lbl">Jugadoras</div></div>
         <div class="kpi ok"><div class="kpi-num">${ok.length}</div><div class="kpi-lbl">Zona óptima</div></div>
         <div class="kpi warn"><div class="kpi-num">${caution.length}</div><div class="kpi-lbl">Precaución</div></div>
         <div class="kpi out"><div class="kpi-num">${out.length}</div><div class="kpi-lbl">Lesionadas</div></div>
-        <div class="kpi"><div class="kpi-num">${wCoverage}/${this.players.length}</div><div class="kpi-lbl">Wellness hoy</div></div>
+        <div class="kpi"><div class="kpi-num">${wCoverage}/${rosterWeek.length}</div><div class="kpi-lbl">Wellness hoy</div></div>
     </div>
 
     <div class="section-title">Carga y Wellness <span>${playerData.length}</span></div>
@@ -335,7 +337,7 @@ RPETracker.prototype.generateWeeklyTeamPDF = function() {
         <tbody>${playerData.map(playerRow).join('')}</tbody>
     </table>
 
-    <div class="section-title">Wellness detalle hoy <span>${wCoverage}/${this.players.length}</span></div>
+    <div class="section-title">Wellness detalle hoy <span>${wCoverage}/${rosterWeek.length}</span></div>
     <table>
         <thead><tr>
             <th style="width:180px">Jugadora</th>
