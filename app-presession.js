@@ -74,14 +74,14 @@ RPETracker.prototype._renderPreSessionModal = function() {
     const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
 
     // Section 1: Low readiness (<60)
-    const lowReadiness = this.players.map(p => ({
+    const lowReadiness = this.activePlayers.map(p => ({
         player: p,
         score: this.calculateReadiness(p.id)
     })).filter(d => d.score !== null && d.score < 60)
       .sort((a, b) => a.score - b.score);
 
     // Section 2: A:C out of individual threshold
-    const acOutOfRange = this.players.map(p => {
+    const acOutOfRange = this.activePlayers.map(p => {
         const ratio = this.calculateAcuteChronicRatio(p.id);
         const r = parseFloat(ratio.ratio);
         const t = this.getPlayerThresholds(p.id);
@@ -98,7 +98,7 @@ RPETracker.prototype._renderPreSessionModal = function() {
     });
 
     // Section 3: Injured / in rehab
-    const injured = this.players.map(p => {
+    const injured = this.activePlayers.map(p => {
         const inj = (this.injuries || []).find(i => i.playerId === p.id && i.status === 'active');
         if (!inj) return null;
         const loc = this.getLocationName ? this.getLocationName(inj.location) : (inj.location || 'lesión activa');
@@ -124,7 +124,7 @@ RPETracker.prototype._renderPreSessionModal = function() {
             return p ? p.id : null;
         }).filter(Boolean)
     ]);
-    const clearPlayers = this.players.filter(p => !alertedIds.has(p.id));
+    const clearPlayers = this.activePlayers.filter(p => !alertedIds.has(p.id));
 
     const allClear = lowReadiness.length === 0 && acOutOfRange.length === 0 &&
                      injured.length === 0 && wellnessTrend.length === 0;
@@ -272,7 +272,7 @@ RPETracker.prototype._renderSemaphoreBar = function() {
         return           { color: '#43a047', icon: '🟢', label: 'Óptimo' };
     };
 
-    const pills = this.players.map(player => {
+    const pills = this.activePlayers.map(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
         const st = getStatus(ratio.ratio, player.id);
         const ratioDisplay = ratio.ratio === 'N/A' ? '—' : ratio.ratio;

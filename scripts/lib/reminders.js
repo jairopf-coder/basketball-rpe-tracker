@@ -119,6 +119,41 @@ function buildTestPayload() {
 
 // ── Quién falta ───────────────────────────────────────────────────────
 
+// ¿La jugadora sigue en el equipo ese día? Misma regla que isPlayerActiveOn() de la app (app-players.js;
+// hay una prueba que compara ambas): de baja = archived + archivedAt (último día con el equipo). Sigue
+// activa hasta ese día incluido, así se le puede pedir el RPE/wellness de su último día, y no después.
+function isActiveOn(player, date) {
+    if (!player || !player.archived) return true;
+    return !!player.archivedAt && date <= String(player.archivedAt).slice(0, 10);
+}
+
+// ¿La jugadora está FUERA del trabajo de equipo ese día? Misma regla que
+// getPlayerParticipation() de la app (injury-management.js; hay una prueba que compara
+// ambas): lesión vigente en fases 1-4, o marcada "no disponible". En fase 5 (entrenamiento
+// modificado) o 6 sí participa y hay que pedirle el RPE.
+//   injuries: lista de lesiones · availability: { [jugadora]: { [fecha]: 'limited'|'unavailable' } }
+function isOutOn(injuries, availability, playerId, date) {
+    const mark = availability && availability[playerId] ? availability[playerId][date] : null;
+    if (mark === 'unavailable') return true;
+    return (injuries || []).some(inj => {
+        if (!inj || inj.playerId !== playerId) return false;
+        const start = inj.startDate ? String(inj.startDate).slice(0, 10) : null;
+        if (start && date < start) return false;
+        if (inj.status === 'recovered') {
+            if (!start || !inj.endDate || date >= String(inj.endDate).slice(0, 10)) return false;
+        } else if (inj.status !== 'active') {
+            return false;
+        }
+        const hist = (inj.history || [])
+            .filter(h => h && h.date && h.phase)
+            .map(h => ({ d: String(h.date).slice(0, 10), phase: parseInt(h.phase, 10) || 1 }))
+            .sort((a, b) => a.d.localeCompare(b.d));
+        let phase = parseInt(inj.rtpPhase, 10) || 1;       // sin historial: fase actual
+        if (hist.length) { phase = 1; hist.forEach(h => { if (h.d <= date) phase = h.phase; }); }
+        return phase <= 4;
+    });
+}
+
 async function findPending({ db, players, tipo, turno, date }) {
     const out = { pending: [], excluded: 0, done: 0 };
 
@@ -139,12 +174,13 @@ async function findPending({ db, players, tipo, turno, date }) {
     const staffDone = new Set(sessions.filter(s => t.match
         ? s.type === 'match'
         : s.type !== 'match' && s.type !== 'rest' && s.timeOfDay === t.timeOfDay).map(s => s.playerId));
-    const injured = new Set(values(await db.get('injuries')).filter(i => i.status === 'active').map(i => i.playerId));
+    const injuries = values(await db.get('injuries'));
+    const availability = (await db.get('availability')) || {};
     for (const p of players) {
         let done = staffDone.has(p.id);
         if (!done && p.authUid) done = (await db.get(`playerRpeReports/${p.authUid}/${date}/${t.sessionType}`)) != null;
         if (done) { out.done++; continue; }
-        if (injured.has(p.id)) { out.excluded++; continue; }
+        if (isOutOn(injuries, availability, p.id, date)) { out.excluded++; continue; }
         out.pending.push(p);
     }
     return out;
@@ -162,7 +198,7 @@ async function run({ db, sender, input, now = new Date(), log = () => {}, ttl = 
     const today = todayMadrid(now);
     const { tipo, turno, modo, jugadora, fecha } = validateInput(input, today);
     const date = fecha;
-    const players = values(await db.get('players')).filter(p => p.id);
+    const players = values(await db.get('players')).filter(p => p.id && isActiveOn(p, date));
 
     const summary = { date, tipo, turno, modo, pending: 0, noAccount: 0, noPush: 0, excluded: 0, done: 0, toSend: 0, sent: 0, gone: 0, failed: 0, statusCodes: {} };
     let targets = [];   // { uid, sub }
@@ -170,7 +206,7 @@ async function run({ db, sender, input, now = new Date(), log = () => {}, ttl = 
 
     if (modo === 'prueba') {
         const q = normalize(jugadora);
-        const matches = players.filter(p => normalize(p.name).includes(q));
+        const matches = players.filter(p => normalize([p.name, p.lastName].filter(Boolean).join(' ')).includes(q));
         if (matches.length === 0) throw new Error('Ninguna jugadora coincide con ese nombre.');
         if (matches.length > 1) throw new Error(`El nombre coincide con ${matches.length} jugadoras: escribe nombre y apellido.`);
         const p = matches[0];
@@ -235,4 +271,4 @@ function summaryMarkdown(s) {
 }
 
 module.exports = { TURNOS, TIPOS, MODOS, todayMadrid, normalize, values, isValidDate, extractVapidPublicKey, parseDatabaseUrl,
-    checkVapidPair, validateInput, buildPayload, buildTestPayload, findPending, validSubscription, run, summaryMarkdown };
+    checkVapidPair, validateInput, buildPayload, buildTestPayload, findPending, isOutOn, isActiveOn, validSubscription, run, summaryMarkdown };

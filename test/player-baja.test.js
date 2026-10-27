@@ -26,7 +26,7 @@ const ctx = vm.createContext({
     console, Date, Math, JSON, Set, Map, Object, Array, Number, String, parseInt, parseFloat, isNaN, Promise, setTimeout,
     document: {
         getElementById: id => els[id] || null,
-        createElement: () => ({ style: {}, setAttribute() {}, appendChild() {} }),
+        createElement: () => { const n = { style: {}, setAttribute() {}, appendChild() {}, remove() { if (n.id) delete els[n.id]; } }; return n; },
         head: { appendChild() {} },
         body: { appendChild(n) { if (n.id) els[n.id] = n; } },
     },
@@ -226,6 +226,74 @@ test('registros de hoy de wellness: solo las activas', () => {
     assert.ok(!html.includes('Ingrid'));
     assert.ok(html.includes('1 pendientes'));
 });
+console.log('\nFase 2: participación, desplegables, planificación e informes');
+test('getPlayerParticipation: de baja cuenta como «fuera» desde el día siguiente a su último día', () => {
+    const T = makeTracker([baja('b', 'Ingrid', 'V', '2026-10-24'), alta('a', 'Carla', 'M')]);
+    T.injuries = []; T.availability = {};
+    assert.strictEqual(T.getPlayerParticipation('b', '2026-10-20'), 'full');
+    assert.strictEqual(T.getPlayerParticipation('b', '2026-10-24'), 'full', 'su último día participa');
+    assert.strictEqual(T.getPlayerParticipation('b', '2026-10-25'), 'out');
+    assert.strictEqual(T.getPlayerParticipation('a', '2030-01-01'), 'full');
+    assert.strictEqual(T.getPlayerParticipation('desconocida', '2030-01-01'), 'full');
+});
+test('una lesión de antes de la baja sigue contando como «fuera» ese día (el historial no cambia)', () => {
+    const T = makeTracker([baja('b', 'Ingrid', 'V', '2026-10-24')]);
+    T.availability = {};
+    T.injuries = [{ playerId: 'b', status: 'active', startDate: '2026-10-01', rtpPhase: 2 }];
+    assert.strictEqual(T.getPlayerParticipation('b', '2026-10-10'), 'out');
+});
+test('hasActiveDaysFrom: la semana de su último día la incluye y la siguiente ya no', () => {
+    const T = makeTracker([baja('b', 'Ingrid', 'V', '2026-10-24'), alta('a', 'Carla', 'M'), { id: 'x', name: 'X', archived: true }]);
+    assert.strictEqual(T.hasActiveDaysFrom(T.players[0], '2026-10-19'), true, 'lunes de su semana (su último día es el sábado)');
+    assert.strictEqual(T.hasActiveDaysFrom(T.players[0], '2026-10-24'), true);
+    assert.strictEqual(T.hasActiveDaysFrom(T.players[0], '2026-10-26'), false, 'lunes siguiente');
+    assert.strictEqual(T.hasActiveDaysFrom(T.players[1], '2099-01-01'), true);
+    assert.strictEqual(T.hasActiveDaysFrom(T.players[2], '2026-01-01'), false, 'de baja sin fecha');
+});
+test('playerOptionsHtml: las activas primero y las de baja en su propio grupo', () => {
+    const T = makeTracker([alta('a', 'Carla', 'M'), baja('b', 'Ingrid', 'V', AYER), alta('c', 'Marta', 'F')]);
+    const html = T.playerOptionsHtml(p => `<option value="${p.id}">${p.name}</option>`);
+    assert.strictEqual(html, '<option value="a">Carla</option><option value="c">Marta</option><optgroup label="De baja"><option value="b">Ingrid</option></optgroup>');
+});
+test('playerOptionsHtml: sin bajas no hay grupo', () => {
+    const T = makeTracker([alta('a', 'Carla', 'M')]);
+    assert.strictEqual(T.playerOptionsHtml(p => `<option>${p.name}</option>`), '<option>Carla</option>');
+});
+test('una baja con el último día de hoy sigue entre las activas del desplegable', () => {
+    const T = makeTracker([baja('b', 'Ingrid', 'V', HOY)]);
+    assert.ok(!T.playerOptionsHtml(p => p.name).includes('optgroup'));
+});
+test('los desplegables donde se ELIGE jugadora (lesiones, tests de fuerza, GPS) usan playerOptionsHtml', () => {
+    [['injury-management.js', 2], ['strength.js', 1], ['gps-tracking.js', 2]].forEach(([f, n]) => {
+        const hits = (read(f).match(/this\.playerOptionsHtml\(/g) || []).length;
+        assert.strictEqual(hits, n, `${f} debería usar playerOptionsHtml ${n} veces`);
+    });
+});
+test('Microciclo: la tabla de la semana solo incluye a quien tuvo algún día activo esa semana', () => {
+    const src = read('microciclo.js');
+    assert.ok(src.includes('const roster = this.players.filter(p => this.hasActiveDaysFrom(p, dayDateStrs[0]));'));
+    assert.ok(src.includes('roster.forEach(p => {') && src.includes('roster.filter(p => !outMap[p.id][i])') && src.includes('const tableRows = roster.map('));
+});
+test('el informe semanal del equipo usa la plantilla de ESA semana (una baja a mitad de semana sale)', () => {
+    const body = cuerpo('team-status.js', 'generateWeeklyTeamPDF');
+    assert.ok(body.includes('const rosterWeek = this.players.filter(p => this.hasActiveDaysFrom(p, toLocalISODate(monday)));'));
+    assert.ok(!/this\.(players|activePlayers)\b/.test(body.replace(/this\.players\.filter\(p => this\.hasActiveDaysFrom[^;]*;/, '').replace(/this\.players\.find\(/g, '')));
+});
+test('la sección Bajas avisa de que su cuenta de jugadora sigue activa', () => {
+    const T = makeTracker([{ id: 'b', name: 'Ingrid', lastName: 'V', archived: true, archivedAt: AYER, authUid: 'u1' }, baja('c', 'Marta', 'F', AYER)]);
+    el('playersBajas');
+    T._renderPlayersBajas();
+    const h = els.playersBajas.innerHTML;
+    assert.strictEqual((h.match(/cuenta de jugadora sigue activa/g) || []).length, 1, 'solo la que tiene cuenta');
+});
+test('el modal de baja avisa de la cuenta de jugadora solo si la tiene', () => {
+    const T = makeTracker([{ id: 'a', name: 'Carla', lastName: 'M', authUid: 'u1' }, alta('b', 'Marta', 'F')]);
+    T.openPlayerBajaModal('a');
+    assert.ok(els.playerBajaOverlay.innerHTML.includes('cuenta de jugadora'));
+    T.openPlayerBajaModal('b');
+    assert.ok(!els.playerBajaOverlay.innerHTML.includes('cuenta de jugadora'));
+});
+
 console.log('\nLo que NO debe cambiar');
 test('buscar a una jugadora por id (historial, informes) sigue viendo a las de baja', () => {
     const T = makeTracker([baja('b', 'Ingrid', 'V', HACE10)]);
@@ -262,6 +330,15 @@ test('las pantallas de registro y los resúmenes de Inicio solo listan jugadoras
         ['dashboard-comparison.js', '_renderPlayerComparisonSection'],
         ['app-sessions.js', 'openNewSessionModal'], ['app-sessions.js', '_eligiblePlayerIds'], ['app-sessions.js', 'renderPlayerButtonsMulti'],
         ['app.js', 'checkAndShowAlerts'], ['app.js', '_updateNavAlertBadge'],
+        // Fase 2
+        ['team-status.js', 'renderTeamStatus'],
+        ['weekplan-medical.js', '_renderProjectedACRow'], ['weekplan-medical.js', '_plannedWeekLoad'],
+        ['weekplan-medical.js', '_plannedWeekSessions'], ['weekplan-medical.js', '_getRehabLoadData'],
+        ['strength.js', 'renderGymView'], ['strength.js', '_openNewGymSession'], ['strength.js', 'renderTestsView'],
+        ['app-presession.js', '_renderPreSessionModal'], ['app-presession.js', '_renderSemaphoreBar'],
+        ['injury-management-2.js', 'renderAvailabilityTable'],
+        ['injury-prediction.js', 'renderInjuryPredictionDashboard'], ['injury-prediction.js', '_predSelectAll'],
+        ['calendar.js', 'getWeeklySummary'],
     ];
     funciones.forEach(([f, n]) => {
         const sinBusquedas = cuerpo(f, n).replace(/this\.players\.find\(/g, '');

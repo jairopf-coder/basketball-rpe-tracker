@@ -246,6 +246,60 @@ test('RPE: un RPE ya descartado/revisado por el staff sigue contando como "envia
 });
 
 // ═════════ Contenido ═════════
+console.log('\nJugadoras de baja');
+const deBaja = (data, id, ultimoDia) => { data.players[id].archived = true; data.players[id].archivedAt = ultimoDia; return data; };
+test('wellness: quien ya se fue (su último día es anterior) no recibe el aviso ni cuenta como pendiente', async () => {
+    const { summary, sender } = await go({ tipo: 'wellness' }, deBaja(w12(), 'p6', '2026-10-04'));
+    assert.strictEqual(summary.pending, 3);        // p3, p4, p5 (p6 ya no está)
+    assert.strictEqual(summary.toSend, 1);         // solo p5
+    assert.strictEqual(sender.calls.length, 1);
+});
+test('RPE: quien ya se fue no recibe el aviso', async () => {
+    const base = await go({ tipo: 'rpe', turno: 'manana' }, world());
+    const { summary } = await go({ tipo: 'rpe', turno: 'manana' }, deBaja(world(), 'p6', '2026-10-04'));
+    assert.strictEqual(summary.pending, base.summary.pending - 1);
+    assert.strictEqual(summary.toSend, base.summary.toSend - 1);
+});
+test('su ÚLTIMO día todavía se le avisa (para registrar su RPE y wellness de ese día)', async () => {
+    const { summary } = await go({ tipo: 'wellness' }, deBaja(w12(), 'p6', D));
+    assert.strictEqual(summary.pending, 4);
+    assert.strictEqual(summary.toSend, 2);
+});
+test('un aviso para una fecha anterior a la baja sí la incluye', async () => {
+    const data = deBaja(w12(), 'p6', '2026-10-04');
+    const { summary } = await go({ tipo: 'wellness', fecha: '2026-10-03' }, data);
+    assert.ok(summary.pending >= 4);
+    assert.ok(summary.toSend >= 2, 'p5 y p6 reciben el aviso de esa fecha');
+});
+test('baja marcada a mano sin fecha: no recibe avisos', async () => {
+    const data = w12(); data.players.p6.archived = true;
+    const { summary } = await go({ tipo: 'wellness' }, data);
+    assert.strictEqual(summary.toSend, 1);
+});
+test('prueba: no se envía a quien ya está de baja', async () => {
+    const data = deBaja(world(), 'p6', '2026-10-04');
+    await assert.rejects(() => go({ modo: 'prueba', jugadora: 'fran' }, data), /Ninguna jugadora coincide/);
+});
+test('prueba: se puede buscar por nombre y apellido cuando están separados', async () => {
+    const data = world();
+    data.players.p1 = { id: 'p1', name: 'Ana', lastName: 'Pérez', authUid: 'uA' };
+    const { summary, sender } = await go({ modo: 'prueba', jugadora: 'ana perez' }, data);
+    assert.strictEqual(summary.sent, 1);
+    assert.strictEqual(sender.calls.length, 1);
+    const apellidoSolo = await go({ modo: 'prueba', jugadora: 'perez' }, data);
+    assert.strictEqual(apellidoSolo.summary.sent, 1);
+});
+test('isActiveOn: misma regla que isPlayerActiveOn de la app (app-players.js)', () => {
+    const vm = require('vm');
+    const ctx = vm.createContext({ toLocalISODate: d => d.toISOString().slice(0, 10) });
+    vm.runInContext('function RPETracker() {}', ctx);
+    vm.runInContext(require('./active-players-helper')(), ctx);
+    const app = vm.runInContext('new RPETracker()', ctx);
+    const jugadoras = [{}, { archived: false }, { archived: true }, { archived: true, archivedAt: '2026-10-05' }, { archived: false, archivedAt: '2026-10-01' }];
+    ['2026-09-01', '2026-10-04', '2026-10-05', '2026-10-06', '2027-01-01'].forEach(d =>
+        jugadoras.forEach(p => assert.strictEqual(R.isActiveOn(p, d), app.isPlayerActiveOn(p, d), JSON.stringify(p) + ' @ ' + d)));
+});
+
 console.log('\nContenido del aviso');
 test('wellness: texto genérico, etiqueta del día, TTL de 3 horas, sin datos personales', async () => {
     const { sender } = await go({ tipo: 'wellness' });

@@ -39,6 +39,25 @@ Object.defineProperty(RPETracker.prototype, 'activePlayers', {
     configurable: true
 });
 
+// ¿Le queda algún día activo desde `fromISO` en adelante? (p. ej. la tabla de la semana: se mantiene a la
+// jugadora mientras la semana incluya algún día en que estuvo, y desaparece cuando ya pasó entera.)
+RPETracker.prototype.hasActiveDaysFrom = function(player, fromISO) {
+    if (!player) return false;
+    if (!player.archived) return true;
+    if (!player.archivedAt) return false;
+    return String(fromISO || toLocalISODate(new Date())).slice(0, 10) <= player.archivedAt;
+};
+
+// <option>s para un desplegable en el que se ELIGE una jugadora: las activas primero y las de baja en un
+// grupo aparte, para poder seguir cargando datos antiguos (una lesión, un test, un GPS) sin que estorben.
+RPETracker.prototype.playerOptionsHtml = function(optionFn) {
+    const active = this.activePlayers;
+    const ids = new Set(active.map(p => p.id));
+    const bajas = (this.players || []).filter(p => !ids.has(p.id));
+    return active.map(optionFn).join('')
+        + (bajas.length ? `<optgroup label="De baja">${bajas.map(optionFn).join('')}</optgroup>` : '');
+};
+
 // Propuesta para separar un texto completo: primera palabra = nombre, el resto = apellido.
 // Es solo una propuesta (no sirve con nombres compuestos como "María José"): el staff la revisa.
 RPETracker.prototype._splitFullName = function(fullName) {
@@ -772,9 +791,13 @@ RPETracker.prototype._renderPlayersBajas = function() {
                 <div style="min-width:0">
                     <strong>${esc(this.playerFullName(p))}</strong>${p.number ? ` <span style="opacity:.5">#${esc(p.number)}</span>` : ''}
                     <div style="font-size:.8rem;opacity:.7">${p.archivedAt ? `Último día: ${esc(this._fechaES(p.archivedAt))}` : 'De baja'}</div>
+                    ${p.authUid ? '<div style="font-size:.8rem;color:#e65100">⚠️ Su cuenta de jugadora sigue activa: puede seguir entrando a rellenar RPE y wellness</div>' : ''}
                 </div>
             </div>
-            <button type="button" class="btn-secondary" onclick="window.rpeTracker?.reactivatePlayer('${esc(p.id)}')">↩️ Reactivar</button>
+            <div style="display:flex;flex-wrap:wrap;gap:.4rem">
+                ${p.authUid && typeof AppAuth !== 'undefined' && AppAuth.isStaff() ? '<button type="button" class="btn-secondary" onclick="AppAuth.showUserManagement()">👥 Gestionar cuenta</button>' : ''}
+                <button type="button" class="btn-secondary" onclick="window.rpeTracker?.reactivatePlayer('${esc(p.id)}')">↩️ Reactivar</button>
+            </div>
         </div>`).join('');
 
     el.innerHTML = `
@@ -803,6 +826,9 @@ RPETracker.prototype.openPlayerBajaModal = function(playerId) {
                 Dejará de aparecer al registrar RPE y wellness y en los resúmenes de Inicio.
                 Podrás reactivarla desde la sección «Bajas».
             </p>
+            ${player.authUid ? `<p style="margin:.5rem 0 0;padding:.5rem .7rem;border-radius:8px;background:var(--bg-subtle);font-size:.85rem">
+                ⚠️ Tiene una <strong>cuenta de jugadora</strong>. La baja no la bloquea: después de su último día, elimínala en
+                Ajustes → Gestión de usuarios para que no pueda seguir enviando RPE ni wellness.</p>` : ''}
             <label for="playerBajaDate" style="display:block;font-weight:600;margin:.75rem 0 .35rem">Último día con el equipo</label>
             <input type="date" id="playerBajaDate" value="${toLocalISODate(new Date())}" style="${inputStyle}">
             <small style="display:block;margin-top:.35rem;opacity:.75">

@@ -601,10 +601,10 @@ RPETracker.prototype._projectedACRatio = function(playerId, extraLoad) {
  * sessionLoad = RPE × duración calculado desde intensidad y duración del slot.
  */
 RPETracker.prototype._renderProjectedACRow = function(sessionLoad, dateStr) {
-    if (!this.players.length || sessionLoad <= 0) return '';
+    if (!this.activePlayers.length || sessionLoad <= 0) return '';
 
     // Con fecha, solo las jugadoras que participan ese día (una lesionada no hará la sesión)
-    const roster = dateStr ? this.getParticipatingPlayers(dateStr) : this.players;
+    const roster = dateStr ? this.getParticipatingPlayers(dateStr) : this.activePlayers;
     const badges = roster.map(p => {
         const ratio = this._projectedACRatio(p.id, sessionLoad);
         if (ratio === null) return '';
@@ -685,7 +685,7 @@ RPETracker.prototype._plannedWeekLoad = function(days, weekStart) {
     }
     let total = 0;
     Object.values(plan).forEach(d => { total += this._wpDayLoad(d); });
-    const playerCount = Math.max(this.players.length, 1);
+    const playerCount = Math.max(this.activePlayers.length, 1);
     return Math.round(total * playerCount);
 };
 
@@ -712,7 +712,7 @@ RPETracker.prototype._plannedWeekSessions = function(days, weekStart) {
             if (d[slot] && d[slot].enabled) slots++;
         });
     });
-    return slots * Math.max(this.players.length, 1);
+    return slots * Math.max(this.activePlayers.length, 1);
 };
 
 RPETracker.prototype._wpDiffColor = function(planned, real) {
@@ -1129,7 +1129,7 @@ RPETracker.prototype._getRehabLoadData = function(inj, player) {
 
     // Team average (excluding injured player)
     const teamSessions7d = this.sessions.filter(s=>s.playerId!==player.id && new Date(s.date)>=sevenDaysAgo);
-    const teamPlayerCount = Math.max(this.players.filter(p=>p.id!==player.id).length, 1);
+    const teamPlayerCount = Math.max(this.activePlayers.filter(p=>p.id!==player.id).length, 1);
     const teamLoad7d = teamSessions7d.length
         ? Math.round(teamSessions7d.reduce((s,x)=>s+(x.load||0),0) / teamPlayerCount)
         : 0;

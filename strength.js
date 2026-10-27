@@ -252,9 +252,9 @@ RPETracker.prototype.renderGymView = function() {
     }
 
     // ── Vista principal: lista de jugadoras ──
-    const playerCards = this.players.length === 0
+    const playerCards = this.activePlayers.length === 0
         ? '<p class="str-empty">Sin jugadoras registradas</p>'
-        : this.players.map(p => {
+        : this.activePlayers.map(p => {
             const sessions = (this.gymSessions || []).filter(s => s.playerId === p.id);
             const last = sessions.sort((a,b) => b.date.localeCompare(a.date))[0];
             const color = PlayerTokens.get(p);
@@ -926,11 +926,11 @@ RPETracker.prototype._openNewGymSession = function(preselectedPlayerId) {
     this._gymExFilter     = 'all';
     this._gymStep         = 1;
     this._gymSharedRows   = [];
-    this._gymModalPlayers = this.players.map(p => ({
+    this._gymModalPlayers = this.activePlayers.map(p => ({
         ...p, selected: p.id === preselectedPlayerId, rows: []
     }));
-    if (this.players.length === 1) this._gymModalPlayers[0].selected = true;
-    this._gymActiveTab = preselectedPlayerId || (this.players[0]?.id || null);
+    if (this.activePlayers.length === 1) this._gymModalPlayers[0].selected = true;
+    this._gymActiveTab = preselectedPlayerId || (this.activePlayers[0]?.id || null);
 
     let modal = document.getElementById('gymSessionModal');
     if (!modal) { modal = document.createElement('div'); modal.id = 'gymSessionModal'; modal.className = 'modal'; document.body.appendChild(modal); }
@@ -982,7 +982,7 @@ RPETracker.prototype._renderGymModal = function(modal) {
             <div class="modal-body gym-modal-body">
                 <div class="gym-modal-top">
                     <div class="gym-modal-top-players">
-                        <label class="form-label">${this.players.length>1?'Jugadoras':'Jugadora'}</label>
+                        <label class="form-label">${this.activePlayers.length>1?'Jugadoras':'Jugadora'}</label>
                         <div class="gym-player-chips">${playerChips}</div>
                     </div>
                     <div class="gym-modal-top-date">
@@ -1699,9 +1699,9 @@ RPETracker.prototype.renderTestsView = function() {
         return;
     }
 
-    const playerCards = this.players.length === 0
+    const playerCards = this.activePlayers.length === 0
         ? '<p class="str-empty">Sin jugadoras registradas</p>'
-        : this.players.map(p => {
+        : this.activePlayers.map(p => {
             const tests = (this.testSessions || []).filter(s => s.playerId === p.id);
             const last = tests.sort((a,b) => b.date.localeCompare(a.date))[0];
             const color = PlayerTokens.get(p);
@@ -2026,9 +2026,9 @@ RPETracker.prototype._openNewTest = function(preselectedPlayerId, editSessionId)
     const isEdit = !!editSession;
     const results = editSession ? (editSession.results || {}) : {};
 
-    const playerOpts = this.players.map(p =>
+    const playerOpts = this.playerOptionsHtml(p =>
         `<option value="${p.id}" ${p.id === (editSession ? editSession.playerId : preselectedPlayerId) ? 'selected' : ''}>${esc(this.playerDisplayName(p))}${p.number ? ' #'+p.number : ''}</option>`
-    ).join('');
+    );
     const today = toLocalISODate(new Date());
     const dateVal = editSession ? editSession.date : today;
     const bodyWeightVal = editSession && editSession.bodyWeight != null ? editSession.bodyWeight : '';

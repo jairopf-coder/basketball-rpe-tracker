@@ -432,9 +432,9 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
         document.body.appendChild(modal);
     }
 
-    const playerOptions = (selectedId) => this.players.map(p =>
+    const playerOptions = (selectedId) => this.playerOptionsHtml(p =>
         `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(this.playerFullName(p))}</option>`
-    ).join('') + `<option value="">— Ignorar esta fila —</option>`;
+    ) + `<option value="">— Ignorar esta fila —</option>`;
 
     const rowHtml = (item, idx) => {
         const badge = item.confidence === 'exact' ? '✅ Coincidencia exacta'
@@ -457,7 +457,7 @@ RPETracker.prototype._showGpsImportConfirmModal = function(sessionGroupId, match
                     <div class="gps-match-oli-name">${esc(rec.oliPlayerName)}</div>
                     <select class="gps-match-select" id="gpsMatchSelect-u${idx}">
                         <option value="">— Ignorar esta fila —</option>
-                        ${this.players.map(p => `<option value="${p.id}">${esc(this.playerFullName(p))}</option>`).join('')}
+                        ${this.playerOptionsHtml(p => `<option value="${p.id}">${esc(this.playerFullName(p))}</option>`)}
                     </select>
                 </div>
             `).join('')}
