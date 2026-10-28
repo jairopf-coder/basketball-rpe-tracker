@@ -58,6 +58,31 @@ RPETracker.prototype.playerOptionsHtml = function(optionFn) {
         + (bajas.length ? `<optgroup label="De baja">${bajas.map(optionFn).join('')}</optgroup>` : '');
 };
 
+// ── Historial y analítica: la jugadora de baja sigue consultable, con su marca ─────────────────────
+// Nombre para mostrar + «(baja)» si ya no está en el equipo (hoy).
+RPETracker.prototype.playerLabel = function(player) {
+    if (!player) return '';
+    const base = typeof this.playerDisplayName === 'function' ? this.playerDisplayName(player) : String(player.name || '');
+    return this.isPlayerActiveOn(player) ? base : `${base} (baja)`;
+};
+
+// Texto corto para chips (como hasta ahora: la primera palabra del nombre) + «· baja».
+RPETracker.prototype.playerChipLabel = function(player) {
+    if (!player) return '';
+    const first = String(player.name || '').split(' ')[0];
+    return this.isPlayerActiveOn(player) ? first : `${first} · baja`;
+};
+
+// Para listas donde se elige a quién consultar: primero la plantilla actual y después las de baja
+// (la que se fue más recientemente, primero).
+RPETracker.prototype.playersForHistory = function() {
+    const activas = this.activePlayers;
+    const ids = new Set(activas.map(p => p.id));
+    const bajas = (this.players || []).filter(p => !ids.has(p.id))
+        .sort((a, b) => String(b.archivedAt || '').localeCompare(String(a.archivedAt || '')));
+    return activas.concat(bajas);
+};
+
 // Propuesta para separar un texto completo: primera palabra = nombre, el resto = apellido.
 // Es solo una propuesta (no sirve con nombres compuestos como "María José"): el staff la revisa.
 RPETracker.prototype._splitFullName = function(fullName) {
@@ -795,6 +820,7 @@ RPETracker.prototype._renderPlayersBajas = function() {
                 </div>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:.4rem">
+                <button type="button" class="btn-secondary" title="Informe PDF" onclick="window.rpeTracker?.showPlayerReportMenu('${esc(p.id)}')">📄 Informe</button>
                 ${p.authUid && typeof AppAuth !== 'undefined' && AppAuth.isStaff() ? '<button type="button" class="btn-secondary" onclick="AppAuth.showUserManagement()">👥 Gestionar cuenta</button>' : ''}
                 <button type="button" class="btn-secondary" onclick="window.rpeTracker?.reactivatePlayer('${esc(p.id)}')">↩️ Reactivar</button>
             </div>

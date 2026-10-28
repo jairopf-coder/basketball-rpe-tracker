@@ -38,9 +38,11 @@ const ctx = vm.createContext({
     esc: s => String(s),
     toLocalISODate: d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'),
     getCurrentSeasonWindowStart: () => '2026-08-01',
+    requestAnimationFrame: fn => fn(),
+    sessionStorage: { getItem() { return null; }, setItem() {} },
 });
 vm.runInContext('function RPETracker() {}', ctx);
-['gps-tracking.js', 'app-players.js', 'injury-management.js', 'app-sessions.js', 'wellness.js', 'dashboard-renderer.js']
+['gps-tracking.js', 'app-players.js', 'injury-management.js', 'app-sessions.js', 'wellness.js', 'dashboard-renderer.js', 'app-analytics.js', 'gps-tracking-analytics.js']
     .forEach(f => vm.runInContext(read(f), ctx, { filename: f }));
 
 function makeTracker(players) {
@@ -294,6 +296,100 @@ test('el modal de baja avisa de la cuenta de jugadora solo si la tiene', () => {
     assert.ok(!els.playerBajaOverlay.innerHTML.includes('cuenta de jugadora'));
 });
 
+console.log('\nFase 3: historial y analítica (consultable, con marca «baja»)');
+test('playerLabel y playerChipLabel marcan «baja» solo cuando ya no está en el equipo', () => {
+    const T = makeTracker([alta('a', 'Carla', 'M'), baja('b', 'Ingrid', 'V', AYER), baja('c', 'Marta', 'F', HOY)]);
+    assert.strictEqual(T.playerLabel(T.players[0]), 'Carla');
+    assert.strictEqual(T.playerLabel(T.players[1]), 'Ingrid (baja)');
+    assert.strictEqual(T.playerLabel(T.players[2]), 'Marta', 'su último día todavía es activa');
+    assert.strictEqual(T.playerChipLabel(T.players[1]), 'Ingrid · baja');
+    assert.strictEqual(T.playerChipLabel(T.players[0]), 'Carla');
+    assert.strictEqual(T.playerLabel(null), '');
+});
+test('playerChipLabel conserva el comportamiento anterior (primera palabra del nombre)', () => {
+    const T = makeTracker([{ id: 'a', name: 'Carla Mendes' }, baja('b', 'Ingrid Sofía', 'V', AYER)]);
+    assert.strictEqual(T.playerChipLabel(T.players[0]), 'Carla');
+    assert.strictEqual(T.playerChipLabel(T.players[1]), 'Ingrid · baja');
+});
+test('playersForHistory: primero la plantilla actual y después las de baja, la más reciente primero', () => {
+    const T = makeTracker([baja('b1', 'Antigua', 'X', iso(-30)), alta('a', 'Carla', 'M'), baja('b2', 'Reciente', 'Y', iso(-2)), alta('c', 'Marta', 'F')]);
+    assert.deepStrictEqual(J(nombres(T.playersForHistory())), ['Carla', 'Marta', 'Reciente', 'Antigua']);
+    assert.strictEqual(T.players.length, 4, 'no cambia la lista original');
+});
+test('el Historial de sesiones ofrece a la jugadora de baja (antes la ocultaba)', () => {
+    assert.ok(read('app-sessions.js').includes('this.playersForHistory().map(p => {'));
+    assert.ok(!/!p\.archived/.test(read('app-sessions.js')));
+});
+test('ningún módulo oculta ya a las jugadoras de baja con un filtro `!p.archived` (solo app-players.js lo usa para el listado)', () => {
+    fs.readdirSync(ROOT).filter(f => f.endsWith('.js') && !f.startsWith('xlsx') && f !== 'app-players.js').forEach(f => {
+        assert.ok(!/!\s*p\.archived/.test(read(f)), f + ' todavía filtra por archived');
+    });
+});
+test('«Todas» en la evolución de GPS selecciona la plantilla actual, no a las de baja', () => {
+    const T = makeTracker([alta('a', 'Carla', 'M'), baja('b', 'Ingrid', 'V', AYER), alta('c', 'Marta', 'F')]);
+    T._gpsAnPlayerIds = new Set();
+    T._renderGpsPlayerEvolutionTab = () => {};
+    T._gpsAnSelectAllPlayers();
+    assert.deepStrictEqual(J([...T._gpsAnPlayerIds].sort()), ['a', 'c']);
+    // con la plantilla ya seleccionada, volver a pulsar deselecciona
+    T._gpsAnSelectAllPlayers();
+    assert.strictEqual(T._gpsAnPlayerIds.size, 0);
+    // si además hay una baja elegida a mano, «Todas» no está completa y vuelve a seleccionar la plantilla
+    T._gpsAnPlayerIds = new Set(['a', 'c', 'b']);
+    T._gpsAnSelectAllPlayers();
+    assert.deepStrictEqual(J([...T._gpsAnPlayerIds].sort()), ['a', 'c']);
+});
+test('los chips de evolución de GPS incluyen a la de baja, al final y con su marca', () => {
+    const body = cuerpo('gps-tracking-analytics.js', '_renderGpsPlayerEvolutionTab');
+    assert.ok(body.includes('const roster = this.playersForHistory();'));
+    assert.ok(body.includes('const chips = roster.map(p => {') && body.includes('this.playerChipLabel(p)'));
+});
+test('A:C: mientras no se toque nada, las bajas no entran en el gráfico pero están como chips', () => {
+    const T = makeTracker([alta('a', 'Carla', 'M'), baja('b', 'Ingrid', 'V', AYER)]);
+    assert.deepStrictEqual(J([...T._acExcludedSet()]), ['b']);
+    T._acExcluded = new Set(['a']);                       // si el usuario ya eligió, manda su elección
+    assert.deepStrictEqual(J([...T._acExcludedSet()]), ['a']);
+});
+test('A:C: al tocar un chip por primera vez se parte del estado por defecto (la baja sigue fuera)', () => {
+    const T = makeTracker([alta('a', 'Carla', 'M'), alta('c', 'Marta', 'F'), baja('b', 'Ingrid', 'V', AYER)]);
+    T._acExcluded = undefined;
+    T._renderACPlayerChips = () => ''; T._drawACCurveChart = () => {};
+    T._acTogglePlayer('a', false);                        // el usuario quita a Carla
+    assert.deepStrictEqual(J([...T._acExcluded].sort()), ['a', 'b']);
+    T._acTogglePlayer('b', true);                         // y añade a la baja
+    assert.deepStrictEqual(J([...T._acExcluded].sort()), ['a']);
+});
+test('A:C: los chips muestran a las bajas con su marca y la evolución por jugadora parte de la plantilla actual', () => {
+    const T = makeTracker([alta('a', 'Carla', 'M'), baja('b', 'Ingrid', 'V', AYER)]);
+    T._acExcluded = undefined;
+    const html = T._renderACPlayerChips();
+    assert.ok(html.includes('Carla') && html.includes('Ingrid · baja'));
+    assert.ok(html.indexOf('Carla') < html.indexOf('Ingrid'));
+    assert.ok(!/player-filter-chip--selected[^>]*>\s*Ingrid/.test(html), 'la baja aparece sin seleccionar');
+    const src = read('app-analytics.js');
+    assert.ok((src.match(/selected = this\.activePlayers\.map\(p => p\.id\)/g) || []).length === 2);
+});
+test('wellness: la tabla por rango incluye a quien estuvo algún día del rango, con marca; las alertas son de la plantilla actual', () => {
+    const body = cuerpo('wellness.js', '_renderWPlayerTable');
+    assert.ok(body.includes('this.players.filter(p => this.hasActiveDaysFrom(p, start)).map(p => {'));
+    assert.ok(body.includes('this.playerLabel(p)'));
+});
+test('wellness: una baja no cuenta como «con la regla ahora»', () => {
+    const body = cuerpo('wellness.js', '_renderWCycleCard');
+    assert.ok(body.includes('this.isPlayerActiveOn(p) ? info : Object.assign({}, info, { active: false })'));
+});
+test('informe semanal del equipo (PDF) usa la plantilla de esa semana', () => {
+    const body = cuerpo('pdf-reports.js', 'generateTeamWeeklyReport');
+    assert.ok(body.includes('const rosterWeek = this.players.filter(p => this.hasActiveDaysFrom(p, toLocalISODate(monday)));'));
+    assert.ok(!/this\.(players|activePlayers)\b/.test(body.replace(/this\.players\.filter\(p => this\.hasActiveDaysFrom[^;]*;/, '')));
+});
+test('la sección Bajas ofrece su informe PDF para seguir consultándola', () => {
+    const T = makeTracker([baja('b', 'Ingrid', 'V', AYER)]);
+    el('playersBajas');
+    T._renderPlayersBajas();
+    assert.ok(els.playersBajas.innerHTML.includes("showPlayerReportMenu('b')"));
+});
+
 console.log('\nLo que NO debe cambiar');
 test('buscar a una jugadora por id (historial, informes) sigue viendo a las de baja', () => {
     const T = makeTracker([baja('b', 'Ingrid', 'V', HACE10)]);
@@ -339,6 +435,9 @@ test('las pantallas de registro y los resúmenes de Inicio solo listan jugadoras
         ['injury-management-2.js', 'renderAvailabilityTable'],
         ['injury-prediction.js', 'renderInjuryPredictionDashboard'], ['injury-prediction.js', '_predSelectAll'],
         ['calendar.js', 'getWeeklySummary'],
+        // Fase 3: las alertas son para la plantilla actual
+        ['wellness.js', '_renderWAlertsCard'], ['wellness.js', '_wTrendAlerts'], ['wellness.js', '_wAlerts'],
+        ['gps-tracking-analytics.js', '_getGpsAlertPlayers'],
     ];
     funciones.forEach(([f, n]) => {
         const sinBusquedas = cuerpo(f, n).replace(/this\.players\.find\(/g, '');
