@@ -53,15 +53,21 @@ RPETracker.prototype._renderACCurveTab = function() {
 // defecto todas incluidas). Extraído a su propia función para poder
 // re-renderizar solo este trozo desde _acTogglePlayer sin redibujar
 // toda la pestaña de Análisis.
+// Jugadoras que NO entran en el gráfico A:C: las que el usuario ha quitado o, mientras no haya tocado nada,
+// las que ya no están en el equipo (siguen disponibles como chips por si se quiere consultar su evolución).
+RPETracker.prototype._acExcludedSet = function() {
+    return this._acExcluded || new Set((this.players || []).filter(p => !this.isPlayerActiveOn(p)).map(p => p.id));
+};
+
 RPETracker.prototype._renderACPlayerChips = function() {
-    return this.players.map(p => {
+    return this.playersForHistory().map(p => {
         const color = PlayerTokens.get(p);
-        const included = !this._acExcluded?.has(p.id);
+        const included = !this._acExcludedSet().has(p.id);
         return `<button type="button" class="player-filter-chip ${included ? 'player-filter-chip--selected' : ''}"
                 style="--chip-color:${color}"
-                title="${esc(p.name)}${p.number ? ' #' + esc(p.number) : ''}"
+                title="${esc(this.playerLabel(p))}${p.number ? ' #' + esc(p.number) : ''}"
                 onclick="window.rpeTracker?._acTogglePlayer('${p.id}', ${!included})">
-                ${esc(p.name.split(' ')[0])}
+                ${esc(this.playerChipLabel(p))}
                 ${included ? '<span class="player-filter-chip-check">✓</span>' : ''}
             </button>`;
     }).join('');
@@ -90,7 +96,7 @@ RPETracker.prototype._drawACCurveChart = function() {
         labels.push(formatDM(dt));
     }
 
-    const excluded = this._acExcluded || new Set();
+    const excluded = this._acExcludedSet();
     const lambdaA  = 2 / (7 + 1);
     const lambdaC  = 2 / (28 + 1);
     const seasonA  = this._acSeasonA || Store.getActiveSeason();
@@ -213,7 +219,7 @@ RPETracker.prototype._drawACCurveChart = function() {
 };
 
 RPETracker.prototype._acTogglePlayer = function(id, checked) {
-    if (!this._acExcluded) this._acExcluded = new Set();
+    if (!this._acExcluded) this._acExcluded = new Set(this._acExcludedSet());
     if (checked) this._acExcluded.delete(id); else this._acExcluded.add(id);
     const chipsWrap = document.getElementById('acCurvePlayerChips');
     if (chipsWrap) chipsWrap.innerHTML = this._renderACPlayerChips();
@@ -484,7 +490,7 @@ RPETracker.prototype._renderRpePlanVsReal = function() {
 
     const playerOptions = this.players
         .filter(p => rows.some(r => r.player.id === p.id))
-        .map(p => `<option value="${p.id}"${filterPlayer === p.id ? ' selected' : ''}>${esc(this.playerDisplayName(p))}</option>`)
+        .map(p => `<option value="${p.id}"${filterPlayer === p.id ? ' selected' : ''}>${esc(this.playerLabel(p))}</option>`)
         .join('');
 
     const tableRows = filteredRows.length === 0
@@ -637,10 +643,10 @@ RPETracker.prototype.renderEvolutionCharts = function() {
     let selected = (() => {
         try { return JSON.parse(sessionStorage.getItem('rpe_chart_players') || 'null'); } catch(e) { return null; }
     })();
-    if (!selected) selected = this.players.map(p => p.id); // default: all
+    if (!selected) selected = this.activePlayers.map(p => p.id); // por defecto, la plantilla actual
 
     // Build chip selector
-    const chipsHTML = this.players.map(p => {
+    const chipsHTML = this.playersForHistory().map(p => {
         const ratio = this.calculateAcuteChronicRatio(p.id);
         const r = parseFloat(ratio.ratio);
         const _tDot = this.getPlayerThresholds(p.id); const dot = isNaN(r) ? '#999' : r > _tDot.high ? '#e53935' : r > _tDot.opt ? '#fb8c00' : r < _tDot.low ? '#1e88e5' : '#43a047';
@@ -649,7 +655,7 @@ RPETracker.prototype.renderEvolutionCharts = function() {
         const avatar = PlayerTokens.avatar(p, 20, '0.55rem');
         return `<button class="chart-chip ${active}" data-pid="${p.id}" onclick="window.rpeTracker?.toggleChartPlayer('${p.id}')">
             ${avatar}
-            <span class="chart-chip-name">${esc(p.name)}${p.number ? ' <span class="chip-num">#'+esc(p.number)+'</span>' : ''}</span>
+            <span class="chart-chip-name">${esc(p.name)}${this.isPlayerActiveOn(p) ? '' : ' <span class="chip-num">(baja)</span>'}${p.number ? ' <span class="chip-num">#'+esc(p.number)+'</span>' : ''}</span>
             <span class="chart-chip-ratio" style="color:${dot}">${ratioDisplay}</span>
         </button>`;
     }).join('');
@@ -706,7 +712,7 @@ RPETracker.prototype.toggleChartPlayer = function(pid) {
     let selected = (() => {
         try { return JSON.parse(sessionStorage.getItem('rpe_chart_players') || 'null'); } catch(e) { return null; }
     })();
-    if (!selected) selected = this.players.map(p => p.id);
+    if (!selected) selected = this.activePlayers.map(p => p.id);
     if (selected.includes(pid)) {
         if (selected.length > 1) selected = selected.filter(id => id !== pid);
     } else {

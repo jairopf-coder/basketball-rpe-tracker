@@ -546,17 +546,17 @@ RPETracker.prototype._renderSessionsNavChips = function() {
         weekChipsHTML = `<div class="player-filter-chips" id="sessionsWeekChips" style="margin:0.5rem 0 0;">${weekChips}</div>`;
     }
 
-    const activePlayers = this.players.filter(p => !p.archived);
+    // Todas las jugadoras (las de baja al final y con su marca): su historial sigue siendo consultable
     const selectedCount = this._sessionsPlayerFilter ? this._sessionsPlayerFilter.size : 0;
     const allSelected = selectedCount === 0;
-    const playerChips = activePlayers.map(p => {
+    const playerChips = this.playersForHistory().map(p => {
         const color = PlayerTokens.get(p);
         const checked = this._sessionsPlayerFilter && this._sessionsPlayerFilter.has(p.id);
         return `<button type="button" class="player-filter-chip ${checked ? 'player-filter-chip--selected' : ''}"
                 style="--chip-color:${color}"
-                title="${esc(p.name)}"
+                title="${esc(this.playerLabel(p))}"
                 onclick="window.rpeTracker._sessionsToggleChipPlayer('${p.id}')">
-                ${esc(p.name.split(' ')[0])}
+                ${esc(this.playerChipLabel(p))}
                 ${checked ? '<span class="player-filter-chip-check">✓</span>' : ''}
             </button>`;
     }).join('');

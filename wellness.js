@@ -306,7 +306,7 @@ RPETracker.prototype._wRangeStart = function(days) {
 // ========== ALERTAS DE BIENESTAR (siempre últimos 7 días) ==========
 
 RPETracker.prototype._renderWAlertsCard = function() {
-    if (!this.players.length) return '';
+    if (!this.activePlayers.length) return '';
     const start = this._wRangeStart(7);
     const recent = (this.wellnessData||[]).filter(w => w.date >= start);
     const alerts = this._wAlerts(recent);
@@ -329,7 +329,7 @@ RPETracker.prototype._wTrendAlerts = function() {
     const alerts = [];
     const today = new Date(); today.setHours(0,0,0,0);
 
-    this.players.forEach(p => {
+    this.activePlayers.forEach(p => {
         // Get last 7 days of data for this player, sorted ascending
         const pData = (this.wellnessData || [])
             .filter(w => w.playerId === p.id)
@@ -374,7 +374,7 @@ RPETracker.prototype._wTrendAlerts = function() {
 
 RPETracker.prototype._wAlerts = function(recentData) {
     const alerts = [];
-    this.players.forEach(p => {
+    this.activePlayers.forEach(p => {
         const pData = recentData.filter(w=>w.playerId===p.id);
         if (!pData.length) return;
         const avg = m => { const v=pData.map(w=>w[m]).filter(x=>x!=null); return v.length?v.reduce((a,b)=>a+b,0)/v.length:null; };
@@ -430,13 +430,13 @@ RPETracker.prototype._renderWPlayerTable = function() {
         <td style="color:var(--text-secondary)">—</td>
     </tr>`;
 
-    const playerRows = this.players.map(p => {
+    const playerRows = this.players.filter(p => this.hasActiveDaysFrom(p, start)).map(p => {
         const pData = recent.filter(w => w.playerId === p.id);
         const vals = metrics.map(m => avgOf(pData, m));
         const onPeriod = this._wCycleInfo(p.id).active;
         return `<tr>
             <td><div style="display:flex;align-items:center;gap:.5rem;min-width:0">
-                <span class="wt-avatar">${PlayerTokens.avatar(p,22,'.6rem')}</span><span class="wt-name" style="font-weight:600">${esc(p.name)}</span>${onPeriod ? '<span title="Con la regla">🩸</span>' : ''}
+                <span class="wt-avatar">${PlayerTokens.avatar(p,22,'.6rem')}</span><span class="wt-name" style="font-weight:600">${esc(this.playerLabel(p))}</span>${onPeriod ? '<span title="Con la regla">🩸</span>' : ''}
             </div></td>
             ${vals.map(cell).join('')}
             ${globalCell(overallOf(vals))}
@@ -603,7 +603,10 @@ RPETracker.prototype._wCycleInfo = function(playerId) {
 
 RPETracker.prototype._renderWCycleCard = function() {
     if (!this.players.length) return '';
-    const infos = this.players.map(p => ({ p, info: this._wCycleInfo(p.id) }));
+    const infos = this.players.map(p => {
+        const info = this._wCycleInfo(p.id);
+        return { p, info: this.isPlayerActiveOn(p) ? info : Object.assign({}, info, { active: false }) };   // una baja no cuenta como «ahora»
+    });
     const withData = infos.filter(x => x.info.episodes > 0);
     const activeCount = infos.filter(x => x.info.active).length;
 
@@ -619,7 +622,7 @@ RPETracker.prototype._renderWCycleCard = function() {
             <thead><tr><th>Jugadora</th><th>Estado</th><th>Último inicio</th><th>Ciclo aprox.</th></tr></thead>
             <tbody>${withData.map(({p, info}) => `<tr>
                 <td><div style="display:flex;align-items:center;gap:.5rem;min-width:0">
-                    <span class="wt-avatar">${PlayerTokens.avatar(p,22,'.6rem')}</span><span class="wt-name" style="font-weight:600">${esc(p.name)}</span></div></td>
+                    <span class="wt-avatar">${PlayerTokens.avatar(p,22,'.6rem')}</span><span class="wt-name" style="font-weight:600">${esc(this.playerLabel(p))}</span></div></td>
                 <td>${info.active
                     ? `<span class="wellness-period-badge">🩸 Día ${info.dayNumber}</span>`
                     : '<span style="color:var(--text-secondary)">—</span>'}</td>

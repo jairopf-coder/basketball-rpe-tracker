@@ -1412,7 +1412,7 @@ RPETracker.prototype._renderGymTeamView = function(el) {
     const maxByCol = topExIds.map((_, ci) => Math.max(0, ...rows.map(r => r.rms[ci] || 0)));
 
     const headerCells = exNames.map(n => `<th class="gym-cmp-th">${n}</th>`).join('');
-    const bodyRows = rows.map(({ player, color, rms }) => {
+    const bodyRows = rows.filter(r => this.isPlayerActiveOn(r.player) || Object.keys(r.rms || {}).length > 0).map(({ player, color, rms }) => {
         const cells = rms.map((rm, ci) => {
             if (rm === null) return `<td class="gym-cmp-td gym-cmp-td--empty">—</td>`;
             const pct = maxByCol[ci] > 0 ? rm / maxByCol[ci] : 0;
@@ -1422,7 +1422,7 @@ RPETracker.prototype._renderGymTeamView = function(el) {
         return `<tr>
             <td class="gym-cmp-player">
                 <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${esc(player.name.charAt(0))}</div>
-                <span>${esc(player.name.split(' ')[0])}</span>
+                <span>${esc(this.playerChipLabel(player))}</span>
             </td>
             ${cells}
         </tr>`;

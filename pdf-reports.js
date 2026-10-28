@@ -704,6 +704,8 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     const todayKey  = toLocalISODate(now);
+    // Informe de la semana en curso: entra quien estuvo algún día de esta semana (una baja a mitad de semana sale en su semana)
+    const rosterWeek = this.players.filter(p => this.hasActiveDaysFrom(p, toLocalISODate(monday)));
     const dateRange = `${monday.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })} – ${sunday.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
     const wData   = this.wellnessData || [];
@@ -722,7 +724,7 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
     sevenDaysAgo.setHours(0, 0, 0, 0);
 
     // ── Per-player data ──
-    const playerData = this.players.map(player => {
+    const playerData = rosterWeek.map(player => {
         const ratio   = this.calculateAcuteChronicRatio(player.id);
         const r       = parseFloat(ratio.ratio);
         const injury  = (this.injuries || []).find(i => i.playerId === player.id && i.status === 'active');
@@ -903,11 +905,11 @@ RPETracker.prototype.generateTeamWeeklyReport = function() {
 </div>
 
 <div class="kpi-row">
-  <div class="kpi">         <div class="num">${this.players.length}</div><div class="lbl">Jugadoras</div></div>
+  <div class="kpi">         <div class="num">${rosterWeek.length}</div><div class="lbl">Jugadoras</div></div>
   <div class="kpi ok">     <div class="num">${countOk}</div>          <div class="lbl">Zona óptima</div></div>
   <div class="kpi warn">   <div class="num">${countWarn}</div>        <div class="lbl">Precaución</div></div>
   <div class="kpi out">    <div class="num">${countOut}</div>         <div class="lbl">Lesionadas</div></div>
-  <div class="kpi">         <div class="num">${wCoverage}/${this.players.length}</div><div class="lbl">Wellness hoy</div></div>
+  <div class="kpi">         <div class="num">${wCoverage}/${rosterWeek.length}</div><div class="lbl">Wellness hoy</div></div>
 </div>
 
 <div class="sec">Carga &amp; Disponibilidad <span class="badge">${playerData.length}</span></div>
