@@ -644,31 +644,145 @@ RPETracker.prototype._renderWCycleCard = function() {
 
 // ========== HISTORY ==========
 
+// ========== HISTORIAL (filtros de periodo y jugadoras) ==========
+//
+// Por defecto muestra la última semana. Filtros (el estado se conserva mientras la app está abierta,
+// aunque la pantalla se repinte al llegar datos de Firebase):
+//   · Periodo: chips rápidos (Última semana · Últimos 30 días · Este mes · Todo) o fechas Desde/Hasta.
+//     Con una sola fecha rellena se entiende ese día. Si Desde es posterior a Hasta, se intercambian.
+//   · Jugadoras: chips con multiselección; ninguna marcada = todo el equipo (igual que Historial de sesiones).
+// Para no pintar miles de filas a la vez (p. ej. todo el equipo en "Todo"), se muestran los días más
+// recientes de 31 en 31 con un botón "Mostrar más días".
+
+const W_HIST_PAGE_DAYS = 31;
+const W_HIST_PRESETS = [
+    { key: 'week',  label: 'Última semana' },
+    { key: '30d',   label: 'Últimos 30 días' },
+    { key: 'month', label: 'Este mes' },
+    { key: 'all',   label: 'Todo' }
+];
+
+RPETracker.prototype._wHistState = function() {
+    if (!this._wHist) this._wHist = { preset: 'week', from: '', to: '', players: new Set(), shown: W_HIST_PAGE_DAYS };
+    return this._wHist;
+};
+
+// Rango de fechas efectivo { from, to } en YYYY-MM-DD ('' = sin límite por ese lado).
+RPETracker.prototype._wHistRange = function() {
+    const h = this._wHistState();
+    const today = new Date();
+    const daysAgo = n => { const d = new Date(today); d.setDate(d.getDate() - n); return toLocalISODate(d); };
+    if (h.from || h.to) {
+        const a = h.from || h.to, b = h.to || h.from; // una sola fecha = ese día
+        return a <= b ? { from: a, to: b } : { from: b, to: a };
+    }
+    switch (h.preset) {
+        case '30d':   return { from: daysAgo(29), to: toLocalISODate(today) };
+        case 'month': return { from: toLocalISODate(new Date(today.getFullYear(), today.getMonth(), 1)), to: toLocalISODate(today) };
+        case 'all':   return { from: '', to: '' };
+        default:      return { from: daysAgo(6), to: toLocalISODate(today) }; // 'week': hoy y los 6 días anteriores
+    }
+};
+
+// Registros que cumplen los filtros (solo de jugadoras que existen en la ficha).
+RPETracker.prototype._wHistFiltered = function() {
+    const h = this._wHistState();
+    const { from, to } = this._wHistRange();
+    const known = new Set((this.players || []).map(p => p.id));
+    return (this.wellnessData || []).filter(w => w && w.date && known.has(w.playerId)
+        && (!from || w.date >= from) && (!to || w.date <= to)
+        && (!h.players.size || h.players.has(w.playerId)));
+};
+
 RPETracker.prototype._renderWHistory = function() {
-    const all=[...(this.wellnessData||[])].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,90);
-    if(!all.length) return `<div class="wellness-card" style="text-align:center;padding:2rem;color:var(--text-secondary)">
-        <p style="font-size:2rem">📋</p><p>Sin registros aún. ¡Empieza hoy!</p></div>`;
+    return `<div class="wellness-card" id="wHistoryCard">${this._renderWHistoryInner()}</div>`;
+};
 
-    // Agrupar por fecha
+RPETracker.prototype._renderWHistoryInner = function() {
+    const h = this._wHistState();
+    const titleRow = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+            <h3 class="wellness-section-title" style="margin:0">📋 Historial</h3>
+            <button class="btn-danger-sm" title="Elimina TODOS los registros de wellness, no solo los que se ven filtrados" onclick="window.rpeTracker?._clearWellness()">🗑️ Limpiar todo</button>
+        </div>`;
+
+    if (!(this.wellnessData || []).length) {
+        return `${titleRow}<div style="text-align:center;padding:1rem;color:var(--text-secondary)">
+            <p style="font-size:2rem;margin:0 0 .25rem">📋</p><p style="margin:0">Sin registros aún. ¡Empieza hoy!</p></div>`;
+    }
+
+    const today = toLocalISODate(new Date());
+    const hasDates = !!(h.from || h.to);
+
+    // — Filtros —
+    const periodChips = W_HIST_PRESETS.map(pr => {
+        const active = !hasDates && h.preset === pr.key;
+        return `<button type="button" class="player-filter-chip ${active ? 'player-filter-chip--selected' : ''}"
+                style="--chip-color:var(--primary)"
+                onclick="window.rpeTracker?._wHistPreset('${pr.key}')">
+                ${pr.label}${active ? '<span class="player-filter-chip-check">✓</span>' : ''}
+            </button>`;
+    }).join('');
+
+    const allPlayers = h.players.size === 0;
+    const playerChips = this.playersForHistory().map(p => {
+        const checked = h.players.has(p.id);
+        return `<button type="button" class="player-filter-chip ${checked ? 'player-filter-chip--selected' : ''}"
+                style="--chip-color:${PlayerTokens.get(p)}"
+                title="${esc(this.playerLabel(p))}"
+                onclick="window.rpeTracker?._wHistTogglePlayer('${p.id}')">
+                ${esc(this.playerChipLabel(p))}${checked ? '<span class="player-filter-chip-check">✓</span>' : ''}
+            </button>`;
+    }).join('');
+
+    const filtersHTML = `<div class="wh-filters">
+            <div class="player-filter-chips" style="margin:0">${periodChips}</div>
+            <div class="wh-dates">
+                <div class="filter-group"><label for="wHistFrom">Desde:</label>
+                    <input type="date" id="wHistFrom" class="date-input" value="${h.from}" max="${today}" onchange="window.rpeTracker?._wHistSetDates()"></div>
+                <div class="filter-group"><label for="wHistTo">Hasta:</label>
+                    <input type="date" id="wHistTo" class="date-input" value="${h.to}" max="${today}" onchange="window.rpeTracker?._wHistSetDates()"></div>
+                ${hasDates ? `<button type="button" class="btn-secondary" title="Quitar fechas" aria-label="Quitar fechas" onclick="window.rpeTracker?._wHistClearDates()">🔄</button>` : ''}
+            </div>
+            <div class="wh-hint">Para ver un solo día, elige únicamente la fecha en «Desde».</div>
+            <div class="player-filter-chips" style="margin:0">
+                <button type="button" class="player-filter-all-btn ${allPlayers ? 'player-filter-all-btn--active' : ''}"
+                    onclick="window.rpeTracker?._wHistAllPlayers()">${allPlayers ? '✓ Todas' : 'Todas'}</button>
+                ${playerChips}
+            </div>
+        </div>`;
+
+    // — Resultados —
+    const records = this._wHistFiltered();
     const byDate = {};
-    all.forEach(w => {
-        if(!byDate[w.date]) byDate[w.date] = [];
-        byDate[w.date].push(w);
-    });
-    const dates = Object.keys(byDate).sort((a,b) => b.localeCompare(a));
+    records.forEach(w => { (byDate[w.date] = byDate[w.date] || []).push(w); });
+    const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
 
-    const dot = v => v!=null
+    const { from, to } = this._wHistRange();
+    const rangeTxt = !from && !to ? 'Todo el historial'
+        : from === to ? formatDMY(from)
+        : `${from ? formatDMY(from) : '…'} – ${to ? formatDMY(to) : '…'}`;
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    const summary = `<p class="wh-summary">${rangeTxt} · ${plural(records.length, 'registro', 'registros')} · ${plural(dates.length, 'día', 'días')} · ${h.players.size ? plural(h.players.size, 'jugadora', 'jugadoras') : 'todo el equipo'}</p>`;
+
+    if (!records.length) {
+        return `${titleRow}${filtersHTML}${summary}
+            <div class="wh-empty"><p style="font-size:1.6rem;margin:0 0 .25rem">🔍</p>
+                <p style="margin:0 0 .6rem">No hay registros con estos filtros.</p>
+                <button type="button" class="btn-secondary" onclick="window.rpeTracker?._wHistPreset('all')">Ver todo el historial</button></div>`;
+    }
+
+    const dot = v => v != null
         ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${this._wColor(v)}" title="${v}/5"></span> ${v}`
         : '—';
 
-    const groupsHTML = dates.map(date => {
-        const records = byDate[date];
-        const dayLabel = this._wFmtDate(date);
-        const avgOverall = records.reduce((s,w) => s + this._wOverall(w), 0) / records.length;
+    const shownDates = dates.slice(0, h.shown);
+    const groupsHTML = shownDates.map(date => {
+        const dayRecords = byDate[date];
+        const avgOverall = dayRecords.reduce((sum, w) => sum + this._wOverall(w), 0) / dayRecords.length;
 
-        const rowsHTML = records.map(w => {
+        const rowsHTML = dayRecords.map(w => {
             const p = this.players.find(x => x.id === w.playerId);
-            if(!p) return '';
+            if (!p) return '';
             const o = this._wOverall(w);
             return `<tr>
                 <td><div style="display:flex;align-items:center;gap:.35rem">${PlayerTokens.avatar(p,17,'.5rem')}<span style="font-size:.83rem">${esc(p.name)}</span>${w.period===true?' <span title="Con la regla">🩸</span>':''}</div></td>
@@ -683,11 +797,11 @@ RPETracker.prototype._renderWHistory = function() {
         }).join('');
 
         return `
-        <details class="wh-day-group">
+        <details class="wh-day-group" ${dates.length === 1 ? 'open' : ''}>
             <summary class="wh-day-summary">
-                <span class="wh-day-label">${dayLabel}</span>
+                <span class="wh-day-label">${this._wFmtDate(date)}</span>
                 <span class="wh-day-meta">
-                    <span class="wh-day-count">${records.length} registro${records.length>1?'s':''}</span>
+                    <span class="wh-day-count">${dayRecords.length} registro${dayRecords.length>1?'s':''}</span>
                     <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${this._wColor(avgOverall)}"></span>
                     <span style="font-size:.82rem;font-weight:600;color:${this._wColor(avgOverall)}">${avgOverall.toFixed(1)}</span>
                 </span>
@@ -704,13 +818,58 @@ RPETracker.prototype._renderWHistory = function() {
         </details>`;
     }).join('');
 
-    return `<div class="wellness-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-            <h3 class="wellness-section-title" style="margin:0">📋 Historial reciente</h3>
-            <button class="btn-danger-sm" onclick="window.rpeTracker?._clearWellness()">🗑️ Limpiar todo</button>
-        </div>
-        <div class="wh-groups">${groupsHTML}</div>
-    </div>`;
+    const rest = dates.length - shownDates.length;
+    const moreBtn = rest > 0
+        ? `<button type="button" class="btn-secondary wh-more" onclick="window.rpeTracker?._wHistMore()">Mostrar más días (${rest} restantes)</button>`
+        : '';
+
+    return `${titleRow}${filtersHTML}${summary}<div class="wh-groups">${groupsHTML}</div>${moreBtn}`;
+};
+
+// Repinta solo la tarjeta del Historial (no toda la pantalla), para no mover el scroll.
+RPETracker.prototype._wHistRefresh = function() {
+    const card = document.getElementById('wHistoryCard');
+    if (card) card.innerHTML = this._renderWHistoryInner();
+};
+
+RPETracker.prototype._wHistPreset = function(key) {
+    const h = this._wHistState();
+    h.preset = key; h.from = ''; h.to = ''; h.shown = W_HIST_PAGE_DAYS;
+    this._wHistRefresh();
+};
+
+RPETracker.prototype._wHistSetDates = function() {
+    const h = this._wHistState();
+    h.from = document.getElementById('wHistFrom')?.value || '';
+    h.to = document.getElementById('wHistTo')?.value || '';
+    if (!h.from && !h.to) h.preset = 'week';
+    h.shown = W_HIST_PAGE_DAYS;
+    this._wHistRefresh();
+};
+
+RPETracker.prototype._wHistClearDates = function() {
+    const h = this._wHistState();
+    h.from = ''; h.to = ''; h.preset = 'week'; h.shown = W_HIST_PAGE_DAYS;
+    this._wHistRefresh();
+};
+
+RPETracker.prototype._wHistTogglePlayer = function(id) {
+    const h = this._wHistState();
+    if (h.players.has(id)) h.players.delete(id); else h.players.add(id);
+    h.shown = W_HIST_PAGE_DAYS;
+    this._wHistRefresh();
+};
+
+RPETracker.prototype._wHistAllPlayers = function() {
+    const h = this._wHistState();
+    h.players.clear(); h.shown = W_HIST_PAGE_DAYS;
+    this._wHistRefresh();
+};
+
+RPETracker.prototype._wHistMore = function() {
+    const h = this._wHistState();
+    h.shown += W_HIST_PAGE_DAYS;
+    this._wHistRefresh();
 };
 
 // ========== MODAL ==========
@@ -1031,6 +1190,12 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 .wh-day-count{font-size:.75rem;color:var(--text-secondary);background:var(--bg-subtle);padding:.1rem .45rem;border-radius:10px;border:1px solid var(--border)}
 .wh-day-chevron{font-size:1.1rem;color:var(--text-muted);transition:transform .2s ease;flex-shrink:0}
 .wh-day-group[open] .wh-day-chevron{transform:rotate(90deg)}
+.wh-filters{display:flex;flex-direction:column;gap:.6rem;margin-bottom:.85rem}
+.wh-dates{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .9rem}
+.wh-hint{font-size:.75rem;color:var(--text-muted)}
+.wh-summary{font-size:.8rem;color:var(--text-secondary);margin:0 0 .6rem}
+.wh-empty{text-align:center;padding:1.25rem 1rem;color:var(--text-secondary)}
+.wh-more{display:block;margin:.75rem auto 0}
 .wh-day-body{border-top:1px solid var(--border);padding:.6rem .75rem;background:var(--bg-subtle)}
 @media(max-width:640px){.wellness-header{flex-direction:column}.ws-label-lo,.ws-label-hi{width:55px;font-size:.65rem}.ws-pips{margin:.35rem 55px 0}}
 `;
