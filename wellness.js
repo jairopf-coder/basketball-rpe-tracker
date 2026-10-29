@@ -715,6 +715,16 @@ RPETracker.prototype._renderWHistory = function() {
 
 // ========== MODAL ==========
 
+// Etiquetas del formulario de staff. Las palabras bajo cada número son las mismas que ve la
+// jugadora en su pantalla (player-i18n.js, versión ES); se copian aquí para que el staff no
+// dependa del idioma que haya elegido en la vista de jugadora. Escala: 1 = peor, 5 = mejor.
+const W_SCALE_META = {
+    sleep:    { label: '😴 Calidad del sueño', subs: ['Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'] },
+    fatigue:  { label: '⚡ Nivel de energía',  subs: ['Agotada', 'Muy cansada', 'Cansada', 'Bien', 'Fresca'] },
+    mood:     { label: '😊 Estado de ánimo',   subs: ['Muy bajo', 'Bajo', 'Normal', 'Bueno', 'Excelente'] },
+    soreness: { label: '💪 Dolor muscular',    subs: ['Mucho dolor', 'Dolor', 'Algo', 'Leve', 'Sin dolor'] }
+};
+
 RPETracker.prototype._renderWModal = function(today) {
     if(!this.activePlayers.length) return '';
     return `<div id="wellnessModal" class="modal modal--top" style="display:none">
@@ -737,25 +747,21 @@ RPETracker.prototype._renderWModal = function(today) {
                     <input type="date" id="wFormDate" class="form-input" value="${today}" max="${today}">
                 </div>
                 ${['sleep','fatigue','mood','soreness'].map(m=>{
-                    const config={
-                        sleep:   {label:'😴 Calidad del sueño',   emojis:['😫','😞','😐','🙂','😄']},
-                        fatigue: {label:'⚡ Nivel de energía',    emojis:['😴','🥱','😐','💪','⚡']},
-                        mood:    {label:'😊 Estado de ánimo',     emojis:['😭','😟','😐','😊','😁']},
-                        soreness:{label:'💪 Dolor muscular',      emojis:['🤕','😣','😐','🙂','✅']}
-                    }[m];
+                    const cfg=W_SCALE_META[m];
                     const cap=m.charAt(0).toUpperCase()+m.slice(1);
+                    // Mismo modelo que la pantalla de las jugadoras (.pv-scale): número grande + palabra
                     const btns=[1,2,3,4,5].map(n=>`<button type="button"
-                        class="wem-btn" data-metric="${m}" data-val="${n}"
-                        title="${n}/5"
-                        onclick="window.rpeTracker?._wSelectEmoji('${m}',${n},this)">
-                        ${config.emojis[n-1]}
+                        class="pv-scale-btn" data-metric="${m}" data-val="${n}"
+                        aria-label="${cfg.subs[n-1]}, ${n}" aria-pressed="false"
+                        onclick="window.rpeTracker?._wSelectScale('${m}',${n})">
+                        <span class="pv-scale-num">${n}</span>
+                        <span class="pv-scale-lbl">${cfg.subs[n-1]}</span>
                     </button>`).join('');
                     return `<div class="form-group">
-                        <label class="form-label">${config.label}</label>
-                        <div class="wem-row" id="wEmRow${cap}">
+                        <label class="form-label">${cfg.label}</label>
+                        <div class="pv-scale" id="wScaleRow${cap}" role="group" aria-label="${cfg.label}">
                             <input type="hidden" id="wForm${cap}" data-metric="${m}" value="">
                             ${btns}
-                            <span class="wem-hint" id="wVal${cap}"></span>
                         </div>
                     </div>`;
                 }).join('')}
@@ -790,68 +796,34 @@ RPETracker.prototype.openWellnessForm = function(presetPlayerId) {
     if (!modal) { this.renderWellnessDashboard(); return; }
     modal.style.display = 'flex';
 
-    // Event delegation for sliders (avoids inline rpeTracker ref timing issue)
-    if (!modal._sliderDelegated) {
-        modal._sliderDelegated = true;
-        modal.addEventListener('input', e => {
-            if (!e.target.classList.contains('wellness-slider')) return;
-            const metric = e.target.dataset.metric;
-            if (metric && window.rpeTracker) window.rpeTracker._wUpdateSlider(metric, e.target.value);
-        });
-    }
-
     if (presetPlayerId) {
         const sel = document.getElementById('wFormPlayer');
         if (sel) sel.value = presetPlayerId;
     }
+    this._wLoadFormEntry();
 
+    // Al cambiar de jugadora o de fecha se carga lo que ya hubiera registrado ese día
+    // (así no se sobrescribe a ciegas un registro existente).
+    const reload = () => this._wLoadFormEntry();
+    const sel = document.getElementById('wFormPlayer');
+    const dateInput = document.getElementById('wFormDate');
+    if (sel) sel.onchange = reload;
+    if (dateInput) dateInput.onchange = reload;
+};
+
+// Rellena el formulario con el registro existente de la jugadora y fecha elegidas,
+// o lo deja vacío si no hay ninguno.
+RPETracker.prototype._wLoadFormEntry = function() {
     const playerId = document.getElementById('wFormPlayer')?.value;
     const date = document.getElementById('wFormDate')?.value;
     const existing = (this.wellnessData||[]).find(w=>w.playerId===playerId && w.date===date);
 
-    ['sleep','fatigue','mood','soreness'].forEach(m=>{
-        const cap=m.charAt(0).toUpperCase()+m.slice(1);
-        const hidden=document.getElementById(`wForm${cap}`);
-        if(hidden){
-            const val = existing ? (existing[m] || null) : null;
-            hidden.value = val || '';
-            // Activate matching emoji button, or none if no existing entry
-            const row=document.getElementById(`wEmRow${cap}`);
-            if(row){
-                row.querySelectorAll('.wem-btn').forEach(b=>{
-                    const active = val && parseInt(b.dataset.val)===val;
-                    b.classList.toggle('wem-btn--active', !!active);
-                });
-            }
-            const hint=document.getElementById(`wVal${cap}`);
-            if(hint){ hint.textContent=val?this._wEmojiLabel(val):''; hint.style.color=val?this._wColor(val):''; }
-        }
-    });
-    if (existing) { const n=document.getElementById('wFormNotes'); if(n) n.value=existing.notes||''; }
+    ['sleep','fatigue','mood','soreness'].forEach(m => this._wApplyScale(m, existing ? (existing[m] || null) : null));
+    const notes = document.getElementById('wFormNotes');
+    if (notes) notes.value = existing?.notes || '';
     const periodBox = document.getElementById('wFormPeriod');
     if (periodBox) periodBox.checked = existing?.period === true;
     this._wUpdateOverallPreview();
-
-    const sel = document.getElementById('wFormPlayer');
-    if (sel) sel.onchange = () => {
-        const pid=sel.value, dt=document.getElementById('wFormDate')?.value;
-        const ex=(this.wellnessData||[]).find(w=>w.playerId===pid&&w.date===dt);
-        ['sleep','fatigue','mood','soreness'].forEach(m=>{
-            const cap=m.charAt(0).toUpperCase()+m.slice(1);
-            const hidden=document.getElementById(`wForm${cap}`);
-            const val = ex ? (ex[m] || null) : null;
-            if(hidden){ hidden.value = val || ''; }
-            const row=document.getElementById(`wEmRow${cap}`);
-            if(row){ row.querySelectorAll('.wem-btn').forEach(b=>{ b.classList.toggle('wem-btn--active', val&&parseInt(b.dataset.val)===val); }); }
-            const hint=document.getElementById(`wVal${cap}`);
-            if(hint){ hint.textContent=val?this._wEmojiLabel(val):''; hint.style.color=val?this._wColor(val):''; }
-        });
-        const notes=document.getElementById('wFormNotes');
-        if(notes) notes.value=ex?.notes||'';
-        const pBox=document.getElementById('wFormPeriod');
-        if(pBox) pBox.checked = ex?.period === true;
-        this._wUpdateOverallPreview();
-    };
 };
 
 RPETracker.prototype.closeWellnessModal = function() {
@@ -859,36 +831,22 @@ RPETracker.prototype.closeWellnessModal = function() {
     if(m) m.style.display='none';
 };
 
-RPETracker.prototype._wUpdateSlider = function(metric, value) {
-    const v=parseInt(value);
-    const labels={1:'Muy malo / Muy bajo',2:'Malo / Bajo',3:'Aceptable',4:'Bueno',5:'Excelente'};
-    const cap=metric.charAt(0).toUpperCase()+metric.slice(1);
-    const disp=document.getElementById(`wVal${cap}`);
-    if(disp){disp.textContent=`${v} — ${labels[v]}`;disp.style.color=this._wColor(v);}
-    const pips=document.getElementById(`wPips${cap}`);
-    if(pips){pips.innerHTML=[1,2,3,4,5].map(i=>
-        `<span class="ws-pip ${i<=v?'active':''}" style="${i<=v?`background:${this._wColor(v)}`:''}" ></span>`).join('');}
-    this._wUpdateOverallPreview();
-};
-
-RPETracker.prototype._wSelectEmoji = function(metric, val, btn) {
+// Marca el botón elegido de una métrica (val = 1..5, o null para dejarla sin responder).
+RPETracker.prototype._wApplyScale = function(metric, val) {
     const cap = metric.charAt(0).toUpperCase() + metric.slice(1);
-    // Update hidden input
     const hidden = document.getElementById(`wForm${cap}`);
-    if (hidden) hidden.value = val;
-    // Toggle active class
-    const row = document.getElementById(`wEmRow${cap}`);
-    if (row) row.querySelectorAll('.wem-btn').forEach(b => {
-        b.classList.toggle('wem-btn--active', parseInt(b.dataset.val) === val);
+    if (hidden) hidden.value = val || '';
+    const row = document.getElementById(`wScaleRow${cap}`);
+    if (row) row.querySelectorAll('.pv-scale-btn').forEach(b => {
+        const on = !!val && parseInt(b.dataset.val, 10) === val;
+        b.classList.toggle('selected', on);
+        b.setAttribute('aria-pressed', String(on));
     });
-    // Update hint
-    const hint = document.getElementById(`wVal${cap}`);
-    if (hint) { hint.textContent = this._wEmojiLabel(val); hint.style.color = this._wColor(val); }
-    this._wUpdateOverallPreview();
 };
 
-RPETracker.prototype._wEmojiLabel = function(val) {
-    return {1:'Muy malo',2:'Malo',3:'Aceptable',4:'Bueno',5:'Excelente'}[val] || '';
+RPETracker.prototype._wSelectScale = function(metric, val) {
+    this._wApplyScale(metric, val);
+    this._wUpdateOverallPreview();
 };
 
 RPETracker.prototype._wUpdateOverallPreview = function() {
@@ -1054,12 +1012,6 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 .ws-label-hi{text-align:right}
 .ws-pips{display:none}
 .ws-val-display{display:none}
-/* ── Emoji buttons ── */
-.wem-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.2rem}
-.wem-btn{font-size:1.6rem;background:none;border:2px solid var(--border-color);border-radius:10px;padding:.25rem .45rem;cursor:pointer;transition:transform .12s,border-color .15s,background .15s;line-height:1;flex-shrink:0}
-.wem-btn:hover{transform:scale(1.15);border-color:var(--text-secondary)}
-.wem-btn--active{border-color:var(--primary-color);background:rgba(255,152,0,.12);transform:scale(1.18)}
-.wem-hint{font-size:.8rem;font-weight:600;margin-left:.4rem;transition:color .2s;min-width:70px}
 .wellness-overall-preview{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-radius:10px;border:2px solid var(--border-color);background:var(--card-bg);margin-top:.5rem;transition:border-color .3s}
 .wellness-history-table{width:100%;border-collapse:collapse;font-size:.82rem}
 .wellness-history-table th{text-align:left;padding:.35rem .5rem;color:var(--text-secondary);font-size:.75rem;border-bottom:2px solid var(--border-color)}
