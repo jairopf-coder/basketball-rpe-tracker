@@ -595,6 +595,15 @@ RPETracker.prototype._confirmGpsImport = function(sessionGroupId) {
     if (this.currentSessionId && typeof this.showSessionDetail === 'function') {
         this.showSessionDetail(this.currentSessionId);
     }
+
+    // Refrescar la pantalla Carga-GPS si es la que está a la vista: el listener de Firebase ignora
+    // a propósito el eco de nuestro propio guardado (_savingGpsData), así que sin esto la tabla y
+    // las gráficas no mostraban lo importado hasta recargar la página. Se vuelve a pintar con la
+    // misma función que usan las pestañas: conserva pestaña, jugadoras y filtros elegidos.
+    if (savedPlayerNames.length > 0 && this.currentView === 'gpsanalytics'
+        && typeof this.renderGpsAnalyticsView === 'function') {
+        this.renderGpsAnalyticsView();
+    }
 };
 
 // ========== Renderizado del resumen en la ficha de sesión ==========
