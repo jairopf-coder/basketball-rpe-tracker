@@ -66,20 +66,29 @@ RPETracker.prototype.renderDashboard = function() {
         return           { icon: '🟢', color: '#4caf50', risk: 2 };
     };
 
+    // Jugadoras que hoy NO entrenan con el grupo (lesión en fases 1-4 o marcadas "no disponible"):
+    // su ratio A:C cae por falta de carga, no por descarga planificada, y sale "insuficiente" sin
+    // ser un dato útil. Se listan al final con 🏥 en vez de ratio; su wellness y readiness se ven igual.
+    const _isOutToday = id => typeof this.getPlayerParticipation === 'function'
+        && this.getPlayerParticipation(id, _wToday) === 'out';
+
     let players = this.activePlayers.map(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
-        const st = getStatus(ratio.ratio, player.id);
-        return { player, ratio, st, r: parseFloat(ratio.ratio) || 0 };
+        const out = _isOutToday(player.id);
+        const st = out ? { icon: '', color: 'var(--text-faint)', risk: -1 } : getStatus(ratio.ratio, player.id);
+        return { player, ratio, st, out, r: out ? 0 : (parseFloat(ratio.ratio) || 0) };
     });
 
     if (this._dashSort === 'risk')  players.sort((a, b) => b.st.risk - a.st.risk || b.r - a.r);
     if (this._dashSort === 'safe')  players.sort((a, b) => a.st.risk - b.st.risk || a.r - b.r);
     if (this._dashSort === 'name')  players.sort((a, b) => a.player.name.localeCompare(b.player.name));
+    // Las que no entrenan van siempre al final, con cualquier orden elegido (el orden anterior se conserva dentro de cada grupo)
+    players = [...players.filter(p => !p.out), ...players.filter(p => p.out)];
 
     const sortLabel = { risk: '↓', safe: '↑', name: 'A–Z' };
     const nextSort  = { risk: 'safe', safe: 'name', name: 'risk' };
 
-    const playerRows = players.map(({ player, ratio, st, r }) => {
+    const playerRows = players.map(({ player, ratio, st, r, out }) => {
         const barW = Math.min(r / 2 * 100, 100).toFixed(0);
         // Wellness de hoy para esta jugadora
         const wEntry = _wData.find(e => e.playerId === player.id && e.date === _wToday);
@@ -105,7 +114,7 @@ RPETracker.prototype.renderDashboard = function() {
                     <div class="db-bar-lo"></div>
                     <div class="db-bar-hi"></div>
                 </div>
-                <div class="db-player-ratio" style="color:${st.color}">${ratio.confidence === 'low' ? '<span class="badge-insuf" title="' + (ratio.message||'Datos insuficientes') + '">⚠️ Insuf.</span>' : ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
+                <div class="db-player-ratio" style="color:${st.color}">${out ? '<span title="No entrena con el grupo: no se calcula el ratio A:C">🏥</span>' : ratio.confidence === 'low' ? '<span class="badge-insuf" title="' + (ratio.message||'Datos insuficientes') + '">⚠️ Insuf.</span>' : ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
                 <div class="db-player-icon">${st.icon}</div>
                 <div class="db-player-wellness" style="color:${wColor};background:${wBg}">${wScore}</div>
                 <div class="db-player-readiness ${rdyLbl.cls}" title="Readiness: ${rdyTxt}/100" style="color:${rdyLbl.color};background:${rdyLbl.bg}">${rdyLbl.icon} ${rdyTxt}</div>
@@ -129,8 +138,8 @@ RPETracker.prototype.renderDashboard = function() {
     });
 
     // ── Alert banner data ──────────────────────────────────────
-    const alertPlayers = players.filter(p => { if (p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); return parseFloat(p.ratio.ratio) > _t.high; });
-    const warnPlayers  = players.filter(p => { if (p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
+    const alertPlayers = players.filter(p => { if (p.out || p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); return parseFloat(p.ratio.ratio) > _t.high; });
+    const warnPlayers  = players.filter(p => { if (p.out || p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
     const pendingWellness = _pendingW.length;
 
     // ── C) Team-level A:C alert (3+ players simultaneously over individual threshold) ──
@@ -223,6 +232,7 @@ RPETracker.prototype.renderDashboard = function() {
         : 'ok';
 
     const acAlertCount  = players.filter(p => {
+        if (p.out) return false;
         const t = this.getPlayerThresholds(p.player.id);
         return parseFloat(p.ratio.ratio) > t.high;
     }).length;
@@ -509,7 +519,7 @@ RPETracker.prototype._renderMatchDayView = function(availGroups, players) {
     const todayW = wData.filter(e => e.date === today);
     const avgW   = todayW.length
         ? (todayW.reduce((s,e) => s + this._wOverall(e), 0) / todayW.length).toFixed(1) : '—';
-    const atRisk = players.filter(p => p.ratio.confidence !== 'low' && parseFloat(p.ratio.ratio) > this.getPlayerThresholds(p.player.id).high).length;
+    const atRisk = players.filter(p => !p.out && p.ratio.confidence !== 'low' && parseFloat(p.ratio.ratio) > this.getPlayerThresholds(p.player.id).high).length;
 
     return `<div class="md-wrap">
         <div class="md-summary">
