@@ -135,7 +135,7 @@ test('para CADA pantalla se resalta exactamente UN botón, y el correcto', () =>
 test('Equipo y Rendimiento resaltan "Más"; Carga y Salud resaltan su propia pestaña', () => {
     const e = loadBottomNav();
     const expect = { players: 'more', teamstatus: 'more', objectives: 'more', gym: 'more', tests: 'more',
-                     microciclo: 'carga', calendar: 'carga', wellness: 'salud', rehab: 'salud', dashboard: 'dashboard' };
+                     teamload: 'carga', calendar: 'carga', wellness: 'salud', rehab: 'salud', dashboard: 'dashboard' };
     for (const [view, tab] of Object.entries(expect)) { e.BN.syncToView(view); assert.deepStrictEqual(J(e.activeGroups()), [tab], view); }
 });
 
@@ -145,10 +145,10 @@ test('una pantalla suelta que no está en el menú ("medical") no cambia el resa
     assert.deepStrictEqual(J(e.activeGroups()), ['salud']);
 });
 
-test('pestañas: la primera vez van a la pantalla por defecto (Carga→Microciclo, Salud→Wellness, Inicio→dashboard)', () => {
+test('pestañas: la primera vez van a la pantalla por defecto (Carga→Carga equipo, Salud→Wellness, Inicio→dashboard)', () => {
     const e = loadBottomNav();
     e.tap('carga'); e.tap('salud'); e.tap('dashboard');
-    assert.deepStrictEqual(J(e.visited), ['microciclo', 'wellness', 'dashboard']);
+    assert.deepStrictEqual(J(e.visited), ['teamload', 'wellness', 'dashboard']);
 });
 
 test('cada pestaña recuerda la última pantalla de SU grupo', () => {

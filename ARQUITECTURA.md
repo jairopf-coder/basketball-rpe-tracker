@@ -118,7 +118,7 @@ Carga y analítica
 ├── 📈 ewma-calculator.js        → EWMA y ratio A:C (minSessions, confidence)
 ├── 📊 dashboard-renderer.js     → Dashboard
 ├── 🆚 dashboard-comparison.js   → Comparativa A:C + wellness, radar
-├── 📊 team-load.js              → Mapa de calor de carga del equipo
+├── 📊 team-load.js              → Carga equipo: mapa de calor semanal (arriba de la pantalla)
 ├── 🚦 team-status.js            → Disponibilidad para el partido
 ├── 🔮 injury-prediction.js      → Predicción de riesgo
 ├── 📡 gps-tracking.js           → Importación de GPS (CSV de Oli Sports)
@@ -136,7 +136,7 @@ Salud
 
 Planificación y entrenamiento
 ├── 🗓️ weekplan-medical.js       → Planificación semanal
-├── 📆 microciclo.js             → Carga-Microciclo: comparador de semanas y
+├── 📆 microciclo.js             → Dashboard Microciclo (debajo del mapa de Carga equipo): comparador de semanas y
 │                                   tabla Jugadora × Día (solo lectura)
 ├── 📅 calendar.js               → Calendario y bloques de temporada
 ├── 🎯 objectives.js             → Próximos partidos
