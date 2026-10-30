@@ -10055,6 +10055,27 @@ details[open] .ewma-toggle-hint { display: none; }
     opacity: 0.4;
     font-weight: 400;
 }
+/* Jugadora fuera del grupo (lesión / no disponible) y día posterior a una baja */
+.tl-cell-out {
+    background: var(--tl-zone-rest-bg);
+    color: var(--tl-zone-rest-text);
+    font-weight: 400;
+}
+.tl-cell-gone {
+    background: transparent;
+    color: var(--text-faint);
+    font-weight: 400;
+}
+.tl-out-mark {
+    font-size: 0.7em;
+    margin-left: 0.2rem;
+}
+/* Línea fina que separa a las jugadoras que han estado fuera del resto */
+.tl-row-sep .tl-td-player,
+.tl-row-sep .tl-td-cell,
+.tl-row-sep .tl-td-total {
+    border-top: 2px solid var(--border);
+}
 .tl-td-total {
     text-align: center;
     padding: 0.45rem 0.5rem;

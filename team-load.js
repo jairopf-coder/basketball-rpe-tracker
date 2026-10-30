@@ -84,20 +84,46 @@
             return;
         }
 
-        const players  = (tracker.players  || []).filter(p => p && p.id);
         const sessions = tracker.sessions  || [];
-
         const monday = _currentMonday;
-        const { matrix, weekDates } = computeWeekMatrix(sessions, players, monday);
+
+        // Plantilla de ESTA semana: la jugadora de baja sale cuando ya no queda ningún día de la semana
+        // en que estuviera en el equipo (misma regla que la tabla de Microciclo).
+        const mondayISO = toYMD(monday);
+        const roster = (tracker.players || []).filter(p => p && p.id
+            && (typeof tracker.hasActiveDaysFrom !== 'function' || tracker.hasActiveDaysFrom(p, mondayISO)));
+
+        const { matrix, weekDates } = computeWeekMatrix(sessions, roster, monday);
+
+        // Estado de cada jugadora cada día: 'in' (participa con el grupo, también en fase 5 "parcial"),
+        // 'out' (lesión en fases 1-4 o no disponible: no entrena con el grupo) o 'gone' (ya no estaba
+        // en el equipo ese día, por una baja a mitad de semana).
+        const dayState = {};
+        roster.forEach(p => {
+            dayState[p.id] = weekDates.map(ds => {
+                if (typeof tracker.isPlayerActiveOn === 'function' && !tracker.isPlayerActiveOn(p, ds)) return 'gone';
+                if (typeof tracker.getPlayerParticipation === 'function'
+                    && tracker.getPlayerParticipation(p.id, ds) === 'out') return 'out';
+                return 'in';
+            });
+        });
+
+        // Las que han estado fuera algún día de la semana van al final (conservando su orden entre ellas)
+        const hasOutDay = p => dayState[p.id].includes('out');
+        const players = [...roster.filter(p => !hasOutDay(p)), ...roster.filter(hasOutDay)];
+        const firstOutId = players.find(hasOutDay)?.id;
+        const anyOut = firstOutId !== undefined;
 
         const minMonday = getMondayOf(addDays(new Date(), -730));
         const maxMonday = getMondayOf(addDays(new Date(), 183));
         const atMin = toYMD(monday) <= toYMD(minMonday);
         const atMax = toYMD(monday) >= toYMD(maxMonday);
 
-        // ── Totales por día (suma de todos los jugadores) ────────────────────
+        // ── Totales por día: suma de quienes participaron con el grupo ese día ──
+        // La carga de una jugadora fuera del grupo (readaptación, trabajo individual) se ve en su fila,
+        // pero no entra en el total del equipo (igual que en Microciclo y en las medias).
         const teamTotals = weekDates.map((_, di) =>
-            players.reduce((sum, p) => sum + (matrix[p.id]?.[di] || 0), 0)
+            players.reduce((sum, p) => sum + (dayState[p.id][di] === 'in' ? (matrix[p.id]?.[di] || 0) : 0), 0)
         );
 
         // ── Totales por jugadora (suma de la semana) ────────────────────────
@@ -124,6 +150,7 @@
                         <span>${z.title} (${z.label})</span>
                     </span>
                 `).join('')}
+                ${anyOut ? `<span class="tl-legend-item"><span>🏥 Fuera del grupo (lesión / no disponible)</span></span>` : ''}
             </div>
         </div>
 
@@ -149,20 +176,35 @@
                     ${players.map(p => {
                         const dayLoads = matrix[p.id] || Array(7).fill(0);
                         const total    = playerTotals[p.id] || 0;
+                        const isOutRow = hasOutDay(p);
                         return `
-                        <tr class="tl-row">
+                        <tr class="tl-row ${p.id === firstOutId ? 'tl-row-sep' : ''}">
                             <td class="tl-td-player">
                                 <span class="tl-player-dot" style="background:${p.color || 'var(--text-muted)'}"></span>
-                                <span class="tl-player-name">${escapeHtml(p.name)}</span>
+                                <span class="tl-player-name">${escapeHtml(p.name)}</span>${isOutRow ? ' <span title="Ha estado fuera del grupo esta semana (lesión / no disponible)">🏥</span>' : ''}
                             </td>
                             ${dayLoads.map((ua, di) => {
-                                const zone    = getZone(ua);
+                                const state   = dayState[p.id][di];
                                 const isToday = weekDates[di] === toYMD(new Date());
-                                return `<td class="tl-td-cell ${isToday ? 'tl-today' : ''}"
+                                const todayCls = isToday ? 'tl-today' : '';
+                                const when    = `${DAY_LABELS[di]} ${weekDates[di]}`;
+                                if (ua === 0 && state === 'out') {
+                                    return `<td class="tl-td-cell tl-cell-out ${todayCls}"
+                                        title="${when}: fuera del grupo (lesión / no disponible)"
+                                        aria-label="Fuera del grupo">🏥</td>`;
+                                }
+                                if (ua === 0 && state === 'gone') {
+                                    return `<td class="tl-td-cell tl-cell-gone ${todayCls}"
+                                        title="${when}: ya no estaba en el equipo"
+                                        aria-label="Ya no estaba en el equipo">·</td>`;
+                                }
+                                const zone = getZone(ua);
+                                const note = state === 'out' ? ' — fuera del grupo: no cuenta en el total del equipo' : '';
+                                return `<td class="tl-td-cell ${todayCls}"
                                     style="background:var(${zone.varBg});color:var(${zone.varText})"
-                                    title="${DAY_LABELS[di]} ${weekDates[di]}: ${ua} UA — ${zone.title}"
+                                    title="${when}: ${ua} UA — ${zone.title}${note}"
                                     aria-label="${ua} UA">
-                                    ${ua > 0 ? ua : '<span class="tl-zero">—</span>'}
+                                    ${ua > 0 ? ua : '<span class="tl-zero">—</span>'}${state === 'out' ? '<span class="tl-out-mark">🏥</span>' : ''}
                                 </td>`;
                             }).join('')}
                             <td class="tl-td-total">${total > 0 ? total : '—'}</td>
@@ -171,7 +213,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="tl-team-row">
-                        <td class="tl-td-player tl-team-label">🏀 Equipo</td>
+                        <td class="tl-td-player tl-team-label" title="Suma de la carga de quienes participaron con el grupo cada día">🏀 Equipo</td>
                         ${teamTotals.map((ua, di) => {
                             const zone    = getZone(ua);
                             const isToday = weekDates[di] === toYMD(new Date());
