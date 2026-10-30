@@ -9,15 +9,14 @@ const NavMenu = {
             // la fila de subsecciones para Carga/Salud y el cajón "Más" para el resto.
             // Formato del label: "<emoji> <texto>" (el emoji se separa por el primer espacio).
             items: [
-                { view: 'microciclo', label: '📆 Microciclo' },
+                { view: 'teamload',  label: '🔥 Carga equipo' },   // incluye el Dashboard Microciclo debajo del mapa de calor
                 { view: 'analytics', label: '📈 Análisis A:C' },
-                { view: 'teamload',  label: '🔥 Carga equipo' },
                 { view: 'gpsanalytics', label: '📡 GPS' },
                 { view: 'weekplan',  label: '📅 Planificación' },
                 { view: 'sessions',  label: '📋 Historial' },
                 { view: 'calendar',  label: '🗓️ Calendario' },
             ],
-            default: 'microciclo'
+            default: 'teamload'
         },
         salud: {
             label: '❤️ Salud',
@@ -544,16 +543,16 @@ class RPETracker {
                 if (typeof this.renderWellnessDashboard === 'function') this.renderWellnessDashboard();
                 break;
             case 'teamload':
+                // Carga equipo = mapa de calor semanal + Dashboard Microciclo debajo (dos contenedores de la misma vista).
+                // Las flechas ‹ › del mapa solo repintan el mapa, no el Microciclo.
                 if (typeof this.renderTeamLoad === 'function') this.renderTeamLoad();
+                if (typeof this.renderMicrociclo === 'function') this.renderMicrociclo();
                 break;
             case 'gpsanalytics':
                 if (typeof this.renderGpsAnalyticsView === 'function') this.renderGpsAnalyticsView();
                 break;
             case 'weekplan':
                 if (typeof this.renderWeeklyPlanning === 'function') this.renderWeeklyPlanning();
-                break;
-            case 'microciclo':
-                if (typeof this.renderMicrociclo === 'function') this.renderMicrociclo();
                 break;
             case 'rehab':
                 if (typeof this.renderRehabLoad === 'function') this.renderRehabLoad();

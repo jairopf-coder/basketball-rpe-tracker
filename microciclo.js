@@ -1,5 +1,5 @@
 // ========== MICROCICLO (microciclo.js) ==========
-// Vista Carga → Microciclo  (#microcicloView → #microcicloContent)
+// Dashboard Microciclo: segunda parte de la pantalla Carga → Carga equipo (#teamloadView → #microcicloContent)
 //   1. Gráfico que compara DOS semanas a elegir (por defecto: la actual frente
 //      a la anterior), en Carga UA o en RPE medio, con el detalle de cada sesión
 //      (turno, tipo, RPE, UA) al pulsar una barra.
@@ -241,7 +241,7 @@
 
         this._mcHistoryRequested = true;                        // un solo intento por sesión de uso
         this.ensureFullSessionHistory()
-            .then(() => { if (this.currentView === 'microciclo') this.renderMicrociclo(); })
+            .then(() => { if (this.currentView === 'teamload') this.renderMicrociclo(); })
             .catch(e => console.error('Microciclo: no se pudo cargar el histórico', e));
     };
 
