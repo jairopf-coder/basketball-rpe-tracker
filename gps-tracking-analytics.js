@@ -76,7 +76,7 @@ const GPS_COMPARISON_METRICS = [
 RPETracker.prototype._getGpsAlertPlayers = function() {
     if (!this.gpsData) return [];
     const alerts = [];
-    const activePlayers = this.players.filter(p => !p.archived);
+    const activePlayers = this.activePlayers;   // las alertas son para la plantilla actual
 
     activePlayers.forEach(player => {
         const reasons = [];
@@ -204,7 +204,7 @@ RPETracker.prototype._renderGpsAnTabContent = function() {
 // ========== PESTAÑA 1: Evolución individual (ya existente, Fase 2) ==========
 
 RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
-    const activePlayers = this.players.filter(p => !p.archived);
+    const activePlayers = this.activePlayers;
 
     // Estado inicial: ninguna jugadora seleccionada, métrica externa
     // en distancia (m), rango 30 días. La selección múltiple es
@@ -215,16 +215,20 @@ RPETracker.prototype._renderGpsPlayerEvolutionTab = function(container) {
     if (!this._gpsAnalyticsRange) this._gpsAnalyticsRange = '30';
 
     const selectedCount = this._gpsAnPlayerIds.size;
-    const allSelected = selectedCount > 0 && selectedCount === activePlayers.length;
+    // «Todas» = exactamente la plantilla actual (una baja elegida a mano no cuenta como «todas»)
+    const allSelected = selectedCount > 0 && selectedCount === activePlayers.length
+        && activePlayers.every(p => this._gpsAnPlayerIds.has(p.id));
 
-    const chips = activePlayers.map(p => {
+    // Chips: la plantilla actual y, al final, las jugadoras de baja con su marca (siguen consultables)
+    const roster = this.playersForHistory();
+    const chips = roster.map(p => {
         const color = PlayerTokens.get(p);
         const checked = this._gpsAnPlayerIds.has(p.id);
         return `<button type="button" class="player-filter-chip ${checked ? 'player-filter-chip--selected' : ''}"
                 style="--chip-color:${color}"
-                title="${esc(p.name)}"
+                title="${esc(this.playerLabel(p))}"
                 onclick="window.rpeTracker._gpsAnTogglePlayer('${p.id}', ${!checked})">
-                ${esc(p.name.split(' ')[0])}
+                ${esc(this.playerChipLabel(p))}
                 ${checked ? '<span class="player-filter-chip-check">✓</span>' : ''}
             </button>`;
     }).join('');
@@ -308,8 +312,9 @@ RPETracker.prototype._gpsAnTogglePlayer = function(playerId, checked) {
 // Selecciona todas las jugadoras activas, o ninguna si ya estaban
 // todas seleccionadas. Botón "Todas" siempre visible junto a los chips.
 RPETracker.prototype._gpsAnSelectAllPlayers = function() {
-    const activePlayers = this.players.filter(p => !p.archived);
-    const allSelected = this._gpsAnPlayerIds instanceof Set && this._gpsAnPlayerIds.size === activePlayers.length;
+    const activePlayers = this.activePlayers;
+    const allSelected = this._gpsAnPlayerIds instanceof Set && this._gpsAnPlayerIds.size === activePlayers.length
+        && activePlayers.every(p => this._gpsAnPlayerIds.has(p.id));
 
     this._gpsAnPlayerIds = allSelected ? new Set() : new Set(activePlayers.map(p => p.id));
 
@@ -869,7 +874,7 @@ RPETracker.prototype._gpsTeamSetMode = function(mode) {
 // (no se muestran como 0, para no dar una imagen falsa de "no corrió nada").
 RPETracker.prototype._getGpsTeamComparisonData = function() {
     const metricDef = GPS_COMPARISON_METRICS.find(m => m.key === this._gpsTeamMetric) || GPS_COMPARISON_METRICS[0];
-    const activePlayers = this.players.filter(p => !p.archived);
+    const activePlayers = this.activePlayers;
     const results = [];
 
     activePlayers.forEach(player => {
@@ -1090,7 +1095,7 @@ RPETracker.prototype._renderGpsRadarTab = function(container) {
     if (!Array.isArray(this._gpsBarsPlayerIds)) this._gpsBarsPlayerIds = [];
     if (this._gpsBarsShowTeamAvg === undefined) this._gpsBarsShowTeamAvg = false;
 
-    const activePlayers = this.players.filter(p => !p.archived);
+    const activePlayers = this.activePlayers;
     const teamSessions = this._getTeamSessionOptions();
 
     // Selección inicial: si no hay nadie elegido, arrancamos con las 2
@@ -1212,7 +1217,7 @@ RPETracker.prototype._gpsBarsToggleTeamAvg = function(checked) {
 // IIO, e igual lógica sum/avg que la pestaña de barras horizontales
 // (Comparativa equipo) para el resto.
 RPETracker.prototype._getGpsBarsValue = function(metricDef, playerId) {
-    const targetPlayers = playerId ? [playerId] : this.players.filter(p => !p.archived).map(p => p.id);
+    const targetPlayers = playerId ? [playerId] : this.activePlayers.map(p => p.id);
     const perPlayerValues = [];
 
     targetPlayers.forEach(pid => {

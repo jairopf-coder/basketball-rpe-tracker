@@ -30,7 +30,7 @@ RPETracker.prototype.renderAvailabilityTable = function() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${this.players.map(player => this.renderAvailabilityRow(player, next7Days)).join('')}
+                        ${this.activePlayers.map(player => this.renderAvailabilityRow(player, next7Days)).join('')}
                     </tbody>
                 </table>
             </div>

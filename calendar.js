@@ -438,7 +438,7 @@ RPETracker.prototype.getWeeklySummary = function() {
     const weekSessions  = this.sessions.filter(s => new Date(s.date) >= weekStart);
     const totalLoad     = weekSessions.reduce((sum, s) => sum + (s.load || s.rpe * (s.duration || 60)), 0);
     const avgRPE        = weekSessions.length ? weekSessions.reduce((sum, s) => sum + s.rpe, 0) / weekSessions.length : 0;
-    const playersAtRisk = this.players.filter(p => parseFloat(this.calculateAcuteChronicRatio(p.id).ratio) > 1.5);
+    const playersAtRisk = this.activePlayers.filter(p => parseFloat(this.calculateAcuteChronicRatio(p.id).ratio) > 1.5);
 
     return {
         sessions:      weekSessions.length,
