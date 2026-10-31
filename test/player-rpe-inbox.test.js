@@ -24,6 +24,7 @@ const ctx = vm.createContext({
     getCurrentSeasonWindowStart: () => '2026-08-01',
 });
 vm.runInContext('function RPETracker() {}', ctx);
+require('./store-dates')(vm, ctx);   // formatDM/formatWeekdayDM reales de store.js
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'app-sessions.js'), 'utf8'), ctx);
 
 function makeTracker() {

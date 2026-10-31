@@ -33,6 +33,7 @@ vm.runInContext(`
         return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
     }
 `, ctx);
+vm.runInContext(require('./active-players-helper')(), ctx);   // activePlayers / getPlayersActiveOn / isPlayerActiveOn… reales de app-players.js
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'dashboard-renderer.js'), 'utf8'), ctx);
 // getPlayerParticipation(): qué jugadoras participan hoy (lesión en fases 1-4 / no disponible = fuera)
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'injury-management.js'), 'utf8'), ctx);

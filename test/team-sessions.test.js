@@ -63,6 +63,7 @@ function load(files, { dashboard = false } = {}) {
         window.trapFocus = () => () => {};
         window.AppAlert = { show() {} };
     `, ctx);
+    vm.runInContext(require('./active-players-helper')(), ctx);   // activePlayers / getPlayersActiveOn / isPlayerActiveOn… reales de app-players.js
     files.forEach(f => vm.runInContext(read(f), ctx, { filename: f }));
     return { ctx, els, created };
 }

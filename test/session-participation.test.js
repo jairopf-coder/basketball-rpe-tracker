@@ -62,6 +62,7 @@ function load() {
         window.PlayerTokens = { avatar: () => '', get: () => '#999' };
         window.trapFocus = () => () => {};
     `, ctx);
+    vm.runInContext(require('./active-players-helper')(), ctx);   // activePlayers / getPlayersActiveOn / isPlayerActiveOn… reales de app-players.js
     ['store.js', 'injury-management.js', 'app-sessions.js'].forEach(f => vm.runInContext(read(f), ctx, { filename: f }));
     return { ctx, els };
 }

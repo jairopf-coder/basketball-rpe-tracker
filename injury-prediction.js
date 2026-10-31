@@ -269,7 +269,7 @@ RPETracker.prototype.renderInjuryPredictionDashboard = function() {
     }
 
     // ── 1. Compute all predictions ───────────────────────────────────────
-    let predictions = this.players.map(player => ({
+    let predictions = this.activePlayers.map(player => ({   // el riesgo se predice para la plantilla actual
         player,
         prediction: this.predictInjuryRisk(player.id)
     }));
@@ -554,8 +554,8 @@ RPETracker.prototype._predToggleSelect = function(playerId) {
 // ── Select / deselect all players ────────────────────────────────────────────
 RPETracker.prototype._predSelectAll = function() {
     if (!this._predState) this._predState = { sortOrder: 'desc', selected: new Set(), expanded: new Set() };
-    const allIds = this.players.map(p => p.id);
-    if (this._predState.selected.size === allIds.length) {
+    const allIds = this.activePlayers.map(p => p.id);
+    if (this._predState.selected.size === allIds.length && allIds.every(id => this._predState.selected.has(id))) {
         this._predState.selected.clear();
     } else {
         this._predState.selected = new Set(allIds);

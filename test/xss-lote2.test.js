@@ -33,6 +33,8 @@ const ctx = vm.createContext({
 vm.runInContext(secSrc + '\n;globalThis.esc = esc;', ctx);       // esc() REAL de security.js
 vm.runInContext(`function RPETracker() {}
 function toLocalISODate(d){const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}`, ctx);
+vm.runInContext(require('./active-players-helper')(), ctx);   // activePlayers / getPlayersActiveOn / isPlayerActiveOn… reales de app-players.js
+require('./store-dates')(vm, ctx);   // formatDM/formatDMY reales de store.js
 ['wellness.js', 'dashboard-renderer.js', 'dashboard-comparison.js', 'app-presession.js', 'team-status.js', 'injury-prediction.js']
     .forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f }));
 const today = vm.runInContext('toLocalISODate', ctx)(new Date());

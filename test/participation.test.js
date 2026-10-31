@@ -56,6 +56,7 @@ function load() {
         window.PlayerTokens = { avatar: () => '', get: () => '#999' };
         window.requestAnimationFrame = () => 0;   // el gráfico se dibuja después de pintar la tabla
     `, ctx);
+    vm.runInContext(require('./active-players-helper')(), ctx);   // activePlayers / getPlayersActiveOn / isPlayerActiveOn… reales de app-players.js
     ['store.js', 'injury-management.js', 'weekplan-medical.js', 'microciclo.js', 'app-comparisons.js']
         .forEach(f => vm.runInContext(read(f), ctx, { filename: f }));
     return ctx;

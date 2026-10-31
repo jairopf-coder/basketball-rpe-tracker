@@ -98,6 +98,7 @@ function loadTracker(file, ctxExtra) {
     }, ctxExtra || {}));
     vm.runInContext(secSrc + '\n;globalThis.esc = esc; globalThis.SafeData = SafeData;', ctx);
     vm.runInContext('function RPETracker() {}', ctx);
+    require('./store-dates')(vm, ctx);   // formatDM/formatWeekdayDM reales de store.js
     vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), ctx);
     const T = vm.runInContext('new RPETracker()', ctx);
     T.players = [{ id: 'p1', name: 'Ana', authUid: 'uA' }];

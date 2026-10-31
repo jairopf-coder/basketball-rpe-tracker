@@ -46,6 +46,7 @@ vm.runInContext(`
         return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
     }
 `, ctx);
+vm.runInContext(require('./active-players-helper')(), ctx);   // activePlayers / getPlayersActiveOn / isPlayerActiveOn… reales de app-players.js
 ['wellness.js', 'dashboard-renderer.js', 'dashboard-comparison.js', 'app-presession.js', 'team-status.js']
     .forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx));
 

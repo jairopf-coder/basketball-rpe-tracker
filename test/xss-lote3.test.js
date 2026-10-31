@@ -42,6 +42,7 @@ function baseCtx(extra) {
     ctx.window = ctx;
     vm.runInContext(secSrc + '\n;globalThis.esc = esc; globalThis.csvCell = typeof csvCell === "function" ? csvCell : undefined;', ctx);
     vm.runInContext('function RPETracker() {}', ctx);
+    vm.runInContext(require('./active-players-helper')(), ctx);   // activePlayers / getPlayersActiveOn / isPlayerActiveOn… reales de app-players.js
     // toLocalISODate real de store.js (los botones de jugadora de Nueva sesión la usan para la fecha)
     vm.runInContext(/function toLocalISODate\(d\) \{[\s\S]*?\n\}/.exec(read('store.js'))[0], ctx);
     return ctx;

@@ -523,6 +523,7 @@ function loadStaff(pushOn, withDb) {
         document: { head: { appendChild() {} }, getElementById: id => id === 'dbRightWidgets' ? dom.widgets : null, createElement: () => ({ style: {} }), body: {} },
         window: {}, navigator: {} });
     vm.runInContext(`function RPETracker(){}; function toLocalISODate(d){const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}`, ctx);
+    vm.runInContext(require('./active-players-helper')(), ctx);   // activePlayers / getPlayersActiveOn… reales de app-players.js
     vm.runInContext(read('dashboard-renderer.js'), ctx);
     if (pushOn !== null) ctx.PushClient = { isConfigured: () => pushOn };
     const refs = [];

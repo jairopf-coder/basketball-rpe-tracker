@@ -30,6 +30,8 @@ vm.runInContext(`
         return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
     }
 `, ctx);
+vm.runInContext(require('./active-players-helper')({ names: true }), ctx);   // ayudantes reales de app-players.js (bajas y nombres)
+require('./store-dates')(vm, ctx);   // formatDM/formatWeekdayDM reales de store.js
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'wellness.js'), 'utf8'), ctx);
 
 const T = vm.runInContext('new RPETracker()', ctx);
