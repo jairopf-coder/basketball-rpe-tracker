@@ -27,3 +27,8 @@ node_modules/
 # Backups locales
 *.bak
 *.backup
+
+# Material personal que no se sube
+CAMBIOS-fix-timezone-fechas.md
+EJEMPLO-export-formato-2.xlsx
+load-ctrl-icon*.svg
