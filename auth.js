@@ -367,14 +367,55 @@ const AppAuth = {
         return t && typeof t.playerFullName === 'function' ? t.playerFullName(p) : String((p && p.name) || '');
     },
 
-    // Devuelve las <option> del roster de jugadoras para los selectores de vínculo
-    _playerOptionsHtml(selectedId) {
-        const players = (window.rpeTracker && window.rpeTracker.players) || [];
-        return players
-            .slice()
-            .sort((a, b) => this._playerFullLabel(a).localeCompare(this._playerFullLabel(b)))
-            .map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(this._playerFullLabel(p))}${p.number ? ` #${esc(p.number)}` : ''}</option>`)
-            .join('');
+    // Cuenta de jugadora que ya está vinculada a esa ficha (distinta de exceptUid), o null.
+    // Mira la lista de cuentas si ya está cargada y, además, el vínculo guardado en la propia ficha.
+    _accountOwnerOf(playerId, exceptUid) {
+        if (!playerId) return null;
+        const users = this._umUsers || {};
+        const byUser = Object.entries(users).find(([uid, u]) => uid !== exceptUid && u && u.role === 'player' && u.playerId === playerId);
+        if (byUser) return { uid: byUser[0], email: byUser[1].email || '' };
+        // Si la lista de cuentas ya está cargada, manda ella (el authUid de la ficha puede estar desfasado).
+        // Solo si aún no se ha cargado se usa el vínculo guardado en la ficha.
+        if (this._umUsers) return null;
+        const player = ((window.rpeTracker && window.rpeTracker.players) || []).find(p => p.id === playerId);
+        if (player && player.authUid && player.authUid !== exceptUid) {
+            return { uid: player.authUid, email: '' };
+        }
+        return null;
+    },
+
+    // Devuelve las <option> del roster de jugadoras para los selectores de vínculo.
+    // Primero la plantilla actual y, al final, las de baja (no se pueden elegir para una cuenta nueva,
+    // salvo la que ya está vinculada). Las que ya tienen cuenta llevan una marca.
+    _playerOptionsHtml(selectedId, exceptUid) {
+        const t = window.rpeTracker;
+        const players = (t && t.players) || [];
+        const activeIds = new Set(((t && t.activePlayers) || players).map(p => p.id));
+        const byName = (a, b) => this._playerFullLabel(a).localeCompare(this._playerFullLabel(b));
+        const sorted = [
+            ...players.filter(p => activeIds.has(p.id)).sort(byName),
+            ...players.filter(p => !activeIds.has(p.id)).sort(byName)
+        ];
+        return sorted.map(p => {
+            const baja = !activeIds.has(p.id);
+            const owner = this._accountOwnerOf(p.id, exceptUid);
+            const marks = `${p.number ? ` #${esc(p.number)}` : ''}${baja ? ' (baja)' : ''}${owner ? ' · ya tiene cuenta' : ''}`;
+            const disabled = baja && p.id !== selectedId ? ' disabled' : '';
+            return `<option value="${esc(p.id)}" ${p.id === selectedId ? 'selected' : ''}${disabled}>${esc(this._playerFullLabel(p))}${marks}</option>`;
+        }).join('');
+    },
+
+    // Pregunta antes de quitarle la jugadora a otra cuenta. Devuelve true si se puede continuar.
+    async _confirmTakeOver(playerId, owner) {
+        const player = ((window.rpeTracker && window.rpeTracker.players) || []).find(p => p.id === playerId);
+        const name = player ? this._playerFullLabel(player) : 'esta jugadora';
+        // AppConfirm escapa el mensaje con esc() y confirm() es texto plano, así que el email no puede inyectar HTML
+        const message = name + ' ya tiene una cuenta vinculada' + (owner.email ? ' (' + owner.email + ')' : '') + '. ' +
+            'Si continúas, esa cuenta quedará sin vincular y dejará de asociar sus respuestas a la ficha.';
+        if (window.AppConfirm) {
+            return AppConfirm.show({ title: '¿Cambiar la cuenta de la jugadora?', message, confirmText: 'Continuar', danger: true });
+        }
+        return confirm(message);
     },
 
     // Pinta la lista de cuentas creadas en esta sesión (solo en memoria, se pierde al recargar)
@@ -433,16 +474,25 @@ const AppAuth = {
         if (!emailRaw)    { this._umError('Escribe el email o nombre de usuario.'); return; }
         if (!password || password.length < 8) { this._umError('La contraseña debe tener al menos 8 caracteres.'); return; }
 
+        // Una cuenta de jugadora SIEMPRE debe quedar vinculada a su ficha: sin ficha, lo que envíe no se asociaría a nadie
+        const linkedPlayerId = role === 'player' ? (document.getElementById('um-playerLink')?.value || '') : '';
+        if (role === 'player' && !linkedPlayerId) { this._umError('Elige la jugadora a la que pertenece esta cuenta.'); return; }
+        const previousOwner = this._accountOwnerOf(linkedPlayerId);
+        if (previousOwner && !(await this._confirmTakeOver(linkedPlayerId, previousOwner))) return;
+
         btn.disabled    = true;
         btn.textContent = 'Creando…';
         if (errEl) errEl.style.display = 'none';
 
+        let secondaryApp = null;
+        let authUserCreated = false;
         try {
             // Crear usuario en Firebase Auth usando un Auth secundario para no perder la sesión del staff
-            const secondaryApp = firebase.initializeApp(firebase.app().options, `tmp_${Date.now()}`);
+            secondaryApp = firebase.initializeApp(firebase.app().options, `tmp_${Date.now()}`);
             const secondaryAuth = secondaryApp.auth();
 
             const cred = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+            authUserCreated = true;
             const uid  = cred.user.uid;
 
             // Actualizar displayName
@@ -450,19 +500,19 @@ const AppAuth = {
 
             // Guardar rol en Realtime Database (usando el auth PRINCIPAL del staff, que sí tiene permisos de escritura)
             const userRecord = { email, role, displayName, createdAt: Date.now() };
-
-            const linkedPlayerId = role === 'player' ? document.getElementById('um-playerLink')?.value : '';
             if (linkedPlayerId) userRecord.playerId = linkedPlayerId;
 
-            await window.firebaseDB.ref(`users/${uid}`).set(userRecord);
-
-            // Vínculo inverso: la ficha de la jugadora también guarda el uid de su cuenta.
+            // Cuenta + vínculo con la ficha en UN solo paso: se guardan los dos o ninguno
+            const paths = { [`users/${uid}`]: userRecord };
             if (linkedPlayerId) {
-                await window.firebaseDB.ref(`players/${linkedPlayerId}/authUid`).set(uid);
+                paths[`players/${linkedPlayerId}/authUid`] = uid;                       // vínculo inverso en la ficha
+                if (previousOwner) paths[`users/${previousOwner.uid}/playerId`] = null; // la cuenta anterior queda sin vincular
             }
+            await window.firebaseDB.ref().update(paths);
 
             // Cerrar la app secundaria
             await secondaryApp.delete();
+            secondaryApp = null;
 
             this._umSuccess(`✅ Cuenta creada: ${email}`);
             this._loadUserList();
@@ -485,7 +535,14 @@ const AppAuth = {
                 'auth/invalid-email':        'El formato del email no es válido.',
                 'auth/weak-password':        'La contraseña es demasiado débil (mín. 6 caracteres).',
             };
-            this._umError(msgs[e.code] || `Error: ${e.message}`);
+            if (authUserCreated) {
+                // La cuenta de acceso ya existe pero no se guardó su rol/vínculo: hay que repetirlo, no dejarlo a medias
+                this._umError(`Se creó la cuenta de acceso pero NO se guardó su vínculo (${e.message}). ` +
+                    `Elimina ${email} en Firebase Console → Authentication y vuelve a crearla.`);
+            } else {
+                this._umError(msgs[e.code] || `Error: ${e.message}`);
+            }
+            try { if (secondaryApp) await secondaryApp.delete(); } catch (_) { /* la app secundaria es desechable */ }
         } finally {
             btn.disabled    = false;
             btn.textContent = 'Crear cuenta';
@@ -580,10 +637,9 @@ const AppAuth = {
             const snap = await window.firebaseDB.ref(`users/${uid}`).once('value');
             const linkedPlayerId = (snap.val() || {}).playerId || null;
 
-            await window.firebaseDB.ref(`users/${uid}`).remove();
-            if (linkedPlayerId) {
-                await window.firebaseDB.ref(`players/${linkedPlayerId}/authUid`).remove();
-            }
+            const paths = { [`users/${uid}`]: null };
+            if (linkedPlayerId) paths[`players/${linkedPlayerId}/authUid`] = null;
+            await window.firebaseDB.ref().update(paths);   // cuenta y vínculo se quitan juntos
 
             this._loadUserList();
         } catch (e) {
@@ -649,7 +705,7 @@ const AppAuth = {
                             <label>Jugadora vinculada</label>
                             <select id="ue-playerLink" class="form-input">
                                 <option value="">— Sin vincular —</option>
-                                ${AppAuth._playerOptionsHtml(u.playerId)}
+                                ${AppAuth._playerOptionsHtml(u.playerId, uid)}
                             </select>
                         </div>
                         <div id="ue-error" class="login-error" style="display:none"></div>
@@ -690,17 +746,21 @@ const AppAuth = {
 
             const newPlayerId = role === 'player' ? (document.getElementById('ue-playerLink')?.value || null) : null;
 
-            const updates = { displayName, email, role };
-            updates.playerId = newPlayerId || null;
-            await window.firebaseDB.ref(`users/${uid}`).update(updates);
+            // Si la jugadora elegida ya tiene otra cuenta, se avisa antes de quitársela
+            const otherOwner = newPlayerId && newPlayerId !== previousPlayerId ? this._accountOwnerOf(newPlayerId, uid) : null;
+            if (otherOwner && !(await this._confirmTakeOver(newPlayerId, otherOwner))) return;
 
-            // Si la jugadora vinculada cambió, actualizar el vínculo inverso en 'players'
-            if (previousPlayerId && previousPlayerId !== newPlayerId) {
-                await window.firebaseDB.ref(`players/${previousPlayerId}/authUid`).remove();
-            }
-            if (newPlayerId) {
-                await window.firebaseDB.ref(`players/${newPlayerId}/authUid`).set(uid);
-            }
+            // Todos los cambios (cuenta + vínculo con la ficha) en UN solo paso: se guardan todos o ninguno
+            const paths = {
+                [`users/${uid}/displayName`]: displayName,
+                [`users/${uid}/email`]: email,
+                [`users/${uid}/role`]: role,
+                [`users/${uid}/playerId`]: newPlayerId || null
+            };
+            if (previousPlayerId && previousPlayerId !== newPlayerId) paths[`players/${previousPlayerId}/authUid`] = null;
+            if (newPlayerId) paths[`players/${newPlayerId}/authUid`] = uid;
+            if (otherOwner) paths[`users/${otherOwner.uid}/playerId`] = null;
+            await window.firebaseDB.ref().update(paths);
 
             document.getElementById('um-edit-modal')?.remove();
             this._loadUserList();
