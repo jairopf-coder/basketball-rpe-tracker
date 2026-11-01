@@ -539,7 +539,9 @@ test('workflow: Node 22 (lo que exige firebase-admin) y dependencias fijadas con
 test('el despliegue a GitHub Pages ya no publica scripts/ ni test/', () => {
     const d = read('.github/workflows/deploy.yml');
     assert.ok(/exclude_assets: '[^']*,scripts,test'/.test(d));
-    assert.ok(d.includes('\r\n'), 'deploy.yml debe conservar sus saltos de línea de Windows');
+    // Con «* text=auto» en .gitattributes, en GitHub llega con LF y en algunos equipos con CRLF: vale cualquiera, pero sin mezclar
+    const crlf = d.split('\r\n').length - 1, lfSueltos = (d.split('\n').length - 1) - crlf;
+    assert.ok(crlf === 0 || lfSueltos === 0, 'deploy.yml no debe mezclar saltos de línea CRLF y LF');
 });
 test('node_modules no se sube a git', () => assert.ok(/^node_modules\/\s*$/m.test(read('.gitignore'))));
 test('el service worker NO precachea los scripts del servidor', () => assert.ok(!/scripts\/|send-reminders/.test(read('sw.js'))));

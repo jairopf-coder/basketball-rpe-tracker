@@ -1,7 +1,7 @@
 // ============================================================
 //  test/deploy-version.test.js
 //  El despliegue sella CACHE_VERSION de sw.js con un sufijo único (-bNN):
-//   · el paso existe, en el orden correcto, y deploy.yml conserva sus saltos CRLF
+//   · el paso existe, en el orden correcto, y deploy.yml no mezcla saltos de línea (CRLF y LF)
 //   · se EJECUTA el script real del paso sobre una copia de sw.js
 //   · si sw.js cambia de formato avisa (::warning::) sin romper el despliegue
 //   · el service worker sellado sigue funcionando (nombre de caché y limpieza de las viejas)
@@ -52,9 +52,13 @@ test('existe, va después de generar firebase-config.js y antes de publicar', ()
     const iSello = wf.indexOf('- name: Stamp service worker version'), iDeploy = wf.indexOf('- name: Deploy to GitHub Pages');
     assert.ok(iCheckout >= 0 && iCheckout < iInject && iInject < iSello && iSello < iDeploy, [iCheckout, iInject, iSello, iDeploy].join(','));
 });
-test('deploy.yml conserva sus saltos de línea de Windows (todas las líneas)', () => {
-    assert.ok(wfRaw.includes('\r\n'));
-    assert.strictEqual(wfRaw.split('\n').length - 1, wfRaw.split('\r\n').length - 1, 'hay líneas con LF suelto');
+// .gitattributes lleva «* text=auto»: git guarda los archivos de texto con LF y en un checkout limpio
+// (GitHub Actions) llegan con LF, mientras que en un ordenador con Windows o heredado de él pueden estar en
+// CRLF. Las dos cosas son válidas; lo que NO debe haber es un archivo con ambos tipos mezclados.
+test('deploy.yml tiene saltos de línea homogéneos (todo CRLF o todo LF, sin mezclar)', () => {
+    const crlf = wfRaw.split('\r\n').length - 1;
+    const lfSueltos = (wfRaw.split('\n').length - 1) - crlf;
+    assert.ok(crlf === 0 || lfSueltos === 0, `mezcla de saltos: ${crlf} CRLF y ${lfSueltos} LF sueltos`);
 });
 test('la versión del repositorio es una base limpia (sin sufijo -b) y mantiene el formato vNNN', () => {
     assert.ok(/^v\d+$/.test(versionBase), versionBase);
