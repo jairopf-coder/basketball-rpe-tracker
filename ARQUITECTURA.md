@@ -157,18 +157,23 @@ Datos, informes y privacidad
 ├── 🔥 firebase-rules.json   → Reglas de Firebase (se publican a mano en la
 │                               consola: Realtime Database → Reglas)
 ├── .github/workflows/
-│   ├── deploy.yml           → Genera firebase-config.js, sella la versión de
-│   │                           sw.js y publica en gh-pages
+│   ├── deploy.yml           → 1) Tests (avisan en rojo si fallan);
+│   │                           2) genera firebase-config.js, sella la versión
+│   │                           de sw.js y publica en gh-pages
 │   └── enviar-recordatorio.yml → Aviso push a las jugadoras; se lanza a mano
 │                                  desde la pestaña Actions de GitHub
-└── scripts/                 → send-reminders.js (solo en CI; usa npm:
+└── scripts/                 → run-tests.js (ejecuta todos los tests; lo usa la
+                                CI y se puede lanzar a mano),
+                                send-reminders.js (solo en CI; usa npm:
                                 firebase-admin y web-push)
 ```
 
 ### Tests y documentación
 ```
-├── test/                    → 20 ficheros `*.test.js` sin framework:
+├── test/                    → 27 ficheros `*.test.js` sin framework:
 │                               node test/<nombre>.test.js
+│                               todos a la vez: node scripts/run-tests.js
+│     · ayudantes (no son tests): store-dates.js, active-players-helper.js
 │     · reglas:      firebase-rules.test.js, firebase-rules-validate.test.js
 │                    (este último usa targaryen si está instalado fuera del
 │                    proyecto: npm install --prefix ~/.rpe-tools targaryen)
@@ -261,7 +266,22 @@ Git).
 ### Notas sobre el flujo de deploy
 
 - La rama `main` contiene el código fuente y los workflows.
-- El workflow `deploy.yml` (disparado por `push` a `main`) genera
+- **Los tests se ejecutan antes de cada despliegue, en modo AVISO.** `deploy.yml`
+  tiene dos trabajos: `test` (checkout limpio de lo que está subido a git, Node
+  22 y zona horaria `Europe/Madrid`, ejecuta `node scripts/run-tests.js`) y
+  `deploy`. Si un test falla, la ejecución se marca en rojo en la pestaña
+  Actions (con qué test ha fallado) y GitHub avisa por correo, pero el despliegue
+  continúa. Para pasar a modo BLOQUEO (un test en rojo impide desplegar) hay que
+  cambiar la condición `if:` del trabajo `deploy`; el comentario del propio
+  `deploy.yml` trae la línea exacta.
+  Como se prueba lo que hay en git, también avisa de archivos que existen solo en
+  tu ordenador y no se subieron. En el trabajo `test` se crea un
+  `firebase-config.js` vacío (el real no está en git) porque `push-client.test.js`
+  comprueba que existe. Los tests de fechas asumen la hora de España: fuera de
+  esa zona horaria (p. ej. `TZ=Pacific/Auckland`) dos de ellos no pasan, y es
+  esperado. Desde Actions → Deploy to GitHub Pages → Run workflow se puede
+  lanzar un despliegue «SIN pasar los tests» (útil sobre todo en modo bloqueo).
+- El trabajo `deploy` de `deploy.yml` (disparado por `push` a `main`) genera
   `firebase-config.js` con el secreto, **sella la versión del service worker**
   (`CACHE_VERSION` de `sw.js`: `v143` se publica como `v143-bNN`, con NN el
   número de ejecución; ya no hay que subirla a mano) y publica el contenido en

@@ -3,9 +3,48 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [ main ]
+  # Lanzamiento manual (GitHub -> Actions -> Deploy to GitHub Pages -> Run workflow).
+  # Solo para emergencias: permite desplegar saltándose los tests.
+  workflow_dispatch:
+    inputs:
+      omitir_tests:
+        description: 'Desplegar SIN pasar los tests (solo en emergencias)'
+        type: boolean
+        default: false
 
 jobs:
+  # 1) Tests: se ejecutan sobre lo que hay SUBIDO a git (un checkout limpio), así que también
+  #    avisan de archivos que existen en tu ordenador pero que se olvidaron de subir.
+  #    MODO AVISO: si algún test falla, la ejecución se marca en rojo y GitHub avisa por correo,
+  #    pero el despliegue SIGUE adelante. Para pasar a modo BLOQUEO (que un test en rojo impida
+  #    desplegar) hay que cambiar la condición del trabajo «deploy» (ver el comentario de abajo).
+  test:
+    name: Tests
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.omitir_tests) }}
+    runs-on: ubuntu-latest
+    env:
+      TZ: Europe/Madrid   # los tests de fechas asumen la zona horaria del equipo (el servidor va en UTC)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Placeholder de firebase-config.js
+        # firebase-config.js no está en git (credenciales). Un test comprueba que está en la lista de
+        # caché del service worker, así que basta con que exista; el real lo genera el trabajo «deploy».
+        run: echo "// El archivo real lo genera el trabajo deploy a partir del secreto FIREBASE_CONFIG" > firebase-config.js
+
+      - name: Run tests
+        run: node scripts/run-tests.js
+
+  # 2) Despliegue. Modo aviso: se despliega aunque los tests hayan fallado (solo no si se cancela la ejecución).
+  #    Modo BLOQUEO: sustituir la condición por la siguiente (solo despliega si los tests pasan o se omitieron):
+  #      if: ${{ !cancelled() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
   deploy:
+    needs: test
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
