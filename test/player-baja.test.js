@@ -423,7 +423,7 @@ test('las pantallas de registro y los resúmenes de Inicio solo listan jugadoras
         ['wellness.js', 'openWellnessQuick'], ['wellness.js', 'saveWellnessQuick'],
         ['dashboard-renderer.js', 'renderDashboard'], ['dashboard-renderer.js', '_pendingToday'],
         ['dashboard-renderer.js', '_renderRightWidgets'], ['dashboard-renderer.js', 'renderTeamRatios'],
-        ['dashboard-comparison.js', '_renderPlayerComparisonSection'],
+        ['dashboard-comparison.js', '_renderPlayersTable'],
         ['app-sessions.js', 'openNewSessionModal'], ['app-sessions.js', '_eligiblePlayerIds'], ['app-sessions.js', 'renderPlayerButtonsMulti'],
         ['app.js', 'checkAndShowAlerts'], ['app.js', '_updateNavAlertBadge'],
         // Fase 2

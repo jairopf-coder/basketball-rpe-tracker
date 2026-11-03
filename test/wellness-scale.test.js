@@ -47,7 +47,7 @@ vm.runInContext(`
     }
 `, ctx);
 vm.runInContext(require('./active-players-helper')(), ctx);   // activePlayers / getPlayersActiveOn / isPlayerActiveOn… reales de app-players.js
-['wellness.js', 'dashboard-renderer.js', 'dashboard-comparison.js', 'app-presession.js', 'team-status.js']
+['ewma-calculator.js', 'wellness.js', 'dashboard-renderer.js', 'dashboard-comparison.js', 'app-presession.js', 'team-status.js']
     .forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx));
 
 const today = vm.runInContext('toLocalISODate', ctx)(new Date());
@@ -67,118 +67,122 @@ function make(wellness) {
     return t;
 }
 const GREEN = 'wh-good', AMBER = 'wh-warn', RED = 'wh-bad';   // el color es una clase, no un fondo
-// Celdas de una fila de la tabla: [{val, color}] en orden Sueño, Energía, Humor, Muscular, Ø
-// (color = clase de color del número: wh-good / wh-warn / wh-bad)
-function heatRow(html, name) {
-    const row = html.split('<tr>').find(r => r.includes(`<span>${name}</span>`));
+const dayStr = n => { const x = new Date(); x.setDate(x.getDate() - n); return vm.runInContext('toLocalISODate', ctx)(x); };
+
+// Tabla única «Ratio A:C — jugadoras» de Inicio: entradas como las prepara renderDashboard
+const ratioEntry = (player, over) => Object.assign(
+    { player, ratio: { ratio: '1.00', confidence: 'high' }, st: { color: '#4caf50', cls: 'wh-good', risk: 2 }, out: false, r: 1 }, over || {});
+const tableOf = (t, over) => t._renderPlayersTable(t.players.map(p => ratioEntry(p, over)));
+// Celdas de la fila de una jugadora: { ac, w, r } con { val, cls }
+function rowCells(html, name) {
+    const row = html.split('<div class="db-player-row">').find(r => r.includes(`<div class="db-player-name">${name}`));
     assert.ok(row, 'no se encontró la fila de ' + name);
-    return [...row.matchAll(/<td class="wh-cell(?: wh-overall)? (wh-(?:good|warn|bad|nodata))"[^>]*>([^<]+)</g)]
-        .map(m => ({ color: m[1], val: m[2] }));
+    const cell = col => {
+        const m = new RegExp(`<div class="db-player-${col} (wh-[a-z]+)"[^>]*>(.*?)</div>`).exec(row);
+        assert.ok(m, `falta la celda ${col} de ${name}`);
+        return { cls: m[1], val: m[2] };
+    };
+    return { ac: cell('ratio'), w: cell('wellness'), r: cell('readiness') };
 }
+const wOf = (wellness, name = 'Ana') => rowCells(tableOf(make(wellness)), name).w;
 
-console.log('\nTabla "Carga y wellness — 7 días" (la que reportaste)');
-test('4.0 en Energía y 4.0 en Humor tienen el MISMO color (verde)', () => {
-    const t = make([entry('p1', 4, 4, 4, 4)]);
-    const cells = heatRow(t._renderPlayerComparisonSection(), 'Ana');
-    assert.strictEqual(cells.length, 5);
-    cells.forEach(c => { assert.strictEqual(c.val, '4.0'); assert.strictEqual(c.color, GREEN, `4.0 debería ser verde y es ${c.color}`); });
+console.log('\nTabla única de Inicio: Ø = bienestar, media de 7 días');
+test('4.0 en las cuatro dimensiones → Ø 4.0 en verde', () => {
+    const c = wOf([entry('p1', 4, 4, 4, 4)]);
+    assert.strictEqual(c.val, '4.0'); assert.strictEqual(c.cls, GREEN);
 });
-test('1 = rojo y 5 = verde en TODAS las columnas, Energía y Muscular incluidas', () => {
+test('1 = rojo y 5 = verde (sin invertir ninguna dimensión)', () => {
     const t = make([entry('p1', 5, 5, 5, 5), entry('p2', 1, 1, 1, 1)]);
-    const html = t._renderPlayerComparisonSection();
-    heatRow(html, 'Ana').forEach(c => { assert.strictEqual(c.val, '5.0'); assert.strictEqual(c.color, GREEN); });
-    heatRow(html, 'Bea').forEach(c => { assert.strictEqual(c.val, '1.0'); assert.strictEqual(c.color, RED); });
+    const html = tableOf(t);
+    assert.deepStrictEqual([rowCells(html, 'Ana').w.val, rowCells(html, 'Ana').w.cls], ['5.0', GREEN]);
+    assert.deepStrictEqual([rowCells(html, 'Bea').w.val, rowCells(html, 'Bea').w.cls], ['1.0', RED]);
 });
-test('energía y muscular bajas (2) salen en rojo, sueño y humor altos (5) en verde', () => {
-    const t = make([entry('p1', 5, 2, 5, 2)]);
-    const [sleep, energy, mood, muscle, overall] = heatRow(t._renderPlayerComparisonSection(), 'Ana');
-    assert.deepStrictEqual([sleep.val, energy.val, mood.val, muscle.val], ['5.0', '2.0', '5.0', '2.0']);
-    assert.deepStrictEqual([sleep.color, energy.color, mood.color, muscle.color], [GREEN, RED, GREEN, RED]);
-    assert.strictEqual(overall.val, '3.5'); // media simple de los cuatro valores guardados
-    assert.strictEqual(overall.color, AMBER);
+test('sueño/humor 5 y energía/muscular 2 → Ø 3.5 (media simple de los cuatro valores guardados), naranja', () => {
+    const c = wOf([entry('p1', 5, 2, 5, 2)]);
+    assert.strictEqual(c.val, '3.5'); assert.strictEqual(c.cls, AMBER);
 });
-test('la media de 7 días promedia los valores tal cual (sin invertir)', () => {
-    const d = n => { const x = new Date(); x.setDate(x.getDate() - n); return vm.runInContext('toLocalISODate', ctx)(x); };
-    const t = make([
-        Object.assign(entry('p1', 4, 2, 4, 2), { id: 'a', date: d(0) }),
-        Object.assign(entry('p1', 4, 4, 4, 4), { id: 'b', date: d(1) }),
-    ]);
-    const [, energy, , muscle] = heatRow(t._renderPlayerComparisonSection(), 'Ana');
-    assert.strictEqual(energy.val, '3.0'); assert.strictEqual(muscle.val, '3.0');
+test('la media de 7 días promedia los registros tal cual', () => {
+    const c = wOf([Object.assign(entry('p1', 4, 2, 4, 2), { id: 'a', date: dayStr(0) }),
+                   Object.assign(entry('p1', 4, 4, 4, 4), { id: 'b', date: dayStr(1) })]);
+    assert.strictEqual(c.val, '3.5');   // (3,0 + 4,0) / 2
 });
-
-console.log('\nRediseño: un solo fondo, color solo en el número');
-const tableStyle = () => {
-    const el = dom.styles.find(e => e.id === 'dashboard-comparison-style');
-    assert.ok(el && el.textContent, 'no se inyectó el CSS de la tabla');
-    return el.textContent;
-};
-test('ninguna celda ni fila lleva fondo propio (no hay style="background")', () => {
-    const t = make([entry('p1', 5, 5, 5, 5), entry('p2', 1, 1, 1, 1), entry('p3', 3, 3, 3, 3)]);
-    const html = t._renderPlayerComparisonSection();
-    assert.ok(!/background/i.test(html), 'la tabla no debe pintar fondos');
-    const table = html.slice(html.indexOf('<table'), html.indexOf('</table>'));
-    assert.ok(!/style=/.test(table), 'el color de las celdas debe ir en clases, no en style');
+test('la ventana son 7 días como en Salud → Wellness: hoy y los 6 anteriores (el día 7 atrás ya no cuenta)', () => {
+    const c = wOf([Object.assign(entry('p1', 5, 5, 5, 5), { id: 'a', date: dayStr(6) }),
+                   Object.assign(entry('p1', 1, 1, 1, 1), { id: 'b', date: dayStr(7) })]);
+    assert.strictEqual(c.val, '5.0');
 });
-test('el CSS de la tabla no define ningún fondo de color (solo transparent)', () => {
-    const css = tableStyle();
-    const heat = css.slice(css.indexOf('Tabla de wellness'));
-    const bgs = [...heat.matchAll(/background:\s*([^;]+);/g)].map(m => m[1].trim());
-    assert.ok(bgs.length > 0);
-    bgs.forEach(v => assert.strictEqual(v, 'transparent', 'fondo distinto de transparent: ' + v));
-    assert.ok(!/2e7d3220|f9a82520|c6282820/.test(css), 'quedan los fondos teñidos antiguos');
-});
-test('hay variante para el tema oscuro en verde, naranja, rojo y azul', () => {
-    const css = tableStyle();
-    ['wh-good', 'wh-warn', 'wh-bad', 'wh-blue'].forEach(c =>
-        assert.ok(css.includes(`[data-theme="dark"] .${c}`), 'falta la variante oscura de ' + c));
+test('los registros incompletos no cuentan', () => {
+    const c = wOf([entry('p1', 4, 4, 4, 4), Object.assign(entry('p1', 1, null, 1, 1), { id: 'x', date: dayStr(1) })]);
+    assert.strictEqual(c.val, '4.0');
 });
 test('umbrales: 5.0 y 4.0 verde · 3.5 y 3.0 naranja · 2.5 y 1.0 rojo', () => {
-    const cls = v => heatRow(make([entry('p1', v, v, v, v)])._renderPlayerComparisonSection(), 'Ana')[0].color;
+    const cls = v => wOf([entry('p1', v, v, v, v)]).cls;
     assert.deepStrictEqual([5, 4, 3.5, 3, 2.5, 1].map(cls), [GREEN, GREEN, AMBER, AMBER, RED, RED]);
 });
-test('el color sigue al número que se VE: un 3,96 se muestra "4.0" y sale verde; un 2,96 se muestra "3.0" y sale naranja', () => {
-    const d = n => { const z = new Date(); z.setDate(z.getDate() - n); return vm.runInContext('toLocalISODate', ctx)(z); };
-    // 7 días: sueño/energía/humor = 4 siempre; muscular = 4 seis días y 3 uno → media 3,857 → Ø = 3,964
-    const mk = (pid, muscleLastDay) => [0, 1, 2, 3, 4, 5, 6].map(i => ({ id: `${pid}${i}`, playerId: pid, date: d(i), sleep: 4, fatigue: 4, mood: 4, soreness: i === 6 ? muscleLastDay : 4 }));
-    const t = make(mk('p1', 3));
-    const cells = heatRow(t._renderPlayerComparisonSection(), 'Ana');
-    const overall = cells[4];
-    assert.strictEqual(overall.val, '4.0'); assert.strictEqual(overall.color, GREEN, 'un "4.0" visible no puede ser naranja');
-    assert.strictEqual(cells[3].val, '3.9'); assert.strictEqual(cells[3].color, AMBER);
-    // y al otro lado: 2,964 → "3.0" naranja (no rojo)
-    const t2 = make([0, 1, 2, 3, 4, 5, 6].map(i => ({ id: `q${i}`, playerId: 'p1', date: d(i), sleep: 3, fatigue: 3, mood: 3, soreness: i === 6 ? 2 : 3 })));
-    const o2 = heatRow(t2._renderPlayerComparisonSection(), 'Ana')[4];
-    assert.strictEqual(o2.val, '3.0'); assert.strictEqual(o2.color, AMBER, 'un "3.0" visible no puede ser rojo');
+test('el color sigue al número que se VE: 3,96 se muestra "4.0" y sale verde; 2,96 se muestra "3.0" y sale naranja', () => {
+    // 7 días: tres dimensiones a 4 siempre; muscular a 4 seis días y a 3 uno → Ø = 3,964
+    const mk = (base, last) => [0, 1, 2, 3, 4, 5, 6].map(i => ({ id: `w${base}${i}`, playerId: 'p1', date: dayStr(i), sleep: base, fatigue: base, mood: base, soreness: i === 6 ? last : base }));
+    const hi = wOf(mk(4, 3));
+    assert.strictEqual(hi.val, '4.0'); assert.strictEqual(hi.cls, GREEN, 'un "4.0" visible no puede ser naranja');
+    const lo = wOf(mk(3, 2));
+    assert.strictEqual(lo.val, '3.0'); assert.strictEqual(lo.cls, AMBER, 'un "3.0" visible no puede ser rojo');
 });
-test('sin datos: celdas "—" sin color de estado, todas iguales', () => {
-    const cells = heatRow(make([])._renderPlayerComparisonSection(), 'Ana');
-    assert.strictEqual(cells.length, 5);
-    cells.forEach(c => { assert.strictEqual(c.color, 'wh-nodata'); assert.strictEqual(c.val, '—'); });
+test('sin registros en 7 días: "—" sin color de estado', () => {
+    const c = wOf([]);
+    assert.strictEqual(c.val, '—'); assert.strictEqual(c.cls, 'wh-nodata');
 });
-test('la columna A:C también colorea solo el número (clase), sin fondo', () => {
+
+console.log('\nTabla única de Inicio: R = readiness y A:C');
+test('readiness: 100 verde · 60 naranja · 20 rojo · sin datos "—"', () => {
+    const r = ws => rowCells(tableOf(make(ws)), 'Ana').r;
+    assert.deepStrictEqual([r([entry('p1', 5, 5, 5, 5)]).val, r([entry('p1', 5, 5, 5, 5)]).cls], ['100', GREEN]);
+    assert.deepStrictEqual([r([entry('p1', 3, 3, 3, 3)]).val, r([entry('p1', 3, 3, 3, 3)]).cls], ['60', AMBER]);
+    assert.deepStrictEqual([r([entry('p1', 1, 1, 1, 1)]).val, r([entry('p1', 1, 1, 1, 1)]).cls], ['20', RED]);
+    const none = r([]);
+    assert.strictEqual(none.cls, 'wh-nodata'); assert.strictEqual(none.val, '—');
+});
+test('A:C colorea solo el número con la clase del estado de cada jugadora (umbrales individuales)', () => {
     const t = make([entry('p1', 4, 4, 4, 4)]);
-    t.getRatioColor = () => '#c62828';
-    let html = t._renderPlayerComparisonSection();
-    assert.ok(html.includes('<span class="wh-bad">1.00</span>'));
-    t.getRatioColor = () => '#2e7d32';
-    assert.ok(t._renderPlayerComparisonSection().includes('<span class="wh-good">1.00</span>'));
-    t.getRatioColor = () => '#1565c0';
-    assert.ok(t._renderPlayerComparisonSection().includes('<span class="wh-blue">1.00</span>'));
+    const cls = c => rowCells(t._renderPlayersTable([ratioEntry(t.players[0], { st: { color: '#000', cls: c, risk: 1 } })]), 'Ana').ac;
+    ['wh-bad', 'wh-warn', 'wh-good', 'wh-blue'].forEach(c => { assert.strictEqual(cls(c).cls, c); assert.strictEqual(cls(c).val, '1.00'); });
 });
-test('la leyenda usa puntos de color (texto) y describe bien los tramos', () => {
-    const html = make([entry('p1', 4, 4, 4, 4)])._renderPlayerComparisonSection();
-    assert.ok(html.includes('<b class="wh-good">●</b>') && html.includes('<b class="wh-warn">●</b>') && html.includes('<b class="wh-bad">●</b>'));
-    assert.ok(html.includes('≥4 bueno') && html.includes('3–3,9 normal') && html.includes('&lt;3 atención'));
+test('una jugadora que no entrena muestra 🏥 en A:C pero conserva su bienestar y su readiness', () => {
+    const t = make([entry('p1', 5, 5, 5, 5)]);
+    const html = t._renderPlayersTable([ratioEntry(t.players[0], { out: true, r: 0, st: { color: 'var(--text-faint)', cls: 'wh-nodata', risk: -1 } })]);
+    const c = rowCells(html, 'Ana');
+    assert.ok(c.ac.val.includes('🏥'));
+    assert.strictEqual(c.w.val, '5.0'); assert.strictEqual(c.r.val, '100');
 });
-test('el subtítulo ya no dice "mayor = mejor" (no vale para el A:C)', () => {
-    const html = make([entry('p1', 4, 4, 4, 4)])._renderPlayerComparisonSection();
-    assert.ok(!html.includes('mayor = mejor'));
-    assert.ok(html.includes('1 (peor) a 5 (mejor)'));
+
+console.log('\nRediseño: color solo en el texto, sin círculos ni fondos; cabeceras A:C, Ø y R');
+test('ni el ratio, ni el bienestar ni el readiness llevan fondo ni style, y no hay columna de círculo', () => {
+    const html = tableOf(make([entry('p1', 5, 5, 5, 5), entry('p2', 1, 1, 1, 1), entry('p3', 3, 3, 3, 3)]));
+    assert.ok(!/class="db-player-(ratio|wellness|readiness)[^"]*"\s+style=/.test(html), 'el color de las celdas debe ir en clases');
+    assert.ok(!html.includes('db-player-icon'), 'ya no hay columna de círculo');
+    const sinBarra = html.replace(/<div class="db-bar-fill"[^>]*>/g, '');
+    assert.ok(!/background/i.test(sinBarra), 'solo la barra de A:C lleva color de fondo');
+    assert.ok(!/[🟢🟡🔴🔵🟠]/u.test(html), 'no quedan círculos de colores en la tabla');
 });
-test('el nombre va en su propio contenedor recortable (no rompe la celda)', () => {
-    const html = make([entry('p1', 4, 4, 4, 4)])._renderPlayerComparisonSection();
-    assert.ok(html.includes('<td class="wh-name">') && html.includes('class="wh-name-in"'));
+test('cabecera: A:C, Ø y R son botones clicables con su texto al pasar el ratón', () => {
+    const html = tableOf(make([entry('p1', 4, 4, 4, 4)]));
+    const head = html.slice(0, html.indexOf('db-player-row'));
+    [['ac', 'A:C', 'Ratio agudo:crónico'], ['w', 'Ø', 'Bienestar'], ['r', 'R', 'Readiness']].forEach(([k, label, title]) => {
+        assert.ok(head.includes(`sortDashBy('${k}')`), 'falta el clic de ' + k);
+        assert.ok(new RegExp(`title="${title}[^"]*"[^>]*>${label}`).test(head), `falta el texto ${label} / ${title}`);
+    });
+});
+test('el nombre va en su propio contenedor recortable', () => {
+    assert.ok(tableOf(make([entry('p1', 4, 4, 4, 4)])).includes('<div class="db-player-name">Ana'));
+});
+test('el CSS de colores no define fondos y tiene variante para el tema oscuro en verde, naranja, rojo y azul', () => {
+    const el = dom.styles.find(e => e.id === 'dashboard-comparison-style');
+    assert.ok(el && el.textContent, 'no se inyectó el CSS de colores');
+    assert.ok(!/background/i.test(el.textContent));
+    ['wh-good', 'wh-warn', 'wh-bad', 'wh-blue'].forEach(c =>
+        assert.ok(el.textContent.includes(`[data-theme="dark"] .${c}`), 'falta la variante oscura de ' + c));
+});
+test('la tarjeta antigua «Carga y wellness — 7 días» ya no se pinta', () => {
+    assert.strictEqual(make([entry('p1', 4, 4, 4, 4)])._renderPlayerComparisonSection(), '');
 });
 
 console.log('\nBarras "Wellness hoy" de Inicio');
