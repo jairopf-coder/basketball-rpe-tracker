@@ -52,18 +52,15 @@ RPETracker.prototype.renderDashboard = function() {
     const _wData  = this.wellnessData || [];
     const _pendingW = this.activePlayers.filter(p => !_wData.some(e => e.playerId === p.id && e.date === _wToday));
 
-    // Sort order — persisted on instance
-    if (!this._dashSort) this._dashSort = 'risk'; // 'risk' | 'safe' | 'name'
-
     // Build player data
     const getStatus = (r, playerId) => {
         const n = parseFloat(r);
-        if (isNaN(n) || r === 'N/A') return { icon: '—', color: '#ccc', risk: -1 };
+        if (isNaN(n) || r === 'N/A') return { icon: '—', color: '#ccc', cls: 'wh-nodata', risk: -1 };
         const _tS = this.getPlayerThresholds(playerId || null);
-        if (n > _tS.high) return { icon: '🔴', color: '#f44336', risk: 4 };
-        if (n > _tS.opt)  return { icon: '🟠', color: '#ff9800', risk: 3 };
-        if (n < _tS.low)  return { icon: '🔵', color: '#2196f3', risk: 1 };
-        return           { icon: '🟢', color: '#4caf50', risk: 2 };
+        if (n > _tS.high) return { icon: '🔴', color: '#f44336', cls: 'wh-bad',  risk: 4 };
+        if (n > _tS.opt)  return { icon: '🟠', color: '#ff9800', cls: 'wh-warn', risk: 3 };
+        if (n < _tS.low)  return { icon: '🔵', color: '#2196f3', cls: 'wh-blue', risk: 1 };
+        return           { icon: '🟢', color: '#4caf50', cls: 'wh-good', risk: 2 };
     };
 
     // Jugadoras que hoy NO entrenan con el grupo (lesión en fases 1-4 o marcadas "no disponible"):
@@ -75,51 +72,15 @@ RPETracker.prototype.renderDashboard = function() {
     let players = this.activePlayers.map(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
         const out = _isOutToday(player.id);
-        const st = out ? { icon: '', color: 'var(--text-faint)', risk: -1 } : getStatus(ratio.ratio, player.id);
+        const st = out ? { icon: '', color: 'var(--text-faint)', cls: 'wh-nodata', risk: -1 } : getStatus(ratio.ratio, player.id);
         return { player, ratio, st, out, r: out ? 0 : (parseFloat(ratio.ratio) || 0) };
     });
 
-    if (this._dashSort === 'risk')  players.sort((a, b) => b.st.risk - a.st.risk || b.r - a.r);
-    if (this._dashSort === 'safe')  players.sort((a, b) => a.st.risk - b.st.risk || a.r - b.r);
-    if (this._dashSort === 'name')  players.sort((a, b) => a.player.name.localeCompare(b.player.name));
-    // Las que no entrenan van siempre al final, con cualquier orden elegido (el orden anterior se conserva dentro de cada grupo)
+    // Orden fijo por riesgo: lo usan las alertas y la vista de día de partido.
+    // El orden de la tabla de jugadoras lo elige la usuaria con las cabeceras (sortDashBy).
+    players.sort((a, b) => b.st.risk - a.st.risk || b.r - a.r);
+    // Las que no entrenan van siempre al final (el orden anterior se conserva dentro de cada grupo)
     players = [...players.filter(p => !p.out), ...players.filter(p => p.out)];
-
-    const sortLabel = { risk: '↓', safe: '↑', name: 'A–Z' };
-    const nextSort  = { risk: 'safe', safe: 'name', name: 'risk' };
-
-    const playerRows = players.map(({ player, ratio, st, r, out }) => {
-        const barW = Math.min(r / 2 * 100, 100).toFixed(0);
-        // Wellness de hoy para esta jugadora
-        const wEntry = _wData.find(e => e.playerId === player.id && e.date === _wToday);
-        let wScore = '—', wColor = 'var(--text-faint)', wBg = 'var(--bg-subtle)';
-        if (wEntry) {
-            const overall = this._wOverall(wEntry); // 1 = peor, 5 = mejor en las cuatro dimensiones
-            wScore = overall.toFixed(1);
-            if (overall >= 4)        { wColor = '#2e7d32'; wBg = '#e8f5e9'; }
-            else if (overall >= 2.5) { wColor = '#e65100'; wBg = '#fff3e0'; }
-            else                     { wColor = '#c62828'; wBg = '#ffebee'; }
-        }
-        // Readiness Score
-        const rdyScore = this.calculateReadiness(player.id);
-        const rdyLbl   = this.readinessLabel(rdyScore);
-        const rdyTxt   = rdyScore !== null ? rdyScore : '—';
-
-        return `
-            <div class="db-player-row">
-                ${PlayerTokens.avatar(player, 20, '0.6rem')}
-                <div class="db-player-name">${esc(player.name)}${player.number ? `<span class="db-num">#${esc(player.number)}</span>` : ''}</div>
-                <div class="db-player-bar">
-                    <div class="db-bar-fill" style="width:${barW}%;background:${st.color}"></div>
-                    <div class="db-bar-lo"></div>
-                    <div class="db-bar-hi"></div>
-                </div>
-                <div class="db-player-ratio" style="color:${st.color}">${out ? '<span title="No entrena con el grupo: no se calcula el ratio A:C">🏥</span>' : ratio.confidence === 'low' ? '<span class="badge-insuf" title="' + (ratio.message||'Datos insuficientes') + '">⚠️ Insuf.</span>' : ratio.ratio === 'N/A' ? '—' : ratio.ratio}</div>
-                <div class="db-player-icon">${st.icon}</div>
-                <div class="db-player-wellness" style="color:${wColor};background:${wBg}">${wScore}</div>
-                <div class="db-player-readiness ${rdyLbl.cls}" title="Readiness: ${rdyTxt}/100" style="color:${rdyLbl.color};background:${rdyLbl.bg}">${rdyLbl.icon} ${rdyTxt}</div>
-            </div>`;
-    }).join('');
 
     // Availability groups (same logic as renderTeamStatus)
     const availGroups = { ok: [], caution: [], out: [] };
@@ -372,9 +333,6 @@ RPETracker.prototype.renderDashboard = function() {
                             </div>
                         </div>
                         <div class="db-right-header-btns">
-                            <button class="db-sort-btn" onclick="window.rpeTracker?.cycleDashSort()" title="${{risk:'Ordenado por mayor riesgo',safe:'Ordenado por menor riesgo',name:'Ordenado alfabéticamente'}[this._dashSort]} · toca para cambiar orden">
-                                ${sortLabel[this._dashSort]}
-                            </button>
                             <button class="db-sort-btn db-sort-btn--icon" onclick="window.rpeTracker?.generateTeamStatusPDF()" title="Informe PDF">
                                 📄
                             </button>
@@ -382,18 +340,15 @@ RPETracker.prototype.renderDashboard = function() {
                     </div>
                 </div><!-- /db-right-sticky -->
                 <div class="db-players">
-                    ${this.activePlayers.length > 0 ? playerRows : '<div class="db-empty">Sin jugadoras</div>'}
+                    ${this.activePlayers.length > 0 ? this._renderPlayersTable(players) : '<div class="db-empty">Sin jugadoras</div>'}
                 </div>
                 <div class="db-right-legend">
                     <span style="color:#4caf50">● óptimo</span>
                     <span style="color:#ff9800">● precaución</span>
                     <span style="color:#f44336">● peligro</span>
                     <span style="color:#2196f3">● bajo</span>
-                    <span style="margin-left:auto;font-size:0.65rem;color:var(--text-faint)">😴⚡😊💪 = wellness 7d</span>
+                    <span style="margin-left:auto;font-size:0.65rem;color:var(--text-faint)">⚠️ pocos datos · Ø bienestar 7d · R readiness</span>
                 </div>
-
-                <!-- Tarjetas 4 y 6: Comparativa + Radar -->
-                ${this._renderPlayerComparisonSection()}
 
             </div>
 
@@ -535,13 +490,6 @@ RPETracker.prototype._renderMatchDayView = function(availGroups, players) {
         <div class="md-section">✅ Disponibles para el partido</div>
         <div class="md-grid">${okCards || '<p class="db-empty">Sin jugadoras disponibles</p>'}</div>
     </div>`;
-};
-
-// ── cycleDashSort ────────────────────────────────────────────────────
-RPETracker.prototype.cycleDashSort = function() {
-    const next = { risk: 'safe', safe: 'name', name: 'risk' };
-    this._dashSort = next[this._dashSort] || 'risk';
-    this.renderDashboard();
 };
 
 // ── "Faltan hoy": quién no ha cubierto wellness / RPE ─────────────────

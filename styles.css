@@ -4768,6 +4768,9 @@ header h1 {
 
 /* Lista de jugadoras — parte central de la tarjeta ratio A:C */
 .db-players {
+    /* Columnas: avatar · nombre · barra · A:C · Ø bienestar · R readiness (filas y cabecera comparten rejilla) */
+    --db-cols: 24px minmax(0, 1fr) 80px 46px 40px 36px;
+    --db-gap: 0.5rem;
     padding: 0.25rem 1.1rem 0.5rem;
     background: var(--bg-surface);
     border: 1px solid var(--border);
@@ -4780,7 +4783,8 @@ header h1 {
 /* Leyenda — cierra la tarjeta ratio A:C, pegada debajo de db-players */
 .db-right-legend {
     display: flex;
-    gap: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.75rem;
     font-size: 0.68rem;
     color: var(--text-muted);
     padding: 0.35rem 1.1rem;
@@ -4793,9 +4797,9 @@ header h1 {
 
 .db-player-row {
     display: grid;
-    grid-template-columns: 20px 120px 1fr 42px 18px 36px;
+    grid-template-columns: var(--db-cols);
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--db-gap);
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--border);
 }
@@ -4842,16 +4846,42 @@ header h1 {
 [data-theme="dark"] .db-player-bar  { background: #4a4a56; outline-color: #5c5c6a; }
 
 .db-player-ratio { font-size: 0.88rem; font-weight: 700; text-align: right; }
-.db-player-icon  { font-size: 13px; text-align: center; }
-.db-player-wellness {
-    font-size: 0.75rem;
+/* Bienestar (Ø) y readiness (R): solo número en color (clases wh-*), sin círculo ni fondo */
+.db-player-wellness,
+.db-player-readiness {
+    font-size: 0.8rem;
     font-weight: 700;
     text-align: center;
-    padding: 2px 4px;
-    border-radius: 6px;
-    background: var(--bg-subtle);
-    min-width: 30px;
+    font-variant-numeric: tabular-nums;
 }
+
+/* Cabecera clicable de la tabla de jugadoras: A:C · Ø · R (ordenan al pulsar) */
+.db-players-head {
+    display: grid;
+    grid-template-columns: var(--db-cols);
+    gap: var(--db-gap);
+    align-items: center;
+    padding: 0.1rem 0 0.2rem;
+    border-bottom: 1px solid var(--border);
+}
+.db-th {
+    justify-self: center;
+    min-height: 28px;
+    padding: 2px 2px;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    cursor: pointer;
+}
+.db-th--end { justify-self: end; }
+.db-th:hover { color: var(--primary); }
+.db-th--active { color: var(--text-primary); }
+.db-th:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; border-radius: 4px; }
+.db-th-arrow { font-size: 0.55rem; margin-left: 2px; }
 .db-empty { color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0; text-align: center; }
 
 /* ── Comparativa de jugadoras — tarjeta independiente ────────────── */
@@ -5265,8 +5295,7 @@ header h1 {
 
     .db-right-header { padding: 0.6rem 1rem 0.45rem; border-radius: 12px 12px 0 0; }
     .db-right-legend { padding: 0.3rem 1rem; font-size: 0.65rem; gap: 0.5rem; border-radius: 0 0 12px 12px; }
-    .db-players      { padding: 0.25rem 1rem 0.5rem; border-radius: 0; }
-    .db-player-row   { grid-template-columns: 20px 110px 1fr 38px 18px; gap: 0.4rem; }
+    .db-players      { --db-cols: 22px minmax(0, 1fr) 48px 40px 32px 28px; --db-gap: 0.4rem; padding: 0.25rem 1rem 0.5rem; border-radius: 0; }
     .db-player-name  { font-size: 0.82rem; }
     .db-player-ratio { font-size: 0.82rem; }
     .db-comparison .cmp-table { min-width: 0; font-size: 0.72rem; }
@@ -8935,36 +8964,7 @@ details[open] .ewma-toggle-hint { display: none; }
 
 /* ========== READINESS SCORE — BLOQUE C ========== */
 
-/* Dashboard player row: Readiness chip (6th column) */
-.db-player-readiness {
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 0.18rem 0.45rem;
-    border-radius: 20px;
-    white-space: nowrap;
-    min-width: 44px;
-    text-align: center;
-    border: 1px solid transparent;
-}
-.db-player-readiness.rdy-none {
-    color: var(--text-muted) !important;
-    background: transparent !important;
-    font-weight: 400;
-}
-.db-player-readiness.rdy-green  { border-color: rgba(46,125,50,.25); }
-.db-player-readiness.rdy-yellow { border-color: rgba(249,168,37,.35); }
-.db-player-readiness.rdy-red    { border-color: rgba(198,40,40,.25); }
-
-/* Extend the db-player-row grid to include the readiness column */
-.db-player-row {
-    grid-template-columns: 24px 1fr 80px 42px 22px 38px 52px !important;
-}
-@media (max-width: 768px) {
-    .db-player-readiness { display: none; }
-    .db-player-row {
-        grid-template-columns: 24px 1fr 70px 36px 20px 34px !important;
-    }
-}
+/* La columna R (readiness) de la tabla de jugadoras se define junto a .db-player-wellness */
 
 /* ---- Edit Player Modal — A:C Thresholds section ---- */
 .ac-thresholds-details {
