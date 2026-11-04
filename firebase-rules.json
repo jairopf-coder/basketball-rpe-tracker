@@ -104,6 +104,16 @@
         "$other": { ".validate": false }
       }
     },
+    "staffAlertsSeen": {
+      "$uid": {
+        ".read":  "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
+        ".validate": "newData.hasChildren(['date', 'keys'])",
+        "date": { ".validate": "newData.isString() && newData.val().length == 10" },
+        "keys": { ".validate": "newData.isString() && newData.val().length <= 4000" },
+        "$other": { ".validate": false }
+      }
+    },
     "injuries": {
       ".read":  "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')",
       ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'fisio')"
