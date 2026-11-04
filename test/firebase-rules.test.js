@@ -120,6 +120,17 @@ esperar('staff lee /pushStatus', allowed('.read', ['pushStatus'], 'staff1'), tru
 esperar('fisio lee /pushStatus', allowed('.read', ['pushStatus'], 'fisio1'), true);
 esperar('cuenta SIN rol NO lee /pushStatus', allowed('.read', ['pushStatus'], 'ghost'), false);
 
+// --- Avisos vistos de Inicio (/staffAlertsSeen/{uid}): solo la dueña, y solo staff o fisio ---
+esperar('staff lee SU marca de avisos vistos', allowed('.read', ['staffAlertsSeen', 'staff1'], 'staff1'), true);
+esperar('staff escribe SU marca de avisos vistos', allowed('.write', ['staffAlertsSeen', 'staff1'], 'staff1'), true);
+esperar('fisio escribe SU marca de avisos vistos', allowed('.write', ['staffAlertsSeen', 'fisio1'], 'fisio1'), true);
+esperar('staff NO lee la marca de otro usuario', allowed('.read', ['staffAlertsSeen', 'fisio1'], 'staff1'), false);
+esperar('staff NO escribe la marca de otro usuario', allowed('.write', ['staffAlertsSeen', 'fisio1'], 'staff1'), false);
+esperar('una jugadora NO escribe en /staffAlertsSeen (ni en el suyo)', allowed('.write', ['staffAlertsSeen', 'player1'], 'player1'), false);
+esperar('cuenta SIN rol NO escribe en /staffAlertsSeen', allowed('.write', ['staffAlertsSeen', 'ghost'], 'ghost'), false);
+esperar('nadie lee /staffAlertsSeen entero', allowed('.read', ['staffAlertsSeen'], 'staff1'), false);
+esperar('sin sesión NO lee /staffAlertsSeen', allowed('.read', ['staffAlertsSeen', 'staff1'], null), false);
+
 // --- Raíz cerrada ---
 esperar('nadie lee la raíz sin rol', allowed('.read', [], 'ghost'), false);
 

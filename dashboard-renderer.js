@@ -103,68 +103,12 @@ RPETracker.prototype.renderDashboard = function() {
     const warnPlayers  = players.filter(p => { if (p.out || p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
     const pendingWellness = _pendingW.length;
 
-    // ── C) Team-level A:C alert (3+ players simultaneously over individual threshold) ──
-    const TEAM_ALERT_THRESHOLD = 3;
-    let bannerHTML = '';
-    if (alertPlayers.length >= TEAM_ALERT_THRESHOLD) {
-        const combinedAtRisk = alertPlayers.length + warnPlayers.length;
-        const teamMsg = alertPlayers.length >= TEAM_ALERT_THRESHOLD
-            ? `⚠️ <strong>${alertPlayers.length} jugadoras en zona de riesgo A:C simultáneamente</strong> — revisar carga de equipo hoy`
-            : '';
-        const teamSecondary = combinedAtRisk >= TEAM_ALERT_THRESHOLD + 1 && warnPlayers.length > 0
-            ? `<div class="db-alert-sep">·</div><div class="db-alert-item">🟠 <strong>${warnPlayers.length} más</strong> en precaución</div>`
-            : '';
-        bannerHTML = `<div class="db-alert-banner db-alert-banner--team">
-            <div class="db-alert-item">${teamMsg}</div>${teamSecondary}
-            <button class="db-alert-btn-team" onclick="window.rpeTracker?.openPreSessionModal()">Ver detalle →</button>
-        </div>`;
-    }
-
-    if (alertPlayers.length > 0 || warnPlayers.length > 0) {
-        const items = [];
-        if (alertPlayers.length) items.push(`🔴 <strong>${alertPlayers.map(p=>esc(p.player.name.split(' ')[0])).join(', ')}</strong> ratio en zona de peligro`);
-        if (warnPlayers.length)  items.push(`🟠 <strong>${warnPlayers.map(p=>esc(p.player.name.split(' ')[0])).join(', ')}</strong> en precaución`);
-        bannerHTML += `<div class="db-alert-banner">
-            ${items.map(i=>`<div class="db-alert-item">${i}</div>`).join('<div class="db-alert-sep">·</div>')}
-        </div>`;
-    }
-
-    // Wellness trend alerts in dashboard banner
+    // ── Avisos de Inicio: UNA línea plegable + recordatorio de planificación (dashboard-alerts.js) ──
     const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
-    if (trendAlerts.length > 0) {
-        const trendItems = trendAlerts.map(a =>
-            `🔁 <strong>${esc(a.name.split(' ')[0])}</strong> — ${a.message}`
-        );
-        bannerHTML += `<div class="db-alert-banner db-alert-banner--trend">
-            ${trendItems.map(i=>`<div class="db-alert-item">${i}</div>`).join('<div class="db-alert-sep">·</div>')}
-        </div>`;
-    }
-
-    // Aviso: RPE enviado por una jugadora distinto del que registró el staff
-    const rpeDiscrepancies = this._rpeDiscrepancies || [];
-    if (rpeDiscrepancies.length > 0) {
-        const items = rpeDiscrepancies.map(d =>
-            `<div class="db-alert-item">⚠️ <strong>${esc(d.playerName.split(' ')[0])}</strong> RPE distinto (tú: ${d.staffRpe}, ella: ${d.playerRpe}) — ${d.date}
-                <button class="db-alert-btn-team" onclick="window.rpeTracker?.showSessionDetail('${d.sessionId}')">Revisar →</button>
-            </div>`
-        );
-        bannerHTML += `<div class="db-alert-banner db-alert-banner--trend">
-            ${items.join('<div class="db-alert-sep">·</div>')}
-        </div>`;
-    }
-
-    // ── Aviso dominical: recordar hacer la planificación de la semana que empieza ──
-    // Solo los domingos, y solo si la semana que empieza mañana todavía no se ha guardado.
-    if (new Date().getDay() === 0) {
-        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-        const nextMonday = this._wpMondayKey ? this._wpMondayKey(tomorrow) : toLocalISODate(tomorrow);
-        if (!this.isWeekPlanSaved || !this.isWeekPlanSaved(nextMonday)) {
-            bannerHTML += `<div class="db-alert-banner db-alert-banner--planning">
-                <div class="db-alert-item">📅 <strong>Planificación pendiente</strong> — revisa la semana que empieza mañana</div>
-                <button class="db-alert-btn-team" onclick="window.rpeTracker?.switchView('weekplan')">Planificar →</button>
-            </div>`;
-        }
-    }
+    const bannerHTML = this._renderDashAlerts({
+        dangerPlayers: alertPlayers, warnPlayers, trendAlerts,
+        rpeDiscrepancies: this._rpeDiscrepancies, teamThreshold: 3
+    }) + this._renderDashPlanningReminder();
 
     // ── Match-day mode ─────────────────────────────────────────
     const todayKey = ['dom','lun','mar','mie','jue','vie','sab'][new Date().getDay()];

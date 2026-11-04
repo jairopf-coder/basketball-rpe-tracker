@@ -288,7 +288,7 @@ console.log('\nInicio — KPIs de equipo (renderDashboard real)');
 
 function dashboardKpis(injured) {
     const { ctx: c, els: e } = load(['store.js', 'security.js', 'ewma-calculator.js', 'wellness.js', 'app-sessions.js',
-        'app-comparisons.js', 'weekplan-medical.js', 'injury-management.js', 'dashboard-comparison.js', 'dashboard-renderer.js']);
+        'app-comparisons.js', 'weekplan-medical.js', 'injury-management.js', 'dashboard-comparison.js', 'dashboard-alerts.js', 'dashboard-renderer.js']);
     const t = buildTracker(c, { injured });
     // Los métodos que no son de este test se sustituyen por huecos para poder pintar la pantalla
     const DATA = { _playerRpeRaw: [], _wellnessPlayerCache: {}, _dashSort: 'risk', _matchDayMode: false };

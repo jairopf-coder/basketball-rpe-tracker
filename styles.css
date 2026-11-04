@@ -8964,6 +8964,92 @@ details[open] .ewma-toggle-hint { display: none; }
 
 /* ========== READINESS SCORE — BLOQUE C ========== */
 
+/* ── Avisos de Inicio: una línea plegable (dashboard-alerts.js) ──────────────
+   Plegada ocupa ~36 px. Al tocarla se despliega la lista; «Marcar como visto por hoy»
+   la deja en gris. Colores con variables del tema (claro y oscuro). */
+.db-alerts {
+    margin: 0 0 0.75rem;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--warning);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    font-size: 0.82rem;
+    overflow: hidden;
+}
+.db-alerts--seen { border-left-color: var(--border); }
+.db-alerts-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    width: 100%;
+    min-height: 36px;
+    padding: 0.35rem 0.85rem;
+    background: none;
+    border: none;
+    font: inherit;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+}
+.db-alerts-bar:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.db-alerts--seen .db-alerts-bar { color: var(--text-muted); }
+.db-alerts-title { font-weight: 600; white-space: nowrap; }
+.db-alerts-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; min-width: 0; }
+.db-alerts--seen .db-alerts-chips { display: none; }
+.db-alerts-chip {
+    font-size: 0.72rem;
+    padding: 1px 8px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+.db-alerts-toggle { margin-left: auto; font-size: 0.75rem; color: var(--text-muted); transition: transform 0.15s; }
+.db-alerts.is-open .db-alerts-toggle { transform: rotate(180deg); }
+.db-alerts-panel { display: none; border-top: 1px solid var(--border); padding: 0.15rem 0.85rem 0.5rem; }
+.db-alerts.is-open .db-alerts-panel { display: block; }
+.db-alerts-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+}
+.db-alerts-foot { display: flex; justify-content: flex-end; padding-top: 0.5rem; }
+.db-alerts-btn {
+    margin-left: auto;
+    padding: 2px 10px;
+    min-height: 28px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font: inherit;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    cursor: pointer;
+}
+.db-alerts-btn:hover { color: var(--primary); border-color: var(--primary); }
+.db-alerts-foot .db-alerts-btn { margin-left: 0; }
+/* Recordatorio de planificación (solo domingos): una tarea, no un aviso */
+.db-alerts-plan {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    margin: 0 0 0.75rem;
+    padding: 0.4rem 0.85rem;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    font-size: 0.82rem;
+    color: var(--text-primary);
+}
+
 /* La columna R (readiness) de la tabla de jugadoras se define junto a .db-player-wellness */
 
 /* ---- Edit Player Modal — A:C Thresholds section ---- */

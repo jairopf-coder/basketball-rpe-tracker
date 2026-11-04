@@ -36,6 +36,7 @@ const urlsToCache = [
   'ewma-calculator.js',
   'dashboard-renderer.js',
   'dashboard-comparison.js',
+  'dashboard-alerts.js',
   'injury-management.js',
   'injury-management-2.js',
   'gps-injury-signal.js',

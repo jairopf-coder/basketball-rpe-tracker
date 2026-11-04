@@ -354,6 +354,8 @@ RPETracker.prototype._wTrendAlerts = function() {
             alerts.push({
                 icon: '🔁',
                 type: 'trend',
+                kind: 'sleep',
+                playerId: p.id,
                 name: p.name,
                 message: 'Sueño deficiente 3+ días consecutivos (≤2/5)'
             });
@@ -364,6 +366,8 @@ RPETracker.prototype._wTrendAlerts = function() {
             alerts.push({
                 icon: '🔁',
                 type: 'trend',
+                kind: 'soreness',
+                playerId: p.id,
                 name: p.name,
                 message: 'Dolor muscular acumulado 3+ días consecutivos'
             });

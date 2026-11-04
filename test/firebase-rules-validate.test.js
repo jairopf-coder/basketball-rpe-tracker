@@ -89,6 +89,13 @@ check('staff borra su ficha de jugadora', as('staff1').write('/players/p1', null
 check('staff borra su anamnesis', as('staff1').write('/anamnesis/p1', null), true);
 check('staff borra su buzón de RPE y de wellness', as('staff1').write('/playerRpeReports/uA', null), true);
 
+// Avisos vistos de Inicio: cada usuario del cuerpo técnico, solo en su propio nodo
+const SEEN = (extra, del = []) => { const e = { date: '2026-11-04', keys: 'ac:d:p1,ac:w:p2,wt:p3:sleep,rpe:s1', ...extra }; del.forEach(k => delete e[k]); return e; };
+check('staff guarda su marca de avisos vistos', as('staff1').write('/staffAlertsSeen/staff1', SEEN()), true);
+check('el fisio guarda la suya', as('fisio1').write('/staffAlertsSeen/fisio1', SEEN()), true);
+check('staff actualiza su marca otro día', as('staff1').write('/staffAlertsSeen/staff1', SEEN({ date: '2026-11-05' })), true);
+check('staff lee su marca', as('staff1').read('/staffAlertsSeen/staff1'), true);
+
 // ===== ATAQUES (deben seguir denegados) =====
 check('staff NO puede escribir una suscripción push ajena', as('staff1').write('/pushSubscriptions/uA', { endpoint: 'https://x.example/y', keys: { p256dh: 'a', auth: 'b' }, updatedAt: 'ahora' }), false);
 check('staff NO puede escribir el estado push ajeno', as('staff1').write('/pushStatus/uA', { active: false, updatedAt: 'ahora' }), false);
@@ -133,6 +140,21 @@ check('email enorme', as('uA').write('/users/uA/email', 'x'.repeat(500)), false)
 check('cuenta sin sesión escribe wellness', as(null).write('/wellnessPlayer/uA/2026-10-05', W()), false);
 check('cuenta sin rol lee players', as('ghost').read('/players'), false);
 check('cuenta sin rol escribe sessions', as('ghost').write('/sessions/x', { a: 1 }), false);
+
+// Avisos vistos: nadie toca la marca de otro y el formato es estricto
+check('staff NO escribe la marca del fisio', as('staff1').write('/staffAlertsSeen/fisio1', SEEN()), false);
+check('staff NO lee la marca del fisio', as('staff1').read('/staffAlertsSeen/fisio1'), false);
+check('una jugadora NO escribe en /staffAlertsSeen', as('uA').write('/staffAlertsSeen/uA', SEEN()), false);
+check('cuenta sin sesión NO escribe avisos vistos', as(null).write('/staffAlertsSeen/staff1', SEEN()), false);
+check('cuenta sin rol NO escribe avisos vistos', as('ghost').write('/staffAlertsSeen/ghost', SEEN()), false);
+check('avisos vistos sin keys', as('staff1').write('/staffAlertsSeen/staff1', SEEN({}, ['keys'])), false);
+check('avisos vistos sin date', as('staff1').write('/staffAlertsSeen/staff1', SEEN({}, ['date'])), false);
+check('date con otra longitud', as('staff1').write('/staffAlertsSeen/staff1', SEEN({ date: '2026-11-4' })), false);
+check('date que no es texto', as('staff1').write('/staffAlertsSeen/staff1', SEEN({ date: 20261104 })), false);
+check('keys demasiado largas (>4000)', as('staff1').write('/staffAlertsSeen/staff1', SEEN({ keys: 'x'.repeat(4001) })), false);
+check('keys que no es texto', as('staff1').write('/staffAlertsSeen/staff1', SEEN({ keys: { a: 1 } })), false);
+check('campo extra en avisos vistos', as('staff1').write('/staffAlertsSeen/staff1', SEEN({ extra: 'x' })), false);
+check('nadie lee /staffAlertsSeen entero', as('staff1').read('/staffAlertsSeen'), false);
 
 if (fails) { console.log(`\n${fails} de ${n} comprobaciones FALLAN (${file})`); process.exit(1); }
 console.log(`OK — ${n} comprobaciones superadas (${file})`);

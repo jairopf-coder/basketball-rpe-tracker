@@ -185,6 +185,14 @@ test('la tarjeta antigua «Carga y wellness — 7 días» ya no se pinta', () =>
     assert.strictEqual(make([entry('p1', 4, 4, 4, 4)])._renderPlayerComparisonSection(), '');
 });
 
+console.log('\nTendencia de wellness: identificador estable para los avisos de Inicio');
+test('_wTrendAlerts indica la jugadora (playerId) y el tipo (sueño / dolor muscular) de cada aviso', () => {
+    const mk = (id, sleep, soreness) => [0, 1, 2].map(i => ({ id: `${id}${i}`, playerId: id, date: dayStr(i), sleep, fatigue: 4, mood: 4, soreness }));
+    const t = make([...mk('p1', 2, 5), ...mk('p2', 5, 2)]);
+    const alerts = Array.from(t._wTrendAlerts().map(a => `${a.playerId}:${a.kind}`)).sort();
+    assert.deepStrictEqual(alerts, ['p1:sleep', 'p2:soreness']);
+});
+
 console.log('\nBarras "Wellness hoy" de Inicio');
 test('Energía 4.0 en verde, Energía 2.0 en rojo; la etiqueta ya no dice "Agujetas"', () => {
     const t = make([entry('p1', 4, 4, 4, 4)]);
