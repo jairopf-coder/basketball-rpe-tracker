@@ -86,10 +86,10 @@ test('sin avisos no se pinta nada, y datos raros (no-listas) no rompen', () => {
 });
 
 console.log('\nLínea plegable');
-test('por defecto: plegada, «N avisos» con chips por tipo y botón «Marcar como visto por hoy»', () => {
+test('por defecto: plegada, «N avisos» con chips por tipo (Peligro, Precaución, Wellness, RPE) y botón «Marcar como visto por hoy»', () => {
     const html = makeEnv().t._renderDashAlerts(DATA());
     assert.ok(html.includes('6 avisos'));
-    assert.ok(html.includes('A:C 4') && html.includes('Wellness 1') && html.includes('RPE 1'));
+    assert.ok(/Peligro <\/span>3/.test(html) && /Precaución <\/span>1/.test(html) && html.includes('Wellness 1') && html.includes('RPE 1'));
     assert.ok(html.includes('aria-expanded="false"') && !html.includes('is-open'));
     assert.ok(html.includes('Marcar como visto por hoy') && !html.includes('db-alerts--seen'));
 });
@@ -278,6 +278,51 @@ test('el recordatorio no cuenta como aviso ni entra en la marca de «visto»', (
         const a = t._collectDashAlerts({ dangerPlayers: [], warnPlayers: [], trendAlerts: [], rpeDiscrepancies: [] });
         assert.strictEqual(a.total, 0);
     } finally { NOW = new Date(2026, 10, 4, 10, 0); }
+});
+
+console.log('\nRegla única de alerta A:C (la misma en KPI, línea de avisos, insignia, icono y notificación)');
+const TH = { low: 0.8, opt: 1.3, high: 1.5 };
+function acEnv(ratios, { thresholds = {}, out = [], players } = {}) {
+    const { t } = makeEnv();
+    t.getPlayerThresholds = id => thresholds[id] || TH;
+    t.calculateAcuteChronicRatio = id => ratios[id];
+    t.activePlayers = (players || Object.keys(ratios)).map(id => ({ id }));
+    t.getPlayerParticipation = (id) => (out.includes(id) ? 'out' : 'in');
+    return t;
+}
+const R = (v, confidence = 'high') => ({ ratio: String(v), confidence });
+test('niveles: peligro solo por ENCIMA del umbral alto; precaución por encima del óptimo; el borde exacto no sube de nivel', () => {
+    const t = acEnv({});
+    const lv = v => t._acLevel(R(v), 'x');
+    assert.deepStrictEqual([1.51, 1.5, 1.31, 1.3, 1.0, 0.8, 0.79].map(lv), ['danger', 'warn', 'warn', 'ok', 'ok', 'ok', 'low']);
+});
+test('sin ratio fiable ("Insuf.", N/A o vacío) no es ningún nivel de alerta, aunque el número sea alto', () => {
+    const t = acEnv({});
+    assert.strictEqual(t._acLevel(R(2.4, 'low'), 'x'), 'na');
+    assert.strictEqual(t._acLevel(R('N/A'), 'x'), 'na');
+    assert.strictEqual(t._acLevel(undefined, 'x'), 'na');
+});
+test('usa los umbrales individuales de cada jugadora', () => {
+    const t = acEnv({ a: R(1.6), b: R(1.6) }, { thresholds: { b: { low: 0.8, opt: 1.4, high: 1.8 } } });
+    assert.strictEqual(t._acLevel(R(1.6), 'a'), 'danger');
+    assert.strictEqual(t._acLevel(R(1.6), 'b'), 'warn');
+});
+test('_acDangerCount cuenta solo peligro: no precaución, ni lesionadas, ni "Insuf.", ni jugadoras que no son activas', () => {
+    const t = acEnv(
+        { p1: R(1.8), p2: R(1.4), p3: R(1.9), p4: R(2.2, 'low'), p5: R(1.7), p6: R(2.0) },
+        { out: ['p3'], players: ['p1', 'p2', 'p3', 'p4', 'p5'] });   // p6 no es activa
+    assert.strictEqual(t._acDangerCount(), 2);   // p1 y p5
+});
+test('el KPI, la insignia de Análisis, el icono de la app y la notificación usan esa misma regla (sin contarla cada uno por su cuenta)', () => {
+    const rend = fs.readFileSync(path.join(ROOT, 'dashboard-renderer.js'), 'utf8');
+    const app = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+    assert.ok(/alertPlayers = players\.filter\([^;]*_acLevel\([^;]*'danger'/.test(rend), 'el peligro del Inicio sale de _acLevel');
+    assert.ok(/warnPlayers\s*= players\.filter\([^;]*_acLevel\([^;]*'warn'/.test(rend), 'la precaución del Inicio sale de _acLevel');
+    assert.ok(/acAlertCount\s*= alertPlayers\.length/.test(rend), 'el KPI es el nº de jugadoras en peligro de la línea de avisos');
+    assert.ok(app.includes('const alertCount = this._acDangerCount()'), 'insignia de Análisis');
+    assert.ok(app.includes('const count = tracker._acDangerCount()'), 'icono de la app');
+    assert.ok(/tracker\._acLevel\(ratio, pid\) === 'danger'/.test(app), 'notificación al guardar sesión');
+    assert.ok(!/r > this\.getPlayerThresholds\(player\.id\)\.opt/.test(app), 'la insignia ya no cuenta la precaución');
 });
 
 console.log('\nCableado');
