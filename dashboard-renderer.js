@@ -66,8 +66,7 @@ RPETracker.prototype.renderDashboard = function() {
     // Jugadoras que hoy NO entrenan con el grupo (lesión en fases 1-4 o marcadas "no disponible"):
     // su ratio A:C cae por falta de carga, no por descarga planificada, y sale "insuficiente" sin
     // ser un dato útil. Se listan al final con 🏥 en vez de ratio; su wellness y readiness se ven igual.
-    const _isOutToday = id => typeof this.getPlayerParticipation === 'function'
-        && this.getPlayerParticipation(id, _wToday) === 'out';
+    const _isOutToday = id => this._acIsOutToday(id, _wToday);
 
     let players = this.activePlayers.map(player => {
         const ratio = this.calculateAcuteChronicRatio(player.id);
@@ -99,8 +98,9 @@ RPETracker.prototype.renderDashboard = function() {
     });
 
     // ── Alert banner data ──────────────────────────────────────
-    const alertPlayers = players.filter(p => { if (p.out || p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); return parseFloat(p.ratio.ratio) > _t.high; });
-    const warnPlayers  = players.filter(p => { if (p.out || p.ratio.confidence === 'low') return false; const _t=this.getPlayerThresholds(p.player.id); const r=parseFloat(p.ratio.ratio); return r >= _t.opt && r <= _t.high; });
+    // Regla única de alerta A:C (dashboard-alerts.js → _acLevel): peligro = alerta; precaución = aviso suave
+    const alertPlayers = players.filter(p => !p.out && this._acLevel(p.ratio, p.player.id) === 'danger');
+    const warnPlayers  = players.filter(p => !p.out && this._acLevel(p.ratio, p.player.id) === 'warn');
     const pendingWellness = _pendingW.length;
 
     // ── Avisos de Inicio: UNA línea plegable + recordatorio de planificación (dashboard-alerts.js) ──
@@ -136,11 +136,7 @@ RPETracker.prototype.renderDashboard = function() {
         : parseFloat(teamAC) < 0.8 ? 'low'
         : 'ok';
 
-    const acAlertCount  = players.filter(p => {
-        if (p.out) return false;
-        const t = this.getPlayerThresholds(p.player.id);
-        return parseFloat(p.ratio.ratio) > t.high;
-    }).length;
+    const acAlertCount  = alertPlayers.length;   // el mismo número que la insignia de Análisis y el icono de la app
     const pendingCount   = _pendingW.length;
 
     container.innerHTML = `

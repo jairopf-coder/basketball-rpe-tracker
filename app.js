@@ -1286,11 +1286,7 @@ class RPETracker {
     // ========== BATCH 3: NAV ALERT BADGE ==========
 
     _updateNavAlertBadge() {
-        const alertCount = this.activePlayers.filter(player => {
-            const ratio = this.calculateAcuteChronicRatio(player.id);
-            const r = parseFloat(ratio.ratio);
-            return !isNaN(r) && r > this.getPlayerThresholds(player.id).opt;
-        }).length;
+        const alertCount = this._acDangerCount();   // regla única de alerta A:C (dashboard-alerts.js)
 
         // Bottom-nav "Análisis" badge (A:C alerts)
         const alertBadge = document.getElementById('bnAlertBadge');
@@ -1335,10 +1331,8 @@ const PushNotifications = {
             const player = tracker.players.find(p => p.id === pid);
             if (!player) continue;
             const ratio = tracker.calculateAcuteChronicRatio(pid);
-            const r = parseFloat(ratio.ratio);
-            if (isNaN(r)) continue;
-            const thresh = tracker.getPlayerThresholds(pid);
-            if (r > thresh.high) {
+            if (tracker._acIsOutToday(pid)) continue;
+            if (tracker._acLevel(ratio, pid) === 'danger') {
                 alertCount++;
                 await this.send(
                     `🔴 Alerta carga — ${esc(player.name)}`,
@@ -1353,15 +1347,7 @@ const PushNotifications = {
     // Update PWA badge with count of players currently above critical threshold
     updateBadge(tracker) {
         if (!tracker) return;
-        let count = 0;
-        for (const player of tracker.players) {
-            const ratio = tracker.calculateAcuteChronicRatio(player.id);
-            const r = parseFloat(ratio.ratio);
-            if (!isNaN(r)) {
-                const thresh = tracker.getPlayerThresholds(player.id);
-                if (r > thresh.high) count++;
-            }
-        }
+        const count = tracker._acDangerCount();   // regla única de alerta A:C (dashboard-alerts.js)
         try {
             if ('setAppBadge' in navigator) {
                 if (count > 0) navigator.setAppBadge(count);

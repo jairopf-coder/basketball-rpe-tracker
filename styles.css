@@ -4671,13 +4671,12 @@ header h1 {
     min-width: 0;
 }
 
-/* Tarjeta: Ratio A:C + comparativa + radar (todo en .db-right) */
+/* Tarjeta: Ratio A:C — jugadoras (todo en .db-right) */
 .db-right-sticky {
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: 12px 12px 0 0;
     box-shadow: none; /* unificado con db-players abajo */
-    /* La leyenda ya no está aquí — está entre db-players y db-comparison */
 }
 
 /* .db-right-sticky + .db-players + .db-right-legend forman UNA sola tarjeta
@@ -4707,13 +4706,6 @@ header h1 {
     background: var(--bg-surface);
 }
 
-.db-right-header-actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    gap: 0.5rem;
-}
 
 .db-right-header-left {
     display: flex;
@@ -4742,13 +4734,6 @@ header h1 {
     flex-shrink: 0;
 }
 
-.db-right-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-}
 
 .db-sort-btn {
     font-size: 0.75rem;
@@ -4885,73 +4870,9 @@ header h1 {
 .db-empty { color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0; text-align: center; }
 
 /* ── Comparativa de jugadoras — tarjeta independiente ────────────── */
-.db-comparison {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1rem 1.1rem 1.1rem;
-    box-shadow: var(--shadow-sm);
-}
 
 /* Radar de wellness — tarjeta independiente */
-.db-comparison-radar {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1rem 1.1rem 1.1rem;
-    box-shadow: var(--shadow-sm);
-}
 
-.db-comparison-header,
-.cmp-radar-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-bottom: 0.75rem;
-}
-.db-comparison-header .db-left-label,
-.cmp-radar-header .db-left-label { margin-bottom: 0; }
-
-.cmp-subtitle {
-    font-size: 0.72rem;
-    color: var(--text-muted);
-}
-
-.db-comparison .cmp-table-wrap {
-    border-radius: 8px;
-    box-shadow: none;
-    background: transparent;
-    border: 1px solid var(--border);
-    margin-top: 0;
-    overflow-x: hidden; /* sin scroll horizontal */
-}
-.db-comparison .cmp-table { width: 100%; min-width: 0; font-size: 0.75rem; }
-.db-comparison .cmp-table thead tr {
-    background: var(--bg-subtle);
-    border-bottom: 1px solid var(--border);
-}
-.db-comparison .cmp-table th {
-    padding: 0.35rem 0.3rem;
-    text-align: center;
-    font-weight: 600;
-    font-size: 0.68rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-.db-comparison .cmp-table td { vertical-align: middle; }
-
-.cmp-th-player { text-align: left !important; text-transform: uppercase; letter-spacing: 0.04em; }
-.cmp-td-player { padding: 0.5rem 0.6rem; white-space: nowrap; }
-.cmp-td-player-inner { display: flex; align-items: center; flex-wrap: nowrap; gap: 0.45rem; min-width: 0; }
-.cmp-player-name { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; }
-.db-comparison .cmp-td-ratio,
-.db-comparison .cmp-td-w { padding: 0.4rem 0.3rem; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
-.cmp-td-flag { padding: 0.5rem 0.4rem; text-align: center; width: 28px; }
-.cmp-flag    { font-size: 0.85rem; }
-.cmp-nodata  { color: var(--text-muted); }
-.cmp-table-hint { font-size: 0.7rem; color: var(--text-muted); padding: 0.55rem 0.75rem; border-top: 1px solid var(--border); }
 
 .badge-insuf {
     display: inline-flex;
@@ -4967,24 +4888,6 @@ header h1 {
 }
 
 /* Radar: selector de jugadoras */
-.cmp-checks { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.85rem; }
-.cmp-check {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.78rem;
-    padding: 3px 9px 3px 6px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-    background: var(--bg-subtle);
-    cursor: pointer;
-    user-select: none;
-}
-.cmp-check .cmp-radar-checkbox { margin: 0; accent-color: var(--primary); cursor: pointer; }
-.cmp-check-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.cmp-check-name { font-weight: 500; color: var(--text-secondary); }
-.cmp-radar-canvas-wrap { position: relative; height: 280px; }
-.cmp-radar-empty { text-align: center; padding: 2rem 1rem; font-size: 0.85rem; color: var(--text-muted); }
 
 /* ── Pills de disponibilidad ─────────────────────────────────────── */
 .db-avail-pill {
@@ -5254,8 +5157,6 @@ header h1 {
 [data-theme="dark"] .db-right-legend  { background: var(--bg-surface); border-color: var(--border); }
 [data-theme="dark"] .db-players       { background: var(--bg-surface); border-color: var(--border); }
 [data-theme="dark"] .db-rw-card       { background: var(--bg-surface); border-color: var(--border); }
-[data-theme="dark"] .db-comparison    { background: var(--bg-surface); border-color: var(--border); }
-[data-theme="dark"] .db-comparison-radar { background: var(--bg-surface); border-color: var(--border); }
 
 /* ── Responsive ──────────────────────────────────────────────────── */
 @media (min-width: 769px) and (max-width: 1100px) {
@@ -5298,8 +5199,7 @@ header h1 {
     .db-players      { --db-cols: 22px minmax(0, 1fr) 48px 40px 32px 28px; --db-gap: 0.4rem; padding: 0.25rem 1rem 0.5rem; border-radius: 0; }
     .db-player-name  { font-size: 0.82rem; }
     .db-player-ratio { font-size: 0.82rem; }
-    .db-comparison .cmp-table { min-width: 0; font-size: 0.72rem; }
-}
+    }
 
 /* ===================================================================
    DARK MODE — Catch-all overrides for elements with inline/residual
@@ -7186,16 +7086,6 @@ details[open] .ewma-toggle-hint { display: none; }
 [data-theme="dark"] .inj-criteria-header,
 [data-theme="dark"] .inj-ac-header { background: var(--bg-elevated); }
 
-/* ── Trend alert banner variant ──────────────────────────────────── */
-.db-alert-banner--trend {
-    background: linear-gradient(135deg, rgba(156,39,176,0.10), rgba(63,81,181,0.08));
-    border-left: 3px solid #9c27b0;
-}
-[data-theme="dark"] .db-alert-banner--trend {
-    background: rgba(156,39,176,0.14);
-    border-left-color: #ce93d8;
-}
-
 /* Nav badge – trend variant (purple) */
 .nav-alert-badge--trend { background: #9c27b0 !important; }
 
@@ -8201,46 +8091,9 @@ details[open] .ewma-toggle-hint { display: none; }
 }
 
 /* ================================================================
-   BLOQUE A — Alert banner + Match-day mode
+   BLOQUE A — Match-day mode
    ================================================================ */
 
-.db-alert-banner {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    padding: 0.55rem 1.25rem;
-    background: var(--warning-soft);
-    border-bottom: 0.5px solid var(--warning);
-    font-size: 0.82rem;
-    color: var(--warning);
-    max-width: 1200px;
-    margin: 0 auto;
-    width: 100%;
-    box-sizing: border-box;
-    border-radius: 12px;
-}
-[data-theme="dark"] .db-alert-banner {
-    background: rgba(245,166,35,0.12);
-    border-color: rgba(245,166,35,0.3);
-    color: #ffe082;
-}
-.db-alert-item { display: flex; align-items: center; gap: 0.3rem; }
-.db-alert-sep  { color: #bbb; font-size: 0.75rem; }
-.db-alert-btn  {
-    margin-left: auto;
-    background: #ff6600;
-    color: #fff;
-    border: none;
-    border-radius: 20px;
-    padding: 3px 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.15s;
-}
-.db-alert-btn:hover { background: #e55a00; }
 
 .db-matchday-bar {
     display: flex;
@@ -9005,6 +8858,13 @@ details[open] .ewma-toggle-hint { display: none; }
     white-space: nowrap;
     color: var(--text-secondary);
 }
+/* Móvil: los chips de A:C quedan en «● 3» (sin la palabra) para que la línea plegada siga midiendo una fila */
+@media (max-width: 480px) {
+    .db-alerts-bar { gap: 0.25rem 0.5rem; }
+    .db-alerts-chips { flex-wrap: nowrap; gap: 0.2rem; }
+    .db-alerts-chip { padding: 1px 6px; font-size: 0.68rem; }
+    .db-alerts-chip-txt { display: none; }
+}
 .db-alerts-toggle { margin-left: auto; font-size: 0.75rem; color: var(--text-muted); transition: transform 0.15s; }
 .db-alerts.is-open .db-alerts-toggle { transform: rotate(180deg); }
 .db-alerts-panel { display: none; border-top: 1px solid var(--border); padding: 0.15rem 0.85rem 0.5rem; }
@@ -9105,47 +8965,6 @@ details[open] .ewma-toggle-hint { display: none; }
     color: var(--text-muted);
     margin: 0.5rem 0 0.15rem;
     font-style: italic;
-}
-
-/* ================================================================
-   C) TEAM ALERT BANNER
-   ================================================================ */
-.db-alert-banner--team {
-    background: linear-gradient(135deg, rgba(230,81,0,0.12), rgba(245,124,0,0.08));
-    border-left: 4px solid #e65100;
-    font-weight: 500;
-    gap: 0.75rem;
-}
-[data-theme="dark"] .db-alert-banner--team {
-    background: rgba(230,81,0,0.16);
-    border-left-color: #ff8f00;
-    color: #ffcc80;
-}
-.db-alert-btn-team {
-    margin-left: auto;
-    font-size: 0.75rem;
-    background: transparent;
-    border: 1px solid currentColor;
-    color: inherit;
-    border-radius: 12px;
-    padding: 0.15rem 0.65rem;
-    cursor: pointer;
-    opacity: 0.85;
-    transition: opacity 0.15s;
-    white-space: nowrap;
-}
-.db-alert-btn-team:hover { opacity: 1; }
-
-/* ── Aviso de planificación semanal pendiente (domingos) ─────────── */
-.db-alert-banner--planning {
-    background: linear-gradient(135deg, rgba(33,150,243,0.10), rgba(3,169,244,0.08));
-    border-left: 3px solid #2196f3;
-    color: #1565c0;
-}
-[data-theme="dark"] .db-alert-banner--planning {
-    background: rgba(33,150,243,0.14);
-    border-left-color: #64b5f6;
-    color: #90caf9;
 }
 
 

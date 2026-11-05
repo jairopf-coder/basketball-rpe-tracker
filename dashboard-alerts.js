@@ -1,7 +1,7 @@
 // BasketballRPE-Web — dashboard-alerts.js
 // Avisos de Inicio en UNA línea plegable (antes eran hasta cinco franjas a todo el ancho).
 //
-//   · Plegada por defecto: «4 avisos · A:C 4 · Wellness 2 · RPE 1». Al tocarla se despliega la lista.
+//   · Plegada por defecto: «4 avisos · Peligro 2 · Precaución 1 · Wellness 1». Al tocarla se despliega la lista.
 //   · «Marcar como visto por hoy»: la línea pasa a gris («Avisos vistos hoy: 4») y la lista sigue
 //     disponible al tocarla. Vuelve a destacarse si aparece un aviso NUEVO o al día siguiente.
 //   · La marca de «visto» se sincroniza entre dispositivos (nodo /staffAlertsSeen/{uid}, solo la
@@ -31,6 +31,40 @@ function _dashAlertsValid(rec) {
 
 // Primer nombre, SIN escapar: el escape (esc) se aplica al construir el HTML, en _renderDashAlerts
 function _dashAlertsFirstName(name) { return String(name || '').split(' ')[0]; }
+
+// ── 0. Regla ÚNICA de «alerta A:C» ───────────────────────────────────────────
+// La usan la línea de avisos, el KPI «alertas A:C», la insignia de Análisis, el icono de la app y
+// la notificación al guardar una sesión, para que el número sea el mismo en todas partes:
+//   · alerta = jugadora en PELIGRO (ratio por encima de su umbral «alto»); la precaución se ve en
+//     la tabla y en la lista de avisos, pero no cuenta como alerta;
+//   · se usan los umbrales individuales de cada jugadora (getPlayerThresholds);
+//   · no cuentan las que hoy no entrenan con el grupo (🏥) ni las de «datos insuficientes» (⚠️),
+//     porque en la tabla no muestran ratio.
+// @returns 'danger' | 'warn' | 'low' | 'ok' | 'na' (sin ratio fiable)
+RPETracker.prototype._acLevel = function(ratio, playerId) {
+    if (!ratio || ratio.confidence === 'low') return 'na';
+    const n = parseFloat(ratio.ratio);
+    if (isNaN(n)) return 'na';
+    const t = this.getPlayerThresholds(playerId || null);
+    if (n > t.high) return 'danger';
+    if (n > t.opt)  return 'warn';
+    if (n < t.low)  return 'low';
+    return 'ok';
+};
+
+// ¿La jugadora hoy NO entrena con el grupo (lesión en fases 1-4 o «no disponible»)?
+RPETracker.prototype._acIsOutToday = function(playerId, dateStr) {
+    return typeof this.getPlayerParticipation === 'function'
+        && this.getPlayerParticipation(playerId, dateStr || _dashAlertsToday()) === 'out';
+};
+
+// Número de jugadoras en peligro A:C (el mismo en KPI, insignia, icono de la app y notificación)
+RPETracker.prototype._acDangerCount = function() {
+    const today = _dashAlertsToday();
+    return this.activePlayers.filter(p =>
+        !this._acIsOutToday(p.id, today) && this._acLevel(this.calculateAcuteChronicRatio(p.id), p.id) === 'danger'
+    ).length;
+};
 
 // ── 1. Reunir los avisos y darle un identificador estable a cada uno ─────────
 // Identificadores: ac:d:<jugadora> (peligro), ac:w:<jugadora> (precaución),
@@ -88,9 +122,9 @@ RPETracker.prototype._renderDashAlerts = function(data) {
         if (info.partial) title += ` · ${info.newCount} ${info.newCount === 1 ? 'nuevo' : 'nuevos'}`;
     }
 
-    const acCount = a.danger.length + a.warn.length;
     const chips = [
-        acCount        ? `<span class="db-alerts-chip"><span class="${a.danger.length ? 'wh-bad' : 'wh-warn'}" aria-hidden="true">●</span> A:C ${acCount}</span>` : '',
+        a.danger.length ? `<span class="db-alerts-chip" title="Jugadoras en peligro A:C"><span class="wh-bad" aria-hidden="true">●</span> <span class="db-alerts-chip-txt">Peligro </span>${a.danger.length}</span>` : '',
+        a.warn.length   ? `<span class="db-alerts-chip" title="Jugadoras en precaución A:C"><span class="wh-warn" aria-hidden="true">●</span> <span class="db-alerts-chip-txt">Precaución </span>${a.warn.length}</span>` : '',
         a.trend.length ? `<span class="db-alerts-chip">Wellness ${a.trend.length}</span>` : '',
         a.rpe.length   ? `<span class="db-alerts-chip">RPE ${a.rpe.length}</span>` : ''
     ].join('');
