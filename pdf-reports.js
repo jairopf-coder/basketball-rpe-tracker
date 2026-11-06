@@ -688,6 +688,10 @@ RPETracker.prototype.showPlayerReportMenu = function(playerId) {
                     style="padding:0.7rem 1rem;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-subtle);cursor:pointer;text-align:left;font-size:0.9rem">
                     📊 Informe trimestral
                 </button>
+                <button onclick="window.rpeTracker.showCustomReportDialog('${playerId}');document.getElementById('reportMenuOverlay').remove()"
+                    style="padding:0.7rem 1rem;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-subtle);cursor:pointer;text-align:left;font-size:0.9rem">
+                    📊 Informe personalizado…
+                </button>
             </div>
         </div>`;
 

@@ -7311,6 +7311,24 @@ details[open] .ewma-toggle-hint { display: none; }
 /* Modal de gimnasio */
 .modal-content--wide { max-width: 720px; }
 
+/* Diálogo «Informe personalizado» (custom-report.js): campos a todo el ancho; solo afecta a este diálogo */
+#customReportModal .form-label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+#customReportModal .form-select,
+#customReportModal .form-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6rem 0.75rem;
+    border: 2px solid var(--border-input);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+#customReportModal textarea.form-input { resize: vertical; }
+#customReportModal .form-select:focus,
+#customReportModal .form-input:focus { outline: none; border-color: var(--primary); }
+
 .gym-exercise-rows { display: flex; flex-direction: column; gap: 1rem; }
 .gym-ex-row {
     background: var(--bg-subtle);

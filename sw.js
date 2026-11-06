@@ -45,6 +45,7 @@ const urlsToCache = [
   'gps-tracking.js',
   'gps-tracking-analytics.js',
   'pdf-reports.js',
+  'custom-report.js',
   'player-view.js',
   'player-i18n.js',
   'strength.js',
