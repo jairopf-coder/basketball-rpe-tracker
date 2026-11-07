@@ -1182,6 +1182,27 @@ header h1 {
     gap: 0.5rem;
 }
 
+/* Botón ⋮ de la ficha de jugadora: abre el menú de acciones (informes, editar, anamnesis, baja, eliminar) */
+.player-menu-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.player-menu-btn:hover,
+.player-menu-btn[aria-expanded="true"] { background: var(--bg-subtle); color: var(--text-primary); }
+.player-menu-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
 .btn-icon {
     width: 40px;
     height: 40px;
@@ -6669,11 +6690,14 @@ details[open] .ewma-toggle-hint { display: none; }
    al modo escritorio real ni al horizontal de iPad (≥1080px). */
 @media (max-width: 1100px) {
     .player-card {
+        position: relative;
         flex-wrap: wrap;
         row-gap: 0.65rem;
     }
     .player-info {
         width: 100%;
+        box-sizing: border-box;
+        padding-right: 3rem;   /* deja sitio al botón ⋮ de la esquina */
     }
     .player-stats {
         order: 2;
@@ -6685,10 +6709,11 @@ details[open] .ewma-toggle-hint { display: none; }
         width: 100%;
     }
     .player-actions {
-        order: 4;
-        width: 100%;
-        justify-content: space-around;
+        position: absolute;    /* el botón ⋮ va en la esquina superior derecha de la tarjeta */
+        top: 0.6rem;
+        right: 0.75rem;
     }
+    .player-menu-btn { width: 44px; height: 44px; }
 }
 
 /* Cabecera: por debajo de 1100px los 4 botones de acción se quedan en el

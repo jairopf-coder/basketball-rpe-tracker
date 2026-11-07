@@ -395,12 +395,8 @@ RPETracker.prototype.renderPlayers = function() {
                     <canvas id="${sparkId}" class="player-sparkline" width="120" height="28"></canvas>
                 </div>
                 <div class="player-actions">
-                    <button class="btn-icon" style="background: #2196f3; color: white;" onclick="window.rpeTracker?.showPlayerReportMenu('${player.id}')" title="Informe PDF">📄</button>
-                    <button class="btn-icon" style="background: #7b1fa2; color: white;" onclick="window.rpeTracker?.generatePlayerReport('${player.id}')" title="Informe individual">📋</button>
-                    <button class="btn-icon" style="background: #00897b; color: white;" onclick="window.AnamnesisModule?.open('${player.id}')" title="Anamnesis">🩺</button>
-                    <button class="btn-icon" style="background: var(--primary); color: white;" onclick="window.rpeTracker?.editPlayer('${player.id}')" title="Editar">✏️</button>
-                    <button class="btn-icon" style="background: #ff9800; color: white;" onclick="window.rpeTracker?.openPlayerBajaModal('${player.id}')" title="Dar de baja">🚪</button>
-                    <button class="btn-icon" style="background: #f44336; color: white;" onclick="window.rpeTracker?.deletePlayer('${player.id}')" title="Eliminar">🗑️</button>
+                    <button type="button" class="player-menu-btn" onclick="window.rpeTracker?.showPlayerActionsMenu('${player.id}', this, event)"
+                            aria-haspopup="menu" aria-expanded="false" aria-label="Acciones de ${esc(this.playerDisplayName(player))}" title="Acciones">⋮</button>
                 </div>
             </div>
         `;
@@ -910,4 +906,105 @@ RPETracker.prototype.reactivatePlayer = function(playerId) {
         this.populatePlayerSelects();
         this.showToast(`↩️ ${this.playerFullName(player)} reactivada`, 'success');
     });
+};
+
+// ── Menú de acciones de la ficha de jugadora (⋮) ──────────────────────────────────────────────────
+// Un solo botón en la tarjeta que abre el mismo tipo de desplegable que la rueda de Inicio
+// (clases gear-*). Las acciones se resuelven por delegación de eventos con data-action: ningún id va
+// dentro de un onclick. Eliminar y Dar de baja conservan sus confirmaciones.
+
+RPETracker.prototype.closePlayerActionsMenu = function() {
+    const overlay = document.getElementById('playerActionsOverlay');
+    if (overlay) overlay.remove();
+    if (this._playerMenuKeyHandler) {
+        document.removeEventListener('keydown', this._playerMenuKeyHandler);
+        this._playerMenuKeyHandler = null;
+    }
+    if (this._playerMenuBtn) {
+        this._playerMenuBtn.setAttribute('aria-expanded', 'false');
+        if (typeof this._playerMenuBtn.focus === 'function') this._playerMenuBtn.focus();
+        this._playerMenuBtn = null;
+    }
+};
+
+// Cada acción llama a lo que antes llamaba su botón (mismas funciones, mismos argumentos)
+RPETracker.prototype._playerMenuRun = function(action, playerId) {
+    switch (action) {
+        case 'report-individual': return this.generatePlayerReport(playerId);
+        case 'report-menu':       return this.showPlayerReportMenu(playerId);
+        case 'edit':              return this.editPlayer(playerId);
+        case 'anamnesis':         return window.AnamnesisModule?.open(playerId);
+        case 'baja':              return this.openPlayerBajaModal(playerId);
+        case 'delete':            return this.deletePlayer(playerId);
+    }
+};
+
+RPETracker.prototype.showPlayerActionsMenu = function(playerId, btn, ev) {
+    this.closePlayerActionsMenu();
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    const item = (action, icon, label, danger) =>
+        `<button type="button" class="gear-item${danger ? ' gear-item--danger' : ''}" role="menuitem" data-action="${action}">
+            <span class="gear-icon">${icon}</span><span>${label}</span></button>`;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'playerActionsOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2000';
+    overlay.innerHTML = `
+        <div class="gear-dropdown" id="playerActionsDropdown" role="menu" aria-label="Acciones de ${esc(this.playerDisplayName(player))}">
+            <div class="gear-section-label">Informes</div>
+            ${item('report-individual', '📋', 'Informe individual (A4)')}
+            ${item('report-menu', '📄', 'Informe PDF…')}
+            <div class="gear-divider"></div>
+            <div class="gear-section-label">Ficha</div>
+            ${item('edit', '✏️', 'Editar jugadora')}
+            ${item('anamnesis', '🩺', 'Anamnesis')}
+            <div class="gear-divider"></div>
+            <div class="gear-section-label">Estado</div>
+            ${item('baja', '🚪', 'Dar de baja')}
+            <div class="gear-divider"></div>
+            ${item('delete', '🗑️', 'Eliminar jugadora', true)}
+        </div>`;
+
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) { this.closePlayerActionsMenu(); return; }   // clic fuera: solo cierra
+        const el = e.target && typeof e.target.closest === 'function' ? e.target.closest('[data-action]') : null;
+        if (!el) return;                                                         // clic en una etiqueta o separador
+        const action = el.dataset.action;
+        this.closePlayerActionsMenu();
+        this._playerMenuRun(action, playerId);   // síncrono: conserva el gesto del usuario (window.open de los informes)
+    });
+
+    this._playerMenuKeyHandler = e => {
+        if (e.key === 'Escape') { this.closePlayerActionsMenu(); return; }
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        const items = [...overlay.querySelectorAll('.gear-item')];
+        if (!items.length) return;
+        e.preventDefault();
+        const i = items.indexOf(document.activeElement);
+        items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus();
+    };
+    document.addEventListener('keydown', this._playerMenuKeyHandler);
+
+    document.body.appendChild(overlay);
+    this._playerMenuBtn = btn || null;
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+
+    // Debajo del botón y alineado a su derecha; si no cabe, encima; siempre dentro de la pantalla
+    const dd = overlay.firstElementChild;
+    if (btn && dd && typeof btn.getBoundingClientRect === 'function') {
+        const r = btn.getBoundingClientRect();
+        const w = dd.offsetWidth, h = dd.offsetHeight;
+        let top = r.bottom + 6;
+        if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+        const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+        dd.style.top = top + 'px';
+        dd.style.left = left + 'px';
+    }
+    // El foco va a la primera opción solo si se abrió con el teclado (clic con detail 0): con ratón o dedo
+    // un aro de foco sobre la primera opción sería ruido visual
+    const byKeyboard = !ev || ev.detail === 0;
+    const first = overlay.querySelector('.gear-item');
+    if (byKeyboard && first && typeof first.focus === 'function') first.focus();
 };
