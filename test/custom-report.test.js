@@ -27,14 +27,16 @@ function makeEnv({ popupBlocked = false } = {}) {
     const printWindow = { html: '', document: { write(h) { printWindow.html += h; log.push('write'); }, open() { printWindow.html = ''; log.push('docopen'); }, close() { log.push('docclose'); } }, print() { log.push('print'); } };
     const document = {
         getElementById: id => els[id] || null,
-        querySelector: () => null,
+        querySelector: () => null, querySelectorAll: () => [],
         createElement: () => ({ classList: { add() {}, remove() {} }, innerHTML: '' }),
         body: { appendChild(el) { els[el.id] = el; } },
         addEventListener() {}, head: { appendChild() {} },
     };
+    const store = {};
     const ctx = vm.createContext({
         console: { log() {}, warn() {}, error() {} }, Date, Math, JSON, Set, Object, Array, Number, String, parseInt, parseFloat, isNaN, isFinite, Promise, Map, setTimeout: fn => fn(),
         document, alert: m => alerts.push(m),
+        localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
         window: { open: () => { log.push('open'); return popupBlocked ? null : printWindow; } },
         Store: { getActiveSeason: () => '2026-27' },
     });
@@ -42,6 +44,7 @@ function makeEnv({ popupBlocked = false } = {}) {
     vm.runInContext(`function RPETracker() {}
         function toLocalISODate(d){const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}`, ctx);
     vm.runInContext(fs.readFileSync(path.join(ROOT, 'custom-report.js'), 'utf8'), ctx, { filename: 'custom-report.js' });
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'dashboard-alerts.js'), 'utf8'), ctx, { filename: 'dashboard-alerts.js' });   // _acLevel: la regla única de nivel A:C
     const t = vm.runInContext('new RPETracker()', ctx);
     t.players = [{ id: 'p1', name: 'Hennie', lastName: 'Van Test' }, { id: 'p2', name: 'Ana', lastName: '' }, { id: 'p3', name: 'Bea', lastName: '' }];
     t.sessions = [];
@@ -50,7 +53,7 @@ function makeEnv({ popupBlocked = false } = {}) {
     t.buildLoadingPlaceholderHTML = () => '<html>loading</html>';
     t.showToast = (m, type) => toasts.push([m, type || 'ok']);
     t.ensureFullSessionHistory = async () => { log.push('history'); };
-    return { t, ctx, els, log, toasts, alerts, printWindow };
+    return { t, ctx, els, log, toasts, alerts, printWindow, store };
 }
 const fn = (ctx, name) => vm.runInContext(name, ctx);
 const S = (date, type, rpe, duration, playerId = 'p1', extra = {}) => Object.assign({ id: `${playerId}${date}${type}`, playerId, date, type, rpe, duration, load: rpe * duration }, extra);
@@ -256,11 +259,15 @@ test('el diálogo se construye con todos los controles y la jugadora preseleccio
     assert.ok(/<option value="p2" selected>/.test(h));
     assert.ok(!/gimnasio\s*<\/label>/i.test(h) && /No incluye gimnasio/.test(h));
 });
-test('los atajos de «para quién es» fijan idioma y secciones', () => {
-    assert.strictEqual(fn(makeEnv().ctx, 'CR_PRESETS').selection.lang, 'en');
-    same(fn(makeEnv().ctx, 'CR_PRESETS').selection.sections, { table: true, chart: true, sessions: false });
-    assert.strictEqual(fn(makeEnv().ctx, 'CR_PRESETS').newteam.sections.sessions, true);
-    assert.strictEqual(fn(makeEnv().ctx, 'CR_PRESETS').player.lang, 'es');
+test('los atajos de «para quién es» fijan idioma y secciones (las de salud solo en «Para la jugadora» y «Cuerpo técnico»)', () => {
+    const { ctx } = makeEnv();
+    const P = fn(ctx, 'CR_PRESETS');
+    const on = k => Object.entries(P[k].sections).filter(([, v]) => v).map(([x]) => x);
+    assert.strictEqual(P.selection.lang, 'en'); assert.deepStrictEqual(on('selection'), ['table', 'chart']);
+    assert.deepStrictEqual(on('newteam'), ['table', 'chart', 'sessions']); assert.strictEqual(P.newteam.lang, 'en');
+    assert.deepStrictEqual(on('player'), ['table', 'chart', 'ac', 'wellness']); assert.strictEqual(P.player.lang, 'es');
+    assert.deepStrictEqual(on('staff'), ['table', 'chart', 'sessions', 'ac', 'gps', 'wellness', 'injuries']);
+    ['selection', 'newteam'].forEach(k => assert.ok(!P[k].sections.wellness && !P[k].sections.injuries, k + ' (externo) sin datos de salud'));
 });
 test('el inicio de «toda la temporada» es la primera sesión de la jugadora en la temporada activa (o el 1 de septiembre)', () => {
     const { t } = makeEnv();
@@ -271,7 +278,8 @@ test('el inicio de «toda la temporada» es la primera sesión de la jugadora en
 });
 function setForm(els, v) {
     Object.entries({ crPlayer: { value: v.player || 'p1' }, crFrom: { value: v.from || '2026-10-10' }, crTo: { value: v.to || '2026-11-06' }, crGroup: { value: v.group || 'weeks' }, crLang: { value: v.lang || 'en' },
-        crSecTable: { checked: v.table !== false }, crSecChart: { checked: v.chart !== false }, crSecSessions: { checked: !!v.sessions }, crNote: { value: v.note || '' } }).forEach(([k, o]) => { els[k] = o; });
+        crSecTable: { checked: v.table !== false }, crSecChart: { checked: v.chart !== false }, crSecSessions: { checked: !!v.sessions },
+        crSecAc: { checked: !!v.ac }, crSecGps: { checked: !!v.gps }, crSecWellness: { checked: !!v.wellness }, crSecInjuries: { checked: !!v.injuries }, crNote: { value: v.note || '' } }).forEach(([k, o]) => { els[k] = o; });
 }
 test('generar: la ventana se abre ANTES de cargar el histórico (iOS bloquea window.open tras un await) y luego escribe el PDF e imprime', async () => {
     const { t, els, log, toasts, printWindow } = makeEnv();
@@ -297,6 +305,240 @@ test('si el navegador bloquea la ventana se avisa y no se sigue', async () => {
     setForm(els, {});
     await t.generateCustomReport();
     assert.strictEqual(alerts.length, 1); assert.ok(!log.includes('history'));
+});
+
+console.log('\nFase 2: ratio A:C al final de cada periodo');
+const BLOCKS = [{ index: 1, from: '2026-10-10', to: '2026-10-16' }, { index: 2, from: '2026-10-17', to: '2026-10-23' }, { index: 3, from: '2026-10-24', to: '2026-10-30' }, { index: 4, from: '2026-10-31', to: '2026-11-06' }];
+const TH = { low: 0.8, opt: 1.3, high: 1.5 };
+function acTracker(table) {
+    const e = makeEnv(); const calls = [];
+    e.t.getPlayerThresholds = () => TH;
+    e.t.calculateAcuteChronicRatio = (id, min, asOf) => { const iso = fn(e.ctx, 'toLocalISODate')(asOf); calls.push([id, min, iso]); return table[iso] || { ratio: 'N/A', confidence: 'low' }; };
+    return { ...e, calls };
+}
+test('pide a la app el A:C «tal como estaba» el último día de cada bloque, con 7 sesiones mínimas', () => {
+    const { t, calls } = acTracker({});
+    t._crBuildAc('p1', BLOCKS);
+    assert.deepStrictEqual(calls, BLOCKS.map(b => ['p1', 7, b.to]));
+});
+test('el nivel sale de la regla única de la app con los umbrales de la jugadora; sin ratio fiable → «sin datos»', () => {
+    const { t } = acTracker({ '2026-10-16': { ratio: '1.62', confidence: 'high' }, '2026-10-23': { ratio: '1.40', confidence: 'high' }, '2026-10-30': { ratio: '1.10', confidence: 'high' }, '2026-11-06': { ratio: '2.40', confidence: 'low' } });
+    const r = t._crBuildAc('p1', BLOCKS);
+    assert.deepStrictEqual(r.rows.map(x => x.level), ['danger', 'warn', 'ok', 'na']);
+    assert.deepStrictEqual(r.rows.map(x => x.ratio), [1.62, 1.4, 1.1, null]);
+    same(r.thresholds, TH);
+});
+test('un periodo que acaba en el futuro se calcula a fecha de hoy', () => {
+    const { t, calls } = acTracker({});
+    t._crBuildAc('p1', [{ index: 1, from: '2026-10-10', to: '2099-01-01' }]);
+    assert.strictEqual(calls[0][2], fn(makeEnv().ctx, 'toLocalISODate')(new Date()));
+});
+
+console.log('\nFase 2: bienestar');
+test('media por bloque solo de esa jugadora, con registros completos; sin registros → 0 registros', () => {
+    const { t } = makeEnv();
+    const W = (playerId, date, a, b, c, d) => ({ id: playerId + date, playerId, date, sleep: a, fatigue: b, mood: c, soreness: d });
+    t.wellnessData = [W('p1', '2026-10-11', 4, 2, 4, 2), W('p1', '2026-10-12', 2, 4, 2, 4), W('p2', '2026-10-12', 1, 1, 1, 1),
+                      W('p1', '2026-10-13', 5, null, 5, 5), W('p1', '2026-10-24', 5, 5, 5, 5), W('p1', '2026-12-01', 1, 1, 1, 1)];
+    const w = t._crBuildWellness('p1', BLOCKS);
+    assert.strictEqual(w[0].entries, 2); assert.strictEqual(w[0].sleep, 3); assert.strictEqual(w[0].energy, 3); assert.strictEqual(w[0].overall, 3);
+    assert.strictEqual(w[1].entries, 0); assert.strictEqual(w[2].overall, 5); assert.strictEqual(w[3].entries, 0);
+});
+
+console.log('\nFase 2: disponibilidad y lesiones');
+function availEnv() {
+    const e = makeEnv();
+    e.t.isPlayerActiveOn = (p, day) => day >= '2026-10-14';                       // se incorpora a la plantilla el 14-oct
+    e.t.getPlayerParticipation = (id, day) => (day >= '2026-10-20' && day <= '2026-10-22' ? 'out' : day === '2026-10-23' ? 'partial' : 'full');
+    e.t.injuries = [
+        { id: 'i1', playerId: 'p1', location: 'ankle', type: 'joint', severity: 'moderate', startDate: '2026-10-20', endDate: '2026-11-02', status: 'recovered', description: 'SECRETO-descripción', mechanism: 'SECRETO-mecanismo', initialTreatment: 'SECRETO-tratamiento', notes: 'SECRETO-notas', painLevel: 8 },
+        { id: 'i2', playerId: 'p1', location: 'knee', type: 'muscle', severity: 'minor', startDate: '2026-11-04', endDate: null, status: 'active', notes: 'SECRETO-notas2' },
+        { id: 'i3', playerId: 'p1', location: 'back', type: 'muscle', severity: 'minor', startDate: '2026-08-01', endDate: '2026-08-10', status: 'recovered' },
+        { id: 'i4', playerId: 'p1', location: 'wrist', type: 'bone', severity: 'severe', startDate: '2026-12-15', endDate: null, status: 'active' },
+        { id: 'i5', playerId: 'p2', location: 'ankle', type: 'joint', severity: 'minor', startDate: '2026-10-20', endDate: null, status: 'active' },
+        { id: 'i6', playerId: 'p1', location: 'groin', type: 'muscle', severity: 'minor', startDate: '2026-09-20', endDate: null, status: 'active' }];
+    return e;
+}
+test('cuenta los días por estado SOLO mientras estaba en la plantilla (no cuenta como «no disponible» lo anterior a su fichaje)', () => {
+    const { t } = availEnv();
+    const a = t._crBuildAvailability('p1', '2026-10-10', '2026-11-06', BLOCKS);
+    assert.deepStrictEqual(a.rows.map(r => r.days), [3, 7, 7, 7], 'del 14 al 16 de oct: 3 días');
+    same(a.rows[1], { days: 7, full: 3, partial: 1, out: 3 });
+    assert.ok(a.rows.every(r => r.days === r.full + r.partial + r.out));
+});
+test('lesiones: las que tocan el periodo (también las en curso), de esa jugadora y ordenadas; sin las anteriores ni las posteriores', () => {
+    const { t } = availEnv();
+    const inj = t._crBuildAvailability('p1', '2026-10-10', '2026-11-06', BLOCKS).injuries;
+    assert.deepStrictEqual(inj.map(x => x.location), ['groin', 'ankle', 'knee']);   // groin en curso desde sept, ankle desde 20-oct, knee desde 4-nov
+    assert.deepStrictEqual(inj.map(x => x.ongoing), [true, false, true]);
+});
+test('de cada lesión solo salen zona, tipo, gravedad, fechas y estado: nunca texto libre, dolor ni notas', () => {
+    const { t } = availEnv();
+    const inj = t._crBuildAvailability('p1', '2026-10-10', '2026-11-06', BLOCKS).injuries;
+    inj.forEach(x => assert.deepStrictEqual(Object.keys(x).sort(), ['end', 'location', 'ongoing', 'severity', 'start', 'type']));
+    assert.ok(!JSON.stringify(inj).includes('SECRETO'));
+});
+
+console.log('\nFase 2: GPS');
+test('suma por bloque las sesiones de pista y partido con GPS; velocidad máxima = la mayor; sin gimnasio ni otras jugadoras', () => {
+    const { t } = makeEnv();
+    t.sessions = [S('2026-10-12', 'training', 5, 60), S('2026-10-14', 'match', 8, 30), S('2026-10-15', 'gym', 9, 60), S('2026-10-16', 'training', 5, 60, 'p2'), S('2026-10-17', 'training', 5, 60), S('2026-10-18', 'training', 5, 60)];
+    const gps = { [t.sessions[0].id]: { distanceM: 4200, maxSpeedKmh: 24.5, highIntensityRunsM: 150, maxIntensityRunsM: 30, highAccelerations: 12, highDecelerations: 9 },
+                  [t.sessions[1].id]: { distanceM: 3000.5, maxSpeedKmh: 27.1, highIntensityRunsM: 100, maxIntensityRunsM: 45, highAccelerations: 8, highDecelerations: null },
+                  [t.sessions[2].id]: { distanceM: 9999, maxSpeedKmh: 40 }, [t.sessions[3].id]: { distanceM: 8888 },
+                  [t.sessions[4].id]: { distanceM: 5000, maxSpeedKmh: null, highIntensityRunsM: undefined } };
+    t._getGpsForSession = s => gps[s.id] || null;
+    const g = t._crBuildGps('p1', BLOCKS);
+    same(g[0], { sessions: 2, distanceM: 7200.5, maxSpeed: 27.1, hsrM: 250, sprintM: 75, accel: 20, decel: 9 });
+    assert.deepStrictEqual([g[1].sessions, g[1].distanceM, g[1].maxSpeed], [1, 5000, null]);
+    assert.strictEqual(g[2].sessions, 0);
+});
+
+console.log('\nFase 2: el PDF');
+function fullPdf(opts = {}) {
+    const e = availEnv(); const t = e.t;
+    t.getPlayerThresholds = () => TH;
+    t.calculateAcuteChronicRatio = (id, min, asOf) => ({ ratio: { '2026-10-16': '1.62', '2026-10-23': '1.40', '2026-10-30': '1.05' }[fn(e.ctx, 'toLocalISODate')(asOf)] || 'N/A', confidence: 'high' });
+    t.wellnessData = [{ playerId: 'p1', date: '2026-10-12', sleep: 4, fatigue: 4, mood: 4, soreness: 4 }, { playerId: 'p1', date: '2026-10-25', sleep: 2, fatigue: 2, mood: 3, soreness: 2 }];
+    t.sessions = [S('2026-10-12', 'training', 6, 90), S('2026-10-24', 'match', 8, 32), S('2026-10-20', 'gym', 9, 60)];
+    t._getGpsForSession = s => (s.type === 'training' ? { distanceM: 4200, maxSpeedKmh: 24.5, highIntensityRunsM: 150, maxIntensityRunsM: 30, highAccelerations: 12, highDecelerations: 9 } : null);
+    const sections = Object.assign({ table: true, chart: false, sessions: false, ac: false, gps: false, wellness: false, injuries: false }, opts.sections || {});
+    const data = t.buildCustomReportData('p1', { from: '2026-10-10', to: '2026-11-06', group: 'weeks' });
+    data.extras = t.buildCustomReportExtras('p1', data, sections);
+    return { html: t.buildCustomReportHTML(t.players[0], data, { lang: opts.lang || 'en', sections, note: opts.note || '' }), t, data };
+}
+test('cada sección nueva aparece solo si se marca', () => {
+    const none = fullPdf().html;
+    ['Acute:chronic workload ratio', 'GPS (external load)', 'Wellness (average per period)', 'Availability', 'Injuries in the period'].forEach(x => assert.ok(!none.includes(x), 'no debería salir: ' + x));
+    const all = fullPdf({ sections: { ac: true, gps: true, wellness: true, injuries: true } }).html;
+    ['Acute:chronic workload ratio', 'GPS (external load)', 'Wellness (average per period)', 'Availability', 'Injuries in the period', 'Days in squad'].forEach(x => assert.ok(all.includes(x), 'falta: ' + x));
+    assert.ok(fullPdf({ sections: { gps: true } }).html.includes('GPS (external load)') && !fullPdf({ sections: { gps: true } }).html.includes('Wellness (average'));
+});
+test('la marca «Confidencial» sale solo con bienestar o lesiones (no con A:C ni GPS)', () => {
+    assert.ok(!fullPdf({ sections: { ac: true, gps: true } }).html.includes('class="confidential"'));
+    assert.ok(fullPdf({ sections: { wellness: true } }).html.includes('Confidential — contains health information'));
+    assert.ok(fullPdf({ sections: { injuries: true }, lang: 'es' }).html.includes('Confidencial — contiene información de salud'));
+});
+test('A:C: ratio con 2 decimales, estado con su color y umbrales de la jugadora en la nota (sin marcadores sin sustituir)', () => {
+    const { html } = fullPdf({ sections: { ac: true } });
+    assert.ok(/1\.62<\/td>\s*<td class="c-bad"><strong>Danger/.test(html));
+    assert.ok(/1\.40<\/td>\s*<td class="c-warn"><strong>Caution/.test(html));
+    assert.ok(/1\.05<\/td>\s*<td class="c-good"><strong>Optimal/.test(html));
+    assert.ok(/<td class="c-na"><strong>Insufficient data/.test(html));
+    assert.ok(html.includes('low &lt; 0.80') && html.includes('optimal up to 1.30') && html.includes('caution up to 1.50') && html.includes('danger above 1.50'));
+    assert.ok(!/\{(low|opt|high)\}/.test(html));
+    assert.ok(/1,62<\/td>/.test(fullPdf({ sections: { ac: true }, lang: 'es' }).html), 'coma decimal en español');
+});
+test('bienestar: colores por el valor redondeado que se ve, y semanas sin registros con guion', () => {
+    const { html } = fullPdf({ sections: { wellness: true } });
+    assert.ok(/<td class="c-good">4\.0<\/td>/.test(html) && /<td class="c-bad">2\.0<\/td>/.test(html));
+    assert.ok(/<td>0<\/td><td colspan="5">–<\/td>/.test(html));
+    assert.ok(html.includes('Wellness scale 1–5, higher is better'));
+});
+test('lesiones: etiquetas traducidas, estado en curso / recuperada y NINGÚN texto libre', () => {
+    const en = fullPdf({ sections: { injuries: true } }).html;
+    ['Groin', 'Ankle', 'Knee', 'Joint', 'Muscle', 'Moderate', 'Minor', 'Ongoing', 'Recovered', 'Unavailable', 'Limited'].forEach(x => assert.ok(en.includes(x), 'falta ' + x));
+    assert.ok(!en.includes('SECRETO') && !/wrist|Wrist/.test(en), 'ni texto libre ni lesiones posteriores al periodo');
+    const es = fullPdf({ sections: { injuries: true }, lang: 'es' }).html;
+    ['Ingle', 'Tobillo', 'Rodilla', 'Articular', 'En curso', 'Recuperada', 'No disponible'].forEach(x => assert.ok(es.includes(x), 'falta ' + x));
+});
+test('una zona o tipo desconocido se muestra tal cual pero escapado', () => {
+    const { t, data } = fullPdf({ sections: { injuries: true } });
+    t.injuries.push({ id: 'x', playerId: 'p1', location: '<img src=x onerror=alert(1)>', type: 'raro', severity: 'minor', startDate: '2026-10-20', endDate: null, status: 'active' });
+    data.extras = t.buildCustomReportExtras('p1', data, { injuries: true });
+    const html = t.buildCustomReportHTML(t.players[0], data, { lang: 'en', sections: { injuries: true } });
+    assert.ok(!html.includes('<img src=x') && html.includes('&lt;img') && html.includes('raro'));
+});
+test('con todas las secciones el PDF sigue sin gimnasio, y las de carga se pintan aunque no haya sesiones si solo se piden las nuevas', () => {
+    const all = fullPdf({ sections: { sessions: true, chart: true, ac: true, gps: true, wellness: true, injuries: true } }).html;
+    assert.ok(!/gym|gimnasio|strength|fuerza/i.test(all));
+    const { t, data } = fullPdf({ sections: { wellness: true } });
+    t.sessions = []; const d2 = t.buildCustomReportData('p1', { from: '2026-10-10', to: '2026-11-06', group: 'weeks' }); d2.extras = t.buildCustomReportExtras('p1', d2, { wellness: true });
+    const only = t.buildCustomReportHTML(t.players[0], d2, { lang: 'en', sections: { wellness: true } });
+    assert.ok(only.includes('Wellness (average per period)') && !only.includes('No sessions recorded'));
+    const withTable = t.buildCustomReportHTML(t.players[0], d2, { lang: 'en', sections: { table: true, wellness: true } });
+    assert.ok(withTable.includes('No sessions recorded in this period.') && withTable.includes('Wellness (average per period)'));
+});
+test('la lista de sesiones pasa a página aparte si hay cualquier sección antes', () => {
+    assert.ok(fullPdf({ sections: { table: false, sessions: true, gps: true } }).html.includes('class="section sessions-page"'));
+    assert.ok(!fullPdf({ sections: { table: false, sessions: true } }).html.includes('class="section sessions-page"'));
+});
+
+console.log('\nFase 2: última selección y diálogo');
+test('lo recordado NO incluye secciones de salud, ni jugadora, ni fechas, ni la nota', () => {
+    const { t, store } = makeEnv();
+    t._crSavePrefs({ lang: 'en', group: 'months', periodKind: '3w', playerId: 'p1', from: '2026-10-01', to: '2026-11-01', note: 'NOTA-PRIVADA',
+        sections: { table: true, chart: false, sessions: true, ac: true, gps: true, wellness: true, injuries: true } });
+    const raw = store.basketballCustomReportPrefs;
+    ['wellness', 'injuries', 'p1', '2026-10', 'NOTA-PRIVADA', 'playerId'].forEach(x => assert.ok(!raw.includes(x), 'no debe guardarse: ' + x));
+    same(JSON.parse(raw), { lang: 'en', group: 'months', period: '3w', sections: { table: true, chart: false, sessions: true, ac: true, gps: true } });
+});
+test('al cargar, las de salud salen SIEMPRE desmarcadas aunque alguien manipule el almacenamiento', () => {
+    const { t, store } = makeEnv();
+    store.basketballCustomReportPrefs = JSON.stringify({ lang: 'en', group: 'weeks', period: '4w', sections: { table: true, wellness: true, injuries: true } });
+    const p = t._crLoadPrefs();
+    assert.strictEqual(p.sections.wellness, false); assert.strictEqual(p.sections.injuries, false); assert.strictEqual(p.sections.table, true);
+});
+test('lo corrupto o raro se ignora o se normaliza (periodo «personalizado» no se recuerda)', () => {
+    const { t, store } = makeEnv();
+    store.basketballCustomReportPrefs = '{no es json';
+    assert.strictEqual(t._crLoadPrefs(), null);
+    store.basketballCustomReportPrefs = JSON.stringify({ lang: 'fr', group: 'x', period: 'custom', sections: { table: true } });
+    same(t._crLoadPrefs().period, null); assert.strictEqual(t._crLoadPrefs().lang, 'es'); assert.strictEqual(t._crLoadPrefs().group, 'weeks');
+    t._crSavePrefs({ lang: 'es', group: 'weeks', periodKind: 'custom', sections: {} });
+    assert.strictEqual(JSON.parse(store.basketballCustomReportPrefs).period, null);
+});
+test('abrir el diálogo aplica lo recordado (idioma, agrupación, secciones y atajo de periodo)', () => {
+    const { t, els, store } = makeEnv();
+    setForm(els, { lang: 'es', group: 'weeks', table: true, chart: true });
+    store.basketballCustomReportPrefs = JSON.stringify({ lang: 'en', group: 'months', period: '3w', sections: { table: false, chart: true, sessions: true, ac: true, gps: false } });
+    t.showCustomReportDialog('p1');
+    assert.strictEqual(els.crLang.value, 'en'); assert.strictEqual(els.crGroup.value, 'months');
+    assert.deepStrictEqual([els.crSecTable.checked, els.crSecChart.checked, els.crSecSessions.checked, els.crSecAc.checked, els.crSecGps.checked, els.crSecWellness.checked, els.crSecInjuries.checked],
+        [false, true, true, true, false, false, false]);
+    assert.strictEqual(t._crPeriodKind, '3w');
+    const days = fn(makeEnv().ctx, '_crDiffDays')(els.crFrom.value, els.crTo.value) + 1;
+    assert.strictEqual(days, 21);
+});
+test('el diálogo tiene las casillas nuevas, el aviso de datos sensibles y el atajo «Cuerpo técnico»', () => {
+    const { t, els } = makeEnv(); t.showCustomReportDialog('p1');
+    const h = els.customReportModal.innerHTML;
+    ['crSecAc', 'crSecGps', 'crSecWellness', 'crSecInjuries', 'crSensWarn', 'Cuerpo técnico', 'Salud (datos sensibles)', 'Ratio A:C', 'Lesiones y disponibilidad', 'siempre salen desmarcadas'].forEach(x => assert.ok(h.includes(x), 'falta: ' + x));
+    assert.ok(/crDatesEdited/.test(h));
+});
+test('editar las fechas a mano convierte el periodo en «personalizado» y deja de recordarse', () => {
+    const { t, els } = makeEnv(); setForm(els, {});
+    t.showCustomReportDialog('p1'); t._crDatesEdited();
+    assert.strictEqual(t._crPeriodKind, 'custom');
+    assert.strictEqual(t._crReadForm().periodKind, 'custom');
+});
+test('el aviso de datos sensibles se muestra solo si hay bienestar o lesiones marcados', () => {
+    const { t, els } = makeEnv(); setForm(els, { wellness: true }); els.crSensWarn = { style: {} }; els.crInfo = { textContent: '' }; els.crWarnings = { innerHTML: '' };
+    t._crRefreshInfo(); assert.strictEqual(els.crSensWarn.style.display, 'block');
+    setForm(els, { ac: true, gps: true }); t._crRefreshInfo(); assert.strictEqual(els.crSensWarn.style.display, 'none');
+});
+test('validar: basta cualquier sección nueva; sin ninguna, no', () => {
+    const { ctx } = makeEnv(); const v = fn(ctx, '_crValidate'); const ok = { from: '2026-10-10', to: '2026-11-06' };
+    ['ac', 'gps', 'wellness', 'injuries'].forEach(k => assert.strictEqual(v({ ...ok, sections: { [k]: true } }), '', k));
+    assert.ok(v({ ...ok, sections: { table: false, chart: false, sessions: false, ac: false, gps: false, wellness: false, injuries: false } }));
+});
+test('generar con secciones de salud las incluye en el PDF pero NO las recuerda; sí recuerda las demás', async () => {
+    const { t, els, store, printWindow } = makeEnv();
+    t.getPlayerThresholds = () => TH; t.calculateAcuteChronicRatio = () => ({ ratio: '1.10', confidence: 'high' });
+    t.wellnessData = [{ playerId: 'p1', date: '2026-10-12', sleep: 4, fatigue: 4, mood: 4, soreness: 4 }]; t.injuries = []; t.sessions = [S('2026-10-12', 'training', 6, 90)];
+    setForm(els, { wellness: true, injuries: true, ac: true, sessions: true, lang: 'en' });
+    t._crPeriodKind = '4w';
+    await t.generateCustomReport();
+    assert.ok(printWindow.html.includes('Wellness (average per period)') && printWindow.html.includes('Confidential') && printWindow.html.includes('Acute:chronic workload ratio'));
+    const saved = JSON.parse(store.basketballCustomReportPrefs);
+    assert.deepStrictEqual(saved.sections, { table: true, chart: true, sessions: true, ac: true, gps: false });
+    assert.ok(!('wellness' in saved.sections) && !('injuries' in saved.sections));
+});
+test('si no se llega a generar (datos inválidos) no se guarda nada', async () => {
+    const { t, els, store } = makeEnv();
+    setForm(els, { from: '2026-11-07', to: '2026-11-06' });
+    await t.generateCustomReport();
+    assert.strictEqual(store.basketballCustomReportPrefs, undefined);
 });
 
 console.log('\nCableado');
