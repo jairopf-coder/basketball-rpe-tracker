@@ -26,6 +26,7 @@ const CR_MAX_RANGE_DAYS = 800;     // ~2 años: evita informes interminables por
 const CR_SECTION_KEYS   = ['table', 'chart', 'sessions', 'ac', 'gps', 'wellness', 'injuries'];
 const CR_SENSITIVE_KEYS = ['wellness', 'injuries'];                // datos de salud
 const CR_PREFS_KEY      = 'basketballCustomReportPrefs';
+const CR_COMPACT_BLOCKS = 10;      // con más de 10 semanas/meses las tablas pasan a formato compacto (una línea por fila)
 const CR_PERIOD_KINDS   = ['3w', '4w', 'month', 'season'];
 const CR_SECTION_IDS    = { table: 'crSecTable', chart: 'crSecChart', sessions: 'crSecSessions', ac: 'crSecAc', gps: 'crSecGps', wellness: 'crSecWellness', injuries: 'crSecInjuries' };
 
@@ -331,13 +332,17 @@ RPETracker.prototype.buildCustomReportExtras = function(playerId, data, sections
 
 // ── PDF (HTML que se abre en una ventana para imprimir / guardar como PDF) ────────────────────────────
 // Etiquetas de cada bloque (semana / mes) y sus fechas
-function _crLabeler(L, lang, isMonths) {
+function _crLabeler(L, lang, isMonths, compact) {
     return {
+        compact: !!compact,
         label: b => (isMonths ? `${L.months[_crParseISO(b.from).getMonth()]} ${_crParseISO(b.from).getFullYear()}` : `${L.week} ${b.index}`),
         dates: b => (b.from === b.to ? _crFmtDay(b.from, lang) : `${_crFmtDay(b.from, lang)} – ${_crFmtDay(b.to, lang)}`)
     };
 }
-function _crRowHead(lab, b) { return `<td class="left"><strong>${esc(lab.label(b))}</strong><br><span class="dates">${esc(lab.dates(b))}</span></td>`; }
+// En formato compacto el periodo y sus fechas van en una sola línea (filas más bajas: caben más por hoja)
+function _crRowHead(lab, b) {
+    return `<td class="left${lab.compact ? ' nowrap' : ''}"><strong>${esc(lab.label(b))}</strong>${lab.compact ? ' ' : '<br>'}<span class="dates">${esc(lab.dates(b))}</span></td>`;
+}
 const _crDash = '–';
 
 // Color del texto según el nivel (imprime en color; con el texto del estado al lado no depende solo del color)
@@ -416,7 +421,8 @@ RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
     const ex = data.extras || {};
     const name = this.playerFullName(player);
     const isMonths = data.group === 'months';
-    const lab = _crLabeler(L, lang, isMonths);
+    const compact = data.blocks.length > CR_COMPACT_BLOCKS;
+    const lab = _crLabeler(L, lang, isMonths, compact);
     const range = `${_crFmtDate(data.from, lang)} – ${_crFmtDate(data.to, lang)}`;
     const todayLabel = _crFmtDate(toLocalISODate(new Date()), lang);
     const hasLoad = data.totals.all.sessions > 0;
@@ -429,7 +435,7 @@ RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
     const rows = data.blocks.map(b => {
         const t = b.training, g = b.game, all = _crSumBuckets(t, g);
         return `<tr>
-            <td class="left"><strong>${esc(blockLabel(b))}</strong><br><span class="dates">${esc(blockDates(b))}</span></td>
+            ${_crRowHead(lab, b)}
             <td>${cell(t.sessions, t.sessions)}</td><td>${cell(t.minutes, t.sessions)}</td><td>${cell(t.load, t.sessions)}</td>
             <td>${cell(g.sessions, g.sessions)}</td><td>${cell(g.minutes, g.sessions)}</td><td>${cell(g.load, g.sessions)}</td>
             <td class="tot">${cell(all.load, all.sessions)}</td><td>${rpeAvg(all)}</td>
@@ -461,7 +467,7 @@ RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
     const bars = data.blocks.map(b => {
         const tw = (b.training.load / maxLoad * 100).toFixed(1), gw = (b.game.load / maxLoad * 100).toFixed(1);
         return `<div class="bar-row">
-            <div class="bar-label">${esc(blockLabel(b))}<br><span class="dates">${esc(blockDates(b))}</span></div>
+            <div class="bar-label">${esc(blockLabel(b))}${compact ? ' ' : '<br>'}<span class="dates">${esc(blockDates(b))}</span></div>
             <div class="bar-track"><span class="seg train" style="width:${tw}%"></span><span class="seg game" style="width:${gw}%"></span></div>
             <div class="bar-val">${_crNum(b.training.load + b.game.load, lang)}</div></div>`;
     }).join('');
@@ -519,6 +525,17 @@ RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
     .section { margin-bottom: 22px; page-break-inside: avoid; }
     .section h2 { color: #ff6600; border-bottom: 2px solid #eee; padding-bottom: 6px; font-size: 16px; margin: 0 0 12px; }
     table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+    /* Paginación: ninguna fila se parte entre hojas, la cabecera se repite si una tabla ocupa más de una hoja,
+       y un título nunca queda solo al final de una hoja. Si una sección cabe en una hoja, se mantiene entera. */
+    thead { display: table-header-group; }
+    tr, .bar-row { break-inside: avoid; page-break-inside: avoid; }
+    .section h2 { break-after: avoid; page-break-after: avoid; }
+    td.nowrap { white-space: nowrap; }
+    body.compact th, body.compact td { padding: 2px 5px; font-size: 10.5px; }
+    body.compact .dates { font-size: 9.5px; }
+    body.compact .bar-row { margin: 3px 0; }
+    body.compact .bar-track { height: 12px; }
+    body.compact .bar-label { width: 190px; white-space: nowrap; font-size: 10.5px; }
     th, td { border: 1px solid #ddd; padding: 5px 6px; text-align: center; }
     th { background: #f4f4f4; font-weight: bold; }
     td.left, th.left { text-align: left; }
@@ -535,12 +552,11 @@ RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
     .legend { display: flex; gap: 18px; margin-top: 8px; font-size: 11.5px; color: #555; }
     .legend i { display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -2px; border-radius: 2px; }
     .sessions-page { page-break-before: always; page-break-inside: auto; }
-    table.list tr { page-break-inside: avoid; }
     .footnote { margin-top: 18px; padding-top: 10px; border-top: 1px solid #eee; color: #777; font-size: 10.5px; }
     .empty { text-align: center; color: #888; padding: 30px 0; }
 </style>
 </head>
-<body>
+<body${compact ? ' class="compact"' : ''}>
 <div class="report-toolbar no-print">
     <button class="print-btn" onclick="window.print()">${esc(L.print)}</button>
     <button class="close-btn" onclick="window.close()">${esc(L.close)}</button>

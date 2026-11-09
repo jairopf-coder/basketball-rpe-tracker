@@ -541,6 +541,47 @@ test('si no se llega a generar (datos inválidos) no se guarda nada', async () =
     assert.strictEqual(store.basketballCustomReportPrefs, undefined);
 });
 
+console.log('\nPaginación del PDF (las tablas no se parten entre hojas)');
+test('el CSS evita partir filas, repite la cabecera de las tablas largas y no deja un título solo al final de la hoja', () => {
+    const { html } = fullPdf({ sections: { ac: true, gps: true } });
+    assert.ok(/thead \{ display: table-header-group; \}/.test(html), 'cabecera repetida');
+    assert.ok(/tr, \.bar-row \{ break-inside: avoid; page-break-inside: avoid; \}/.test(html), 'filas enteras');
+    assert.ok(/\.section h2 \{ break-after: avoid; page-break-after: avoid; \}/.test(html), 'título pegado a su tabla');
+    assert.ok(/\.section \{[^}]*page-break-inside: avoid/.test(html), 'una sección que cabe en una hoja se mantiene entera');
+});
+function manyBlocks(n) {
+    const e = makeEnv(); const t = e.t;
+    t.sessions = [S('2026-10-12', 'training', 6, 90)];
+    const to = '2026-11-06', from = fn(e.ctx, '_crAddDays')(to, -(n * 7 - 1));
+    const data = t.buildCustomReportData('p1', { from, to, group: 'weeks' });
+    data.extras = {};
+    return { t, data, html: t.buildCustomReportHTML(t.players[0], data, { lang: 'es', sections: { table: true, chart: true } }) };
+}
+test('hasta 10 periodos el formato es el normal (periodo y fechas en dos líneas); a partir de 11 pasa a compacto', () => {
+    const normal = manyBlocks(10), compact = manyBlocks(11);
+    assert.strictEqual(normal.data.blocks.length, 10); assert.strictEqual(compact.data.blocks.length, 11);
+    assert.ok(!normal.html.includes('<body class="compact">') && /<strong>Semana 1<\/strong><br><span class="dates">/.test(normal.html));
+    assert.ok(compact.html.includes('<body class="compact">') && /<strong>Semana 1<\/strong> <span class="dates">/.test(compact.html));
+    assert.ok(!/<strong>Semana 1<\/strong><br>/.test(compact.html), 'sin salto de línea en las filas compactas');
+    assert.ok(/class="bar-label">Semana 1 <span class="dates">/.test(compact.html), 'también en el gráfico');
+});
+test('el formato compacto también se aplica a las secciones nuevas (A:C, GPS, bienestar, disponibilidad)', () => {
+    const e = availEnv(); const t = e.t;
+    t.getPlayerThresholds = () => TH; t.calculateAcuteChronicRatio = () => ({ ratio: '1.10', confidence: 'high' });
+    t.sessions = [S('2026-10-12', 'training', 6, 90)]; t.wellnessData = []; t._getGpsForSession = () => null;
+    const sections = { ac: true, gps: true, wellness: true, injuries: true };
+    const data = t.buildCustomReportData('p1', { from: '2026-05-01', to: '2026-11-06', group: 'weeks' });
+    data.extras = t.buildCustomReportExtras('p1', data, sections);
+    const html = t.buildCustomReportHTML(t.players[0], data, { lang: 'es', sections });
+    assert.ok(data.blocks.length > 10 && html.includes('<body class="compact">'));
+    assert.ok(!/<strong>Semana \d+<\/strong><br>/.test(html), 'ninguna tabla usa filas de dos líneas');
+    assert.ok((html.match(/<td class="left nowrap">/g) || []).length >= data.blocks.length * 4);
+});
+test('la cabecera de fila del periodo es la misma en todas las tablas (sin duplicar el marcado)', () => {
+    const src = fs.readFileSync(path.join(ROOT, 'custom-report.js'), 'utf8');
+    assert.ok(!/<td class="left"><strong>\$\{esc\(blockLabel\(b\)\)\}/.test(src), 'la tabla principal usa _crRowHead como las demás');
+});
+
 console.log('\nCableado');
 test('el botón está en el menú de informes de la jugadora, y el módulo en index.html y sw.js', () => {
     const pdf = fs.readFileSync(path.join(ROOT, 'pdf-reports.js'), 'utf8');
