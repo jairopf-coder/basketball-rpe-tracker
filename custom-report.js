@@ -28,6 +28,16 @@ const CR_SENSITIVE_KEYS = ['wellness', 'injuries'];                // datos de s
 const CR_PREFS_KEY      = 'basketballCustomReportPrefs';
 const CR_COMPACT_BLOCKS = 10;      // con más de 10 semanas/meses las tablas pasan a formato compacto (una línea por fila)
 const CR_PERIOD_KINDS   = ['3w', '4w', 'month', 'season'];
+// Estilos del PDF. «classic» es el de siempre; el resto los pinta report-styles.js
+const CR_STYLES = {
+    classic:          { kind: 'doc',    label: 'Clásico (el de siempre)' },
+    minimal:          { kind: 'doc',    label: 'Documento minimalista' },
+    modern:           { kind: 'doc',    label: 'Documento moderno' },
+    club:             { kind: 'doc',    label: 'Informe de club' },
+    'slides-minimal': { kind: 'slides', label: 'Presentación minimalista' },
+    'slides-modern':  { kind: 'slides', label: 'Presentación moderna' },
+    'slides-staff':   { kind: 'slides', label: 'Presentación cuerpo técnico' }
+};
 const CR_SECTION_IDS    = { table: 'crSecTable', chart: 'crSecChart', sessions: 'crSecSessions', ac: 'crSecAc', gps: 'crSecGps', wellness: 'crSecWellness', injuries: 'crSecInjuries' };
 
 // Qué se marca y en qué idioma según para quién es el informe
@@ -362,7 +372,7 @@ function _crHtmlAc(L, lang, lab, data, ac) {
 }
 function _crDec2(n, lang) { return (Math.round(n * 100) / 100).toFixed(2).replace('.', (CR_I18N[lang] || CR_I18N.en).decimal); }
 
-function _crHtmlGps(L, lang, lab, data, gps) {
+function _crHtmlGps(L, lang, lab, data, gps, withTotal = true) {
     const has = r => r.sessions > 0;
     const rows = data.blocks.map((b, i) => {
         const r = gps[i];
@@ -374,7 +384,7 @@ function _crHtmlGps(L, lang, lab, data, gps) {
     const sum = gps.reduce((t, r) => ({ sessions: t.sessions + r.sessions, distanceM: t.distanceM + r.distanceM, hsrM: t.hsrM + r.hsrM, sprintM: t.sprintM + r.sprintM,
         accel: t.accel + r.accel, decel: t.decel + r.decel, maxSpeed: r.maxSpeed === null ? t.maxSpeed : (t.maxSpeed === null ? r.maxSpeed : Math.max(t.maxSpeed, r.maxSpeed)) }),
         { sessions: 0, distanceM: 0, hsrM: 0, sprintM: 0, accel: 0, decel: 0, maxSpeed: null });
-    const total = sum.sessions ? `<tr class="sum"><td class="left">${esc(L.totalRow)}</td><td>${_crNum(sum.sessions, lang)}</td><td class="tot">${_crDec(sum.distanceM / 1000, lang)}</td>
+    const total = withTotal && sum.sessions ? `<tr class="sum"><td class="left">${esc(L.totalRow)}</td><td>${_crNum(sum.sessions, lang)}</td><td class="tot">${_crDec(sum.distanceM / 1000, lang)}</td>
         <td>${sum.maxSpeed === null ? _crDash : _crDec(sum.maxSpeed, lang)}</td><td>${_crNum(sum.hsrM, lang)}</td><td>${_crNum(sum.sprintM, lang)}</td>
         <td>${_crNum(sum.accel, lang)}</td><td>${_crNum(sum.decel, lang)}</td></tr>` : '';
     return `<div class="section"><h2>${esc(L.gpsTitle)}</h2><table><thead><tr>
@@ -395,26 +405,104 @@ function _crHtmlWellness(L, lang, lab, data, wellness) {
         <th>${esc(L.mood)}</th><th>${esc(L.muscle)}</th><th>${esc(L.overall)}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
-function _crHtmlInjuries(L, lang, lab, data, availability, injuries) {
+function _crHtmlAvailTable(L, lang, lab, data, availability) {
     const rows = data.blocks.map((b, i) => {
         const r = availability[i];
         return `<tr>${_crRowHead(lab, b)}<td>${_crNum(r.days, lang)}</td><td class="c-good">${_crNum(r.full, lang)}</td>
             <td class="c-warn">${_crNum(r.partial, lang)}</td><td class="c-bad">${_crNum(r.out, lang)}</td></tr>`;
     }).join('');
+    return `<table><thead><tr>
+        <th class="left">${esc(data.group === 'months' ? L.month : L.week)}</th><th>${esc(L.daysInSquad)}</th><th>${esc(L.full)}</th><th>${esc(L.limited)}</th><th>${esc(L.out)}</th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+}
+function _crHtmlInjuryTable(L, lang, injuries) {
     const label = (dict, key) => esc((dict && dict[key]) || key || _crDash);
-    const inj = injuries.length ? `<table style="margin-top:12px"><thead><tr><th class="left">${esc(L.zone)}</th><th class="left">${esc(L.injType)}</th>
+    return injuries.length ? `<table style="margin-top:12px"><thead><tr><th class="left">${esc(L.zone)}</th><th class="left">${esc(L.injType)}</th>
         <th class="left">${esc(L.severity)}</th><th>${esc(L.start)}</th><th>${esc(L.endStatus)}</th></tr></thead><tbody>
         ${injuries.map(x => `<tr><td class="left">${label(L.locations, x.location)}</td><td class="left">${label(L.injTypes, x.type)}</td><td class="left">${label(L.severities, x.severity)}</td>
             <td>${esc(_crFmtDate(x.start, lang))}</td><td>${x.ongoing ? `<strong>${esc(L.ongoing)}</strong>` : esc(_crFmtDate(x.end, lang)) + ' · ' + esc(L.recovered)}</td></tr>`).join('')}
         </tbody></table>` : `<p class="muted">${esc(L.noInjuries)}</p>`;
-    return `<div class="section"><h2>${esc(L.availTitle)} · ${esc(L.injuriesTitle)}</h2><table><thead><tr>
-        <th class="left">${esc(data.group === 'months' ? L.month : L.week)}</th><th>${esc(L.daysInSquad)}</th><th>${esc(L.full)}</th><th>${esc(L.limited)}</th><th>${esc(L.out)}</th></tr></thead>
-        <tbody>${rows}</tbody></table>${inj}</div>`;
+}
+function _crHtmlInjuries(L, lang, lab, data, availability, injuries) {
+    return `<div class="section"><h2>${esc(L.availTitle)} · ${esc(L.injuriesTitle)}</h2>${_crHtmlAvailTable(L, lang, lab, data, availability)}${_crHtmlInjuryTable(L, lang, injuries)}</div>`;
 }
 
-// @param opts { lang, sections: {table, chart, sessions, ac, gps, wellness, injuries}, note }
-// Los datos opcionales vienen en data.extras (buildCustomReportExtras)
-RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
+// ── Piezas reutilizables por todos los estilos (clásico, documentos y presentaciones) ─────────────────
+// Tabla principal de carga. `withTotals`: las filas de total y media solo salen al final (en las
+// presentaciones una tabla larga se reparte en varias diapositivas y el total va en la última).
+function _crHtmlLoadTable(L, lang, lab, data, withTotals, peakIndex) {
+    const isMonths = data.group === 'months';
+    const rpeAvg = bucket => (bucket.sessions ? _crDec(bucket.rpeSum / bucket.sessions, lang) : '–');
+    const cell = (n, bucketSessions) => (bucketSessions ? _crNum(n, lang) : '–');
+    const rows = data.blocks.map(b => {
+        const t = b.training, g = b.game, all = _crSumBuckets(t, g);
+        return `<tr${b.index === peakIndex ? ' class="peak"' : ''}>
+            ${_crRowHead(lab, b)}
+            <td>${cell(t.sessions, t.sessions)}</td><td>${cell(t.minutes, t.sessions)}</td><td>${cell(t.load, t.sessions)}</td>
+            <td>${cell(g.sessions, g.sessions)}</td><td>${cell(g.minutes, g.sessions)}</td><td>${cell(g.load, g.sessions)}</td>
+            <td class="tot">${cell(all.load, all.sessions)}</td><td>${rpeAvg(all)}</td>
+        </tr>`;
+    }).join('');
+    const T = data.totals;
+    const totalRow = `<tr class="sum">
+        <td class="left">${esc(L.totalRow)}</td>
+        <td>${_crNum(T.training.sessions, lang)}</td><td>${_crNum(T.training.minutes, lang)}</td><td>${_crNum(T.training.load, lang)}</td>
+        <td>${_crNum(T.game.sessions, lang)}</td><td>${_crNum(T.game.minutes, lang)}</td><td>${_crNum(T.game.load, lang)}</td>
+        <td class="tot">${_crNum(T.all.load, lang)}</td><td>${rpeAvg(T.all)}</td></tr>`;
+    const avgRow = `<tr class="avg">
+        <td class="left">${esc(L.avgRow)}</td>
+        <td colspan="2"></td><td></td><td colspan="2"></td><td></td>
+        <td class="tot">${_crNum(data.avgPer7.load, lang)}</td><td></td></tr>`;
+    return `<div class="section"><table>
+        <thead>
+            <tr><th rowspan="2" class="left">${esc(isMonths ? L.month : L.week)}</th>
+                <th colspan="3">${esc(L.training)}</th><th colspan="3">${esc(L.games)}</th><th colspan="2">${esc(L.total)}</th></tr>
+            <tr><th>${esc(L.sessions)}</th><th>${esc(L.minutes)}</th><th>${esc(L.load)}</th>
+                <th>${esc(L.gamesN)}</th><th>${esc(L.minutes)}</th><th>${esc(L.load)}</th>
+                <th>${esc(L.load)}</th><th>${esc(L.avgRpe)}</th></tr>
+        </thead>
+        <tbody>${rows}${withTotals ? totalRow + avgRow : ''}</tbody></table></div>`;
+}
+
+// Barras de carga por periodo (entrenamiento + partido). `scaleMax` permite que varias diapositivas del mismo
+// informe usen la misma escala.
+function _crHtmlBars(L, lang, lab, data, scaleMax) {
+    const maxLoad = scaleMax || Math.max(1, ...data.blocks.map(b => b.training.load + b.game.load));
+    return data.blocks.map(b => {
+        const tw = (b.training.load / maxLoad * 100).toFixed(1), gw = (b.game.load / maxLoad * 100).toFixed(1);
+        return `<div class="bar-row">
+            <div class="bar-label">${esc(lab.label(b))}${lab.compact ? ' ' : '<br>'}<span class="dates">${esc(lab.dates(b))}</span></div>
+            <div class="bar-track"><span class="seg train" style="width:${tw}%"></span><span class="seg game" style="width:${gw}%"></span></div>
+            <div class="bar-val">${_crNum(b.training.load + b.game.load, lang)}</div></div>`;
+    }).join('');
+}
+function _crHtmlLegend(L) {
+    return `<div class="legend"><span><i class="seg train"></i>${esc(L.legendTraining)}</span><span><i class="seg game"></i>${esc(L.legendGame)}</span></div>`;
+}
+
+// Filas de la lista de sesiones (sin envoltorio: lo pone cada estilo)
+function _crHtmlSessionRows(L, lang, sessions) {
+    const typeLabel = t => (t === CR_GAME_TYPE ? L.typeMatch : t === 'shooting' ? L.typeShooting : L.typeTraining);
+    return sessions.map(s => `<tr><td class="left">${esc(_crFmtDate(s.date, lang))}</td><td class="left">${esc(typeLabel(s.type))}</td>
+            <td>${_crNum(s.minutes, lang)}</td><td>${_crDec(s.rpe, lang)}</td><td>${_crNum(s.load, lang)}</td></tr>`).join('');
+}
+function _crHtmlSessionsHead(L) {
+    return `<thead><tr><th class="left">${esc(L.date)}</th><th class="left">${esc(L.type)}</th><th>${esc(L.minutes)}</th><th>${esc(L.rpe)}</th><th>${esc(L.load)}</th></tr></thead>`;
+}
+
+// Nota con las definiciones de lo que se haya marcado
+function _crFootnoteLines(L, lang, sec, ex) {
+    const th = ex.ac && ex.ac.thresholds;
+    return [
+        L.definitions,
+        sec.ac && th ? L.acNote.replace('{low}', _crDec2(th.low, lang)).replace(/\{opt\}/g, _crDec2(th.opt, lang)).replace(/\{high\}/g, _crDec2(th.high, lang)) : '',
+        sec.gps ? L.gpsNote : '',
+        sec.wellness ? L.wellnessNote : ''
+    ].filter(Boolean);
+}
+
+// Todas las piezas del informe ya formateadas y escapadas. Cada estilo las coloca a su manera.
+RPETracker.prototype._crParts = function(player, data, opts) {
     const lang = CR_I18N[opts.lang] ? opts.lang : 'en';
     const L = CR_I18N[lang];
     const sec = opts.sections || {};
@@ -428,71 +516,15 @@ RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
     const hasLoad = data.totals.all.sessions > 0;
     const sensitive = CR_SENSITIVE_KEYS.some(k => sec[k]);
 
-    const blockLabel = lab.label, blockDates = lab.dates;
-    const rpeAvg = bucket => (bucket.sessions ? _crDec(bucket.rpeSum / bucket.sessions, lang) : '–');
-    const cell = (n, bucketSessions) => (bucketSessions ? _crNum(n, lang) : '–');
-
-    const rows = data.blocks.map(b => {
-        const t = b.training, g = b.game, all = _crSumBuckets(t, g);
-        return `<tr>
-            ${_crRowHead(lab, b)}
-            <td>${cell(t.sessions, t.sessions)}</td><td>${cell(t.minutes, t.sessions)}</td><td>${cell(t.load, t.sessions)}</td>
-            <td>${cell(g.sessions, g.sessions)}</td><td>${cell(g.minutes, g.sessions)}</td><td>${cell(g.load, g.sessions)}</td>
-            <td class="tot">${cell(all.load, all.sessions)}</td><td>${rpeAvg(all)}</td>
-        </tr>`;
-    }).join('');
-
-    const T = data.totals;
-    const totalRow = `<tr class="sum">
-        <td class="left">${esc(L.totalRow)}</td>
-        <td>${_crNum(T.training.sessions, lang)}</td><td>${_crNum(T.training.minutes, lang)}</td><td>${_crNum(T.training.load, lang)}</td>
-        <td>${_crNum(T.game.sessions, lang)}</td><td>${_crNum(T.game.minutes, lang)}</td><td>${_crNum(T.game.load, lang)}</td>
-        <td class="tot">${_crNum(T.all.load, lang)}</td><td>${rpeAvg(T.all)}</td></tr>`;
-    const avgRow = `<tr class="avg">
-        <td class="left">${esc(L.avgRow)}</td>
-        <td colspan="2"></td><td></td><td colspan="2"></td><td></td>
-        <td class="tot">${_crNum(data.avgPer7.load, lang)}</td><td></td></tr>`;
-
-    const tableHTML = `<div class="section"><table>
-        <thead>
-            <tr><th rowspan="2" class="left">${esc(isMonths ? L.month : L.week)}</th>
-                <th colspan="3">${esc(L.training)}</th><th colspan="3">${esc(L.games)}</th><th colspan="2">${esc(L.total)}</th></tr>
-            <tr><th>${esc(L.sessions)}</th><th>${esc(L.minutes)}</th><th>${esc(L.load)}</th>
-                <th>${esc(L.gamesN)}</th><th>${esc(L.minutes)}</th><th>${esc(L.load)}</th>
-                <th>${esc(L.load)}</th><th>${esc(L.avgRpe)}</th></tr>
-        </thead>
-        <tbody>${rows}${totalRow}${avgRow}</tbody></table></div>`;
-
-    const maxLoad = Math.max(1, ...data.blocks.map(b => b.training.load + b.game.load));
-    const bars = data.blocks.map(b => {
-        const tw = (b.training.load / maxLoad * 100).toFixed(1), gw = (b.game.load / maxLoad * 100).toFixed(1);
-        return `<div class="bar-row">
-            <div class="bar-label">${esc(blockLabel(b))}${compact ? ' ' : '<br>'}<span class="dates">${esc(blockDates(b))}</span></div>
-            <div class="bar-track"><span class="seg train" style="width:${tw}%"></span><span class="seg game" style="width:${gw}%"></span></div>
-            <div class="bar-val">${_crNum(b.training.load + b.game.load, lang)}</div></div>`;
-    }).join('');
-    const chartHTML = `<div class="section"><h2>${esc(L.chartTitle)}</h2>${bars}
-        <div class="legend"><span><i class="seg train"></i>${esc(L.legendTraining)}</span><span><i class="seg game"></i>${esc(L.legendGame)}</span></div></div>`;
-
-    const typeLabel = t => (t === CR_GAME_TYPE ? L.typeMatch : t === 'shooting' ? L.typeShooting : L.typeTraining);
+    const tableHTML = _crHtmlLoadTable(L, lang, lab, data, true);
+    const chartHTML = `<div class="section"><h2>${esc(L.chartTitle)}</h2>${_crHtmlBars(L, lang, lab, data)}${_crHtmlLegend(L)}</div>`;
     // La lista de sesiones empieza en página aparte solo si hay algo antes
     const sessionsHTML = `<div class="section${sec.table || sec.chart || sec.ac || sec.gps || sec.wellness || sec.injuries ? ' sessions-page' : ''}"><h2>${esc(L.sessionsTitle)}</h2>
-        <table class="list"><thead><tr><th class="left">${esc(L.date)}</th><th class="left">${esc(L.type)}</th>
-            <th>${esc(L.minutes)}</th><th>${esc(L.rpe)}</th><th>${esc(L.load)}</th></tr></thead><tbody>
-        ${data.sessions.map(s => `<tr><td class="left">${esc(_crFmtDate(s.date, lang))}</td><td class="left">${esc(typeLabel(s.type))}</td>
-            <td>${_crNum(s.minutes, lang)}</td><td>${_crDec(s.rpe, lang)}</td><td>${_crNum(s.load, lang)}</td></tr>`).join('')}
-        </tbody></table></div>`;
+        <table class="list">${_crHtmlSessionsHead(L)}<tbody>${_crHtmlSessionRows(L, lang, data.sessions)}</tbody></table></div>`;
 
     const noteText = String(opts.note || '').trim();
     const noteHTML = noteText ? `<div class="note"><strong>${esc(L.contextTitle)}</strong><br>${esc(noteText)}</div>` : '';
-
-    // Definiciones y fecha: van en la primera página, debajo de las secciones de carga
-    const th = ex.ac && ex.ac.thresholds;
-    const extraNotes = [
-        sec.ac && th ? L.acNote.replace('{low}', _crDec2(th.low, lang)).replace(/\{opt\}/g, _crDec2(th.opt, lang)).replace(/\{high\}/g, _crDec2(th.high, lang)) : '',
-        sec.gps ? L.gpsNote : '',
-        sec.wellness ? L.wellnessNote : ''
-    ].filter(Boolean).map(x => `<br>${esc(x)}`).join('');
+    const extraNotes = _crFootnoteLines(L, lang, sec, ex).slice(1).map(x => `<br>${esc(x)}`).join('');
     const footnoteHTML = `<div class="footnote">${esc(L.definitions)}${extraNotes}<br>${esc(L.generated)}: ${esc(todayLabel)}</div>`;
 
     const loadSections = sec.table || sec.chart || sec.sessions;
@@ -504,26 +536,12 @@ RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
     const wellHTML = sec.wellness && ex.wellness ? _crHtmlWellness(L, lang, lab, data, ex.wellness) : '';
     const injHTML = sec.injuries && ex.availability ? _crHtmlInjuries(L, lang, lab, data, ex.availability, ex.injuries || []) : '';
 
-    return `<!DOCTYPE html>
-<html lang="${L.htmlLang}">
-<head>
-<meta charset="UTF-8">
-<title>${esc(L.title)} - ${esc(name)}</title>
-<style>
-    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
-    @media print { @page { size: A4; margin: 1.5cm; } .no-print { display: none !important; } body { padding: 0 !important; } }
-    body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.45; font-size: 13px; }
-    .report-toolbar { position: sticky; top: 0; background: #fff; display: flex; gap: 10px; justify-content: center; padding: 12px 0; margin: -20px -20px 20px; border-bottom: 1px solid #eee; z-index: 10; }
-    .report-toolbar button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
-    .print-btn { background: #ff6600; color: #fff; } .close-btn { background: #eee; color: #333; }
-    .header { text-align: center; border-bottom: 3px solid #ff6600; padding-bottom: 14px; margin-bottom: 20px; }
-    .header h1 { color: #ff6600; margin: 0; font-size: 24px; }
-    .header .player { font-size: 18px; margin-top: 8px; font-weight: bold; }
-    .header .range { color: #666; margin-top: 4px; }
-    .confidential { display: inline-block; margin-top: 8px; padding: 2px 10px; border: 1px solid #c62828; color: #c62828; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: .03em; }
-    .note { background: #f7f7f7; border-left: 4px solid #ff6600; padding: 10px 14px; margin-bottom: 18px; white-space: pre-wrap; }
-    .section { margin-bottom: 22px; page-break-inside: avoid; }
-    .section h2 { color: #ff6600; border-bottom: 2px solid #eee; padding-bottom: 6px; font-size: 16px; margin: 0 0 12px; }
+    return { lang, L, sec, ex, name, range, todayLabel, sensitive, compact, isMonths, lab, hasLoad, noteText,
+        tableHTML, chartHTML, sessionsHTML, noteHTML, footnoteHTML, loadHTML, acHTML, gpsHTML, wellHTML, injHTML };
+};
+
+// ── CSS de las tablas, barras y paginación: lo comparten todos los estilos de documento ──────────────
+const CR_CSS_TABLES = `
     table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
     /* Paginación: ninguna fila se parte entre hojas, la cabecera se repite si una tabla ocupa más de una hoja,
        y un título nunca queda solo al final de una hoja. Si una sección cabe en una hoja, se mantiene entera. */
@@ -551,24 +569,62 @@ RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
     .seg { display: block; height: 100%; } .seg.train { background: #ff6600; } .seg.game { background: #2c3e50; }
     .legend { display: flex; gap: 18px; margin-top: 8px; font-size: 11.5px; color: #555; }
     .legend i { display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -2px; border-radius: 2px; }
+`;
+// CSS de la hoja del estilo clásico (cabecera centrada, aviso de contexto, pie)
+const CR_CSS_CLASSIC = `
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+    @media print { @page { size: A4; margin: 1.5cm; } .no-print { display: none !important; } body { padding: 0 !important; } }
+    body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.45; font-size: 13px; }
+    .report-toolbar { position: sticky; top: 0; background: #fff; display: flex; gap: 10px; justify-content: center; padding: 12px 0; margin: -20px -20px 20px; border-bottom: 1px solid #eee; z-index: 10; }
+    .report-toolbar button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .print-btn { background: #ff6600; color: #fff; } .close-btn { background: #eee; color: #333; }
+    .header { text-align: center; border-bottom: 3px solid #ff6600; padding-bottom: 14px; margin-bottom: 20px; }
+    .header h1 { color: #ff6600; margin: 0; font-size: 24px; }
+    .header .player { font-size: 18px; margin-top: 8px; font-weight: bold; }
+    .header .range { color: #666; margin-top: 4px; }
+    .confidential { display: inline-block; margin-top: 8px; padding: 2px 10px; border: 1px solid #c62828; color: #c62828; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: .03em; }
+    .note { background: #f7f7f7; border-left: 4px solid #ff6600; padding: 10px 14px; margin-bottom: 18px; white-space: pre-wrap; }
+    .section { margin-bottom: 22px; page-break-inside: avoid; }
+    .section h2 { color: #ff6600; border-bottom: 2px solid #eee; padding-bottom: 6px; font-size: 16px; margin: 0 0 12px; }
     .sessions-page { page-break-before: always; page-break-inside: auto; }
     .footnote { margin-top: 18px; padding-top: 10px; border-top: 1px solid #eee; color: #777; font-size: 10.5px; }
     .empty { text-align: center; color: #888; padding: 30px 0; }
-</style>
-</head>
-<body${compact ? ' class="compact"' : ''}>
-<div class="report-toolbar no-print">
+`;
+
+// Barra de herramientas de la ventana (no se imprime)
+function _crToolbar(L) {
+    return `<div class="report-toolbar no-print">
     <button class="print-btn" onclick="window.print()">${esc(L.print)}</button>
     <button class="close-btn" onclick="window.close()">${esc(L.close)}</button>
-</div>
+</div>`;
+}
+
+// @param opts { lang, sections: {table, chart, sessions, ac, gps, wellness, injuries}, note, style }
+// Los datos opcionales vienen en data.extras (buildCustomReportExtras). El estilo «clásico» es el de siempre;
+// los demás los pinta report-styles.js.
+RPETracker.prototype.buildCustomReportHTML = function(player, data, opts) {
+    const parts = this._crParts(player, data, opts);
+    const style = CR_STYLES[opts.style] ? opts.style : 'classic';
+    if (style !== 'classic' && typeof this._crRenderStyled === 'function') return this._crRenderStyled(style, player, data, opts, parts);
+
+    const { L, name, range, sensitive, compact } = parts;
+    return `<!DOCTYPE html>
+<html lang="${L.htmlLang}">
+<head>
+<meta charset="UTF-8">
+<title>${esc(L.title)} - ${esc(name)}</title>
+<style>${CR_CSS_CLASSIC}${CR_CSS_TABLES}</style>
+</head>
+<body${compact ? ' class="compact"' : ''}>
+${_crToolbar(L)}
 <div class="header">
     <h1>${esc(L.title)}</h1>
     <div class="player">${esc(name)}</div>
     <div class="range">${esc(L.period)}: ${esc(range)}</div>
     ${sensitive ? `<div class="confidential">${esc(L.confidential)}</div>` : ''}
 </div>
-${noteHTML}
-${loadHTML}${acHTML}${gpsHTML}${wellHTML}${injHTML}${footnoteHTML}${sec.sessions && hasLoad ? sessionsHTML : ''}
+${parts.noteHTML}
+${parts.loadHTML}${parts.acHTML}${parts.gpsHTML}${parts.wellHTML}${parts.injHTML}${parts.footnoteHTML}${parts.sec.sessions && parts.hasLoad ? parts.sessionsHTML : ''}
 </body>
 </html>`;
 };
@@ -594,7 +650,7 @@ RPETracker.prototype._crLoadPrefs = function() {
         if (!p || typeof p !== 'object') return null;
         const sections = {};
         CR_SECTION_KEYS.forEach(k => { sections[k] = CR_SENSITIVE_KEYS.includes(k) ? false : !!(p.sections && p.sections[k]); });
-        return { lang: p.lang === 'en' ? 'en' : 'es', group: p.group === 'months' ? 'months' : 'weeks', period: CR_PERIOD_KINDS.includes(p.period) ? p.period : null, sections };
+        return { lang: p.lang === 'en' ? 'en' : 'es', group: p.group === 'months' ? 'months' : 'weeks', style: CR_STYLES[p.style] ? p.style : 'classic', period: CR_PERIOD_KINDS.includes(p.period) ? p.period : null, sections };
     } catch (_) { return null; }
 };
 
@@ -603,7 +659,7 @@ RPETracker.prototype._crSavePrefs = function(f) {
         const sections = {};
         CR_SECTION_KEYS.forEach(k => { if (!CR_SENSITIVE_KEYS.includes(k)) sections[k] = !!(f.sections && f.sections[k]); });
         localStorage.setItem(CR_PREFS_KEY, JSON.stringify({
-            lang: f.lang === 'en' ? 'en' : 'es', group: f.group === 'months' ? 'months' : 'weeks',
+            lang: f.lang === 'en' ? 'en' : 'es', group: f.group === 'months' ? 'months' : 'weeks', style: CR_STYLES[f.style] ? f.style : 'classic',
             period: CR_PERIOD_KINDS.includes(f.periodKind) ? f.periodKind : null, sections
         }));
     } catch (_) { /* sin almacenamiento local: simplemente no se recuerda */ }
@@ -618,6 +674,7 @@ RPETracker.prototype.showCustomReportDialog = function(playerId) {
     const playerOpts = this.players.map(p =>
         `<option value="${esc(p.id)}"${p.id === playerId ? ' selected' : ''}>${esc(this.playerDisplayName(p))}${p.number ? ' #' + esc(p.number) : ''}</option>`
     ).join('');
+    const styleOptions = kind => Object.entries(CR_STYLES).filter(([, v]) => v.kind === kind).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
     const chip = (key, label, handler) =>
         `<button type="button" class="btn-secondary crChip" data-key="${key}" style="font-size:0.8rem;padding:0.4rem 0.8rem" onclick="window.rpeTracker.${handler}('${key}')">${label}</button>`;
     const check = (id, label, on) =>
@@ -672,6 +729,13 @@ RPETracker.prototype.showCustomReportDialog = function(playerId) {
                     </div>
                 </div>
                 <div style="margin-bottom:1.1rem">
+                    <label class="form-label">Estilo del PDF</label>
+                    <select id="crStyle" class="form-select">
+                        <optgroup label="Documento (hojas A4 verticales)">${styleOptions('doc')}</optgroup>
+                        <optgroup label="Presentación (diapositivas 16:9, una idea por diapositiva)">${styleOptions('slides')}</optgroup>
+                    </select>
+                </div>
+                <div style="margin-bottom:1.1rem">
                     <label class="form-label">Qué incluir</label>
                     <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);margin:0.2rem 0 0.3rem">Carga y rendimiento</div>
                     <div style="border:1px solid var(--border);border-radius:8px;padding:0 0.75rem">
@@ -710,6 +774,7 @@ RPETracker.prototype.showCustomReportDialog = function(playerId) {
     if (prefs) {
         document.getElementById('crLang').value = prefs.lang;
         document.getElementById('crGroup').value = prefs.group;
+        const styleEl = document.getElementById('crStyle'); if (styleEl) styleEl.value = prefs.style;
         CR_SECTION_KEYS.forEach(k => { const el = document.getElementById(CR_SECTION_IDS[k]); if (el) el.checked = !!prefs.sections[k]; });
         if (prefs.period) this._crSetPeriod(prefs.period);
     }
@@ -767,6 +832,7 @@ RPETracker.prototype._crReadForm = function() {
         playerId: v('crPlayer')?.value, from: v('crFrom')?.value, to: v('crTo')?.value,
         group: v('crGroup')?.value === 'months' ? 'months' : 'weeks',
         lang: v('crLang')?.value === 'en' ? 'en' : 'es',
+        style: CR_STYLES[v('crStyle')?.value] ? v('crStyle').value : 'classic',
         sections: CR_SECTION_KEYS.reduce((o, k) => { o[k] = !!v(CR_SECTION_IDS[k])?.checked; return o; }, {}),
         periodKind: this._crPeriodKind || 'custom',
         note: v('crNote')?.value || ''
@@ -815,7 +881,7 @@ RPETracker.prototype.generateCustomReport = async function() {
 
     const data = this.buildCustomReportData(f.playerId, { from: f.from, to: f.to, group: f.group });
     data.extras = this.buildCustomReportExtras(f.playerId, data, f.sections);
-    const html = this.buildCustomReportHTML(player, data, { lang: f.lang, sections: f.sections, note: f.note });
+    const html = this.buildCustomReportHTML(player, data, { lang: f.lang, sections: f.sections, note: f.note, style: f.style });
 
     printWindow.document.open();
     printWindow.document.write(html);

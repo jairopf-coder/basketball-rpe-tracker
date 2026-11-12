@@ -471,7 +471,7 @@ test('lo recordado NO incluye secciones de salud, ni jugadora, ni fechas, ni la 
         sections: { table: true, chart: false, sessions: true, ac: true, gps: true, wellness: true, injuries: true } });
     const raw = store.basketballCustomReportPrefs;
     ['wellness', 'injuries', 'p1', '2026-10', 'NOTA-PRIVADA', 'playerId'].forEach(x => assert.ok(!raw.includes(x), 'no debe guardarse: ' + x));
-    same(JSON.parse(raw), { lang: 'en', group: 'months', period: '3w', sections: { table: true, chart: false, sessions: true, ac: true, gps: true } });
+    same(JSON.parse(raw), { lang: 'en', group: 'months', style: 'classic', period: '3w', sections: { table: true, chart: false, sessions: true, ac: true, gps: true } });
 });
 test('al cargar, las de salud salen SIEMPRE desmarcadas aunque alguien manipule el almacenamiento', () => {
     const { t, store } = makeEnv();
