@@ -1729,7 +1729,7 @@ RPETracker.prototype.renderTestsView = function() {
                 <h2>📊 Tests de Rendimiento</h2>
                 <div class="str-header-actions">
                     <button class="btn-secondary" onclick="window.rpeTracker.showTestsReportMenu()">📄 Informe</button>
-                    <button class="btn-primary" onclick="window.rpeTracker._openNewTest()" title="Nuevo test" aria-label="Nuevo test">+</button>
+                    <button class="btn-primary" onclick="window.rpeTracker._openTestWizard()" title="Nuevo test" aria-label="Nuevo test">+</button>
                 </div>
             </div>
             <div class="str-player-list">${playerCards}</div>
@@ -1894,7 +1894,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                     <div class="str-player-avatar str-player-avatar--sm" style="background:${color}">${esc(player.name.charAt(0))}</div>
                     <span style="color:${color};font-weight:600">${esc(player.name)}</span>
                 </div>
-                <button class="btn-primary" onclick="window.rpeTracker._openNewTest('${player.id}')" title="Nuevo test" aria-label="Nuevo test">+</button>
+                <button class="btn-primary" onclick="window.rpeTracker._openTestWizard('${player.id}')" title="Nuevo test" aria-label="Nuevo test">+</button>
             </div>
             ${summaryHTML}
             ${buildChartHTML()}
