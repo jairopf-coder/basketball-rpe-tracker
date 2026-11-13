@@ -357,10 +357,13 @@
         // Los valores absolutos quedan en el tooltip de cada celda
         const cellTitle = (real, plan) => `Real ${real} UA · Plan ${plan} UA`;
 
-        // Los días que aún no han llegado se dejan vacíos: comparar con el plan daría -100% y ensucia la tabla.
+        // Se deja vacío lo que aún no ha ocurrido: comparar con el plan daría -100% y ensucia la tabla.
+        //  · días futuros: siempre vacío
+        //  · hoy: vacío mientras no haya ninguna sesión registrada (cuando la haya, sale el dato)
         // Las fechas ISO (YYYY-MM-DD) se comparan bien como texto.
         const todayStr = toLocalISODate(new Date());
         const isFutureDay = ds => ds > todayStr;
+        const isTodayWithoutData = (ds, real) => ds === todayStr && real === 0;
         const emptyFutureCell = '<td class="mc-cell mc-cell-neutral"></td>';
 
         // ── Tabla jugadora × día ──────────────────────────────────
@@ -389,6 +392,7 @@
                 }
                 const daySessions = this.sessions.filter(s => s.playerId === player.id && s.date && s.date.slice(0, 10) === ds);
                 const realUA  = Math.round(daySessions.reduce((sum, s) => sum + (s.load || 0), 0));
+                if (isTodayWithoutData(ds, realUA)) return emptyFutureCell;
                 const planUA  = plannedUAPerDayPerPlayer[i];
                 const cls     = trafficLight(realUA, planUA);
                 return `<td class="mc-cell ${cls}" title="${cellTitle(realUA, planUA)}">${variationText(realUA, planUA)}</td>`;
@@ -419,7 +423,7 @@
 
         // Team totals row
         const teamTotalCells = dayDateStrs.map((ds, i) => {
-            if (isFutureDay(ds)) return emptyFutureCell;
+            if (isFutureDay(ds) || isTodayWithoutData(ds, realUAPerDay[i])) return emptyFutureCell;
             const ua  = realUAPerDay[i];
             const pua = plannedUAPerDay[i];
             const cls = trafficLight(ua, pua);
