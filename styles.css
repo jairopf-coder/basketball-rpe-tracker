@@ -10865,3 +10865,91 @@ textarea:focus-visible,
     .pri-actions { width: 100%; }
     .pri-min { flex: 1; }
 }
+
+/* ===== Tests: registro por equipo (tests-wizard.js) ===== */
+.tw-body { padding: 1.25rem; }
+.tw-section-title {
+    font-size: 0.8rem; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em; margin: 1.1rem 0 0.5rem;
+}
+.tw-section-title:first-child { margin-top: 0; }
+.tw-hint { font-size: 0.78rem; color: var(--text-muted); margin: 0.6rem 0 0; }
+.tw-date { max-width: 200px; }
+.tw-test-title { font-size: 0.95rem; margin-bottom: 0.25rem; }
+
+.tw-test-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.5rem; }
+.tw-test-btn {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    padding: 0.6rem 0.75rem; border-radius: 10px; cursor: pointer; text-align: left;
+    background: var(--bg-subtle); color: var(--text-primary);
+    border: 2px solid var(--border); transition: border-color 0.15s, background 0.15s;
+}
+.tw-test-btn:hover { border-color: var(--text-muted); }
+.tw-test-btn--selected { border-color: var(--primary); background: rgba(255,102,0,0.10); }
+.tw-test-btn-name { font-weight: 700; font-size: 0.9rem; }
+.tw-test-btn-meta { font-size: 0.7rem; color: var(--text-muted); }
+
+.tw-banner {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem;
+    padding: 0.65rem 0.85rem; margin-bottom: 1rem; border-radius: 10px; font-size: 0.85rem;
+    background: var(--bg-subtle); border: 1px solid var(--border);
+}
+.tw-banner-actions { display: flex; gap: 0.4rem; }
+
+.tw-footer {
+    display: flex; justify-content: space-between; gap: 0.75rem;
+    padding: 0.85rem 1.25rem; border-top: 1px solid var(--border); background: var(--bg-surface);
+}
+.tw-footer .btn-primary[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+.tw-rows { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.75rem; }
+.tw-row {
+    background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.6rem 0.75rem;
+}
+.tw-row--has-data { border-color: var(--primary); }
+.tw-row-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.45rem; }
+.tw-row-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;
+}
+.tw-row-name { font-weight: 600; font-size: 0.9rem; }
+.tw-row-last { margin-left: auto; font-size: 0.72rem; color: var(--text-muted); }
+.tw-tag { font-size: 0.68rem; padding: 1px 6px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); }
+.tw-row-fields { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+.tw-group { display: flex; align-items: center; gap: 0.35rem; }
+.tw-group--weight { margin-left: auto; }
+.tw-side { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); min-width: 14px; text-align: center; }
+.tw-input {
+    width: 4.6rem; text-align: center; padding: 0.4rem 0.3rem;
+    font-size: max(0.9rem, 16px); /* 16px evita el zoom automático de iOS */
+}
+.tw-calc { min-height: 1.1rem; margin-top: 0.4rem; font-size: 0.8rem; color: var(--text-primary); }
+.tw-calc:empty { display: none; }
+.tw-warn { color: var(--color-warning, #ff9800); font-weight: 600; font-size: 0.75rem; display: inline-block; }
+
+.tw-delta { font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.tw-delta--good { color: var(--color-success, #4caf50); }
+.tw-delta--bad  { color: var(--color-danger, #f44336); }
+.tw-delta--flat { color: var(--text-muted); }
+
+.tw-team {
+    padding: 0.6rem 0.85rem; margin: 0.5rem 0 0.75rem; border-radius: 10px; font-size: 0.9rem;
+    background: var(--bg-subtle); border: 1px solid var(--border);
+}
+.tw-sum-list { display: flex; flex-direction: column; }
+.tw-sum-row {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+    padding: 0.5rem 0; border-bottom: 0.5px solid var(--border);
+}
+.tw-sum-row:last-child { border-bottom: none; }
+.tw-rank { width: 1.4rem; text-align: center; font-size: 0.8rem; font-weight: 700; color: var(--text-faint); }
+.tw-sum-name { flex: 1; min-width: 6rem; font-weight: 600; font-size: 0.9rem; }
+.tw-sum-value { font-size: 0.88rem; font-weight: 700; }
+
+@media (max-width: 600px) {
+    .tw-body { padding: 1rem; }
+    .tw-row-last { margin-left: 0; width: 100%; }
+    .tw-group--weight { margin-left: 0; }
+    .tw-input { width: 4.1rem; }
+}
