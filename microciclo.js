@@ -357,6 +357,12 @@
         // Los valores absolutos quedan en el tooltip de cada celda
         const cellTitle = (real, plan) => `Real ${real} UA · Plan ${plan} UA`;
 
+        // Los días que aún no han llegado se dejan vacíos: comparar con el plan daría -100% y ensucia la tabla.
+        // Las fechas ISO (YYYY-MM-DD) se comparan bien como texto.
+        const todayStr = toLocalISODate(new Date());
+        const isFutureDay = ds => ds > todayStr;
+        const emptyFutureCell = '<td class="mc-cell mc-cell-neutral"></td>';
+
         // ── Tabla jugadora × día ──────────────────────────────────
         // For each player, for each day: real UA vs planned (per-player share of daily plan)
         const plannedUAPerDayPerPlayer = plannedLoadPerPlayer.map(load => Math.round(load));
@@ -376,6 +382,7 @@
 
         const tableRows = roster.map(player => {
             const cells = dayDateStrs.map((ds, i) => {
+                if (isFutureDay(ds)) return emptyFutureCell;
                 // Fuera del grupo ese día (lesión o no disponible): no hay plan que comparar
                 if (outMap[player.id][i]) {
                     return `<td class="mc-cell mc-cell-neutral" title="Fuera del grupo ese día (lesión o no disponible): no se compara con el plan">–</td>`;
@@ -412,6 +419,7 @@
 
         // Team totals row
         const teamTotalCells = dayDateStrs.map((ds, i) => {
+            if (isFutureDay(ds)) return emptyFutureCell;
             const ua  = realUAPerDay[i];
             const pua = plannedUAPerDay[i];
             const cls = trafficLight(ua, pua);
