@@ -11005,3 +11005,13 @@ textarea:focus-visible,
 .tt-freq-row:last-child { border-bottom: none; }
 .tt-freq-field { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-muted); white-space: nowrap; }
 .tt-freq-input { width: 4.2rem; text-align: center; padding: 0.35rem 0.3rem; font-size: max(0.9rem, 16px); }
+
+/* ===== Tests: notas (tests-wizard.js, tests-team.js, strength.js) ===== */
+.tw-general-note { margin: 0.75rem 0 0.25rem; }
+.tw-general-note label { display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+.tw-note { margin-top: 0.45rem; }
+.tw-note[hidden] { display: none; }
+.tw-note-input { width: 100%; font-size: max(0.9rem, 16px); padding: 0.4rem 0.6rem; }
+.tw-note-btn { margin-left: 0.25rem; border: none; background: transparent; cursor: pointer; font-size: 1rem; opacity: 0.45; padding: 0 2px; line-height: 1; }
+.tw-note-btn:hover, .tw-note-btn--on { opacity: 1; }
+.tt-note { flex: 1 0 100%; font-size: 0.76rem; color: var(--text-muted); padding-left: 0.2rem; margin-top: 0.1rem; }

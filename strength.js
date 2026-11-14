@@ -1865,6 +1865,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
             const rowsHTML = Object.entries(ts.results || {}).map(([testId, val]) => {
                 const def = TEST_DEFINITIONS.find(t => t.id === testId);
                 if (!def) return '';
+                const _noteHtml = val.note ? `<div class="tt-note">📝 ${esc(val.note)}</div>` : '';
                 if (def.bilateral) {
                     const asym = (val.left != null && val.right != null) ? asymmetry(val.left, val.right) : null;
                     return `<div class="test-result-row">
@@ -1872,7 +1873,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                         <span class="test-val-left">I: <strong>${val.left != null ? val.left + def.unit : '—'}</strong></span>
                         <span class="test-val-right">D: <strong>${val.right != null ? val.right + def.unit : '—'}</strong></span>
                         ${asym !== null ? `<span class="test-asym" style="color:${asymColor(asym)}">Δ ${asym}%</span>` : ''}
-                    </div>`;
+                    </div>${_noteHtml}`;
                 }
                 const _powerSpan = (def.powerCalc && val.power != null)
                     ? `<span style="color:var(--text-muted);font-size:0.8rem">⚡ ${val.power} W · ${val.powerPerKg} W/kg</span>` : '';
@@ -1880,7 +1881,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                     <span class="test-result-name">${def.name}</span>
                     <span><strong>${val.value != null ? val.value + def.unit : '—'}</strong></span>
                     ${_powerSpan}
-                </div>`;
+                </div>${_noteHtml}`;
             }).join('');
             return `<div class="str-session-row str-session-row--test">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
@@ -2370,6 +2371,11 @@ RPETracker.prototype._saveTestSession = function(editSessionId) {
         const idx = this.testSessions.findIndex(s => s.id === editSessionId);
         if (idx === -1) { this.showToast('El test que intentas editar ya no existe', 'error'); return; }
         const original = this.testSessions[idx];
+        // Este modal no tiene campo de nota: se conserva la que ya tuviera cada test (se edita en Tests → "+")
+        Object.keys(results).forEach(id => {
+            const prevNote = original.results && original.results[id] && original.results[id].note;
+            if (prevNote) results[id].note = prevNote;
+        });
         const updated = { ...original, playerId, date, results, updatedAt: new Date().toISOString() };
         if (!isNaN(bodyWeight) && bodyWeight > 0) updated.bodyWeight = bodyWeight;
         else delete updated.bodyWeight;
