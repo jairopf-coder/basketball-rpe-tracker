@@ -1698,6 +1698,10 @@ RPETracker.prototype.renderTestsView = function() {
         this._renderTestPlayer(el);
         return;
     }
+    if (sub === 'byTest' && typeof this._renderTestByTest === 'function') {
+        this._renderTestByTest(el);
+        return;
+    }
 
     const playerCards = this.activePlayers.length === 0
         ? '<p class="str-empty">Sin jugadoras registradas</p>'
@@ -1732,6 +1736,7 @@ RPETracker.prototype.renderTestsView = function() {
                     <button class="btn-primary" onclick="window.rpeTracker._openTestWizard()" title="Nuevo test" aria-label="Nuevo test">+</button>
                 </div>
             </div>
+            ${typeof this._testsTabsHtml === 'function' ? this._testsTabsHtml('list') : ''}
             <div class="str-player-list">${playerCards}</div>
         </div>
     `;

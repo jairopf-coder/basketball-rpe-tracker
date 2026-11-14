@@ -51,6 +51,7 @@ const urlsToCache = [
   'player-i18n.js',
   'strength.js',
   'tests-wizard.js',
+  'tests-team.js',
   'team-load.js',
   'team-status.js',
   'objectives.js',

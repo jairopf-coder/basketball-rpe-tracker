@@ -10897,7 +10897,7 @@ textarea:focus-visible,
 .tw-banner-actions { display: flex; gap: 0.4rem; }
 
 .tw-footer {
-    display: flex; justify-content: space-between; gap: 0.75rem;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;
     padding: 0.85rem 1.25rem; border-top: 1px solid var(--border); background: var(--bg-surface);
 }
 .tw-footer .btn-primary[disabled] { opacity: 0.45; cursor: not-allowed; }
@@ -10952,4 +10952,36 @@ textarea:focus-visible,
     .tw-row-last { margin-left: 0; width: 100%; }
     .tw-group--weight { margin-left: 0; }
     .tw-input { width: 4.1rem; }
+}
+
+/* ===== Tests: vista "Por test" (tests-team.js) ===== */
+.tt-tabs { display: flex; gap: 0.25rem; padding: 0.2rem; margin-bottom: 1rem; background: var(--bg-subtle); border-radius: 10px; width: fit-content; max-width: 100%; }
+.tt-tab {
+    border: none; background: transparent; color: var(--text-muted); cursor: pointer;
+    padding: 0.4rem 0.9rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; white-space: nowrap;
+}
+.tt-tab--active { background: var(--bg-surface); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+
+.tt-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin: 1rem 0 1.25rem; }
+.tt-kpi { background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 0.85rem; min-width: 0; }
+.tt-kpi-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.tt-kpi-value { font-size: 1.5rem; font-weight: 700; margin-top: 2px; }
+.tt-kpi-unit { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
+.tt-kpi-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; min-height: 1rem; }
+
+.tt-section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.tt-date-select { max-width: 240px; }
+.tt-rank-list { display: flex; flex-direction: column; }
+.tt-rank-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.45rem 0; border-bottom: 0.5px solid var(--border); }
+.tt-rank-row:last-child { border-bottom: none; }
+.tt-rank-name { flex: 0 0 9rem; min-width: 0; font-weight: 600; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-bar { flex: 1; min-width: 4rem; height: 8px; border-radius: 4px; background: var(--bg-subtle); overflow: hidden; }
+.tt-bar-fill { display: block; height: 100%; border-radius: 4px; background: var(--primary); }
+.tt-rank-value { font-size: 0.88rem; font-weight: 700; white-space: nowrap; min-width: 5.5rem; text-align: right; }
+.tt-chart-box { position: relative; width: 100%; }
+
+@media (max-width: 600px) {
+    .tt-kpis { grid-template-columns: 1fr; }
+    .tt-rank-name { flex: 1 1 auto; }
+    .tt-bar { order: 5; flex: 1 0 100%; }
 }
