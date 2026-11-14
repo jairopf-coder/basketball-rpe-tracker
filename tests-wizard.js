@@ -322,7 +322,7 @@ RPETracker.prototype._twInputHint = function(def) {
     }
 };
 
-RPETracker.prototype._openTestWizard = function(preselectedPlayerId) {
+RPETracker.prototype._openTestWizard = function(preselectedPlayerId, preselectedTestId) {
     if (!this.testSessions) this._loadStrengthData();
     const date = toLocalISODate(new Date());
     this._tw = {
@@ -330,6 +330,8 @@ RPETracker.prototype._openTestWizard = function(preselectedPlayerId) {
         playerIds: new Set(), touched: false,
         vals: {}, weights: {}, prefill: {}, summary: null
     };
+    // Desde la vista "Por test" el test ya viene elegido
+    if (preselectedTestId && TestWizardLogic.defById(preselectedTestId)) this._tw.testId = preselectedTestId;
     if (preselectedPlayerId) {
         this._tw.playerIds.add(preselectedPlayerId);
         this._tw.touched = true;
@@ -805,8 +807,18 @@ RPETracker.prototype._twStep3Html = function() {
         </div>
         <div class="tw-footer">
             <button type="button" class="btn-secondary" onclick="window.rpeTracker._twClose()">Cerrar</button>
+            <button type="button" class="btn-secondary" onclick="window.rpeTracker._twShowTeamView()">📈 Ver evolución del equipo</button>
             <button type="button" class="btn-primary" onclick="window.rpeTracker._twAnother()">➕ Registrar otro test</button>
         </div>`;
+};
+
+/** Cierra el asistente y abre la vista "Por test" con este test y este día */
+RPETracker.prototype._twShowTeamView = function() {
+    const tw = this._tw;
+    this._tt = { testId: tw.testId, date: tw.date, players: new Set() };
+    this._testSub = 'byTest';
+    this._twClose();
+    if (this.currentView === 'tests') this.renderTestsView();
 };
 
 /** Vuelve al paso 1 conservando día y jugadoras, para registrar otro test del mismo día */
