@@ -78,6 +78,40 @@ const TestTeamLogic = {
         return best;
     },
 
+    ASYM_ALERT_PCT: 15,          // mismo umbral que el rojo de asymColor (≥15 %)
+    ASYM_ALERT_MAX_AGE_DAYS: 60, // un test más antiguo ya no es una alerta de hoy
+
+    /**
+     * Asimetrías altas en el ÚLTIMO test de cada jugadora y test con dos piernas.
+     * Solo cuenta el test más reciente (si después mejora, la alerta desaparece sola) y solo si es
+     * de los últimos 60 días. Devuelve [{ playerId, testId, date, left, right, asym }], de mayor a menor.
+     */
+    asymAlerts(sessions, players, todayIso, opts) {
+        const threshold = opts && opts.threshold != null ? opts.threshold : this.ASYM_ALERT_PCT;
+        const maxAge = opts && opts.maxAgeDays != null ? opts.maxAgeDays : this.ASYM_ALERT_MAX_AGE_DAYS;
+        const ids = new Set((players || []).map(p => p.id));
+        const toUtc = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN; };
+        const latest = {};
+        (sessions || []).forEach(s => {
+            if (!s.results || !ids.has(s.playerId)) return;
+            TEST_DEFINITIONS.forEach(def => {
+                if (!def.bilateral) return;
+                const r = s.results[def.id];
+                if (!r || r.left == null || r.right == null) return;
+                const k = s.playerId + '|' + def.id;
+                const cur = latest[k];
+                if (!cur || s.date > cur.date || (s.date === cur.date && String(s.createdAt || '') >= String(cur.createdAt || ''))) {
+                    latest[k] = { playerId: s.playerId, testId: def.id, date: s.date, createdAt: s.createdAt, left: r.left, right: r.right };
+                }
+            });
+        });
+        const today = toUtc(todayIso);
+        return Object.values(latest)
+            .map(x => ({ playerId: x.playerId, testId: x.testId, date: x.date, left: x.left, right: x.right, asym: parseFloat(asymmetry(x.left, x.right)) }))
+            .filter(x => x.asym >= threshold && (today - toUtc(x.date)) / 86400000 <= maxAge)
+            .sort((a, b) => b.asym - a.asym || a.playerId.localeCompare(b.playerId));
+    },
+
     /** Largo de la barra (0–100): la mejor marca del día llena la barra entera */
     barPct(def, value, values) {
         if (!values.length || value === null || value <= 0) return 0;
@@ -86,6 +120,36 @@ const TestTeamLogic = {
     }
 };
 window.TestTeamLogic = TestTeamLogic;
+
+// ─────────────────────────────────────────
+//  AVISOS DE INICIO: asimetría alta
+// ─────────────────────────────────────────
+
+/**
+ * Asimetrías altas de las jugadoras de la plantilla actual, para la línea de avisos de Inicio.
+ * Los tests se cargan al primer uso (igual que al abrir Tests); al llegar los datos de Firebase,
+ * strength.js repinta Inicio.
+ */
+RPETracker.prototype._testAsymAlerts = function() {
+    if (!this.testSessions && typeof this._loadStrengthData === 'function') this._loadStrengthData();
+    const sessions = this.testSessions || [];
+    if (!sessions.length) return [];
+    const today = toLocalISODate(new Date());
+    return TestTeamLogic.asymAlerts(sessions, this.activePlayers || [], today).map(a => {
+        const p = (this.players || []).find(x => x.id === a.playerId);
+        const d = TestWizardLogic.defById(a.testId);
+        return p && d ? { ...a, player: p, testName: d.name, unit: d.unit } : null;
+    }).filter(Boolean);
+};
+
+/** Desde un aviso de Inicio: abre la ficha de tests de esa jugadora en ese test */
+RPETracker.prototype._openTestAsym = function(playerId, testId) {
+    this._testSub = 'player';
+    this._testPlayerId = playerId;
+    if (testId) this._testChartTab = testId;
+    if (typeof this.switchView === 'function') this.switchView('tests');
+    else this.renderTestsView();
+};
 
 // ─────────────────────────────────────────
 //  PANTALLA

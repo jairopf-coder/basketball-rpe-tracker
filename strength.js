@@ -161,6 +161,7 @@ RPETracker.prototype._loadStrengthData = function() {
         window.firebaseSync.onTestSessionsChange(updated => {
             this.testSessions = updated;
             if (this.currentView === 'tests') this.renderTestsView();
+            else if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard(); // aviso de asimetría
             console.log('🔄 TestSessions actualizadas desde Firebase');
         });
         // fix: la biblioteca de ejercicios y las plantillas de gimnasio solo
