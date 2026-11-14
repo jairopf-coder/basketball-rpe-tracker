@@ -7,6 +7,11 @@
 //    • Ranking del día elegido, con barra, variación por jugadora, 🏅 y asimetría
 //    • Evolución de la media del equipo, con las jugadoras que quieras superpuestas
 //
+//  También los AVISOS por jugadora de la lista de Tests (junto al nombre):
+//    • 🦵 asimetría alta (≥15 %) en el último test de dos piernas
+//    • ⏱ toca repetir un test, según la frecuencia (en semanas) que fijas por test (⚙️)
+//  Al pulsar el aviso se explica qué pasa y hay botones para ir al problema. No hay avisos en Inicio.
+//
 //  Solo LEE this.testSessions: no escribe nada ni cambia el formato de los datos.
 //  Depende de strength.js (TEST_DEFINITIONS, asymmetry, asymColor) y de tests-wizard.js
 //  (TestWizardLogic). Cargar DESPUÉS de tests-wizard.js.
@@ -112,6 +117,88 @@ const TestTeamLogic = {
             .sort((a, b) => b.asym - a.asym || a.playerId.localeCompare(b.playerId));
     },
 
+    // Cada cuántas semanas conviene repetir cada test (0 = sin aviso). Son valores propuestos: se ajustan en ⚙️.
+    DEFAULT_FREQ_WEEKS: { cmj: 4, sj: 8, slcmj: 6, dj: 8, sts: 8, triple: 8, sprint10: 6, sprint20: 6, ift3015: 8, five0five: 8 },
+    MAX_FREQ_WEEKS: 52,
+
+    /** Ajustes válidos: para cada test, un entero de 0 a 52; lo que falte o no valga se rellena con el valor propuesto */
+    normalizeSettings(raw) {
+        const src = raw && typeof raw === 'object' && raw.freqWeeks && typeof raw.freqWeeks === 'object' ? raw.freqWeeks : {};
+        const freqWeeks = {};
+        TEST_DEFINITIONS.forEach(def => {
+            const v = src[def.id];
+            const n = v === '' || v === null || v === undefined ? NaN : Number(v);
+            freqWeeks[def.id] = Number.isInteger(n) && n >= 0 && n <= this.MAX_FREQ_WEEKS ? n : (this.DEFAULT_FREQ_WEEKS[def.id] || 0);
+        });
+        return { freqWeeks };
+    },
+
+    /** Lee lo escrito en la pantalla de frecuencias: { testId: texto } → { ok, freqWeeks } o { ok:false, testId } */
+    parseFreqInputs(raw) {
+        const freqWeeks = {};
+        for (const def of TEST_DEFINITIONS) {
+            const t = String(raw && raw[def.id] !== undefined ? raw[def.id] : '').trim();
+            if (t === '') { freqWeeks[def.id] = 0; continue; }   // en blanco = sin aviso
+            const n = Number(t);
+            if (!Number.isInteger(n) || n < 0 || n > this.MAX_FREQ_WEEKS) return { ok: false, testId: def.id };
+            freqWeeks[def.id] = n;
+        }
+        return { ok: true, freqWeeks };
+    },
+
+    /**
+     * Tests que "tocan repetir" por jugadora.
+     *  • repeat: su último test es más antiguo que la frecuencia fijada.
+     *  • never:  no tiene ningún registro, pero el equipo hizo ese test dentro del periodo de la frecuencia
+     *            (se quedó fuera de la última sesión).
+     * Solo cuenta si la frecuencia es > 0 y el equipo ha hecho alguna vez ese test.
+     * isOut(playerId): las jugadoras fuera del grupo ese día no se testan, así que no avisan.
+     * Devuelve [{ playerId, testId, kind, lastDate, weeks, freq, teamLast }].
+     */
+    repeatAlerts(sessions, players, freqWeeks, todayIso, isOut) {
+        const toUtc = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN; };
+        const today = toUtc(todayIso);
+        const teamLast = {}, playerLast = {};
+        (sessions || []).forEach(s => {
+            if (!s.results) return;
+            TEST_DEFINITIONS.forEach(def => {
+                const r = s.results[def.id];
+                if (!r || TestWizardLogic.mainValue(def, r) === null) return;
+                if (!teamLast[def.id] || s.date > teamLast[def.id]) teamLast[def.id] = s.date;
+                const k = s.playerId + '|' + def.id;
+                if (!playerLast[k] || s.date > playerLast[k]) playerLast[k] = s.date;
+            });
+        });
+        const out = [];
+        (players || []).forEach(p => {
+            if (isOut && isOut(p.id)) return;
+            TEST_DEFINITIONS.forEach(def => {
+                const freq = freqWeeks ? Number(freqWeeks[def.id]) : 0;
+                const team = teamLast[def.id];
+                if (!(freq > 0) || !team) return;
+                const last = playerLast[p.id + '|' + def.id];
+                if (last) {
+                    const days = Math.floor((today - toUtc(last)) / 86400000);
+                    if (days > freq * 7) out.push({ playerId: p.id, testId: def.id, kind: 'repeat', lastDate: last, weeks: Math.floor(days / 7), freq, teamLast: team });
+                } else if (Math.floor((today - toUtc(team)) / 86400000) <= freq * 7) {
+                    out.push({ playerId: p.id, testId: def.id, kind: 'never', lastDate: null, weeks: null, freq, teamLast: team });
+                }
+            });
+        });
+        return out;
+    },
+
+    /** Todos los avisos agrupados por jugadora: { playerId: { asym:[…], repeat:[…] } } (solo las que tienen alguno) */
+    playerAlerts(sessions, players, freqWeeks, todayIso, isOut) {
+        const by = {};
+        const slot = pid => (by[pid] = by[pid] || { asym: [], repeat: [] });
+        this.asymAlerts(sessions, players, todayIso).forEach(a => slot(a.playerId).asym.push(a));
+        this.repeatAlerts(sessions, players, freqWeeks, todayIso, isOut)
+            .sort((a, b) => (b.weeks === null ? -1 : 0) - (a.weeks === null ? -1 : 0) || (b.weeks || 0) - (a.weeks || 0))
+            .forEach(a => slot(a.playerId).repeat.push(a));
+        return by;
+    },
+
     /** Largo de la barra (0–100): la mejor marca del día llena la barra entera */
     barPct(def, value, values) {
         if (!values.length || value === null || value <= 0) return 0;
@@ -122,33 +209,213 @@ const TestTeamLogic = {
 window.TestTeamLogic = TestTeamLogic;
 
 // ─────────────────────────────────────────
-//  AVISOS DE INICIO: asimetría alta
+//  AJUSTES: frecuencia de repetición de cada test
 // ─────────────────────────────────────────
+const TEST_SETTINGS_LS_KEY = 'bk_test_settings';
 
-/**
- * Asimetrías altas de las jugadoras de la plantilla actual, para la línea de avisos de Inicio.
- * Los tests se cargan al primer uso (igual que al abrir Tests); al llegar los datos de Firebase,
- * strength.js repinta Inicio.
- */
-RPETracker.prototype._testAsymAlerts = function() {
-    if (!this.testSessions && typeof this._loadStrengthData === 'function') this._loadStrengthData();
-    const sessions = this.testSessions || [];
-    if (!sessions.length) return [];
-    const today = toLocalISODate(new Date());
-    return TestTeamLogic.asymAlerts(sessions, this.activePlayers || [], today).map(a => {
-        const p = (this.players || []).find(x => x.id === a.playerId);
-        const d = TestWizardLogic.defById(a.testId);
-        return p && d ? { ...a, player: p, testName: d.name, unit: d.unit } : null;
-    }).filter(Boolean);
+/** Carga los ajustes (de este dispositivo) y escucha los de Firebase una sola vez, para que móvil y ordenador coincidan */
+RPETracker.prototype._ensureTestSettings = function() {
+    if (!this.testSettings) {
+        let raw = null;
+        try { raw = JSON.parse(localStorage.getItem(TEST_SETTINGS_LS_KEY) || 'null'); } catch (e) { raw = null; }
+        this.testSettings = TestTeamLogic.normalizeSettings(raw);
+    }
+    if (this._testSettingsListener || !window.firebaseDB) return;
+    this._testSettingsListener = true;
+    try {
+        window.firebaseDB.ref('testSettings').on('value', snap => {
+            const v = snap.val();
+            if (!v) return;                       // aún no hay ajustes en la nube: se usan los de aquí
+            this.testSettings = TestTeamLogic.normalizeSettings(v);
+            try { localStorage.setItem(TEST_SETTINGS_LS_KEY, JSON.stringify(this.testSettings)); } catch (e) { /* sin almacenamiento local */ }
+            const editing = document.getElementById('testFreqModal');
+            if (this.currentView === 'tests' && !(editing && editing.classList.contains('active'))) this.renderTestsView();
+        }, err => console.warn('Ajustes de tests: sin acceso a la nube, se usan los de este dispositivo:', err && err.message));
+    } catch (e) { console.warn('Ajustes de tests: no se pudo escuchar la nube:', e && e.message); }
 };
 
-/** Desde un aviso de Inicio: abre la ficha de tests de esa jugadora en ese test */
-RPETracker.prototype._openTestAsym = function(playerId, testId) {
+RPETracker.prototype._saveTestSettings = function(freqWeeks) {
+    this.testSettings = TestTeamLogic.normalizeSettings({ freqWeeks });
+    try { localStorage.setItem(TEST_SETTINGS_LS_KEY, JSON.stringify(this.testSettings)); } catch (e) { /* sin almacenamiento local */ }
+    try {
+        if (window.firebaseDB) {
+            const p = window.firebaseDB.ref('testSettings').set({ freqWeeks: this.testSettings.freqWeeks, updatedAt: new Date().toISOString() });
+            if (p && typeof p.catch === 'function') p.catch(e => console.warn('No se pudieron sincronizar los ajustes de tests:', e && e.message));
+        }
+    } catch (e) { console.warn('No se pudieron sincronizar los ajustes de tests:', e && e.message); }
+};
+
+RPETracker.prototype._mountTestModal = function(id) {
+    let modal = document.getElementById(id);
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = id;
+        modal.className = 'modal';
+        document.body.appendChild(modal);   // en <body>, como el resto de modales
+    }
+    modal.classList.add('active');
+    return modal;
+};
+
+RPETracker.prototype._openTestFreqSettings = function() {
+    this._ensureTestSettings();
+    const modal = this._mountTestModal('testFreqModal');
+    const weeks = this.testSettings.freqWeeks;
+    const rows = TEST_DEFINITIONS.map(def => `
+        <div class="tt-freq-row">
+            <label for="ttFreq_${esc(def.id)}">${esc(def.name)}</label>
+            <span class="tt-freq-field">cada
+                <input type="number" min="0" max="${TestTeamLogic.MAX_FREQ_WEEKS}" step="1" inputmode="numeric" class="form-input tt-freq-input"
+                    id="ttFreq_${esc(def.id)}" data-test="${esc(def.id)}" value="${esc(weeks[def.id] || '')}" placeholder="—">
+                semanas</span>
+        </div>`).join('');
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-inner"><h2>⚙️ Cada cuánto repetir cada test</h2></div>
+                <button class="modal-close" onclick="window.rpeTracker._closeTestModal('testFreqModal')" aria-label="Cerrar">✕</button>
+            </div>
+            <div class="modal-body tw-body">
+                <p class="tw-hint" style="margin-top:0">Si una jugadora pasa más tiempo sin repetir un test, aparece un aviso ⏱ junto a su nombre en Tests. Deja el campo vacío (o 0) para no recibir avisos de ese test. Son valores propuestos: cámbialos a tu gusto.</p>
+                <div class="tt-freq-list">${rows}</div>
+            </div>
+            <div class="tw-footer">
+                <button type="button" class="btn-secondary" onclick="window.rpeTracker._resetTestFreqInputs()">Valores propuestos</button>
+                <button type="button" class="btn-secondary" onclick="window.rpeTracker._closeTestModal('testFreqModal')">Cancelar</button>
+                <button type="button" class="btn-primary" onclick="window.rpeTracker._submitTestFreqSettings()">Guardar</button>
+            </div>
+        </div>`;
+};
+
+RPETracker.prototype._closeTestModal = function(id) {
+    const m = document.getElementById(id);
+    if (m) m.classList.remove('active');
+};
+
+RPETracker.prototype._testFreqInputs = function() {
+    const modal = document.getElementById('testFreqModal');
+    return modal ? [...modal.querySelectorAll('input[data-test]')] : [];
+};
+
+RPETracker.prototype._resetTestFreqInputs = function() {
+    this._testFreqInputs().forEach(inp => {
+        const d = TestTeamLogic.DEFAULT_FREQ_WEEKS[inp.dataset.test];
+        inp.value = d ? String(d) : '';
+    });
+};
+
+RPETracker.prototype._submitTestFreqSettings = function() {
+    const raw = {};
+    this._testFreqInputs().forEach(inp => { raw[inp.dataset.test] = inp.value; });
+    const res = TestTeamLogic.parseFreqInputs(raw);
+    if (!res.ok) {
+        const def = TestWizardLogic.defById(res.testId);
+        const testName = def ? def.name : res.testId;
+        this.showToast(`${testName}: escribe un número entero de semanas entre 0 y ${TestTeamLogic.MAX_FREQ_WEEKS}`, 'error');
+        return;
+    }
+    this._saveTestSettings(res.freqWeeks);
+    this._closeTestModal('testFreqModal');
+    this.showToast('Frecuencias guardadas', 'success');
+    if (this.currentView === 'tests') this.renderTestsView();
+};
+
+// ─────────────────────────────────────────
+//  AVISOS POR JUGADORA (lista de Tests)
+// ─────────────────────────────────────────
+
+/** Avisos de cada jugadora de la plantilla actual: { playerId: { asym:[…], repeat:[…] } } */
+RPETracker.prototype._testAlertsByPlayer = function() {
+    this._ensureTestSettings();
+    const sessions = this.testSessions || [];
+    if (!sessions.length) return {};
+    const today = toLocalISODate(new Date());
+    const isOut = pid => typeof this.getPlayerParticipation === 'function' && this.getPlayerParticipation(pid, today) === 'out';
+    return TestTeamLogic.playerAlerts(sessions, this.activePlayers || [], this.testSettings.freqWeeks, today, isOut);
+};
+
+/** Insignias junto al nombre: 🦵 asimetría y ⏱ toca repetir (con cuántos). Pulsarlas abre la explicación */
+RPETracker.prototype._testAlertBadgesHtml = function(playerId, alerts) {
+    if (!alerts || (!alerts.asym.length && !alerts.repeat.length)) return '';
+    const pid = esc(playerId);
+    const btn = (cls, icon, n, title) => `<button type="button" class="tt-alert tt-alert--${cls}" title="${esc(title)}" aria-label="${esc(title)}"
+        onclick="event.stopPropagation(); window.rpeTracker._openTestAlerts('${pid}')">${icon} ${n}</button>`;
+    return (alerts.asym.length ? btn('asym', '🦵', alerts.asym.length, 'Asimetría alta entre piernas: pulsa para ver el detalle') : '')
+         + (alerts.repeat.length ? btn('repeat', '⏱', alerts.repeat.length, 'Toca repetir tests: pulsa para ver el detalle') : '');
+};
+
+/** Explica qué pasa con esa jugadora y ofrece ir al problema */
+RPETracker.prototype._openTestAlerts = function(playerId) {
+    const p = (this.players || []).find(x => x.id === playerId);
+    const al = this._testAlertsByPlayer()[playerId];
+    if (!p || !al) return;
+    const f = v => TestWizardLogic.fmt(v);
+    const dm = iso => this._ttFmtDate(iso);
+    const pid = esc(playerId);
+    const actions = (testId, registerLabel) => `
+        <div class="tt-alert-actions">
+            <button type="button" class="btn-secondary" data-pid="${pid}" data-test="${esc(testId)}"
+                onclick="window.rpeTracker._testAlertGo('view', this.dataset.pid, this.dataset.test)">📈 Ver evolución</button>
+            <button type="button" class="btn-primary" data-pid="${pid}" data-test="${esc(testId)}"
+                onclick="window.rpeTracker._testAlertGo('register', this.dataset.pid, this.dataset.test)">${registerLabel}</button>
+        </div>`;
+
+    const asymHtml = al.asym.map(a => {
+        const d = TestWizardLogic.defById(a.testId);
+        if (!d) return '';
+        const weaker = (d.lowerIsBetter ? a.left > a.right : a.left < a.right) ? 'izquierda' : 'derecha';
+        return `
+        <div class="tt-alert-item tt-alert-item--asym">
+            <div class="tt-alert-item-title">🦵 ${esc(d.name)} · ${esc(dm(a.date))}</div>
+            <div>I <strong>${esc(f(a.left))}</strong> · D <strong>${esc(f(a.right))}</strong> ${esc(d.unit)} → asimetría <strong style="color:var(--color-danger,#f44336)">${esc(a.asym.toFixed(1))}%</strong></div>
+            <p class="tw-hint">La pierna ${weaker} rinde peor. Una diferencia de este tamaño entre piernas (la app la marca en rojo desde el ${TestTeamLogic.ASYM_ALERT_PCT} %) conviene vigilarla: compárala con sus tests anteriores y valora trabajar la pierna más débil. El aviso desaparece cuando un test posterior baje de ese umbral.</p>
+            ${actions(a.testId, '🔁 Repetir este test')}
+        </div>`;
+    }).join('');
+
+    const repeatHtml = al.repeat.map(a => {
+        const d = TestWizardLogic.defById(a.testId);
+        if (!d) return '';
+        const why = a.kind === 'never'
+            ? `Todavía no tiene ningún registro de este test. El equipo lo hizo por última vez el ${esc(dm(a.teamLast))}.`
+            : `Su último test fue el ${esc(dm(a.lastDate))} (hace ${a.weeks} ${a.weeks === 1 ? 'semana' : 'semanas'}). Has fijado repetirlo cada ${a.freq} ${a.freq === 1 ? 'semana' : 'semanas'}.`;
+        return `
+        <div class="tt-alert-item tt-alert-item--repeat">
+            <div class="tt-alert-item-title">⏱ ${esc(d.name)}</div>
+            <div>${why}</div>
+            ${actions(a.testId, `➕ Registrar ${esc(d.name)}`)}
+        </div>`;
+    }).join('');
+
+    const modal = this._mountTestModal('testAlertsModal');
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-inner"><h2>⚠️ Avisos de tests · ${esc(this.playerDisplayName(p))}</h2></div>
+                <button class="modal-close" onclick="window.rpeTracker._closeTestModal('testAlertsModal')" aria-label="Cerrar">✕</button>
+            </div>
+            <div class="modal-body tw-body">
+                ${asymHtml ? `<div class="tw-section-title">Asimetría entre piernas</div>${asymHtml}` : ''}
+                ${repeatHtml ? `<div class="tw-section-title">Toca repetir</div>${repeatHtml}` : ''}
+            </div>
+            <div class="tw-footer">
+                <button type="button" class="btn-secondary" onclick="window.rpeTracker._closeTestModal('testAlertsModal'); window.rpeTracker._openTestFreqSettings()">⚙️ Ajustar frecuencias</button>
+                <button type="button" class="btn-primary" onclick="window.rpeTracker._closeTestModal('testAlertsModal')">Cerrar</button>
+            </div>
+        </div>`;
+};
+
+/** Botones de un aviso: 'view' abre la ficha de tests de la jugadora en ese test; 'register' abre el asistente listo para registrarlo */
+RPETracker.prototype._testAlertGo = function(action, playerId, testId) {
+    this._closeTestModal('testAlertsModal');
+    if (action === 'register') {
+        this._openTestWizard(playerId, testId);
+        return;
+    }
     this._testSub = 'player';
     this._testPlayerId = playerId;
     if (testId) this._testChartTab = testId;
-    if (typeof this.switchView === 'function') this.switchView('tests');
-    else this.renderTestsView();
+    this.renderTestsView();
 };
 
 // ─────────────────────────────────────────
@@ -200,6 +467,7 @@ RPETracker.prototype._renderTestByTest = function(el) {
             <h2>📊 Tests de Rendimiento</h2>
             <div class="str-header-actions">
                 <button class="btn-secondary" onclick="window.rpeTracker.showTestsReportMenu()">📄 Informe</button>
+                <button class="btn-secondary" onclick="window.rpeTracker._openTestFreqSettings()" title="Cada cuánto repetir cada test" aria-label="Frecuencias de repetición">⚙️</button>
                 <button class="btn-primary" onclick="window.rpeTracker._openTestWizard(null, window.rpeTracker._tt && window.rpeTracker._tt.testId)" title="Nuevo test" aria-label="Nuevo test">+</button>
             </div>
         </div>
