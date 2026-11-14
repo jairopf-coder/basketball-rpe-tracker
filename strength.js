@@ -161,7 +161,6 @@ RPETracker.prototype._loadStrengthData = function() {
         window.firebaseSync.onTestSessionsChange(updated => {
             this.testSessions = updated;
             if (this.currentView === 'tests') this.renderTestsView();
-            else if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard(); // aviso de asimetría
             console.log('🔄 TestSessions actualizadas desde Firebase');
         });
         // fix: la biblioteca de ejercicios y las plantillas de gimnasio solo
@@ -1704,6 +1703,8 @@ RPETracker.prototype.renderTestsView = function() {
         return;
     }
 
+    // Avisos por jugadora (asimetría alta, toca repetir): se pintan al lado del nombre
+    const alertsByPlayer = typeof this._testAlertsByPlayer === 'function' ? this._testAlertsByPlayer() : {};
     const playerCards = this.activePlayers.length === 0
         ? '<p class="str-empty">Sin jugadoras registradas</p>'
         : this.activePlayers.map(p => {
@@ -1720,7 +1721,7 @@ RPETracker.prototype.renderTestsView = function() {
             <div class="str-player-card" onclick="window.rpeTracker._openTestPlayer('${p.id}')">
                 <div class="str-player-avatar" style="background:${color}">${esc(p.name.charAt(0).toUpperCase())}</div>
                 <div class="str-player-info">
-                    <div class="str-player-name">${esc(p.name)}${p.number ? ` <span class="str-num">#${esc(p.number)}</span>` : ''}</div>
+                    <div class="str-player-name">${esc(p.name)}${p.number ? ` <span class="str-num">#${esc(p.number)}</span>` : ''}${typeof this._testAlertBadgesHtml === 'function' ? this._testAlertBadgesHtml(p.id, alertsByPlayer[p.id]) : ''}</div>
                     <div class="str-player-meta">${last ? `Último test: ${last.date}` : 'Sin tests registrados'}</div>
                 </div>
                 ${badge}
@@ -1734,6 +1735,7 @@ RPETracker.prototype.renderTestsView = function() {
                 <h2>📊 Tests de Rendimiento</h2>
                 <div class="str-header-actions">
                     <button class="btn-secondary" onclick="window.rpeTracker.showTestsReportMenu()">📄 Informe</button>
+                    <button class="btn-secondary" onclick="window.rpeTracker._openTestFreqSettings()" title="Cada cuánto repetir cada test" aria-label="Frecuencias de repetición">⚙️</button>
                     <button class="btn-primary" onclick="window.rpeTracker._openTestWizard()" title="Nuevo test" aria-label="Nuevo test">+</button>
                 </div>
             </div>

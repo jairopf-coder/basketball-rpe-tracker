@@ -68,9 +68,7 @@ RPETracker.prototype._acDangerCount = function() {
 
 // ── 1. Reunir los avisos y darle un identificador estable a cada uno ─────────
 // Identificadores: ac:d:<jugadora> (peligro), ac:w:<jugadora> (precaución),
-// wt:<jugadora>:<tipo> (tendencia de wellness), rpe:<sesión> (RPE distinto) y
-// as:<jugadora>:<test>:<fecha> (asimetría alta en el último test de dos piernas).
-// La asimetría la calcula tests-team.js (_testAsymAlerts); si ese archivo no está, no hay avisos de ese tipo.
+// wt:<jugadora>:<tipo> (tendencia de wellness) y rpe:<sesión> (RPE distinto).
 RPETracker.prototype._collectDashAlerts = function(data) {
     const asList = v => Array.isArray(v) ? v : [];
     const danger = asList(data.dangerPlayers).map(p => ({ key: `ac:d:${p.player.id}`, name: _dashAlertsFirstName(p.player.name) }));
@@ -86,16 +84,9 @@ RPETracker.prototype._collectDashAlerts = function(data) {
         staffRpe: String(d.staffRpe), playerRpe: String(d.playerRpe),
         date: String(d.date || ''), sessionId: String(d.sessionId)
     }));
-    const asymRaw = typeof this._testAsymAlerts === 'function' ? this._testAsymAlerts() : [];
-    const asym = asList(asymRaw).map(a => ({
-        key: `as:${a.playerId}:${a.testId}:${a.date}`,
-        name: _dashAlertsFirstName(a.player.name),
-        playerId: String(a.playerId), testId: String(a.testId), testName: String(a.testName),
-        pct: String(a.asym), left: String(a.left), right: String(a.right), date: String(a.date)
-    }));
-    const keys = [...danger, ...warn, ...trend, ...rpe, ...asym].map(a => a.key);
+    const keys = [...danger, ...warn, ...trend, ...rpe].map(a => a.key);
     return {
-        danger, warn, trend, rpe, asym, keys,
+        danger, warn, trend, rpe, keys,
         team: danger.length >= (data.teamThreshold || 3),   // 3+ jugadoras en peligro a la vez
         total: keys.length
     };
@@ -135,8 +126,7 @@ RPETracker.prototype._renderDashAlerts = function(data) {
         a.danger.length ? `<span class="db-alerts-chip" title="Jugadoras en peligro A:C"><span class="wh-bad" aria-hidden="true">●</span> <span class="db-alerts-chip-txt">Peligro </span>${a.danger.length}</span>` : '',
         a.warn.length   ? `<span class="db-alerts-chip" title="Jugadoras en precaución A:C"><span class="wh-warn" aria-hidden="true">●</span> <span class="db-alerts-chip-txt">Precaución </span>${a.warn.length}</span>` : '',
         a.trend.length ? `<span class="db-alerts-chip">Wellness ${a.trend.length}</span>` : '',
-        a.rpe.length   ? `<span class="db-alerts-chip">RPE ${a.rpe.length}</span>` : '',
-        a.asym.length  ? `<span class="db-alerts-chip" title="Asimetría alta en tests de dos piernas">Asimetría ${a.asym.length}</span>` : ''
+        a.rpe.length   ? `<span class="db-alerts-chip">RPE ${a.rpe.length}</span>` : ''
     ].join('');
 
     const names = list => list.map(x => esc(x.name)).join(', ');
@@ -150,9 +140,6 @@ RPETracker.prototype._renderDashAlerts = function(data) {
     a.trend.forEach(t => rows.push(`<div class="db-alerts-row"><span>🔁 <strong>${esc(t.name)}</strong> — ${esc(t.message)}</span></div>`));
     a.rpe.forEach(d => rows.push(`<div class="db-alerts-row"><span>⚠️ <strong>${esc(d.name)}</strong> RPE distinto (tú: ${esc(d.staffRpe)}, ella: ${esc(d.playerRpe)}) — ${esc(d.date)}</span>`
         + `<button type="button" class="db-alerts-btn" data-session-id="${esc(d.sessionId)}" onclick="window.rpeTracker?.showSessionDetail(this.dataset.sessionId)">Revisar →</button></div>`));
-
-    a.asym.forEach(x => rows.push(`<div class="db-alerts-row"><span>🦵 <strong>${esc(x.name)}</strong> — ${esc(x.testName)}: asimetría <strong class="wh-bad">${esc(x.pct)}%</strong> (I ${esc(x.left)} · D ${esc(x.right)}) · ${esc(x.date)}</span>`
-        + `<button type="button" class="db-alerts-btn" data-player-id="${esc(x.playerId)}" data-test-id="${esc(x.testId)}" onclick="window.rpeTracker?._openTestAsym(this.dataset.playerId, this.dataset.testId)">Ver tests →</button></div>`));
 
     const foot = info.seen ? '' :
         `<div class="db-alerts-foot"><button type="button" class="db-alerts-btn db-alerts-btn--seen" onclick="window.rpeTracker?.markDashAlertsSeen()">Marcar como visto por hoy</button></div>`;
