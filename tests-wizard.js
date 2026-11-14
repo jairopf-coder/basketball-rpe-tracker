@@ -35,6 +35,20 @@ const TestWizardLogic = {
         return Date.now().toString() + '_' + Math.random().toString(36).slice(2, 7);
     },
 
+    NOTE_MAX: 200,
+
+    /** Nota limpia: espacios y saltos de línea colapsados, sin márgenes y con un máximo de 200 caracteres */
+    cleanNote(s) {
+        const t = String(s === null || s === undefined ? '' : s).replace(/\s+/g, ' ').trim();
+        return t.length > this.NOTE_MAX ? t.slice(0, this.NOTE_MAX).trim() : t;
+    },
+
+    /** Nota general (para todas) + nota propia de la jugadora, unidas con " · " */
+    combineNote(general, own) {
+        const g = this.cleanNote(general), o = this.cleanNote(own);
+        return this.cleanNote(g && o ? g + ' · ' + o : g || o);
+    },
+
     /** Campos de la tabla según el tipo de test */
     fieldsFor(def) {
         const multiFlight = def.inputType === 'flight' && !!def.multiTrial;
@@ -328,7 +342,8 @@ RPETracker.prototype._openTestWizard = function(preselectedPlayerId, preselected
     this._tw = {
         step: 1, testId: null, date,
         playerIds: new Set(), touched: false,
-        vals: {}, weights: {}, prefill: {}, summary: null
+        vals: {}, weights: {}, prefill: {}, summary: null,
+        notes: {}, prefillNote: {}, generalNote: ''
     };
     // Desde la vista "Por test" el test ya viene elegido
     if (preselectedTestId && TestWizardLogic.defById(preselectedTestId)) this._tw.testId = preselectedTestId;
@@ -506,6 +521,8 @@ RPETracker.prototype._twContinue = function() {
         const existing = TestWizardLogic.resultOn(sessions, pid, def.id, tw.date);
         const stored = existing ? TestWizardLogic.valuesFromResult(def, existing.result) : null;
         tw.prefill[pid] = stored ? JSON.stringify(stored) : null;
+        tw.prefillNote[pid] = existing && existing.result.note ? existing.result.note : '';
+        if (tw.notes[pid] === undefined) tw.notes[pid] = tw.prefillNote[pid];
         if (!tw.vals[pid]) tw.vals[pid] = stored ? { ...stored } : {};
         if (def.powerCalc && tw.weights[pid] === undefined) {
             const w = existing && existing.session.bodyWeight > 0
@@ -533,7 +550,7 @@ RPETracker.prototype._twPersistDraft = function() {
     if (!hasData) { TestWizardLogic.clearDraft(localStorage); return; }
     TestWizardLogic.saveDraft(localStorage, {
         testId: tw.testId, date: tw.date, playerIds: [...tw.playerIds],
-        vals: tw.vals, weights: tw.weights, savedAt: new Date().toISOString()
+        vals: tw.vals, weights: tw.weights, notes: tw.notes, generalNote: tw.generalNote, savedAt: new Date().toISOString()
     });
 };
 RPETracker.prototype._twResumeDraft = function() {
@@ -546,6 +563,8 @@ RPETracker.prototype._twResumeDraft = function() {
     tw.touched = true;
     tw.vals = d.vals && typeof d.vals === 'object' ? d.vals : {};
     tw.weights = d.weights && typeof d.weights === 'object' ? d.weights : {};
+    tw.notes = d.notes && typeof d.notes === 'object' ? d.notes : {};
+    tw.generalNote = typeof d.generalNote === 'string' ? d.generalNote : '';
     this._twContinue();
 };
 RPETracker.prototype._twDiscardDraft = function() {
@@ -575,6 +594,7 @@ RPETracker.prototype._twRowHtml = function(def, p) {
         : 'Sin test anterior';
     const out = typeof this.getPlayerParticipation === 'function' && this.getPlayerParticipation(pid, tw.date) === 'out';
     const existingTag = tw.prefill[pid] ? '<span class="tw-tag">✎ ya registrado</span>' : '';
+    const note = (tw.notes && tw.notes[pid]) || '';
     const inp = (f, ph) => this._twInputHtml(pid, f, ph, vals[f] === undefined ? '' : vals[f]);
 
     let fields;
@@ -603,9 +623,16 @@ RPETracker.prototype._twRowHtml = function(def, p) {
                 <span class="tw-row-name">${esc(this.playerDisplayName(p))}${out ? ' 🏥' : ''}</span>
                 ${existingTag}
                 <span class="tw-row-last">${prevText}</span>
+                <button type="button" class="tw-note-btn ${note ? 'tw-note-btn--on' : ''}" title="Nota de esta jugadora" aria-label="Nota de esta jugadora"
+                    onclick="window.rpeTracker._twToggleNote('${esc(pid)}')">📝</button>
             </div>
             <div class="tw-row-fields">${fields}${weight}</div>
             <div class="tw-calc" data-calc="${esc(pid)}"></div>
+            <div class="tw-note" data-note-box="${esc(pid)}" ${note ? '' : 'hidden'}>
+                <input type="text" class="form-input tw-note-input" maxlength="${TestWizardLogic.NOTE_MAX}" data-pid="${esc(pid)}" data-scope="row"
+                    placeholder="Nota de esta jugadora (opcional): fatiga, intento nulo…" value="${esc(note)}"
+                    oninput="window.rpeTracker._twOnNote(this)">
+            </div>
         </div>`;
 };
 
@@ -617,6 +644,12 @@ RPETracker.prototype._twStep2Html = function() {
         <div class="modal-body tw-body">
             <div class="tw-test-title"><strong>${esc(def.name)}</strong> · ${esc(this._twShortDate(tw.date))} · ${this._twPlayersInTable().length} jugadora(s)</div>
             <p class="tw-hint">${esc(this._twInputHint(def))}. Deja en blanco a quien no lo hizo. Con Intro pasas al siguiente campo.</p>
+            <div class="tw-general-note">
+                <label for="twGeneralNote">📝 Nota para todas (opcional)</label>
+                <input type="text" id="twGeneralNote" class="form-input tw-note-input" maxlength="${TestWizardLogic.NOTE_MAX}" data-scope="all"
+                    placeholder="Ej.: pista mojada, mucho calor, después de partido" value="${esc(tw.generalNote || '')}"
+                    oninput="window.rpeTracker._twOnNote(this)">
+            </div>
             <div class="tw-rows">${rows}</div>
         </div>
         <div class="tw-footer">
@@ -636,11 +669,14 @@ RPETracker.prototype._twItems = function() {
         const weight = def.powerCalc ? TestWizardLogic.parseNum(tw.weights[p.id]) : null;
         const entry = TestWizardLogic.buildEntry(def, vals, weight);
         if (!entry) return;
+        const noteText = TestWizardLogic.combineNote(tw.generalNote, (tw.notes || {})[p.id]);
+        if (noteText) entry.note = noteText;
         const prev = TestWizardLogic.previousResult(def, sessions, p.id, tw.date);
         const main = TestWizardLogic.mainValue(def, entry);
         const existing = !!tw.prefill[p.id];
         // Si la fila ya estaba guardada y no se ha tocado, no se reescribe (evita redondeos al convertir ms ↔ cm)
         const unchanged = existing && JSON.stringify(vals) === tw.prefill[p.id]
+            && noteText === TestWizardLogic.cleanNote((tw.prefillNote || {})[p.id])
             && (!def.powerCalc || String(weight || '') === String(TestWizardLogic.resultOn(sessions, p.id, def.id, tw.date).session.bodyWeight || ''));
         items.push({
             playerId: p.id, entry, bodyWeight: weight, main,
@@ -663,6 +699,25 @@ RPETracker.prototype._twOnInput = function(el) {
     this._twUpdateSaveBtn();
     clearTimeout(this._twDraftTimer);
     this._twDraftTimer = setTimeout(() => this._twPersistDraft(), 400);
+};
+
+/** Escribir una nota: la general (data-scope="all") o la de una jugadora. Se guarda en el borrador */
+RPETracker.prototype._twOnNote = function(el) {
+    const tw = this._tw;
+    if (el.dataset.scope === 'all') tw.generalNote = el.value;
+    else { if (!tw.notes) tw.notes = {}; tw.notes[el.dataset.pid] = el.value; }
+    clearTimeout(this._twDraftTimer);
+    this._twDraftTimer = setTimeout(() => this._twPersistDraft(), 400);
+};
+
+/** Muestra u oculta la caja de nota de una jugadora (sin repintar la tabla, para no perder lo escrito) */
+RPETracker.prototype._twToggleNote = function(pid) {
+    const modal = document.getElementById('testWizardModal');
+    if (!modal) return;
+    const box = [...modal.querySelectorAll('[data-note-box]')].find(e => e.dataset.noteBox === pid);
+    if (!box) return;
+    box.hidden = !box.hidden;
+    if (!box.hidden) { const inp = box.querySelector ? box.querySelector('input') : null; if (inp) inp.focus(); }
 };
 
 RPETracker.prototype._twKey = function(e, el) {
@@ -795,6 +850,7 @@ RPETracker.prototype._twStep3Html = function() {
                 ${r.asym !== null ? `<span style="color:${asymColor(r.asym)};font-weight:700;font-size:0.78rem">Δ ${esc(r.asym)}%</span>` : ''}
                 ${this._twDeltaHtml(r.pct, r.improved)}
                 ${r.isPB ? '<span class="tw-pb" title="Mejor marca personal">🏅</span>' : ''}
+                ${r.result.note ? `<div class="tt-note">📝 ${esc(r.result.note)}</div>` : ''}
             </div>`;
     }).join('');
 
@@ -829,6 +885,9 @@ RPETracker.prototype._twAnother = function() {
     tw.vals = {};
     tw.weights = {};
     tw.prefill = {};
+    tw.notes = {};
+    tw.prefillNote = {};
+    tw.generalNote = '';
     tw.summary = null;
     this._twRender();
 };

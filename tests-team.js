@@ -538,6 +538,7 @@ RPETracker.prototype._renderTestByTest = function(el) {
                 ${r.asym !== null ? `<span style="color:${asymColor(r.asym)};font-weight:700;font-size:0.75rem">Δ ${esc(r.asym)}%</span>` : ''}
                 ${this._twDeltaHtml(r.pct, r.improved)}
                 ${r.isPB ? '<span class="tw-pb" title="Mejor marca personal">🏅</span>' : ''}
+                ${r.result.note ? `<div class="tt-note">📝 ${esc(r.result.note)}</div>` : ''}
             </div>`;
     }).join('');
 
