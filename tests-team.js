@@ -7,6 +7,9 @@
 //    • Ranking del día elegido, con barra, variación por jugadora, 🏅 y asimetría
 //    • Evolución de la media del equipo, con las jugadoras que quieras superpuestas
 //
+//  Las gráficas de evolución (de una jugadora y del equipo) marcan con una franja roja el periodo de
+//  lesión (de inicio a alta), para ver si un descenso coincide con ella.
+//
 //  También los AVISOS por jugadora de la lista de Tests (junto al nombre):
 //    • 🦵 asimetría alta (≥15 %) en el último test de dos piernas
 //    • ⏱ toca repetir un test, según la frecuencia (en semanas) que fijas por test (⚙️)
@@ -199,6 +202,45 @@ const TestTeamLogic = {
         return by;
     },
 
+    /**
+     * Periodos de lesión de una jugadora: de la fecha de inicio al alta (o hasta hoy si sigue lesionada).
+     * Solo lesiones "activas" o "recuperadas" con fechas válidas, igual que getPlayerParticipation.
+     * Devuelve [{ start, end, ongoing, injuryId }] ordenados por inicio.
+     */
+    injuryBands(injuries, playerId, todayIso) {
+        const day = v => (/^\d{4}-\d{2}-\d{2}/.test(String(v || '')) ? String(v).slice(0, 10) : null);
+        return (injuries || []).map(i => {
+            if (!i || i.playerId !== playerId || (i.status !== 'active' && i.status !== 'recovered')) return null;
+            const start = day(i.startDate);
+            const end = i.status === 'recovered' ? day(i.endDate) : day(todayIso);
+            if (!start || !end || end < start) return null;
+            return { start, end, ongoing: i.status === 'active', injuryId: i.id };
+        }).filter(Boolean).sort((a, b) => a.start.localeCompare(b.start));
+    },
+
+    /**
+     * Dónde cae un periodo sobre el eje del gráfico. dates = fechas (AAAA-MM-DD, de antigua a reciente) de los
+     * puntos del gráfico. Devuelve posiciones decimales entre puntos { from, to } (0 = primer punto) o null si
+     * el periodo no toca el rango del gráfico. Lo que sobresale se recorta a los extremos.
+     */
+    bandEdges(dates, start, end) {
+        const n = dates ? dates.length : 0;
+        if (n < 2) return null;
+        const toDay = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000 : NaN; };
+        const days = dates.map(toDay);
+        const s = toDay(start), e = toDay(end);
+        if (isNaN(s) || isNaN(e) || days.some(isNaN) || e < days[0] || s > days[n - 1]) return null;
+        const pos = t => {
+            if (t <= days[0]) return 0;
+            if (t >= days[n - 1]) return n - 1;
+            for (let i = 0; i < n - 1; i++) {
+                if (t >= days[i] && t <= days[i + 1]) { const span = days[i + 1] - days[i]; return span === 0 ? i : i + (t - days[i]) / span; }
+            }
+            return n - 1;
+        };
+        return { from: pos(s), to: pos(e) };
+    },
+
     /** Largo de la barra (0–100): la mejor marca del día llena la barra entera */
     barPct(def, value, values) {
         if (!values.length || value === null || value <= 0) return 0;
@@ -207,6 +249,57 @@ const TestTeamLogic = {
     }
 };
 window.TestTeamLogic = TestTeamLogic;
+
+// ─────────────────────────────────────────
+//  FRANJAS DE LESIÓN EN LAS GRÁFICAS
+// ─────────────────────────────────────────
+
+/** Plugin de Chart.js: pinta una franja roja translúcida por cada periodo de lesión (debajo de las líneas) */
+const InjuryBandsPlugin = {
+    id: 'injuryBands',
+    beforeDatasetsDraw(chart, args, opts) {
+        if (!opts || !opts.bands || !opts.bands.length || !chart.chartArea || !chart.scales || !chart.scales.x) return;
+        const { ctx, chartArea: a, scales: { x } } = chart;
+        ctx.save();
+        opts.bands.forEach(b => {
+            const e = TestTeamLogic.bandEdges(opts.dates, b.start, b.end);
+            if (!e) return;
+            const x0 = Math.max(a.left, x.getPixelForValue(e.from));
+            const x1 = Math.min(a.right, x.getPixelForValue(e.to));
+            const w = Math.min(Math.max(x1 - x0, 3), a.right - x0);   // mínimo 3 px para que siempre se vea
+            if (!(w > 0)) return;
+            ctx.fillStyle = 'rgba(244,67,54,0.16)';
+            ctx.fillRect(x0, a.top, w, a.bottom - a.top);
+            if (b.label && w >= 34) {
+                ctx.fillStyle = 'rgba(244,67,54,0.9)';
+                ctx.font = '10px sans-serif';
+                ctx.textBaseline = 'top';
+                ctx.fillText(b.label, x0 + 3, a.top + 3);
+            }
+        });
+        ctx.restore();
+    }
+};
+
+/**
+ * Franjas de lesión para una gráfica. entries: [{ playerId, label }]; dates: fechas (AAAA-MM-DD) de los puntos.
+ * Devuelve { plugins, options, hintHtml } para pasar a Chart.js, o null si ninguna lesión toca la gráfica.
+ */
+RPETracker.prototype._injuryBandsFor = function(entries, dates) {
+    const today = toLocalISODate(new Date());
+    const bands = [];
+    (entries || []).forEach(en => {
+        TestTeamLogic.injuryBands(this.injuries, en.playerId, today).forEach(b => {
+            if (TestTeamLogic.bandEdges(dates, b.start, b.end)) bands.push({ ...b, label: en.label || '' });
+        });
+    });
+    if (!bands.length) return null;
+    return {
+        plugins: [InjuryBandsPlugin],
+        options: { bands, dates },
+        hintHtml: '<p class="tw-hint">🟥 La franja roja marca un periodo de lesión (desde el inicio hasta el alta; si sigue lesionada, hasta hoy).</p>'
+    };
+};
 
 // ─────────────────────────────────────────
 //  AJUSTES: frecuencia de repetición de cada test
@@ -555,8 +648,13 @@ RPETracker.prototype._renderTestByTest = function(el) {
     }).join('');
 
     const ser = T.series(def, sessions);
+    const inj = ser.dates.length >= 2 ? this._injuryBandsFor(
+        [...this._tt.players].map(pid => {
+            const pl = (this.players || []).find(x => x.id === pid);
+            return { playerId: pid, label: pl ? this.playerChipLabel(pl) : '' };
+        }), ser.dates) : null;
     const chartHtml = ser.dates.length >= 2
-        ? `<div class="tt-chart-box"><canvas id="testTeamChart" height="170"></canvas></div>`
+        ? `<div class="tt-chart-box"><canvas id="testTeamChart" height="170"></canvas></div>${inj ? inj.hintHtml : ''}`
         : `<p class="str-empty">Hacen falta al menos dos días con este test para ver la evolución.</p>`;
 
     el.innerHTML = `
@@ -583,10 +681,10 @@ RPETracker.prototype._renderTestByTest = function(el) {
             </div>
         </div>`;
 
-    this._ttDrawChart(def, ser);
+    this._ttDrawChart(def, ser, inj);
 };
 
-RPETracker.prototype._ttDrawChart = function(def, ser) {
+RPETracker.prototype._ttDrawChart = function(def, ser, inj) {
     if (ser.dates.length < 2 || typeof Chart === 'undefined') return;
     requestAnimationFrame(() => {
         const canvas = document.getElementById('testTeamChart');
@@ -613,11 +711,13 @@ RPETracker.prototype._ttDrawChart = function(def, ser) {
         if (canvas._chartInstance) canvas._chartInstance.destroy();
         canvas._chartInstance = new Chart(canvas.getContext('2d'), {
             type: 'line',
+            plugins: inj ? inj.plugins : [],
             data: { labels, datasets },
             options: {
                 responsive: true,
                 animation: { duration: 400 },
                 plugins: {
+                    ...(inj ? { injuryBands: inj.options } : {}),
                     legend: { display: datasets.length > 1, labels: { color: textCol, boxWidth: 12, font: { size: 10 } } },
                     tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw} ${def.unit}` } }
                 },
