@@ -52,6 +52,7 @@ const urlsToCache = [
   'strength.js',
   'tests-wizard.js',
   'tests-team.js',
+  'tests-export.js',
   'team-load.js',
   'team-status.js',
   'objectives.js',

@@ -1734,7 +1734,7 @@ RPETracker.prototype.renderTestsView = function() {
             <div class="str-header">
                 <h2>📊 Tests de Rendimiento</h2>
                 <div class="str-header-actions">
-                    <button class="btn-secondary" onclick="window.rpeTracker.showTestsReportMenu()">📄 Informe</button>
+                    <button class="btn-secondary" onclick="window.rpeTracker.showTestsReportMenu()" title="Informe en PDF o Excel">📄 Informe / Excel</button>
                     <button class="btn-secondary" onclick="window.rpeTracker._openTestFreqSettings()" title="Cada cuánto repetir cada test" aria-label="Frecuencias de repetición">⚙️</button>
                     <button class="btn-primary" onclick="window.rpeTracker._openTestWizard()" title="Nuevo test" aria-label="Nuevo test">+</button>
                 </div>
