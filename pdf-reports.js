@@ -1274,7 +1274,7 @@ RPETracker.prototype.showTestsReportMenu = function() {
     modal.innerHTML = `
         <div class="modal-content modal-content--wide">
             <div class="modal-header">
-                <div class="modal-header-inner"><h2>📊 Informe de Tests Físicos</h2></div>
+                <div class="modal-header-inner"><h2>📊 Informe y Excel de Tests Físicos</h2></div>
                 <button class="modal-close" onclick="document.getElementById('testsReportModal').classList.remove('active')">✕</button>
             </div>
             <div class="modal-body" style="padding:1.25rem">
@@ -1311,6 +1311,7 @@ RPETracker.prototype.showTestsReportMenu = function() {
 
                 <div style="margin-top:1.5rem;text-align:right">
                     <button class="btn-secondary" onclick="document.getElementById('testsReportModal').classList.remove('active')" style="margin-right:0.5rem">Cancelar</button>
+                    <button class="btn-secondary" onclick="window.rpeTracker.generateTestsExcel()" style="margin-right:0.5rem" title="Descarga un Excel con estos mismos filtros">📥 Excel</button>
                     <button class="btn-primary" onclick="window.rpeTracker.generateTestsReport()">📄 Generar informe</button>
                 </div>
             </div>
