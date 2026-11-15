@@ -1789,6 +1789,9 @@ RPETracker.prototype._renderTestPlayer = function(el) {
         .filter(s => s.results?.[this._testChartTab])
         .map(s => ({ date: s.date, r: s.results[this._testChartTab] }))
         .reverse();
+    // Franja roja con el periodo de lesión de la jugadora (la dibuja tests-team.js)
+    const injChart = typeof this._injuryBandsFor === 'function' && chartSessions.length >= 2
+        ? this._injuryBandsFor([{ playerId: player.id, label: 'Lesión' }], chartSessions.map(d => d.date)) : null;
 
     const buildChartHTML = () => {
         if (!selectedDef || chartSessions.length < 2) return '';
@@ -1907,6 +1910,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
             </div>
             ${summaryHTML}
             ${buildChartHTML()}
+            ${injChart ? injChart.hintHtml : ''}
             <div class="str-section">
                 <h3 class="str-section-title">📋 Historial completo</h3>
                 <div class="str-session-list">${historyHTML}</div>
@@ -1928,6 +1932,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                 if (canvas._chartInstance) canvas._chartInstance.destroy();
                 canvas._chartInstance = new Chart(canvas.getContext('2d'), {
                     type: 'line',
+                    plugins: injChart ? injChart.plugins : [],
                     data: {
                         labels,
                         datasets: [{
@@ -1946,6 +1951,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                         responsive: true,
                         animation: { duration: 500 },
                         plugins: {
+                            ...(injChart ? { injuryBands: injChart.options } : {}),
                             legend: { display: false },
                             tooltip: { callbacks: { label: ctx => `${ctx.raw} ${unitLabel}` } }
                         },
@@ -1994,7 +2000,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                     };
                     asymCanvas._chartInstance = new Chart(asymCanvas.getContext('2d'), {
                         type: 'line',
-                        plugins: [asymZone],
+                        plugins: [asymZone, ...(injChart ? injChart.plugins : [])],
                         data: {
                             labels,
                             datasets: [{
@@ -2012,7 +2018,7 @@ RPETracker.prototype._renderTestPlayer = function(el) {
                         options: {
                             responsive: true,
                             animation: { duration: 500 },
-                            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.raw?.toFixed(1)}%` } } },
+                            plugins: { ...(injChart ? { injuryBands: injChart.options } : {}), legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.raw?.toFixed(1)}%` } } },
                             scales: {
                                 x: { ticks: { color: textCol, font: { size: 10 } }, grid: { color: gridCol } },
                                 y: { min: 0, suggestedMax: 20, ticks: { color: textCol, font: { size: 10 }, callback: v => v + '%' }, grid: { color: gridCol } }
