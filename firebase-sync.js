@@ -75,7 +75,7 @@ const SyncDiff = {
     },
 
     // ----- Variante por RUTAS, para objetos anidados { clave1: { clave2: valor } } -----
-    // (availability: { [jugadora]: { [fecha]: 'limited' | 'unavailable' } }). La unidad de
+    // (availability: { [jugadora]: { [fecha]: 'limited' | 'unavailable' | 'absent[:motivo]' } }). La unidad de
     // cambio es "clave1/clave2", así dos dispositivos que editan fechas distintas de la
     // misma jugadora no se pisan.
     _leaves(obj) {
@@ -408,7 +408,7 @@ FirebaseSync.prototype.onInjuriesChange = function(callback) {
 };
 
 // ========== AVAILABILITY (Firebase sync) ==========
-// Estructura: { [playerId]: { [fecha YYYY-MM-DD]: 'limited' | 'unavailable' } }
+// Estructura: { [playerId]: { [fecha YYYY-MM-DD]: 'limited' | 'unavailable' | 'absent' | 'absent:<motivo>' } }
 
 FirebaseSync.prototype.saveAvailability = async function(availability) {
     if (DIFF_WRITES_ENABLED) return this._saveByDiff('availability', availability || {}, 'disponibilidad');

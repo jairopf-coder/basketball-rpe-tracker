@@ -143,8 +143,11 @@ RPETracker.prototype._renderPlayersTable = function(entries) {
 
     const body = rows.map(({ player, ratio, st, out, r, w, rdy }) => {
         const barW = Math.min(r / 2 * 100, 100).toFixed(0);
+        const absence = out && typeof this.getAbsenceOn === 'function' ? this.getAbsenceOn(player.id, toLocalISODate(new Date())) : null;
         const acHtml = out
-            ? '<span title="No entrena con el grupo: no se calcula el ratio A:C">🏥</span>'
+            ? (absence
+                ? `<span title="Ausente (${esc(absence.label)}): no se calcula el ratio A:C">🚫</span>`
+                : '<span title="No entrena con el grupo: no se calcula el ratio A:C">🏥</span>')
             : ratio.confidence === 'low'
                 ? `<span class="badge-insuf" title="${esc(ratio.message || 'Datos insuficientes')}" aria-label="Datos insuficientes">⚠️</span>`
                 : ratio.ratio === 'N/A' ? '—' : esc(String(ratio.ratio));

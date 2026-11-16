@@ -59,7 +59,11 @@ RPETracker.prototype.renderPlayerButtonsMulti = function() {
         const color = PlayerTokens.get(player);
         const part = this._sessionParticipation(player.id, date);
         const selected = (this.selectedPlayerIds || []).includes(player.id);
-        const flag = part === 'out'
+        const absence = typeof this.getAbsenceOn === 'function' ? this.getAbsenceOn(player.id, date) : null;
+        const absentLabel = absence ? 'Ausente: ' + absence.label : '';
+        const flag = absence
+            ? `<span class="player-btn-flag" title="${esc(absentLabel)} ese día" aria-label="${esc(absentLabel)} ese día">🚫</span>`
+            : part === 'out'
             ? '<span class="player-btn-flag" title="Lesionada o no disponible ese día" aria-label="Lesionada o no disponible ese día">🏥</span>'
             : part === 'partial'
                 ? '<span class="player-btn-flag" title="Participa con limitaciones ese día" aria-label="Participa con limitaciones ese día">🩹</span>'
@@ -67,6 +71,9 @@ RPETracker.prototype.renderPlayerButtonsMulti = function() {
         return `
         <button type="button" class="player-btn${selected ? ' multi-selected' : ''}${part === 'out' ? ' player-btn--out' : ''}" data-player-id="${player.id}" style="--player-token:${color}">
             ${flag}
+            <span class="player-btn-absent" role="button" data-absent-player="${player.id}"
+                title="${absence ? 'Editar o quitar la ausencia' : 'Marcar ausente (selección, club, estudios…)'}"
+                aria-label="${absence ? 'Editar o quitar la ausencia de ' : 'Marcar ausente a '}${esc(player.name)}">${absence ? '✏️' : '🚫'}</span>
             ${PlayerTokens.avatar(player, 50, '1.3rem', 'player-btn-avatar')}
             <div class="player-btn-name">${esc(player.name)}</div>
             ${player.number ? `<div class="player-btn-number">#${esc(player.number)}</div>` : ''}
@@ -116,8 +123,13 @@ RPETracker.prototype.togglePlayerSelection = function(playerId) {
         // Aviso (sin bloquear): puede que haga trabajo individual y el staff quiera registrarlo
         if (this._sessionParticipation(playerId, this._newSessionDate()) === 'out') {
             const p = this.players.find(x => x.id === playerId);
+            const absence = typeof this.getAbsenceOn === 'function' ? this.getAbsenceOn(playerId, this._newSessionDate()) : null;
             // showToast pinta con textContent (no HTML): el nombre no necesita esc()
-            this.showToast('🏥 ' + (p ? p.name : 'Esta jugadora') + ' figura como lesionada o no disponible ese día. Se registrará su sesión; comprueba que es correcto.', 'warning');
+            if (absence) {
+                this.showToast('🚫 ' + (p ? p.name : 'Esta jugadora') + ' figura como ausente (' + absence.label + ') ese día. Se registrará su sesión y se quitará su ausencia de ese día; comprueba que es correcto.', 'warning');
+            } else {
+                this.showToast('🏥 ' + (p ? p.name : 'Esta jugadora') + ' figura como lesionada o no disponible ese día. Se registrará su sesión; comprueba que es correcto.', 'warning');
+            }
         }
     } else {
         this.selectedPlayerIds.splice(idx, 1);
@@ -128,6 +140,77 @@ RPETracker.prototype.togglePlayerSelection = function(playerId) {
         btn.classList.toggle('multi-selected', this.selectedPlayerIds.includes(id));
     });
     this.updateSelectedCount();
+};
+
+// Mini-formulario para marcar (o quitar) la ausencia de una jugadora desde el Paso 1 de Nueva sesión.
+// Primer día = fecha de la sesión; "Hasta" = último día de ausencia (incluido). Por defecto, solo ese día.
+RPETracker.prototype.openAbsentModal = function(playerId) {
+    const player = (this.players || []).find(p => p.id === playerId);
+    if (!player) return;
+    const day = this._newSessionDate();
+    const current = this.getAbsenceOn(playerId, day);
+    const prev = document.getElementById('absentModal');
+    if (prev) prev.remove();
+
+    // Sin motivo por defecto: no se inventa uno si no se elige
+    const reasonOptions = `<option value=""${current && current.reason ? '' : ' selected'}>Sin especificar</option>`
+        + Object.keys(ABSENCE_REASONS).map(k =>
+            `<option value="${k}"${current && current.reason === k ? ' selected' : ''}>${esc(ABSENCE_REASONS[k])}</option>`).join('');
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'absentModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:420px">
+            <div class="modal-header">
+                <h2>🚫 Ausente</h2>
+                <button type="button" class="btn-close" id="absentClose" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:1.25rem 1.5rem">
+                <p style="margin:0 0 1rem"><strong>${esc(player.name)}</strong> · desde el ${esc(day.split('-').reverse().join('/'))}</p>
+                <div class="form-group">
+                    <label for="absentReason">Motivo</label>
+                    <select id="absentReason">${reasonOptions}</select>
+                </div>
+                <div class="form-group">
+                    <label for="absentUntil">Hasta (incluido)</label>
+                    <input type="date" id="absentUntil" value="${esc(day)}" min="${esc(day)}">
+                    <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.3rem">Si lo dejas igual, solo se marca ese día. No cuenta en carga ni RPE; el wellness sigue contando.</div>
+                </div>
+                ${current ? `<div style="font-size:0.85rem;color:var(--text-muted)">Ya figura como ausente (${esc(current.label)}). Guardar actualiza el motivo y las fechas.</div>` : ''}
+            </div>
+            <div class="modal-footer">
+                ${current ? '<button type="button" class="btn-secondary" id="absentClear">Quitar ausencia</button>' : ''}
+                <button type="button" class="btn-secondary" id="absentCancel">Cancelar</button>
+                <button type="button" class="btn-primary" id="absentSave">💾 Guardar</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+
+    const release = typeof trapFocus === 'function' ? trapFocus(modal) : null;
+    const close = () => { if (release) release(); modal.remove(); };
+    modal.querySelector('#absentClose').onclick = close;
+    modal.querySelector('#absentCancel').onclick = close;
+    modal.querySelector('#absentSave').onclick = () => {
+        const until = modal.querySelector('#absentUntil').value || day;
+        const res = this.setAbsence(playerId, day, until, modal.querySelector('#absentReason').value);
+        if (!res.ok) { this.showToast('⚠️ ' + res.error, 'warning'); return; }
+        // Una ausente no entra en la sesión: se quita de la selección si estaba marcada
+        this.selectedPlayerIds = (this.selectedPlayerIds || []).filter(id => id !== playerId);
+        close();
+        this.renderPlayerButtonsMulti();
+        this.showToast(res.marked === 0
+            ? 'ℹ️ No se ha marcado ningún día: ya tiene sesión guardada en esas fechas'
+            // showToast pinta con textContent (no HTML): el nombre no necesita esc()
+            : '🚫 ' + player.name + ': ausente ' + (res.marked === 1 ? '1 día' : res.marked + ' días')
+                + (res.skipped ? ' (' + res.skipped + ' con sesión, sin marcar)' : ''), 'success');
+    };
+    const clearBtn = modal.querySelector('#absentClear');
+    if (clearBtn) clearBtn.onclick = () => {
+        const n = this.clearAbsenceFrom(playerId, day);
+        close();
+        this.renderPlayerButtonsMulti();
+        this.showToast(`✅ Ausencia quitada (${n === 1 ? '1 día' : n + ' días'})`, 'success');
+    };
 };
 
 RPETracker.prototype.updateSelectedCount = function() {
@@ -166,7 +249,7 @@ RPETracker.prototype.selectAllPlayers = function() {
         this.selectedPlayerIds = eligible;
         const skipped = this.getPlayersActiveOn(this._newSessionDate()).length - eligible.length;
         if (skipped > 0) {
-            this.showToast(`🏥 ${skipped === 1 ? '1 jugadora no se ha seleccionado' : skipped + ' jugadoras no se han seleccionado'} (lesionada o no disponible ese día). Puedes añadirla a mano.`, 'info');
+            this.showToast(`🏥 ${skipped === 1 ? '1 jugadora no se ha seleccionado' : skipped + ' jugadoras no se han seleccionado'} (lesionada, ausente o no disponible ese día). Puedes añadirla a mano.`, 'info');
         }
     }
     document.querySelectorAll('.player-btn').forEach(btn => {
@@ -368,6 +451,8 @@ RPETracker.prototype.saveTeamSession = function() {
     });
 
     this.saveSessions();
+    // Si estaba marcada como ausente ese día y ha entrenado, se quita la marca de ESE día
+    if (typeof this.clearAbsenceOn === 'function') this.clearAbsenceOn(this.selectedPlayerIds, dateValue);
     this.renderSessions();
     if (this.currentView === 'dashboard') this.renderDashboard();
     this.closeModal('newSessionModal');
@@ -379,7 +464,7 @@ RPETracker.prototype.saveTeamSession = function() {
         const p = this.players.find(pl => pl.id === pid);
         const ratio = this.calculateAcuteChronicRatio(pid);
         const r = parseFloat(ratio.ratio);
-        const _t1 = this.getPlayerThresholds(playerId); const icon = isNaN(r) ? '' : r > _t1.high ? '🔴' : r > _t1.opt ? '🟠' : r < _t1.low ? '🔵' : '🟢';
+        const _t1 = this.getPlayerThresholds(pid); const icon = isNaN(r) ? '' : r > _t1.high ? '🔴' : r > _t1.opt ? '🟠' : r < _t1.low ? '🔵' : '🟢';
         const rLabel = ratio.ratio === 'N/A' ? '' : ` · Ratio A:C: ${ratio.ratio} ${icon}`;
         this.showToast(`✅ Sesión guardada${rLabel}`, 'success');
     } else {

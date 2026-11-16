@@ -343,6 +343,9 @@ class RPETracker {
 
         // Player selection buttons (event delegation)
         document.addEventListener('click', (e) => {
+            // El icono 🚫 de la tarjeta abre el formulario de ausencia (no selecciona a la jugadora)
+            const absentCtl = e.target.closest('[data-absent-player]');
+            if (absentCtl) { this.openAbsentModal(absentCtl.dataset.absentPlayer); return; }
             const btn = e.target.closest('.player-btn');
             if (btn && btn.dataset.playerId) {
                 this.togglePlayerSelection(btn.dataset.playerId);
