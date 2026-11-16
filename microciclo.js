@@ -388,7 +388,7 @@
                 if (isFutureDay(ds)) return emptyFutureCell;
                 // Fuera del grupo ese día (lesión o no disponible): no hay plan que comparar
                 if (outMap[player.id][i]) {
-                    return `<td class="mc-cell mc-cell-neutral" title="Fuera del grupo ese día (lesión o no disponible): no se compara con el plan">–</td>`;
+                    return `<td class="mc-cell mc-cell-neutral" title="Fuera del grupo ese día (lesión, no disponible o ausente): no se compara con el plan">–</td>`;
                 }
                 const daySessions = this.sessions.filter(s => s.playerId === player.id && s.date && s.date.slice(0, 10) === ds);
                 const realUA  = Math.round(daySessions.reduce((sum, s) => sum + (s.load || 0), 0));

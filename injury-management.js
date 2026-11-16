@@ -437,7 +437,8 @@ RPETracker.prototype.saveAvailability = function() {
 //   'full'    → participa con normalidad.
 // Se calcula con las fechas de la lesión y la fase que tenía ESE día (historial),
 // no con el estado de hoy, así las semanas pasadas siguen siendo correctas.
-// El wellness NO usa esta función: cuenta para todas las jugadoras.
+// El wellness NO usa esta función: cuenta para todas las jugadoras (también las ausentes).
+// 'Ausente' (selección, acto del club, examen, día libre…) cuenta como 'out' para la carga y el RPE.
 RPETracker.prototype.getPlayerParticipation = function(playerId, dateISO) {
     const day = String(dateISO || toLocalISODate(new Date())).slice(0, 10);
 
@@ -450,7 +451,7 @@ RPETracker.prototype.getPlayerParticipation = function(playerId, dateISO) {
 
     // 1) Disponibilidad marcada a mano para ese día
     const mark = this.availability && this.availability[playerId] ? this.availability[playerId][day] : null;
-    if (mark === 'unavailable') raise('out');
+    if (mark === 'unavailable' || isAbsentMark(mark)) raise('out');
     else if (mark === 'limited') raise('partial');
 
     // 2) Lesiones vigentes ese día
@@ -512,6 +513,95 @@ RPETracker.prototype.getTeamSessions = function(sessions) {
 // Jugadoras de la plantilla que participan en el trabajo de equipo en una fecha.
 RPETracker.prototype.getParticipatingPlayers = function(dateISO) {
     return this.getPlayersActiveOn(dateISO).filter(p => this.getPlayerParticipation(p.id, dateISO) !== 'out');
+};
+
+// ========== AUSENCIAS (selección, club, estudios, día libre…) ==========
+//
+// Una jugadora ausente no entrena ese día por un motivo que no es una lesión. Se guarda en
+// `availability` como una marca más: 'absent' o 'absent:<motivo>' (p. ej. 'absent:seleccion').
+// Para la carga y el RPE cuenta como 'out' (ver getPlayerParticipation); el wellness NO cambia.
+const ABSENCE_REASONS = {
+    seleccion: 'Selección',
+    club: 'Acto del club',
+    estudios: 'Estudios',
+    libre: 'Día libre',
+    otro: 'Otro'
+};
+const MAX_ABSENCE_DAYS = 90;   // tope de una sola vez: evita un año mal escrito que marque media temporada
+
+function isAbsentMark(mark) {
+    return typeof mark === 'string' && (mark === 'absent' || mark.indexOf('absent:') === 0);
+}
+
+// Suma n días (puede ser negativo) a una fecha YYYY-MM-DD, en día local.
+function _absenceAddDays(iso, n) {
+    const p = String(iso).slice(0, 10).split('-').map(Number);
+    return toLocalISODate(new Date(p[0], p[1] - 1, p[2] + n));
+}
+
+function _absenceIsISO(s) {
+    return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)
+        && _absenceAddDays(s, 0) === s;   // descarta fechas imposibles como 2026-02-31
+}
+
+// null si no está ausente ese día; si lo está: { reason: clave|null, label: texto }
+RPETracker.prototype.getAbsenceOn = function(playerId, dateISO) {
+    const day = String(dateISO || toLocalISODate(new Date())).slice(0, 10);
+    const mark = this.availability && this.availability[playerId] ? this.availability[playerId][day] : null;
+    if (!isAbsentMark(mark)) return null;
+    const key = mark.indexOf(':') > -1 ? mark.slice(mark.indexOf(':') + 1) : '';
+    return { reason: key || null, label: ABSENCE_REASONS[key] || 'Ausente' };
+};
+
+// Marca como ausente desde `fromISO` hasta `toISO` (ambos incluidos).
+// Los días en que ya tiene una sesión guardada no se marcan (ese día sí hay datos).
+// Devuelve { ok, marked, skipped } o { ok:false, error }.
+RPETracker.prototype.setAbsence = function(playerId, fromISO, toISO, reasonKey) {
+    if (!(this.players || []).some(p => p.id === playerId)) return { ok: false, error: 'Jugadora no encontrada' };
+    if (!_absenceIsISO(fromISO) || !_absenceIsISO(toISO)) return { ok: false, error: 'Fecha no válida' };
+    if (toISO < fromISO) return { ok: false, error: 'La fecha de vuelta no puede ser anterior al primer día' };
+    const days = [];
+    for (let d = fromISO; d <= toISO; d = _absenceAddDays(d, 1)) {
+        days.push(d);
+        if (days.length > MAX_ABSENCE_DAYS) return { ok: false, error: `Máximo ${MAX_ABSENCE_DAYS} días de una vez` };
+    }
+    const withData = new Set((this.sessions || [])
+        .filter(s => s && s.playerId === playerId && s.date)
+        .map(s => String(s.date).slice(0, 10)));
+    const value = ABSENCE_REASONS[reasonKey] ? 'absent:' + reasonKey : 'absent';
+    if (!this.availability) this.availability = {};
+    if (!this.availability[playerId]) this.availability[playerId] = {};
+    let marked = 0, skipped = 0;
+    days.forEach(d => {
+        if (withData.has(d)) { skipped++; return; }
+        this.availability[playerId][d] = value;
+        marked++;
+    });
+    if (marked > 0) this.saveAvailability();
+    return { ok: true, marked, skipped };
+};
+
+// Quita la ausencia de `fromISO` y de los días seguidos que sigan ausentes (hasta el primer día libre).
+RPETracker.prototype.clearAbsenceFrom = function(playerId, fromISO) {
+    const marks = this.availability && this.availability[playerId];
+    if (!marks || !_absenceIsISO(fromISO)) return 0;
+    let removed = 0;
+    for (let d = fromISO; isAbsentMark(marks[d]); d = _absenceAddDays(d, 1)) { delete marks[d]; removed++; }
+    if (removed > 0) this.saveAvailability();
+    return removed;
+};
+
+// Al guardar una sesión: quien ha entrenado ese día no estaba ausente. Solo se quita ESE día;
+// una ausencia futura ya anunciada (p. ej. un examen del viernes) se mantiene.
+RPETracker.prototype.clearAbsenceOn = function(playerIds, dayISO) {
+    const day = String(dayISO || '').slice(0, 10);
+    let removed = 0;
+    (playerIds || []).forEach(pid => {
+        const marks = this.availability && this.availability[pid];
+        if (marks && isAbsentMark(marks[day])) { delete marks[day]; removed++; }
+    });
+    if (removed > 0) this.saveAvailability();
+    return removed;
 };
 
 // ========== ADD/EDIT INJURY ==========

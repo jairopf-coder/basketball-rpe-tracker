@@ -127,14 +127,20 @@ function isActiveOn(player, date) {
     return !!player.archivedAt && date <= String(player.archivedAt).slice(0, 10);
 }
 
+// Marca de "ausente" (selección, club, estudios, día libre…): 'absent' o 'absent:<motivo>'.
+// Misma regla que isAbsentMark() de injury-management.js.
+function isAbsentMark(mark) {
+    return typeof mark === 'string' && (mark === 'absent' || mark.indexOf('absent:') === 0);
+}
+
 // ¿La jugadora está FUERA del trabajo de equipo ese día? Misma regla que
 // getPlayerParticipation() de la app (injury-management.js; hay una prueba que compara
-// ambas): lesión vigente en fases 1-4, o marcada "no disponible". En fase 5 (entrenamiento
-// modificado) o 6 sí participa y hay que pedirle el RPE.
-//   injuries: lista de lesiones · availability: { [jugadora]: { [fecha]: 'limited'|'unavailable' } }
+// ambas): lesión vigente en fases 1-4, marcada "no disponible" o "ausente". En fase 5 (entrenamiento
+// modificado) o 6 sí participa y hay que pedirle el RPE. El wellness NO usa esta regla: se pide a todas.
+//   injuries: lista de lesiones · availability: { [jugadora]: { [fecha]: 'limited'|'unavailable'|'absent[:motivo]' } }
 function isOutOn(injuries, availability, playerId, date) {
     const mark = availability && availability[playerId] ? availability[playerId][date] : null;
-    if (mark === 'unavailable') return true;
+    if (mark === 'unavailable' || isAbsentMark(mark)) return true;
     return (injuries || []).some(inj => {
         if (!inj || inj.playerId !== playerId) return false;
         const start = inj.startDate ? String(inj.startDate).slice(0, 10) : null;

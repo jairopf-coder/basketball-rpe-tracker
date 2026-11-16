@@ -39,6 +39,7 @@ RPETracker.prototype.renderAvailabilityTable = function() {
                 <span style="color: #ff9800;">⚠️ Limitada</span>
                 <span style="color: #f44336;">🏥 Lesionada</span>
                 <span style="color: #2196f3;">📋 RTP</span>
+                <span style="color: #7b1fa2;">🚫 Ausente</span>
             </div>
         </div>
     `;
@@ -82,6 +83,10 @@ RPETracker.prototype.renderAvailabilityRow = function(player, dates) {
             icon = '❌';
             color = '#f44336';
             title = 'No disponible';
+        } else if (isAbsentMark(availability)) {
+            icon = '🚫';
+            color = '#7b1fa2';
+            title = 'Ausente · ' + this.getAbsenceOn(player.id, dateKey).label;
         }
         
         row += `
@@ -104,11 +109,13 @@ RPETracker.prototype.toggleAvailability = function(playerId, dateKey) {
     
     const current = this.availability[playerId][dateKey];
     
-    // Cycle through: null (available) → limited → unavailable → available
+    // Cycle through: null (available) → limited → unavailable → absent → available
     if (!current) {
         this.availability[playerId][dateKey] = 'limited';
     } else if (current === 'limited') {
         this.availability[playerId][dateKey] = 'unavailable';
+    } else if (current === 'unavailable') {
+        this.availability[playerId][dateKey] = 'absent';
     } else {
         delete this.availability[playerId][dateKey];
     }

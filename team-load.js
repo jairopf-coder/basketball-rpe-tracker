@@ -99,6 +99,8 @@
         // 'out' (lesión en fases 1-4 o no disponible: no entrena con el grupo) o 'gone' (ya no estaba
         // en el equipo ese día, por una baja a mitad de semana).
         const dayState = {};
+        // Icono del día fuera del grupo: 🚫 si es una ausencia (selección, club…), 🏥 si es lesión / no disponible
+        const outIcon = (pid, ds) => (typeof tracker.getAbsenceOn === 'function' && tracker.getAbsenceOn(pid, ds)) ? '🚫' : '🏥';
         roster.forEach(p => {
             dayState[p.id] = weekDates.map(ds => {
                 if (typeof tracker.isPlayerActiveOn === 'function' && !tracker.isPlayerActiveOn(p, ds)) return 'gone';
@@ -150,7 +152,7 @@
                         <span>${z.title} (${z.label})</span>
                     </span>
                 `).join('')}
-                ${anyOut ? `<span class="tl-legend-item"><span>🏥 Fuera del grupo (lesión / no disponible)</span></span>` : ''}
+                ${anyOut ? `<span class="tl-legend-item"><span>🏥 Fuera del grupo (lesión / no disponible) · 🚫 Ausente</span></span>` : ''}
             </div>
         </div>
 
@@ -181,7 +183,7 @@
                         <tr class="tl-row ${p.id === firstOutId ? 'tl-row-sep' : ''}">
                             <td class="tl-td-player">
                                 <span class="tl-player-dot" style="background:${p.color || 'var(--text-muted)'}"></span>
-                                <span class="tl-player-name">${escapeHtml(p.name)}</span>${isOutRow ? ' <span title="Ha estado fuera del grupo esta semana (lesión / no disponible)">🏥</span>' : ''}
+                                <span class="tl-player-name">${escapeHtml(p.name)}</span>${isOutRow ? ' <span title="Ha estado fuera del grupo esta semana (lesión / no disponible / ausente)">🏥</span>' : ''}
                             </td>
                             ${dayLoads.map((ua, di) => {
                                 const state   = dayState[p.id][di];
@@ -190,8 +192,8 @@
                                 const when    = `${DAY_LABELS[di]} ${weekDates[di]}`;
                                 if (ua === 0 && state === 'out') {
                                     return `<td class="tl-td-cell tl-cell-out ${todayCls}"
-                                        title="${when}: fuera del grupo (lesión / no disponible)"
-                                        aria-label="Fuera del grupo">🏥</td>`;
+                                        title="${when}: fuera del grupo (lesión / no disponible / ausente)"
+                                        aria-label="Fuera del grupo">${outIcon(p.id, weekDates[di])}</td>`;
                                 }
                                 if (ua === 0 && state === 'gone') {
                                     return `<td class="tl-td-cell tl-cell-gone ${todayCls}"
@@ -204,7 +206,7 @@
                                     style="background:var(${zone.varBg});color:var(${zone.varText})"
                                     title="${when}: ${ua} UA — ${zone.title}${note}"
                                     aria-label="${ua} UA">
-                                    ${ua > 0 ? ua : '<span class="tl-zero">—</span>'}${state === 'out' ? '<span class="tl-out-mark">🏥</span>' : ''}
+                                    ${ua > 0 ? ua : '<span class="tl-zero">—</span>'}${state === 'out' ? `<span class="tl-out-mark">${outIcon(p.id, weekDates[di])}</span>` : ''}
                                 </td>`;
                             }).join('')}
                             <td class="tl-td-total">${total > 0 ? total : '—'}</td>
