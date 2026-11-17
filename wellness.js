@@ -1145,12 +1145,18 @@ RPETracker.prototype._wFmtDate = function(dateStr) {
 .wellness-period-check input{width:18px;height:18px}
 .wellness-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 /* Columna de nombre fija: al hacer scroll horizontal la jugadora siempre se ve.
-   Las celdas fijas necesitan fondo opaco. --card-bg no está definida en la app,
-   así que las tarjetas son transparentes sobre --bg-app: usamos ese mismo color.
-   Si algún día se define --card-bg, cambiar aquí --wt-sticky-bg. */
+   Las celdas fijas necesitan fondo opaco y IGUAL al de la tarjeta, o la columna se nota distinta.
+   Tema claro: --card-bg no está definida en la app, así que la tarjeta es transparente sobre --bg-app.
+   Tema oscuro: styles.css pinta la tarjeta con --bg-surface.
+   Si cambia el fondo de .wellness-card, cambiar aquí --wt-sticky-bg (los dos temas). */
 .wellness-player-table{--wt-sticky-bg:var(--bg-app)}
+[data-theme="dark"] .wellness-player-table{--wt-sticky-bg:var(--bg-surface)}
 .wellness-player-table th:first-child,.wellness-player-table td:first-child{position:sticky;left:0;z-index:1;background:var(--wt-sticky-bg)}
 .wellness-team-row td:first-child{background:var(--bg-subtle)}
+/* Tema oscuro: --bg-subtle es MÁS OSCURO que la tarjeta (en claro es más claro), así que la fila de la media
+   del equipo se veía como una franja negra. Misma superficie que el resto de la tabla; se distingue por la
+   negrita y la línea inferior más gruesa. */
+[data-theme="dark"] .wellness-team-row td,[data-theme="dark"] .wellness-team-row td:first-child{background:var(--wt-sticky-bg)}
 .wt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .wt-h-icon,.wt-legend-mobile{display:none}
 @media (max-width:640px){
