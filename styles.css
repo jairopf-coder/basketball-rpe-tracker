@@ -4575,6 +4575,28 @@ header h1 {
    interno y las tarjetas.
 */
 
+/* ── Inicio: una sola separación entre bloques ──────────────────────
+   Los bloques de primer nivel de Inicio (avisos, recordatorio de planificación, bandeja de RPE de
+   jugadoras, barra de día de partido, KPIs y rejilla de tarjetas) llevaban cada uno su propio margen
+   (0.75rem, 1rem, 0 y 1.5rem), y por eso los huecos no eran iguales. Ahora el hueco lo pone SOLO el
+   contenedor y los márgenes propios de esos bloques se anulan. El valor es el mismo que ya usan las
+   columnas de abajo (.db-split, .db-left, .db-right y .db-cal-col): 1.5rem en PC, 0.75rem en móvil.
+   Si se añade un bloque nuevo a Inicio no hay que darle margen: el hueco sale solo. */
+#dashboardContent {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+#dashboardContent > * { margin: 0; }
+@media (max-width: 768px) {
+    #dashboardContent { gap: 0.75rem; }
+}
+/* Hueco entre la barra de navegación y el primer bloque = el mismo 1.5rem: la navegación ya deja
+   0.35rem de relleno inferior, así que al contenedor solo le quedan 1.15rem arriba (solo PC). */
+@media (min-width: 769px) {
+    #dashboardView .dashboard-container { padding-top: 1.15rem; }
+}
+
 /* ── KPI bar — tarjeta superior ─────────────────────────────────── */
 .db-kpi-bar {
     display: flex;
@@ -8881,8 +8903,9 @@ details[open] .ewma-toggle-hint { display: none; }
 /* ── Avisos de Inicio: una línea plegable (dashboard-alerts.js) ──────────────
    Plegada ocupa ~36 px. Al tocarla se despliega la lista; «Marcar como visto por hoy»
    la deja en gris. Colores con variables del tema (claro y oscuro). */
+/* La separación con el resto de bloques de Inicio la pone #dashboardContent (ver «Inicio: una sola separación»). */
 .db-alerts {
-    margin: 0 0 0.75rem;
+    margin: 0;
     border: 1px solid var(--border);
     border-left: 3px solid var(--warning);
     border-radius: 10px;
