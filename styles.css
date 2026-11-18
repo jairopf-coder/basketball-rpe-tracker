@@ -11056,3 +11056,112 @@ textarea:focus-visible,
 .tw-note-btn { margin-left: 0.25rem; border: none; background: transparent; cursor: pointer; font-size: 1rem; opacity: 0.45; padding: 0 2px; line-height: 1; }
 .tw-note-btn:hover, .tw-note-btn--on { opacity: 1; }
 .tt-note { flex: 1 0 100%; font-size: 0.76rem; color: var(--text-muted); padding-left: 0.2rem; margin-top: 0.1rem; }
+
+/* ============================================================
+   HEADER — «Tipográfico con latido»
+   Sin tarjeta ni sombra: nombre grande (Space Grotesk, con «Ctrl» en naranja), logo de línea,
+   estado de conexión como un punto de color (sin texto) y una línea de ECG como separador.
+   Va al FINAL del archivo a propósito: sustituye a las reglas anteriores de `header`, `header h1`,
+   `.header-logo` y `.header-left` (la tarjeta flotante con sombra) en todos los anchos.
+   ============================================================ */
+@font-face {
+    font-family: 'Space Grotesk';
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;   /* mientras carga se ve la fuente del sistema: nunca queda el nombre invisible */
+    src: url('fonts/space-grotesk-700.woff2') format('woff2');
+}
+
+header {
+    background: var(--bg-app);
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0.25rem 0 0;
+}
+[data-theme="dark"] header { box-shadow: none; }
+
+header .header-inner { padding-bottom: 0.3rem; }
+
+.header-left {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+header h1 {
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 2.1rem;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.1;
+    gap: 0.55rem;
+}
+/* #d14500 en claro (contraste ≥ 3:1 para texto grande sobre --bg-app); en oscuro el naranja de marca */
+header h1 .header-name-accent { color: #d14500; }
+[data-theme="dark"] header h1 .header-name-accent { color: var(--primary); }
+
+/* Logo: solo el trazo (sin cuadrado naranja), con el color del texto */
+.header-logo {
+    width: auto;
+    height: auto;
+    background: none;
+    border-radius: 0;
+    margin-right: 0;
+    color: var(--text-primary);
+}
+.header-logo svg { width: 30px; height: 30px; }
+[data-theme="dark"] .header-logo { background: none; box-shadow: none; }
+
+/* Estado de conexión: solo el punto. El texto (que actualiza firebase-sync.js) sigue en el HTML para los
+   lectores de pantalla y como tooltip (title), pero no se ve. */
+.connection-indicator { position: relative; }
+header .connection-indicator { gap: 0; }
+header .connection-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+header .connection-dot { width: 10px; height: 10px; }
+/* Tonos más oscuros en claro para que el punto se distinga del fondo (≥ 3:1); en oscuro, los de siempre */
+header .connection-indicator.online .connection-dot { background: #2e9e4f; box-shadow: 0 0 0 3px rgba(46, 158, 79, 0.22); }
+header .connection-indicator.offline .connection-dot { box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.22); }
+header .connection-indicator.connecting .connection-dot { background: #e65100; }
+[data-theme="dark"] header .connection-indicator.online .connection-dot { background: #4caf50; box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.25); }
+[data-theme="dark"] header .connection-indicator.connecting .connection-dot { background: #ff9800; }
+
+/* Línea de ECG: separador. Se desvanece hacia la derecha. */
+header .header-ecg {
+    display: block;
+    width: 100%;
+    max-width: 1200px;
+    height: 22px;
+    margin: 0 auto;
+    padding: 0 max(1.5rem, env(safe-area-inset-left));
+    box-sizing: border-box;
+    color: #d14500;
+    -webkit-mask-image: linear-gradient(90deg, #000 20%, transparent 95%);
+    mask-image: linear-gradient(90deg, #000 20%, transparent 95%);
+}
+[data-theme="dark"] header .header-ecg { color: var(--primary); }
+
+/* La navegación se pega justo bajo el header, cuya altura ya no es fija (la mide BottomNav.init) */
+.nav-groups { top: var(--header-h, 98px); }
+
+@media (max-width: 768px) {
+    header h1 { font-size: 1.6rem; }
+    .header-logo svg { width: 24px; height: 24px; }
+    header .header-inner { padding-bottom: 0.2rem; }
+    header .header-ecg { height: 14px; }
+}
+
+/* Navegación: sin emojis en PC (≥641px). En móvil se dejan como estaban (BottomNav y la fila de subsecciones). */
+@media (min-width: 641px) {
+    .nav-group-btn .nav-ico,
+    .nav-sub-btn .nav-ico { display: none; }
+}

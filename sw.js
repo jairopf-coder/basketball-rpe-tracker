@@ -62,6 +62,7 @@ const urlsToCache = [
   'wellness.js',
   'export-fisio.js',
   'xlsx.mini.min.js',
+  'fonts/space-grotesk-700.woff2',
 ];
 
 // Convierte una ruta relativa en URL absoluta dentro del scope de la app.
