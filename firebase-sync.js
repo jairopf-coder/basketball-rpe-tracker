@@ -296,6 +296,7 @@ class FirebaseSync {
 
         indicator.className = `connection-indicator ${online ? 'online' : 'offline'}`;
         label.textContent = online ? 'En línea' : 'Sin conexión';
+        indicator.title = label.textContent;   // el texto va oculto en el header: se ve al pasar el ratón
     }
 }
 

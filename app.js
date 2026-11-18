@@ -100,7 +100,7 @@ const NavMenu = {
             <button class="nav-sub-btn ${item.view === this.activeView ? 'active' : ''}"
                 data-view="${item.view}"
                 onclick="NavMenu.selectView('${item.view}')">
-                ${item.label}
+                ${this._labelHtml(item.label)}
             </button>`).join('');
 
         // La fila se redibuja entera y vuelve a empezar por la izquierda: centramos el chip activo
@@ -110,6 +110,15 @@ const NavMenu = {
             const a = active.getBoundingClientRect(), b = bar.getBoundingClientRect();
             bar.scrollLeft += (a.left - b.left) - (b.width - a.width) / 2;
         }
+    },
+
+    // "🏋️ Gimnasio" → el emoji va en <span class="nav-ico"> y el texto aparte. El CSS oculta el emoji en PC
+    // (≥641px); en móvil se ve exactamente igual que antes. Los labels de NavMenu.groups NO se tocan:
+    // BottomNav (móvil) los lee con el mismo formato "<emoji> <texto>".
+    _labelHtml(label) {
+        const i = label.indexOf(' ');
+        if (i < 0) return label;
+        return `<span class="nav-ico" aria-hidden="true">${label.slice(0, i + 1)}</span>${label.slice(i + 1)}`;
     },
 
     hideSubBar() {
