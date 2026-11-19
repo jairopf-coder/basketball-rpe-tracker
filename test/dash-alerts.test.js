@@ -496,18 +496,109 @@ test('_acDangerCount cuenta solo peligro: no precaución, ni lesionadas, ni "Ins
         { out: ['p3'], players: ['p1', 'p2', 'p3', 'p4', 'p5'] });   // p6 no es activa
     assert.strictEqual(t._acDangerCount(), 2);   // p1 y p5
 });
-test('la insignia de Análisis, el icono de la app y la notificación usan la regla única de peligro; el KPI muestra el TOTAL de alertas', () => {
+console.log('\nTotal de alertas: KPI de Inicio = insignia de Análisis = icono de la app');
+// Escenario: p1 peligro, p2 precaución, p3 bien, p4 sin ratio fiable, p5 peligro pero NO entrena hoy, p6 no es activa
+const totalEnv = (extra = {}) => {
+    const t = acEnv({ p1: R(1.8), p2: R(1.4), p3: R(1.0), p4: R(2.2, 'low'), p5: R(1.9), p6: R(2.0) },
+        { out: ['p5'], players: ['p1', 'p2', 'p3', 'p4', 'p5'] });
+    t._wTrendAlerts = () => DATA().trendAlerts;
+    t._rpeDiscrepancies = DATA().rpeDiscrepancies;
+    return Object.assign(t, extra);
+};
+test('el total suma peligro + precaución + tendencias de wellness + RPE distinto (sin las que no entrenan, las «Insuf.» ni las no activas)', () => {
+    const t = totalEnv();
+    assert.strictEqual(t._dashAlertsTotal(), 4);                     // p1 + p2 + 1 tendencia + 1 RPE
+    assert.strictEqual(t._acDangerCount(), 1, 'la cuenta de solo peligro sigue disponible');
+});
+test('Inicio y la insignia dan SIEMPRE el mismo número: _dashAlertsInputs con las filas de Inicio = sin filas', () => {
+    const t = totalEnv();
+    const rows = t.activePlayers.map(player => ({ player, ratio: t.calculateAcuteChronicRatio(player.id), out: t._acIsOutToday(player.id) }));
+    assert.strictEqual(t._dashAlertsSummary(t._dashAlertsInputs(rows)).a.total, t._dashAlertsTotal());
+    assert.strictEqual(JSON.stringify(t._dashAlertsSummary(t._dashAlertsInputs(rows)).a.keys), JSON.stringify(t._collectDashAlerts(t._dashAlertsInputs()).keys));
+});
+test('cambia con las alertas: una tendencia o un RPE distinto nuevo suben el número, y resolverlos lo baja', () => {
+    const t = totalEnv();
+    t._rpeDiscrepancies = DATA().rpeDiscrepancies.concat([{ sessionId: 's9', playerName: 'Eva', staffRpe: 5, playerRpe: 8, date: '2026-11-04' }]);
+    assert.strictEqual(t._dashAlertsTotal(), 5);
+    t._wTrendAlerts = () => []; t._rpeDiscrepancies = [];
+    assert.strictEqual(t._dashAlertsTotal(), 2);
+});
+test('marcar las alertas como «vistas» NO cambia el número (tampoco el del KPI)', () => {
+    const { t } = makeEnv(); t._dashAlertsSummary(DATA()); const before = t._collectDashAlerts(DATA()).total;
+    t.markDashAlertsSeen();
+    assert.strictEqual(t._dashAlertsSummary(DATA()).a.total, before);
+});
+test('datos incompletos no rompen: sin _wTrendAlerts, sin discrepancias de RPE o sin jugadoras → solo cuenta lo que haya', () => {
+    const t = totalEnv({ _wTrendAlerts: undefined, _rpeDiscrepancies: undefined });
+    assert.strictEqual(t._dashAlertsTotal(), 2);
+    const empty = acEnv({}); empty._rpeDiscrepancies = null;
+    assert.strictEqual(empty._dashAlertsTotal(), 0);
+    empty.activePlayers = undefined; assert.strictEqual(empty._dashAlertsTotal(), 0);
+});
+test('un nombre con HTML en los datos de la insignia no afecta al número (solo se cuentan)', () => {
+    const t = totalEnv(); t._rpeDiscrepancies = [{ sessionId: 's1', playerName: '<img src=x>', staffRpe: 1, playerRpe: 9, date: '2026-11-04' }];
+    assert.strictEqual(t._dashAlertsTotal(), 4);   // p1 + p2 + 1 tendencia + 1 RPE (con nombre raro)
+});
+
+// Código REAL de la insignia de Análisis y del icono de la app (app.js), con un DOM y un navegador de mentira
+function badgeEnv(total, trend = 0) {
+    const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+    const push = appSrc.slice(appSrc.indexOf('const PushNotifications = {'), appSrc.indexOf('\n};', appSrc.indexOf('const PushNotifications = {')) + 3);
+    const m0 = appSrc.indexOf('    _updateNavAlertBadge() {');
+    const method = appSrc.slice(m0, appSrc.indexOf('\n    }\n}', m0) + 6);
+    const calls = [];
+    const badge = { textContent: '', style: {} }, inj = { textContent: '', style: {} };
+    const ctx2 = vm.createContext({ console, document: { getElementById: id => ({ bnAlertBadge: badge, bnInjuryBadge: inj })[id] || null },
+        navigator: { setAppBadge: n => calls.push(['set', n]), clearAppBadge: () => calls.push(['clear']) }, window: {} });
+    vm.runInContext(push + '\nglobalThis.PN = PushNotifications;\nglobalThis.O = {' + method + '};', ctx2);
+    const tracker = ctx2.O; tracker._dashAlertsTotal = () => total; tracker._wTrendAlerts = () => new Array(trend).fill({});
+    tracker._acDangerCount = () => { throw new Error('la insignia ya no debe contar solo peligro'); };
+    return { tracker, badge, inj, calls };
+}
+test('la insignia de Análisis y el icono de la app muestran el TOTAL de alertas (el del KPI)', () => {
+    const { tracker, badge, calls } = badgeEnv(4);
+    tracker._updateNavAlertBadge();
+    assert.strictEqual(badge.textContent, 4); assert.strictEqual(badge.style.display, '');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(calls)), [['set', 4]]);
+});
+test('sin alertas: la insignia se oculta y el icono se limpia', () => {
+    const { tracker, badge, calls } = badgeEnv(0);
+    tracker._updateNavAlertBadge();
+    assert.strictEqual(badge.style.display, 'none'); assert.deepStrictEqual(JSON.parse(JSON.stringify(calls)), [['clear']]);
+});
+test('el badge de «Lesiones» sigue contando solo tendencias de wellness (no se ha tocado)', () => {
+    const { tracker, inj } = badgeEnv(5, 2);
+    tracker._updateNavAlertBadge();
+    assert.strictEqual(inj.textContent, 2); assert.strictEqual(inj.style.display, '');
+});
+test('un navegador sin setAppBadge no rompe nada', () => {
+    const { tracker, badge } = badgeEnv(3);
+    const ctxBad = vm.createContext({ console, document: { getElementById: () => badge }, navigator: {}, window: {} });
+    const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+    vm.runInContext(appSrc.slice(appSrc.indexOf('const PushNotifications = {'), appSrc.indexOf('\n};', appSrc.indexOf('const PushNotifications = {')) + 3) + '\nglobalThis.PN = PushNotifications;', ctxBad);
+    assert.strictEqual(ctxBad.PN.updateBadge(tracker), 3);
+});
+test('el refresco de la insignia es SEGURO: si falla (datos a medio cargar) no lanza, y sin _updateNavAlertBadge no hace nada', () => {
+    const { t } = makeEnv();
+    assert.doesNotThrow(() => t._refreshAlertBadges());                      // sin _updateNavAlertBadge
+    let n = 0; t._updateNavAlertBadge = () => { n++; };
+    t._refreshAlertBadges(); assert.strictEqual(n, 1);
+    t._updateNavAlertBadge = () => { throw new Error('datos sin cargar'); };
+    assert.doesNotThrow(() => t._refreshAlertBadges());
+});
+test('cableado: la insignia y el icono usan _dashAlertsTotal; Inicio usa las MISMAS entradas; y se refrescan al llegar alertas nuevas', () => {
     const rend = fs.readFileSync(path.join(ROOT, 'dashboard-renderer.js'), 'utf8');
     const app = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
-    assert.ok(/alertPlayers = players\.filter\([^;]*_acLevel\([^;]*'danger'/.test(rend), 'el peligro del Inicio sale de _acLevel');
-    assert.ok(/warnPlayers\s*= players\.filter\([^;]*_acLevel\([^;]*'warn'/.test(rend), 'la precaución del Inicio sale de _acLevel');
-    assert.ok(/dangerPlayers: alertPlayers, warnPlayers/.test(rend), 'el KPI cuenta esas mismas listas');
-    assert.ok(/<span class="db-kpi-val">\$\{alertsSum\.a\.total\}<\/span>/.test(rend), 'el número del KPI es el total de alertas');
-    assert.ok(!/acAlertCount/.test(rend), 'ya no hay un número aparte de peligro en el KPI');
-    assert.ok(app.includes('const alertCount = this._acDangerCount()'), 'insignia de Análisis');
-    assert.ok(app.includes('const count = tracker._acDangerCount()'), 'icono de la app');
-    assert.ok(/tracker\._acLevel\(ratio, pid\) === 'danger'/.test(app), 'notificación al guardar sesión');
-    assert.ok(!/r > this\.getPlayerThresholds\(player\.id\)\.opt/.test(app), 'la insignia no cuenta la precaución');
+    assert.ok(/this\._dashAlertsSummary\(this\._dashAlertsInputs\(players\)\)/.test(rend), 'Inicio usa _dashAlertsInputs con sus filas');
+    assert.ok(!/alertPlayers|warnPlayers/.test(rend) && !/acAlertCount/.test(rend), 'Inicio ya no construye sus propias listas');
+    assert.ok(app.includes('const alertCount = this._dashAlertsTotal()') && app.includes('const count = tracker._dashAlertsTotal()'));
+    assert.ok(!app.includes('_acDangerCount'), 'ni la insignia ni el icono cuentan solo peligro');
+    assert.ok(/tracker\._acLevel\(ratio, pid\) === 'danger'/.test(app), 'la notificación al guardar sesión sigue siendo solo de peligro');
+    const sess = fs.readFileSync(path.join(ROOT, 'app-sessions.js'), 'utf8');
+    assert.ok(/_analyzePlayerRpe\(\)\.discrepancies;\s*\n\s*\/\/[^\n]*\n\s*if \(typeof this\._refreshAlertBadges === 'function'\) this\._refreshAlertBadges\(\);/.test(sess), 'RPE de jugadoras nuevo');
+    assert.ok(/_rpeDiscrepancies\.filter\(d => d\.sessionId !== sessionId\);\s*\n\s*\}\s*\n\s*if \(typeof this\._refreshAlertBadges === 'function'\) this\._refreshAlertBadges\(\);/.test(sess), 'al resolver un RPE distinto editando la sesión');
+    const well = fs.readFileSync(path.join(ROOT, 'wellness.js'), 'utf8');
+    assert.strictEqual((well.match(/this\._refreshAlertBadges\(\);\s*\/\/ una tendencia nueva es una alerta/g) || []).length, 2, 'wellness nuevo (staff y jugadoras)');
 });
 
 console.log('\nCableado');

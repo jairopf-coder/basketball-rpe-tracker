@@ -16,6 +16,7 @@ RPETracker.prototype.loadWellnessData = function() {
                 // de sobrescribir en la nube datos que la app todavía no ha descargado.
                 this._wellnessCloudReady = true;
                 this.wellnessData = this._mergeWellnessPlayer(updated, this._wellnessPlayerCache || []);
+                if (typeof this._refreshAlertBadges === 'function') this._refreshAlertBadges();   // una tendencia nueva es una alerta
                 if (this.currentView === 'wellness') this.renderWellnessDashboard();
                 if (this.currentView === 'dashboard') this.renderDashboard();
                 if (window._devMode) console.log('🔄 Wellness actualizado desde Firebase');
@@ -61,6 +62,7 @@ RPETracker.prototype._registerWellnessPlayerListeners = function() {
             this.wellnessData || [],
             allEntries
         );
+        if (typeof this._refreshAlertBadges === 'function') this._refreshAlertBadges();   // una tendencia nueva es una alerta
         if (this.currentView === 'wellness') this.renderWellnessDashboard();
         if (this.currentView === 'dashboard') this.renderDashboard();
         if (window._devMode) console.log('🔄 WellnessPlayer actualizado desde Firebase', allEntries.length, 'entries');

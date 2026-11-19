@@ -92,7 +92,8 @@ test('el KPI es un botón accesible con id propio y su número es el TOTAL de al
     assert.ok(tile.includes('onclick="window.rpeTracker?.toggleDashAlerts()"'));
     assert.ok(tile.includes('<span class="db-kpi-val">4</span>'), 'p1 peligro + p2 precaución + 1 wellness + 1 RPE = 4');
     assert.ok(tile.includes('<span class="db-kpi-lbl">alertas</span>'));
-    assert.strictEqual(t._acDangerCount(), 1, 'la insignia de Análisis sigue contando solo peligro');
+    assert.strictEqual(t._dashAlertsTotal(), 4, 'la insignia de Análisis y el icono de la app dan el mismo número que el KPI');
+    assert.strictEqual(t._acDangerCount(), 1, 'la cuenta de solo peligro sigue disponible');
     assert.ok(!html.includes("switchView('analytics')\" title=\"Ver analítica\""), 'el clic ya no lleva a Analítica');
 });
 

@@ -43,10 +43,11 @@ function _dashAlertsValid(rec) {
 function _dashAlertsFirstName(name) { return String(name || '').split(' ')[0]; }
 
 // ── 0. Regla ÚNICA de «alerta A:C» ───────────────────────────────────────────
-// La usan el panel de avisos, el KPI «alertas A:C», la insignia de Análisis, el icono de la app y
-// la notificación al guardar una sesión, para que el número sea el mismo en todas partes:
-//   · alerta = jugadora en PELIGRO (ratio por encima de su umbral «alto»); la precaución se ve en
-//     la tabla y en la lista de avisos, pero no cuenta como alerta;
+// La usan el panel de alertas, el KPI de Inicio, la insignia de Análisis, el icono de la app y
+// la notificación al guardar una sesión, para clasificar a cada jugadora igual en todas partes:
+//   · peligro = ratio por encima de su umbral «alto»; precaución = por encima del «óptimo». El KPI, la insignia
+//     y el icono cuentan TODAS las alertas (peligro y precaución, tendencias de wellness y RPE distinto) con
+//     _dashAlertsTotal(); la notificación al guardar una sesión avisa solo de las jugadoras en peligro;
 //   · se usan los umbrales individuales de cada jugadora (getPlayerThresholds);
 //   · no cuentan las que hoy no entrenan con el grupo (🏥) ni las de «datos insuficientes» (⚠️),
 //     porque en la tabla no muestran ratio.
@@ -68,7 +69,7 @@ RPETracker.prototype._acIsOutToday = function(playerId, dateStr) {
         && this.getPlayerParticipation(playerId, dateStr || _dashAlertsToday()) === 'out';
 };
 
-// Número de jugadoras en peligro A:C (el mismo en KPI, insignia, icono de la app y notificación)
+// Número de jugadoras en peligro A:C (solo peligro; el KPI, la insignia y el icono usan _dashAlertsTotal)
 RPETracker.prototype._acDangerCount = function() {
     const today = _dashAlertsToday();
     return this.activePlayers.filter(p =>
@@ -113,6 +114,39 @@ RPETracker.prototype._dashAlertsSeenInfo = function(keys) {
     const before = new Set(rec.keys.split(',').filter(Boolean));
     const fresh = keys.filter(k => !before.has(k));
     return { seen: fresh.length === 0, newCount: fresh.length, partial: fresh.length > 0 && fresh.length < keys.length };
+};
+
+// ── 2b. Entradas de las alertas y TOTAL ───────────────────────────────────────
+// Las entradas se construyen en UN solo sitio: las usan Inicio (KPI y panel) y la insignia de Análisis / el icono
+// de la app, así el número es el mismo en todas partes. `rows` (opcional) son las filas que Inicio ya tiene
+// calculadas ({ player, ratio, out }); sin ellas se calculan aquí con la misma regla: jugadoras activas que hoy
+// entrenan con el grupo y con ratio fiable (_acLevel).
+RPETracker.prototype._dashAlertsInputs = function(rows) {
+    const today = _dashAlertsToday();
+    const list = Array.isArray(rows) ? rows : (this.activePlayers || []).map(player => ({
+        player, ratio: this.calculateAcuteChronicRatio(player.id), out: this._acIsOutToday(player.id, today)
+    }));
+    const level = r => this._acLevel(r.ratio, r.player.id);
+    return {
+        dangerPlayers: list.filter(r => !r.out && level(r) === 'danger'),
+        warnPlayers:   list.filter(r => !r.out && level(r) === 'warn'),
+        trendAlerts: typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [],
+        rpeDiscrepancies: this._rpeDiscrepancies,
+        teamThreshold: 3
+    };
+};
+
+// Total de alertas de hoy = el número del KPI de Inicio (con o sin «visto»: marcarlas como vistas no cambia el número)
+RPETracker.prototype._dashAlertsTotal = function() {
+    return this._collectDashAlerts(this._dashAlertsInputs()).total;
+};
+
+// Refresca la insignia de Análisis y el icono de la app. Lo llaman escuchas de Firebase (RPE y wellness de jugadoras)
+// que pueden dispararse durante el arranque, con datos a medio cargar: un fallo aquí NUNCA debe cortar al escucha.
+RPETracker.prototype._refreshAlertBadges = function() {
+    if (typeof this._updateNavAlertBadge !== 'function') return;
+    try { this._updateNavAlertBadge(); }
+    catch (e) { if (window._devMode) console.warn('No se pudo refrescar la insignia de alertas:', e); }
 };
 
 // ── 3. Resumen para el KPI y panel de avisos ────────────────────────────────

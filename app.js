@@ -1298,9 +1298,9 @@ class RPETracker {
     // ========== BATCH 3: NAV ALERT BADGE ==========
 
     _updateNavAlertBadge() {
-        const alertCount = this._acDangerCount();   // regla única de alerta A:C (dashboard-alerts.js)
+        const alertCount = this._dashAlertsTotal();   // total de alertas: el mismo número que el KPI de Inicio (dashboard-alerts.js)
 
-        // Bottom-nav "Análisis" badge (A:C alerts)
+        // Bottom-nav "Análisis" badge (total de alertas, como el KPI de Inicio)
         const alertBadge = document.getElementById('bnAlertBadge');
         if (alertBadge) {
             alertBadge.textContent = alertCount;
@@ -1316,7 +1316,7 @@ class RPETracker {
             injBadge.style.display = total > 0 ? '' : 'none';
         }
 
-        // Update PWA app icon badge with count of critical A:C players
+        // Update PWA app icon badge with the same total of alerts
         PushNotifications.updateBadge(this);
     }
 }
@@ -1356,10 +1356,10 @@ const PushNotifications = {
         return alertCount;
     },
 
-    // Update PWA badge with count of players currently above critical threshold
+    // Update PWA badge with the total of alerts (el mismo número que el KPI de Inicio)
     updateBadge(tracker) {
         if (!tracker) return;
-        const count = tracker._acDangerCount();   // regla única de alerta A:C (dashboard-alerts.js)
+        const count = tracker._dashAlertsTotal();   // dashboard-alerts.js
         try {
             if ('setAppBadge' in navigator) {
                 if (count > 0) navigator.setAppBadge(count);
