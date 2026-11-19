@@ -97,19 +97,13 @@ RPETracker.prototype.renderDashboard = function() {
         else                                                     availGroups.ok.push(entry);
     });
 
-    // ── Alert banner data ──────────────────────────────────────
-    // Regla única de alerta A:C (dashboard-alerts.js → _acLevel): peligro = alerta; precaución = aviso suave
-    const alertPlayers = players.filter(p => !p.out && this._acLevel(p.ratio, p.player.id) === 'danger');
-    const warnPlayers  = players.filter(p => !p.out && this._acLevel(p.ratio, p.player.id) === 'warn');
     const pendingWellness = _pendingW.length;
 
-    // ── Avisos de Inicio (dashboard-alerts.js): viven dentro del KPI «alertas A:C» (chips + panel al pulsarlo).
+    // ── Alertas de Inicio (dashboard-alerts.js): viven dentro del KPI «alerta/alertas» (total + panel al pulsarlo).
+    //    Las entradas salen de _dashAlertsInputs(), la MISMA función que usan la insignia de Análisis y el icono de
+    //    la app (_dashAlertsTotal), con las filas de jugadoras que esta tabla ya tiene calculadas.
     //    Arriba de Inicio solo queda el recordatorio de planificación de los domingos. ──
-    const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
-    const alertsSum = this._dashAlertsSummary({
-        dangerPlayers: alertPlayers, warnPlayers, trendAlerts,
-        rpeDiscrepancies: this._rpeDiscrepancies, teamThreshold: 3
-    });
+    const alertsSum = this._dashAlertsSummary(this._dashAlertsInputs(players));
     const bannerHTML = this._renderDashPlanningReminder();
 
     // ── Match-day mode ─────────────────────────────────────────

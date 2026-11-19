@@ -1138,6 +1138,7 @@ RPETracker.prototype.handleEditSessionSubmit = function(e) {
     if (this._rpeDiscrepancies && this._rpeDiscrepancies.length) {
         this._rpeDiscrepancies = this._rpeDiscrepancies.filter(d => d.sessionId !== sessionId);
     }
+    if (typeof this._refreshAlertBadges === 'function') this._refreshAlertBadges();
     if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard();
 };
 
@@ -1352,6 +1353,8 @@ RPETracker.prototype._sessionTypeToTypeTimeOfDay = function(sessionType) {
 RPETracker.prototype._applyPlayerRpeEntries = function(entries) {
     this._playerRpeRaw = entries || [];
     this._rpeDiscrepancies = this._analyzePlayerRpe().discrepancies;
+    // El RPE distinto es una alerta más: se refrescan la insignia y el icono aunque no estemos en Inicio
+    if (typeof this._refreshAlertBadges === 'function') this._refreshAlertBadges();
     if (this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard();
 };
 
