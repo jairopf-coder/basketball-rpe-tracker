@@ -103,12 +103,14 @@ RPETracker.prototype.renderDashboard = function() {
     const warnPlayers  = players.filter(p => !p.out && this._acLevel(p.ratio, p.player.id) === 'warn');
     const pendingWellness = _pendingW.length;
 
-    // ── Avisos de Inicio: UNA línea plegable + recordatorio de planificación (dashboard-alerts.js) ──
+    // ── Avisos de Inicio (dashboard-alerts.js): viven dentro del KPI «alertas A:C» (chips + panel al pulsarlo).
+    //    Arriba de Inicio solo queda el recordatorio de planificación de los domingos. ──
     const trendAlerts = typeof this._wTrendAlerts === 'function' ? this._wTrendAlerts() : [];
-    const bannerHTML = this._renderDashAlerts({
+    const alertsSum = this._dashAlertsSummary({
         dangerPlayers: alertPlayers, warnPlayers, trendAlerts,
         rpeDiscrepancies: this._rpeDiscrepancies, teamThreshold: 3
-    }) + this._renderDashPlanningReminder();
+    });
+    const bannerHTML = this._renderDashPlanningReminder();
 
     // ── Match-day mode ─────────────────────────────────────────
     const todayKey = ['dom','lun','mar','mie','jue','vie','sab'][new Date().getDay()];
@@ -184,9 +186,10 @@ RPETracker.prototype.renderDashboard = function() {
                 <span class="db-kpi-val">${avgRPE7}</span>
                 <span class="db-kpi-lbl">RPE medio 7d</span>
             </div>
-            <div class="db-kpi db-kpi--${acAlertCount > 0 ? 'danger' : 'ok'}" onclick="window.rpeTracker?.switchView('analytics')" title="Ver analítica">
+            <div class="db-kpi db-kpi--alerts db-kpi--${acAlertCount > 0 ? 'danger' : 'ok'}${alertsSum.a.total && !alertsSum.info.seen ? ' db-kpi--unseen' : ''}" ${this._dashAlertsKpiAttrs(alertsSum, acAlertCount)}>
                 <span class="db-kpi-val">${acAlertCount}</span>
                 <span class="db-kpi-lbl">alertas A:C</span>
+                ${this._dashAlertsKpiExtra(alertsSum)}
             </div>
             <div class="db-kpi db-kpi--${availGroups.out.length > 0 ? 'warn' : 'ok'}" onclick="window.rpeTracker?.switchView('injury')" title="Ver lesiones">
                 <span class="db-kpi-val">${availGroups.ok.length}/${this.activePlayers.length}</span>
@@ -366,6 +369,7 @@ RPETracker.prototype.renderDashboard = function() {
         // Render comparativa de jugadoras (radar wellness)
         this._renderComparisonRadar();
         this._bindComparisonEvents();
+        this._syncDashAlertsPanel();   // si el panel de avisos estaba abierto, se refresca bajo el KPI nuevo
     });
 };
 

@@ -1,6 +1,7 @@
 // test/dash-alerts.test.js
-// Avisos de Inicio en una línea plegable (dashboard-alerts.js):
+// Avisos de Inicio dentro del KPI «alertas A:C» + panel al pulsarlo (dashboard-alerts.js):
 //  · qué avisos hay y su identificador · estados (nuevos / vistos hoy / algunos nuevos)
+//  · KPI: chips por tipo, punto de «sin ver», accesible con teclado · panel: lista, abrir/cerrar, Esc, hoja en móvil
 //  · «Marcar como visto por hoy»: se guarda en el dispositivo y en Firebase, y se puede volver a ver la lista
 //  · sincronización: lo marcado en otro dispositivo llega sin recargar; sin conexión no rompe nada
 //  · escape de nombres y de ids · recordatorio de planificación (solo domingos)
@@ -37,15 +38,29 @@ function makeDB(opts = {}) {
     };
 }
 
-function makeEnv({ uid = 'u1', db = makeDB(), ls = {} } = {}) {
+function makeEnv({ uid = 'u1', db = makeDB(), ls = {}, kpi = true, vw = 1280, vh = 800 } = {}) {
     const store = Object.assign({}, ls);
-    const el = { cls: new Set(), attrs: {}, classList: { toggle(c, on) { on ? el.cls.add(c) : el.cls.delete(c); } },
-        querySelector: () => ({ setAttribute(k, v) { el.attrs[k] = v; } }) };
+    // DOM mínimo: elementos «en pantalla» por id, con foco, estilos, atributos y su rectángulo
+    const mkEl = id => ({ id, style: {}, attrs: {}, innerHTML: '', focused: 0, rect: { left: 300, right: 500, top: 100, bottom: 180 },
+        setAttribute(k, v) { this.attrs[k] = v; }, focus() { this.focused++; }, getBoundingClientRect() { return this.rect; } });
+    const els = {};
+    if (kpi) els.dashAlertsKpi = mkEl('dashAlertsKpi');
+    const pop = mkEl('dashAlertsPop');            // el panel va dentro de #dashAlertsLayer: existe mientras esa capa exista
+    const handlers = { document: {}, window: {} };
+    const add = (bag, ev, cb) => { (bag[ev] = bag[ev] || []).push(cb); };
+    const win = { innerWidth: vw, innerHeight: vh, firebaseAuth: uid ? { currentUser: { uid } } : { currentUser: null }, firebaseDB: db,
+        addEventListener: (ev, cb) => add(handlers.window, ev, cb) };
+    const doc = {
+        getElementById: id => (id === 'dashAlertsPop' ? (els.dashAlertsLayer ? pop : null) : (els[id] || null)),
+        addEventListener: (ev, cb) => add(handlers.document, ev, cb),
+        createElement: () => { const e = mkEl(''); e.remove = function() { delete els[this.id]; }; return e; },
+        body: { appendChild(e) { els[e.id] = e; } },
+        head: { appendChild() {} },
+    };
     const ctx = vm.createContext({
         console: { log() {}, warn() {}, error() {} }, Date: FakeDate, Math, JSON, Set, Object, Array, Number, String, parseInt, parseFloat, isNaN, isFinite, Promise, Map,
         localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
-        document: { getElementById: id => (id === 'dashAlerts' ? el : null), addEventListener() {}, createElement: () => ({ style: {} }), head: { appendChild() {} } },
-        window: { firebaseAuth: uid ? { currentUser: { uid } } : { currentUser: null }, firebaseDB: db },
+        document: doc, window: win,
     });
     const sec = fs.readFileSync(path.join(ROOT, 'security.js'), 'utf8');
     vm.runInContext(sec + '\n;globalThis.esc = esc;', ctx);       // esc() REAL
@@ -55,7 +70,10 @@ function makeEnv({ uid = 'u1', db = makeDB(), ls = {} } = {}) {
     const t = vm.runInContext('new RPETracker()', ctx);
     t.renders = 0; t.currentView = 'dashboard';
     t.renderDashboard = function() { this.renders++; };
-    return { t, db, store, el, ctx };
+    // Lo que se ve al abrir el panel: chips del KPI + contenido del panel (resumen y panel salen de la misma cuenta)
+    t._viewDashAlerts = function(d) { const sum = this._dashAlertsSummary(d); return this._dashAlertsKpiExtra(sum) + this._dashAlertsPanelHtml(); };
+    const emit = (where, ev, arg) => (handlers[where][ev] || []).forEach(cb => cb(arg));
+    return { t, db, store, ctx, els, pop, win, handlers, emit, kpi: els.dashAlertsKpi };
 }
 
 const P = (id, name) => ({ player: { id, name } });
@@ -78,42 +96,186 @@ test('con menos de 3 en peligro no hay aviso de equipo', () => {
     const d = DATA(); d.dangerPlayers = d.dangerPlayers.slice(0, 2);
     assert.strictEqual(makeEnv().t._collectDashAlerts(d).team, false);
 });
-test('sin avisos no se pinta nada, y datos raros (no-listas) no rompen', () => {
+test('sin avisos no se pintan chips, y datos raros (no-listas) no rompen', () => {
     const { t } = makeEnv();
-    assert.strictEqual(t._renderDashAlerts({ dangerPlayers: [], warnPlayers: [], trendAlerts: [], rpeDiscrepancies: [] }), '');
-    assert.doesNotThrow(() => t._renderDashAlerts({ dangerPlayers: null, warnPlayers: undefined, trendAlerts: [], rpeDiscrepancies: () => [] }));
-    assert.strictEqual(t._renderDashAlerts({ rpeDiscrepancies: () => [] }), '');
+    const s0 = t._dashAlertsSummary({ dangerPlayers: [], warnPlayers: [], trendAlerts: [], rpeDiscrepancies: [] });
+    assert.strictEqual(s0.a.total, 0); assert.strictEqual(t._dashAlertsKpiExtra(s0), '');
+    assert.doesNotThrow(() => t._dashAlertsSummary({ dangerPlayers: null, warnPlayers: undefined, trendAlerts: [], rpeDiscrepancies: () => [] }));
+    assert.strictEqual(t._dashAlertsSummary({ rpeDiscrepancies: () => [] }).a.total, 0);
+    assert.doesNotThrow(() => t._dashAlertsSummary());
 });
 
-console.log('\nLínea plegable');
-test('por defecto: plegada, «N avisos» con chips por tipo (Peligro, Precaución, Wellness, RPE) y botón «Marcar como visto por hoy»', () => {
-    const html = makeEnv().t._renderDashAlerts(DATA());
-    assert.ok(html.includes('6 avisos'));
-    assert.ok(/Peligro <\/span>3/.test(html) && /Precaución <\/span>1/.test(html) && html.includes('Wellness 1') && html.includes('RPE 1'));
-    assert.ok(html.includes('aria-expanded="false"') && !html.includes('is-open'));
-    assert.ok(html.includes('Marcar como visto por hoy') && !html.includes('db-alerts--seen'));
+console.log('\nKPI «alertas A:C»: chips por tipo, estado y teclado');
+test('chips solo de lo que NO es peligro (el peligro es el número grande): Prec., Well. y RPE', () => {
+    const { t } = makeEnv();
+    const x = t._dashAlertsKpiExtra(t._dashAlertsSummary(DATA()));
+    assert.ok(/Prec\. <\/span>1/.test(x) && /Well\. <\/span>1/.test(x) && /RPE <\/span>1/.test(x), x);
+    assert.ok(!/Peligro/.test(x) && x.includes('wh-warn'));
+    assert.ok(x.includes('title="Jugadoras en precaución A:C"') && x.includes('title="Tendencias de wellness"'));
 });
-test('un solo aviso dice «1 aviso»', () => {
-    const html = makeEnv().t._renderDashAlerts({ dangerPlayers: [], warnPlayers: [P('p4', 'Sofía')], trendAlerts: [], rpeDiscrepancies: [] });
-    assert.ok(html.includes('>1 aviso<'));
+test('solo aparecen los tipos que existen; con solo peligro no hay chips', () => {
+    const { t } = makeEnv();
+    const only = (o) => t._dashAlertsKpiExtra(t._dashAlertsSummary(Object.assign({ dangerPlayers: [], warnPlayers: [], trendAlerts: [], rpeDiscrepancies: [] }, o)));
+    const w = only({ warnPlayers: [P('p4', 'Sofía'), P('p5', 'Noa')] });
+    assert.ok(/Prec\. <\/span>2/.test(w) && !/Well\.|RPE/.test(w));
+    assert.strictEqual(only({ dangerPlayers: [P('p1', 'Marta')] }), '');
 });
-test('la lista desplegable contiene todos los avisos con sus botones', () => {
-    const html = makeEnv().t._renderDashAlerts(DATA());
-    ['Marta, Lucía, Alba', 'Sofía', 'Ana', 'Sueño deficiente', 'Irene', 'tú: 6, ella: 8', 'Ver detalle', 'Revisar'].forEach(x => assert.ok(html.includes(x), 'falta ' + x));
+test('ya vistos hoy: una sola línea «✓ vistos hoy» y ningún chip (aunque solo haya peligro)', () => {
+    const { t } = makeEnv();
+    t._dashAlertsSummary(DATA()); t.markDashAlertsSeen();
+    assert.strictEqual(t._dashAlertsKpiExtra(t._dashAlertsSummary(DATA())), '<span class="db-kpi-seen">✓ vistos hoy</span>');
+    const e2 = makeEnv(); const d = { dangerPlayers: [P('p1', 'Marta')], warnPlayers: [], trendAlerts: [], rpeDiscrepancies: [] };
+    e2.t._dashAlertsSummary(d); e2.t.markDashAlertsSeen();
+    assert.ok(e2.t._dashAlertsKpiExtra(e2.t._dashAlertsSummary(d)).includes('vistos hoy'));
 });
-test('desplegar/plegar cambia la clase y aria-expanded sin repintar Inicio, y el estado se recuerda al repintar', () => {
-    const { t, el } = makeEnv();
+test('atributos del KPI: foco, rol de botón, panel asociado y nombre accesible con las cifras', () => {
+    const { t } = makeEnv();
+    const sum = t._dashAlertsSummary(DATA());
+    const at = t._dashAlertsKpiAttrs(sum, 3);
+    ['id="dashAlertsKpi"', 'role="button"', 'tabindex="0"', 'aria-haspopup="dialog"', 'aria-expanded="false"',
+     'aria-label="3 alertas A:C, 6 avisos hoy. Abrir los avisos"', 'onclick="window.rpeTracker?.toggleDashAlerts()"',
+     'onkeydown="window.rpeTracker?.dashAlertsKpiKey(event)"'].forEach(x => assert.ok(at.includes(x), 'falta ' + x + ' en ' + at));
+    assert.ok(t._dashAlertsKpiAttrs(sum, 1).includes('1 alerta A:C,'));
+    assert.ok(t._dashAlertsKpiAttrs(t._dashAlertsSummary({}), 0).includes('0 alertas A:C, sin avisos hoy'));
+    t._dashAlertsOpen = true; assert.ok(t._dashAlertsKpiAttrs(sum, 3).includes('aria-expanded="true"'));
+    t._dashAlertsOpen = false; t._dashAlertsSummary(DATA()); t.markDashAlertsSeen();
+    assert.ok(t._dashAlertsKpiAttrs(t._dashAlertsSummary(DATA()), 3).includes('(vistos)'));
+});
+test('Enter y espacio abren y cierran el panel (y no hacen scroll); otras teclas, nada', () => {
+    const { t } = makeEnv(); t._dashAlertsSummary(DATA());
+    let prevented = 0; const ev = k => ({ key: k, preventDefault() { prevented++; } });
+    t.dashAlertsKpiKey(ev('Enter')); assert.strictEqual(t._dashAlertsOpen, true);
+    t.dashAlertsKpiKey(ev(' ')); assert.strictEqual(t._dashAlertsOpen, false);
+    t.dashAlertsKpiKey(ev('a')); t.dashAlertsKpiKey(ev('Tab')); t.dashAlertsKpiKey(null);
+    assert.strictEqual(t._dashAlertsOpen, false); assert.strictEqual(prevented, 2);
+});
+
+console.log('\nPanel de avisos: contenido');
+test('título: «N avisos», «1 aviso», «Avisos de hoy» (sin avisos) y «· N nuevos» cuando solo algunos son nuevos', () => {
+    const { t } = makeEnv();
+    const title = d => { t._dashAlertsSummary(d); return /db-alerts-title">([^<]*)</.exec(t._dashAlertsPanelHtml())[1]; };
+    assert.strictEqual(title(DATA()), '6 avisos');
+    assert.strictEqual(title({ warnPlayers: [P('p4', 'Sofía')] }), '1 aviso');
+    assert.strictEqual(title({}), 'Avisos de hoy');
+    t._dashAlertsSummary(DATA()); t.markDashAlertsSeen();
+    const d = DATA(); d.warnPlayers.push(P('p9', 'Noa'));
+    assert.strictEqual(title(d), '7 avisos · 1 nuevo');
+    d.warnPlayers.push(P('p8', 'Eva')); assert.strictEqual(title(d), '8 avisos · 2 nuevos');
+});
+test('el panel es un diálogo con todos los avisos, sus botones, «Marcar como visto por hoy» y «Ver analítica»', () => {
+    const { t } = makeEnv();
+    const html = t._viewDashAlerts(DATA());
+    assert.ok(html.includes('role="dialog"') && html.includes('aria-label="Avisos de hoy"') && html.includes('id="dashAlertsPop"'));
+    ['Marta, Lucía, Alba', 'Sofía', 'Ana', 'Sueño deficiente', 'Irene', 'tú: 6, ella: 8', 'Ver detalle', 'Revisar', 'Marcar como visto por hoy', 'Ver analítica', 'aria-label="Cerrar"'].forEach(x =>
+        assert.ok(html.includes(x), 'falta ' + x));
+});
+test('los botones de una fila cierran el panel antes de actuar; la × cierra devolviendo el foco', () => {
+    const { t } = makeEnv();
+    const html = t._viewDashAlerts(DATA());
+    assert.ok(html.includes('onclick="window.rpeTracker?.closeDashAlerts();window.rpeTracker?.openPreSessionModal()"'));
+    assert.ok(html.includes('onclick="window.rpeTracker?.closeDashAlerts();window.rpeTracker?.showSessionDetail(this.dataset.sessionId)"'));
+    assert.ok(html.includes("onclick=\"window.rpeTracker?.closeDashAlerts();window.rpeTracker?.switchView('analytics')\""));
+    assert.ok(html.includes('class="db-alerts-x" aria-label="Cerrar" onclick="window.rpeTracker?.closeDashAlerts(true)"'));
+});
+test('sin avisos: «Sin avisos hoy ✓», sin botón de visto y con «Ver analítica»', () => {
+    const { t } = makeEnv(); t._dashAlertsSummary({});
+    const html = t._dashAlertsPanelHtml();
+    assert.ok(html.includes('Sin avisos hoy ✓') && html.includes('Ver analítica') && !html.includes('Marcar como visto'));
+});
+
+console.log('\nPanel de avisos: abrir, cerrar y colocar');
+test('pulsar el KPI abre el panel en <body> (con fondo para cerrar al tocar fuera), marca aria-expanded y da el foco; Inicio no se repinta', () => {
+    const { t, els, kpi, pop } = makeEnv(); t._dashAlertsSummary(DATA());
     t.toggleDashAlerts();
-    assert.ok(el.cls.has('is-open')); assert.strictEqual(el.attrs['aria-expanded'], 'true'); assert.strictEqual(t.renders, 0);
-    assert.ok(t._renderDashAlerts(DATA()).includes('is-open'), 'abierta tras repintar');
-    t.toggleDashAlerts();
-    assert.ok(!el.cls.has('is-open')); assert.ok(!t._renderDashAlerts(DATA()).includes('is-open'));
+    assert.strictEqual(t._dashAlertsOpen, true);
+    const layer = els.dashAlertsLayer;
+    assert.ok(layer && layer.innerHTML.includes('db-alerts-backdrop') && layer.innerHTML.includes('id="dashAlertsPop"'));
+    assert.ok(layer.innerHTML.includes('onclick="window.rpeTracker?.closeDashAlerts()"'), 'el fondo cierra');
+    assert.strictEqual(kpi.attrs['aria-expanded'], 'true'); assert.strictEqual(pop.focused, 1); assert.strictEqual(t.renders, 0);
+});
+test('pulsarlo otra vez lo cierra: se quita la capa y NO se roba el foco', () => {
+    const { t, els, kpi } = makeEnv(); t._dashAlertsSummary(DATA());
+    t.toggleDashAlerts(); t.toggleDashAlerts();
+    assert.strictEqual(t._dashAlertsOpen, false); assert.ok(!els.dashAlertsLayer);
+    assert.strictEqual(kpi.attrs['aria-expanded'], 'false'); assert.strictEqual(kpi.focused, 0);
+});
+test('abrir dos veces no duplica la capa (se reutiliza)', () => {
+    const { t, els } = makeEnv(); t._dashAlertsSummary(DATA());
+    t.openDashAlerts(); const first = els.dashAlertsLayer; t.openDashAlerts();
+    assert.strictEqual(els.dashAlertsLayer, first);
+});
+test('Esc cierra y devuelve el foco al KPI; con el panel cerrado o con otra tecla no hace nada', () => {
+    const { t, kpi, emit, els } = makeEnv(); t._dashAlertsSummary(DATA());
+    emit('document', 'keydown', { key: 'Escape' });            // aún no hay oyente: no rompe
+    t.openDashAlerts();
+    emit('document', 'keydown', { key: 'Enter' }); assert.strictEqual(t._dashAlertsOpen, true);
+    emit('document', 'keydown', { key: 'Escape' });
+    assert.strictEqual(t._dashAlertsOpen, false); assert.ok(!els.dashAlertsLayer); assert.strictEqual(kpi.focused, 1);
+    emit('document', 'keydown', { key: 'Escape' }); assert.strictEqual(kpi.focused, 1);
+});
+test('los oyentes de teclado y ventana se registran UNA sola vez aunque se abra muchas veces', () => {
+    const { t, handlers } = makeEnv(); t._dashAlertsSummary(DATA());
+    for (let i = 0; i < 4; i++) { t.openDashAlerts(); t.closeDashAlerts(); }
+    assert.strictEqual(handlers.document.keydown.length, 1);
+    assert.strictEqual(handlers.window.resize.length, 1); assert.strictEqual(handlers.window.scroll.length, 1);
+});
+test('PC: el panel se ancla bajo el KPI; al hacer scroll o redimensionar se recoloca y con el panel cerrado no se toca nada', () => {
+    const { t, pop, kpi, emit } = makeEnv({ vw: 1280, vh: 800 }); t._dashAlertsSummary(DATA());
+    t.openDashAlerts();
+    assert.strictEqual(pop.style.left, '300px'); assert.strictEqual(pop.style.top, '188px');
+    assert.strictEqual(pop.style.width, '440px'); assert.strictEqual(pop.style.maxHeight, '596px');
+    kpi.rect = { left: 300, right: 500, top: 40, bottom: 120 }; emit('window', 'scroll');
+    assert.strictEqual(pop.style.top, '128px');
+    t.closeDashAlerts(); kpi.rect = { left: 10, right: 210, top: 0, bottom: 80 }; emit('window', 'resize');
+    assert.strictEqual(pop.style.top, '128px', 'cerrado: no se recoloca');
+});
+test('móvil (≤768px): es una hoja desde abajo; los estilos en línea de PC se limpian (los pone el CSS)', () => {
+    const { t, pop, win, emit } = makeEnv({ vw: 390, vh: 800 }); t._dashAlertsSummary(DATA());
+    pop.style.left = '300px'; pop.style.top = '9px'; pop.style.width = '440px'; pop.style.maxHeight = '5px';
+    t.openDashAlerts();
+    ['left', 'top', 'width', 'maxHeight'].forEach(k => assert.strictEqual(pop.style[k], '', k));
+    win.innerWidth = 1280; emit('window', 'resize');                 // girar el dispositivo: vuelve a anclarse
+    assert.strictEqual(pop.style.left, '300px');
+});
+test('colocación (función pura): borde derecho, borde inferior y límite entre móvil y PC', () => {
+    const { ctx } = makeEnv(); const place = vm.runInContext('_dashAlertsPlacement', ctx);
+    const r = (left, bottom) => ({ left, right: left + 200, top: bottom - 80, bottom });
+    same(place(r(300, 180), 390, 800), { sheet: true });
+    same(place(r(300, 180), 768, 800), { sheet: true });
+    same(place(r(300, 180), 769, 800).sheet, false);
+    same(place(r(300, 180), 1280, 800), { sheet: false, left: 300, top: 188, width: 440, maxHeight: 596 });
+    assert.strictEqual(place(r(1200, 180), 1280, 800).left, 832, 'no se sale por la derecha');
+    assert.strictEqual(place(r(-50, 180), 1280, 800).left, 8, 'ni por la izquierda');
+    const lowKpi = place(r(300, 590), 1280, 600);
+    assert.strictEqual(lowKpi.top, 440, 'si el KPI queda abajo, sube para tener sitio'); assert.strictEqual(lowKpi.maxHeight, 160);
+    assert.strictEqual(place(r(300, 180), 500 + 300, 800).width, 440);
+});
+test('repintar Inicio con el panel abierto: se refresca con los datos nuevos y se recoloca; cerrado no hace nada; sin KPI se cierra', () => {
+    const { t, els, pop, kpi } = makeEnv(); t._dashAlertsSummary(DATA());
+    t._syncDashAlertsPanel(); assert.ok(!els.dashAlertsLayer, 'cerrado: no crea nada');
+    t.openDashAlerts();
+    const d = DATA(); d.warnPlayers.push(P('p9', 'Noa')); t._dashAlertsSummary(d);
+    kpi.rect = { left: 600, right: 800, top: 100, bottom: 180 };
+    t._syncDashAlertsPanel();
+    assert.ok(els.dashAlertsLayer.innerHTML.includes('7 avisos') && els.dashAlertsLayer.innerHTML.includes('Sofía, Noa'));
+    assert.strictEqual(pop.style.left, '600px'); assert.strictEqual(t._dashAlertsOpen, true);
+    delete els.dashAlertsKpi; t._syncDashAlertsPanel();
+    assert.strictEqual(t._dashAlertsOpen, false); assert.ok(!els.dashAlertsLayer);
+});
+test('«Marcar como visto por hoy» cierra el panel y repinta Inicio', () => {
+    const { t, els } = makeEnv(); t._dashAlertsSummary(DATA());
+    t.openDashAlerts(); t.markDashAlertsSeen();
+    assert.strictEqual(t._dashAlertsOpen, false); assert.ok(!els.dashAlertsLayer); assert.strictEqual(t.renders, 1);
+});
+test('un KPI que aún no está en pantalla no rompe nada al abrir', () => {
+    const { t } = makeEnv({ kpi: false }); t._dashAlertsSummary(DATA());
+    assert.doesNotThrow(() => { t.openDashAlerts(); t.closeDashAlerts(true); });
 });
 
 console.log('\n«Marcar como visto por hoy»');
 test('guarda hoy + los identificadores ordenados en el dispositivo y en Firebase, y repinta', () => {
     const { t, db, store } = makeEnv();
-    t._renderDashAlerts(DATA());
+    t._viewDashAlerts(DATA());
     t.markDashAlertsSeen();
     const rec = { date: '2026-11-04', keys: [...KEYS].sort().join(',') };
     same(JSON.parse(store['basketballDashAlertsSeen_u1']), rec);
@@ -122,49 +284,49 @@ test('guarda hoy + los identificadores ordenados en el dispositivo y en Firebase
 });
 test('lo guardado no contiene nombres ni datos de wellness, solo identificadores', () => {
     const { t, store } = makeEnv();
-    t._renderDashAlerts(DATA()); t.markDashAlertsSeen();
+    t._viewDashAlerts(DATA()); t.markDashAlertsSeen();
     const raw = store['basketballDashAlertsSeen_u1'];
     ['Marta', 'Lucía', 'Sofía', 'Sueño', 'Irene'].forEach(n => assert.ok(!raw.includes(n), 'no debe guardar ' + n));
 });
 test('después: «Avisos vistos hoy: N», en gris, SIN botón, y la lista sigue disponible', () => {
     const { t } = makeEnv();
-    t._renderDashAlerts(DATA()); t.markDashAlertsSeen();
-    const html = t._renderDashAlerts(DATA());
-    assert.ok(html.includes('Avisos vistos hoy: 6') && html.includes('db-alerts--seen'));
+    t._viewDashAlerts(DATA()); t.markDashAlertsSeen();
+    const html = t._viewDashAlerts(DATA());
+    assert.ok(html.includes('Avisos vistos hoy: 6') && html.includes('db-alerts-pop--seen'));
     assert.ok(!html.includes('Marcar como visto'));
     ['Marta, Lucía, Alba', 'Sueño deficiente', 'Revisar'].forEach(x => assert.ok(html.includes(x), 'la lista debe poder verse: ' + x));
 });
 test('no desaparece «para siempre»: los avisos se recalculan, solo la marca se guarda', () => {
     const { t } = makeEnv();
-    t._renderDashAlerts(DATA()); t.markDashAlertsSeen();
+    t._viewDashAlerts(DATA()); t.markDashAlertsSeen();
     t._dashAlertsOpen = true;
-    assert.ok(t._renderDashAlerts(DATA()).includes('Sueño deficiente'));
+    assert.ok(t._viewDashAlerts(DATA()).includes('Sueño deficiente'));
 });
 test('si aparece un aviso NUEVO vuelve a destacarse: «7 avisos · 1 nuevo» y con botón', () => {
     const { t } = makeEnv();
-    t._renderDashAlerts(DATA()); t.markDashAlertsSeen();
+    t._viewDashAlerts(DATA()); t.markDashAlertsSeen();
     const d = DATA(); d.warnPlayers.push(P('p9', 'Noa'));
-    const html = t._renderDashAlerts(d);
-    assert.ok(html.includes('7 avisos · 1 nuevo') && !html.includes('db-alerts--seen') && html.includes('Marcar como visto'));
+    const html = t._viewDashAlerts(d);
+    assert.ok(html.includes('7 avisos · 1 nuevo') && !html.includes('db-alerts-pop--seen') && html.includes('Marcar como visto'));
 });
 test('si un aviso se resuelve (desaparece) NO se destaca de nuevo', () => {
     const { t } = makeEnv();
-    t._renderDashAlerts(DATA()); t.markDashAlertsSeen();
+    t._viewDashAlerts(DATA()); t.markDashAlertsSeen();
     const d = DATA(); d.dangerPlayers = d.dangerPlayers.slice(0, 1); d.rpeDiscrepancies = [];
-    assert.ok(t._renderDashAlerts(d).includes('Avisos vistos hoy: 3'));
+    assert.ok(t._viewDashAlerts(d).includes('Avisos vistos hoy: 3'));
 });
 test('al día siguiente vuelve a destacarse aunque sean los mismos avisos', () => {
     const { t } = makeEnv();
-    t._renderDashAlerts(DATA()); t.markDashAlertsSeen();
+    t._viewDashAlerts(DATA()); t.markDashAlertsSeen();
     NOW = new Date(2026, 10, 5, 9, 0);
     try {
-        const html = t._renderDashAlerts(DATA());
-        assert.ok(html.includes('6 avisos') && !html.includes('db-alerts--seen'));
+        const html = t._viewDashAlerts(DATA());
+        assert.ok(html.includes('6 avisos') && !html.includes('db-alerts-pop--seen'));
     } finally { NOW = new Date(2026, 10, 4, 10, 0); }
 });
 test('marcar sin avisos no hace nada', () => {
     const { t, db } = makeEnv();
-    t._renderDashAlerts({ dangerPlayers: [], warnPlayers: [], trendAlerts: [], rpeDiscrepancies: [] });
+    t._viewDashAlerts({ dangerPlayers: [], warnPlayers: [], trendAlerts: [], rpeDiscrepancies: [] });
     t.markDashAlertsSeen();
     assert.strictEqual(db.writes.length, 0); assert.strictEqual(t.renders, 0);
 });
@@ -173,78 +335,78 @@ console.log('\nSincronización entre dispositivos');
 test('la primera vez carga la marca guardada en el dispositivo y registra UN solo listener', () => {
     const rec = { date: '2026-11-04', keys: [...KEYS].sort().join(',') };
     const { t, db } = makeEnv({ ls: { basketballDashAlertsSeen_u1: JSON.stringify(rec) } });
-    assert.ok(t._renderDashAlerts(DATA()).includes('Avisos vistos hoy: 6'));
-    t._renderDashAlerts(DATA()); t._renderDashAlerts(DATA());
+    assert.ok(t._viewDashAlerts(DATA()).includes('Avisos vistos hoy: 6'));
+    t._viewDashAlerts(DATA()); t._viewDashAlerts(DATA());
     assert.deepStrictEqual(db.ons, ['staffAlertsSeen/u1']);
 });
 test('lo marcado en otro dispositivo llega sin recargar: se actualiza y Inicio se repinta', () => {
     const { t, db, store } = makeEnv();
-    t._renderDashAlerts(DATA());
+    t._viewDashAlerts(DATA());
     const rec = { date: '2026-11-04', keys: [...KEYS].sort().join(',') };
     db.emit('staffAlertsSeen/u1', rec);
-    assert.ok(t._renderDashAlerts(DATA()).includes('Avisos vistos hoy: 6'));
+    assert.ok(t._viewDashAlerts(DATA()).includes('Avisos vistos hoy: 6'));
     assert.strictEqual(t.renders, 1);
     same(JSON.parse(store['basketballDashAlertsSeen_u1']), rec);
 });
 test('el eco de la propia escritura no provoca un repintado extra', () => {
     const { t } = makeEnv();
-    t._renderDashAlerts(DATA()); t.markDashAlertsSeen();
+    t._viewDashAlerts(DATA()); t.markDashAlertsSeen();
     assert.strictEqual(t.renders, 1);   // solo el de markDashAlertsSeen, no uno más por el listener
 });
 test('si Inicio no está abierto, el cambio remoto no repinta pero sí se guarda', () => {
     const { t, db } = makeEnv();
-    t._renderDashAlerts(DATA()); t.currentView = 'wellness';
+    t._viewDashAlerts(DATA()); t.currentView = 'wellness';
     db.emit('staffAlertsSeen/u1', { date: '2026-11-04', keys: 'a' });
     assert.strictEqual(t.renders, 0); assert.strictEqual(t._dashAlertsSeen.keys, 'a');
 });
 test('datos corruptos en la nube se ignoran', () => {
     const { t, db } = makeEnv();
-    t._renderDashAlerts(DATA());
+    t._viewDashAlerts(DATA());
     [{ date: 5, keys: 'a' }, { date: '2026-11-04' }, 'texto', { date: '2026-11-04', keys: 'x'.repeat(4001) }].forEach(v => db.emit('staffAlertsSeen/u1', v));
     assert.ok(!t._dashAlertsSeen);
 });
 test('si la nube aún no tiene marca pero este dispositivo sí, se sube', () => {
     const rec = { date: '2026-11-04', keys: 'a,b' };
     const { t, db } = makeEnv({ ls: { basketballDashAlertsSeen_u1: JSON.stringify(rec) } });
-    t._renderDashAlerts(DATA());
+    t._viewDashAlerts(DATA());
     same(db.writes.find(w => w[0] === 'staffAlertsSeen/u1')[1], rec);
 });
 test('cada usuario tiene su propia marca (ruta con su uid)', () => {
     const a = makeEnv({ uid: 'uA' }), b = makeEnv({ uid: 'uB' });
-    a.t._renderDashAlerts(DATA()); a.t.markDashAlertsSeen();
-    b.t._renderDashAlerts(DATA());
+    a.t._viewDashAlerts(DATA()); a.t.markDashAlertsSeen();
+    b.t._viewDashAlerts(DATA());
     assert.ok(a.db.writes.every(w => w[0] === 'staffAlertsSeen/uA'));
-    assert.ok(b.t._renderDashAlerts(DATA()).includes('6 avisos'), 'la marca de uA no afecta a uB');
+    assert.ok(b.t._viewDashAlerts(DATA()).includes('6 avisos'), 'la marca de uA no afecta a uB');
 });
 test('sin conexión o con la escritura rechazada no rompe nada y la marca queda en el dispositivo', async () => {
     const { t, store } = makeEnv({ db: makeDB({ failWrites: true }) });
-    t._renderDashAlerts(DATA());
+    t._viewDashAlerts(DATA());
     assert.doesNotThrow(() => t.markDashAlertsSeen());
     await new Promise(r => setTimeout(r, 5));
     assert.ok(store['basketballDashAlertsSeen_u1']);
-    assert.ok(t._renderDashAlerts(DATA()).includes('Avisos vistos hoy'));
+    assert.ok(t._viewDashAlerts(DATA()).includes('Avisos vistos hoy'));
 });
 test('si Firebase deniega el permiso se sigue funcionando solo con el dispositivo', () => {
     const { t, db } = makeEnv();
-    t._renderDashAlerts(DATA());
+    t._viewDashAlerts(DATA());
     assert.doesNotThrow(() => db.listeners['staffAlertsSeen/u1'].errCb(new Error('permission_denied')));
     t.markDashAlertsSeen();
-    assert.ok(t._renderDashAlerts(DATA()).includes('Avisos vistos hoy'));
+    assert.ok(t._viewDashAlerts(DATA()).includes('Avisos vistos hoy'));
 });
 test('sin usuario identificado (o sin Firebase) la línea se pinta y marcar no lanza errores', () => {
     const noUser = makeEnv({ uid: null });
-    assert.ok(noUser.t._renderDashAlerts(DATA()).includes('6 avisos'));
+    assert.ok(noUser.t._viewDashAlerts(DATA()).includes('6 avisos'));
     assert.doesNotThrow(() => noUser.t.markDashAlertsSeen());
     assert.strictEqual(noUser.db.writes.length, 0);
     const noDb = makeEnv({ db: null });
-    assert.doesNotThrow(() => { noDb.t._renderDashAlerts(DATA()); noDb.t.markDashAlertsSeen(); });
+    assert.doesNotThrow(() => { noDb.t._viewDashAlerts(DATA()); noDb.t.markDashAlertsSeen(); });
 });
 
 console.log('\nSeguridad: escape de nombres e ids');
 test('nombres, mensajes e ids con HTML o comillas no producen código ejecutable', () => {
     const EVIL = '<img src=x onerror=alert(1)>';
     const { t } = makeEnv();
-    const html = t._renderDashAlerts({
+    const html = t._viewDashAlerts({
         dangerPlayers: [P('p1', EVIL)], warnPlayers: [P('p2', '"><script>alert(2)</script>')],
         trendAlerts: [{ kind: 'sleep', playerId: 'p3', name: EVIL, message: EVIL }],
         rpeDiscrepancies: [{ sessionId: `s1"');alert(3);('`, playerName: EVIL, staffRpe: EVIL, playerRpe: 8, date: EVIL }],
@@ -254,7 +416,7 @@ test('nombres, mensajes e ids con HTML o comillas no producen código ejecutable
     const attr = /data-session-id="([^"]*)"/.exec(html);
     assert.ok(attr && !/['"<>]/.test(attr[1]), 'el id va escapado dentro de su atributo (sin comillas ni < >)');
     const onclicks = html.match(/onclick="[^"]*"/g) || [];
-    onclicks.forEach(o => assert.ok(/^onclick="window\.rpeTracker\?\.\w+\((this\.dataset\.sessionId)?\)"$/.test(o), 'onclick inesperado: ' + o));
+    onclicks.forEach(o => assert.ok(/^onclick="(window\.rpeTracker\?\.\w+\((this\.dataset\.sessionId|'analytics'|true)?\);?)+"$/.test(o), 'onclick inesperado: ' + o));
     assert.ok(html.includes('data-session-id="s1&quot;'), 'el id va en un atributo escapado');
 });
 
@@ -326,9 +488,17 @@ test('el KPI, la insignia de Análisis, el icono de la app y la notificación us
 });
 
 console.log('\nCableado');
-test('las franjas antiguas ya no existen en el renderer y el módulo está en index.html y sw.js', () => {
+test('la barra de avisos ya no existe: el renderer usa el KPI + panel y el recordatorio; el módulo está en index.html y sw.js', () => {
     const r = fs.readFileSync(path.join(ROOT, 'dashboard-renderer.js'), 'utf8');
-    assert.ok(!r.includes('db-alert-banner') && r.includes('_renderDashAlerts') && r.includes('_renderDashPlanningReminder'));
+    assert.ok(!r.includes('db-alert-banner') && !r.includes('_renderDashAlerts('), 'no debe quedar la barra');
+    assert.ok(r.includes('_dashAlertsSummary(') && r.includes('_dashAlertsKpiAttrs(') && r.includes('_dashAlertsKpiExtra(')
+        && r.includes('_renderDashPlanningReminder') && r.includes('_syncDashAlertsPanel()'));
+    assert.ok(/<div class="db-kpi db-kpi--alerts[^`]*\$\{this\._dashAlertsKpiAttrs\(alertsSum, acAlertCount\)\}>\s*<span class="db-kpi-val">\$\{acAlertCount\}<\/span>/.test(r),
+        'el número grande del KPI sigue siendo acAlertCount (la regla única de peligro A:C)');
+    const css = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
+    ['.db-alerts-bar', '.db-alerts-toggle', '.db-alerts-panel', '.db-alerts.is-open', '.db-alerts-chips'].forEach(c => assert.ok(!css.includes(c), 'CSS de la barra sin borrar: ' + c));
+    ['.db-kpi-chips', '.db-kpi--unseen::after', '.db-alerts-pop', '.db-alerts-backdrop'].forEach(c => assert.ok(css.includes(c), 'falta ' + c));
+    assert.ok(/@media \(max-width: 768px\) \{\s*\.db-alerts-backdrop \{ background: rgba\(0, 0, 0, 0\.4\); \}\s*\.db-alerts-pop \{[^}]*bottom: 0;/.test(css), 'la hoja de móvil');
     assert.ok(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').includes('<script src="dashboard-alerts.js"></script>'));
     assert.ok(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8').includes("'dashboard-alerts.js'"));
 });
