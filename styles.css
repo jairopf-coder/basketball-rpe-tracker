@@ -8900,15 +8900,12 @@ details[open] .ewma-toggle-hint { display: none; }
 
 /* ========== READINESS SCORE — BLOQUE C ========== */
 
-/* ── Avisos de Inicio: dentro del KPI «alertas A:C» + panel (dashboard-alerts.js) ──────────────
-   El KPI muestra el número de jugadoras en peligro y chips con las demás alertas; al pulsarlo se abre un
+/* ── Alertas de Inicio: KPI de dos líneas (número + «alerta/alertas») + panel (dashboard-alerts.js) ──────
+   El KPI mide lo mismo que los demás (sin líneas extra); al pulsarlo se abre un
    panel (PC: anclado bajo el KPI · ≤768px: hoja desde abajo) con la lista. El panel vive en <body>
    (#dashAlertsLayer) porque la fila de KPIs recorta lo que sobresale. Colores con variables del tema. */
 .db-kpi--alerts { position: relative; }
 .db-kpi--alerts:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-.db-kpi-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.2rem; max-width: 100%; margin-top: 1px; }
-.db-kpi-chips .db-alerts-chip { font-size: 0.6rem; padding: 0 6px; }
-.db-kpi-seen { font-size: 0.6rem; color: var(--text-muted); white-space: nowrap; }
 /* Punto naranja en la esquina: hay avisos sin ver */
 .db-kpi--unseen::after {
     content: '';
@@ -8919,14 +8916,6 @@ details[open] .ewma-toggle-hint { display: none; }
     height: 8px;
     border-radius: 50%;
     background: var(--primary);
-}
-.db-alerts-chip {
-    font-size: 0.72rem;
-    padding: 1px 8px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    white-space: nowrap;
-    color: var(--text-secondary);
 }
 /* Panel de avisos */
 .db-alerts-backdrop { position: fixed; inset: 0; z-index: 949; background: transparent; }
@@ -9015,10 +9004,6 @@ details[open] .ewma-toggle-hint { display: none; }
         border-bottom: none;
         padding-bottom: env(safe-area-inset-bottom, 0px);
     }
-}
-/* Móvil estrecho: los chips quedan en «● 1 · 1 · 1» (sin la palabra) para caber en el KPI */
-@media (max-width: 480px) {
-    .db-kpi-chips .db-alerts-chip-txt { display: none; }
 }
 /* Recordatorio de planificación (solo domingos): una tarea, no un aviso */
 .db-alerts-plan {

@@ -1,8 +1,8 @@
 // test/dash-kpi.test.js
 // ============================================================
-// Integración: renderDashboard() REAL pinta el KPI «alertas A:C» con los avisos dentro
-// (número de peligro + chips + punto de «sin ver») y YA NO pinta la barra de avisos.
-// El panel que se abre al pulsar el KPI sale de la misma cuenta que el KPI.
+// Integración: renderDashboard() REAL pinta un KPI de DOS líneas (total de alertas + «alerta/alertas»),
+// como el de wellness, y YA NO pinta la barra de avisos. El desglose sale solo al pulsarlo (panel).
+// El panel sale de la misma cuenta que el KPI.
 //
 // Ejecutar con:  node test/dash-kpi.test.js
 // ============================================================
@@ -71,7 +71,7 @@ function make({ ratios = RATIOS, trend = true, rpe = true } = {}) {
     return t;
 }
 const paint = t => { dash.innerHTML = ''; t.renderDashboard(); return dash.innerHTML; };
-const kpiTile = html => (/<div class="db-kpi db-kpi--alerts[\s\S]*?<span class="db-kpi-lbl">alertas A:C<\/span>[\s\S]*?<\/div>/.exec(html) || [''])[0];
+const kpiTile = html => (/<div class="db-kpi db-kpi--alerts[\s\S]*?<span class="db-kpi-lbl">alertas?<\/span>[\s\S]*?<\/div>/.exec(html) || [''])[0];
 
 let passed = 0, failed = 0;
 const queue = [];
@@ -83,45 +83,54 @@ test('Inicio ya NO pinta la barra de avisos (ni su contenedor, ni la flecha, ni 
         assert.ok(!html.includes(x), 'no debe quedar ' + x));
 });
 
-test('el KPI es un botón accesible con id propio, y el número grande es el de jugadoras en PELIGRO', () => {
+test('el KPI es un botón accesible con id propio y su número es el TOTAL de alertas (peligro + precaución + wellness + RPE)', () => {
     const t = make();
     const html = paint(t);
     assert.strictEqual((html.match(/id="dashAlertsKpi"/g) || []).length, 1);
     const tile = kpiTile(html);
     assert.ok(/class="db-kpi db-kpi--alerts db-kpi--danger db-kpi--unseen" id="dashAlertsKpi" role="button" tabindex="0"/.test(tile), tile);
     assert.ok(tile.includes('onclick="window.rpeTracker?.toggleDashAlerts()"'));
-    assert.ok(tile.includes('<span class="db-kpi-val">1</span>'), 'p1 es la única en peligro');
-    assert.strictEqual(t._acDangerCount(), 1, 'misma cuenta que la insignia y el icono');
+    assert.ok(tile.includes('<span class="db-kpi-val">4</span>'), 'p1 peligro + p2 precaución + 1 wellness + 1 RPE = 4');
+    assert.ok(tile.includes('<span class="db-kpi-lbl">alertas</span>'));
+    assert.strictEqual(t._acDangerCount(), 1, 'la insignia de Análisis sigue contando solo peligro');
     assert.ok(!html.includes("switchView('analytics')\" title=\"Ver analítica\""), 'el clic ya no lleva a Analítica');
 });
 
-test('debajo del número salen los chips de lo demás: Prec. 1, Well. 1, RPE 1 (y ninguno de peligro)', () => {
+test('el KPI son DOS líneas, como el de wellness: ni chips, ni «A:C», ni línea de «vistos»', () => {
     const tile = kpiTile(paint(make()));
-    assert.ok(/Prec\. <\/span>1/.test(tile) && /Well\. <\/span>1/.test(tile) && /RPE <\/span>1/.test(tile), tile);
-    assert.ok(!/Peligro/.test(tile));
-    assert.ok(tile.includes('aria-label="1 alerta A:C, 4 avisos hoy. Abrir los avisos"'), tile);
+    assert.strictEqual((tile.match(/<span class="db-kpi-/g) || []).length, 2, tile);
+    ['db-kpi-chips', 'db-alerts-chip', 'db-kpi-seen', 'A:C</span>', 'Prec.', 'Well.', 'RPE </span>'].forEach(x => assert.ok(!tile.includes(x), 'no debe haber ' + x));
+    assert.ok(tile.includes('title="1 en peligro · 1 en precaución · 1 de wellness · 1 RPE distinto"'), 'el desglose va en el tooltip');
+    assert.ok(tile.includes('aria-label="4 alertas hoy: 1 en peligro · 1 en precaución · 1 de wellness · 1 RPE distinto. Abrir las alertas"'), tile);
 });
 
-test('sin ningún aviso: KPI verde con 0, sin chips ni punto, y el panel dirá «Sin avisos hoy»', () => {
+test('singular y color: con una sola alerta que no es de peligro, «1 alerta» en naranja', () => {
+    const t = make({ ratios: { p1: '1.00', p2: '1.40', p3: '1.00', p4: '1.00' }, trend: false, rpe: false });
+    const tile = kpiTile(paint(t));
+    assert.ok(tile.includes('db-kpi--warn') && tile.includes('<span class="db-kpi-val">1</span>') && tile.includes('<span class="db-kpi-lbl">alerta</span>'), tile);
+});
+
+test('sin ninguna alerta: KPI verde con «0 alertas», sin punto, y el panel dirá «Sin alertas hoy»', () => {
     const t = make({ ratios: { p1: '1.00', p2: '1.00', p3: '1.00', p4: '1.00' }, trend: false, rpe: false });
     const tile = kpiTile(paint(t));
-    assert.ok(tile.includes('db-kpi--ok') && !tile.includes('db-kpi--unseen') && tile.includes('<span class="db-kpi-val">0</span>'), tile);
-    assert.ok(!tile.includes('db-kpi-chips') && !tile.includes('vistos'));
-    assert.ok(tile.includes('sin avisos hoy'));
+    assert.ok(tile.includes('db-kpi--ok') && !tile.includes('db-kpi--unseen'), tile);
+    assert.ok(tile.includes('<span class="db-kpi-val">0</span>') && tile.includes('<span class="db-kpi-lbl">alertas</span>'));
+    assert.ok(tile.includes('aria-label="Sin alertas hoy. Abrir las alertas"'));
     t.openDashAlerts();
-    assert.ok(els.dashAlertsLayer.innerHTML.includes('Sin avisos hoy ✓'));
+    assert.ok(els.dashAlertsLayer.innerHTML.includes('Sin alertas hoy ✓'));
     t.closeDashAlerts();
 });
 
-test('al marcar «visto» y repintar: el punto desaparece y los chips pasan a «✓ vistos hoy»; el número no cambia', () => {
+test('al marcar «visto» y repintar: el punto desaparece, el número y el color no cambian y el KPI sigue con dos líneas', () => {
     const t = make();
     paint(t);
     t.renderDashboard = function() {};            // markDashAlertsSeen repinta: lo hacemos nosotros abajo
     t.markDashAlertsSeen();
     delete t.renderDashboard;
     const tile = kpiTile(paint(t));
-    assert.ok(!tile.includes('db-kpi--unseen') && tile.includes('✓ vistos hoy') && !tile.includes('db-kpi-chips'), tile);
-    assert.ok(tile.includes('<span class="db-kpi-val">1</span>') && tile.includes('(vistos)'));
+    assert.ok(!tile.includes('db-kpi--unseen') && tile.includes('db-kpi--danger') && tile.includes('<span class="db-kpi-val">4</span>'), tile);
+    assert.strictEqual((tile.match(/<span class="db-kpi-/g) || []).length, 2);
+    assert.ok(tile.includes('(vistas)'));
 });
 
 test('el panel que se abre sale de los mismos datos que el KPI (nombres, tipos y botones)', () => {
@@ -129,7 +138,7 @@ test('el panel que se abre sale de los mismos datos que el KPI (nombres, tipos y
     paint(t);
     t.openDashAlerts();
     const p = els.dashAlertsLayer.innerHTML;
-    ['4 avisos', 'Marta', 'Sofía', 'Cris', 'Sueño deficiente', 'Noa', 'tú: 6, ella: 8', 'Revisar →', 'Marcar como visto por hoy', 'Ver analítica →'].forEach(x =>
+    ['4 alertas', 'Marta', 'Sofía', 'Cris', 'Sueño deficiente', 'Noa', 'tú: 6, ella: 8', 'Revisar →', 'Marcar como visto por hoy', 'Ver analítica →'].forEach(x =>
         assert.ok(p.includes(x), 'falta ' + x));
     assert.strictEqual(t._dashAlertsOpen, true);
     t.closeDashAlerts();
@@ -143,7 +152,7 @@ test('repintar Inicio no deja el estado de «abierto» a medias: el KPI refleja 
     assert.ok(kpiTile(paint(t)).includes('aria-expanded="false"'));
 });
 
-test('el recordatorio de planificación sigue siendo un bloque aparte (no es un aviso ni forma parte del KPI)', () => {
+test('el recordatorio de planificación sigue siendo un bloque aparte (no es una alerta ni forma parte del KPI)', () => {
     const html = paint(make());
     assert.ok(!kpiTile(html).includes('db-alerts-plan'));
     const t = make(); t.isWeekPlanSaved = () => false;
