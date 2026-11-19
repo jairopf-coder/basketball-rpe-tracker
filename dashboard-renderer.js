@@ -138,7 +138,6 @@ RPETracker.prototype.renderDashboard = function() {
         : parseFloat(teamAC) < 0.8 ? 'low'
         : 'ok';
 
-    const acAlertCount  = alertPlayers.length;   // el mismo número que la insignia de Análisis y el icono de la app
     const pendingCount   = _pendingW.length;
 
     container.innerHTML = `
@@ -186,10 +185,9 @@ RPETracker.prototype.renderDashboard = function() {
                 <span class="db-kpi-val">${avgRPE7}</span>
                 <span class="db-kpi-lbl">RPE medio 7d</span>
             </div>
-            <div class="db-kpi db-kpi--alerts db-kpi--${acAlertCount > 0 ? 'danger' : 'ok'}${alertsSum.a.total && !alertsSum.info.seen ? ' db-kpi--unseen' : ''}" ${this._dashAlertsKpiAttrs(alertsSum, acAlertCount)}>
-                <span class="db-kpi-val">${acAlertCount}</span>
-                <span class="db-kpi-lbl">alertas A:C</span>
-                ${this._dashAlertsKpiExtra(alertsSum)}
+            <div class="db-kpi db-kpi--alerts db-kpi--${this._dashAlertsKpiSeverity(alertsSum.a)}${alertsSum.a.total && !alertsSum.info.seen ? ' db-kpi--unseen' : ''}" ${this._dashAlertsKpiAttrs(alertsSum)}>
+                <span class="db-kpi-val">${alertsSum.a.total}</span>
+                <span class="db-kpi-lbl">${this._dashAlertsKpiWord(alertsSum.a)}</span>
             </div>
             <div class="db-kpi db-kpi--${availGroups.out.length > 0 ? 'warn' : 'ok'}" onclick="window.rpeTracker?.switchView('injury')" title="Ver lesiones">
                 <span class="db-kpi-val">${availGroups.ok.length}/${this.activePlayers.length}</span>

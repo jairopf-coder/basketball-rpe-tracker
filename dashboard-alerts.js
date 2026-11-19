@@ -1,21 +1,25 @@
 // BasketballRPE-Web — dashboard-alerts.js
-// Avisos de Inicio dentro del KPI «alertas A:C» (antes eran una barra plegable aparte).
+// BasketballRPE-Web — dashboard-alerts.js
+// Alertas de Inicio dentro de un KPI de dos líneas (como el de wellness): número arriba, «alerta/alertas» abajo.
 //
-//   · El KPI muestra en grande el nº de jugadoras en PELIGRO A:C (la regla única de _acLevel) y, debajo,
-//     chips con las demás alertas que existan: «Prec. 1 · Well. 1 · RPE 1». Un punto en la esquina indica
-//     que hay avisos sin ver; si ya están vistos hoy, los chips se sustituyen por «✓ vistos hoy».
-//   · Al pulsar el KPI se abre un PANEL con la lista completa de avisos de hoy y sus botones. En PC es un panel
-//     anclado bajo el KPI; en móvil (≤768px) una hoja desde abajo. Se cierra con Esc, tocando fuera, con la × o
-//     al marcar «visto». El panel vive en <body>: la fila de KPIs recorta lo que sobresale (overflow: hidden).
-//   · «Marcar como visto por hoy»: el KPI pasa a «✓ vistos hoy» y la lista sigue disponible al abrirlo. Vuelve a
-//     destacarse si aparece un aviso NUEVO o al día siguiente.
+//   · El KPI muestra el TOTAL de alertas de hoy (peligro y precaución A:C, tendencias de wellness y RPE
+//     distinto) y debajo solo «alerta» o «alertas», sin especificar tipo. Su color sigue la gravedad (rojo si hay
+//     alguna jugadora en peligro, naranja si solo hay otras alertas, verde si no hay ninguna) y un punto
+//     naranja en la esquina indica que hay alertas sin ver. El desglose por tipo va en el tooltip y en el panel.
+//   · Al pulsar el KPI se abre un PANEL con la lista completa y sus botones. En PC es un panel anclado bajo el
+//     KPI; en móvil (≤768px) una hoja desde abajo. Se cierra con Esc, tocando fuera, con la × o al marcar
+//     «visto». El panel vive en <body>: la fila de KPIs recorta lo que sobresale (overflow: hidden).
+//   · «Marcar como visto por hoy»: el punto desaparece y la lista sigue disponible al abrirlo. Vuelve a
+//     destacarse si aparece una alerta NUEVA o al día siguiente.
 //   · La marca de «visto» se sincroniza entre dispositivos (nodo /staffAlertsSeen/{uid}, solo la
 //     dueña lo lee y lo escribe) y se guarda también en el dispositivo por si no hay conexión.
-//   · Los avisos NO se guardan: se calculan cada vez a partir de los datos. Solo se guarda qué
-//     avisos (sus identificadores, sin nombres ni datos de wellness) estaban cuando se marcó «visto».
+//   · Las alertas NO se guardan: se calculan cada vez a partir de los datos. Solo se guarda qué
+//     alertas (sus identificadores, sin nombres ni datos de wellness) estaban cuando se marcó «visto».
+//   · OJO: el número del KPI es el TOTAL de alertas; la insignia de Análisis, el icono de la app y la
+//     notificación al guardar una sesión siguen contando solo jugadoras en PELIGRO (_acDangerCount).
 //
-// Expone: RPETracker.prototype._dashAlertsSummary / _dashAlertsKpiExtra / _dashAlertsKpiAttrs / _dashAlertsPanelHtml
-//          RPETracker.prototype.toggleDashAlerts / openDashAlerts / closeDashAlerts / markDashAlertsSeen
+// Expone: RPETracker.prototype._dashAlertsSummary / _dashAlertsKpiAttrs / _dashAlertsKpiSeverity / _dashAlertsKpiWord
+//          RPETracker.prototype._dashAlertsPanelHtml / toggleDashAlerts / openDashAlerts / closeDashAlerts / markDashAlertsSeen
 //          RPETracker.prototype._renderDashPlanningReminder (recordatorio de los domingos)
 //          (y los auxiliares _collectDashAlerts, _dashAlertsSeenInfo, _ensureDashAlertsSync…)
 // Depende de: dashboard-renderer.js (renderDashboard), security.js (esc), firebase-config.js
@@ -124,31 +128,35 @@ RPETracker.prototype._dashAlertsSummary = function(data) {
     return { a, info };
 };
 
-// Chips bajo el número del KPI: solo los tipos que existen (el peligro es el número grande).
-// Ya vistos hoy: una sola línea gris «✓ vistos hoy».
-RPETracker.prototype._dashAlertsKpiExtra = function(sum) {
-    const { a, info } = sum;
-    if (!a.total) return '';
-    if (info.seen) return '<span class="db-kpi-seen">✓ vistos hoy</span>';
-    const chip = (n, dotClass, txt, title) => n
-        ? `<span class="db-alerts-chip" title="${title}">${dotClass ? `<span class="${dotClass}" aria-hidden="true">●</span> ` : ''}<span class="db-alerts-chip-txt">${txt} </span>${n}</span>`
-        : '';
-    const chips = [
-        chip(a.warn.length,  'wh-warn', 'Prec.', 'Jugadoras en precaución A:C'),
-        chip(a.trend.length, '',        'Well.', 'Tendencias de wellness'),
-        chip(a.rpe.length,   '',        'RPE',   'RPE distinto entre tú y la jugadora')
-    ].join('');
-    return chips ? `<span class="db-kpi-chips">${chips}</span>` : '';
+// Color del KPI según la gravedad: rojo si hay alguna jugadora en peligro, naranja si solo hay otras alertas
+RPETracker.prototype._dashAlertsKpiSeverity = function(a) {
+    return a.danger.length ? 'danger' : (a.total ? 'warn' : 'ok');
+};
+
+// Etiqueta de abajo: solo «alerta» o «alertas» (0 y 2+ van en plural)
+RPETracker.prototype._dashAlertsKpiWord = function(a) {
+    return a.total === 1 ? 'alerta' : 'alertas';
+};
+
+// Desglose por tipo para el tooltip y el lector de pantalla: «2 en peligro · 1 en precaución · …»
+RPETracker.prototype._dashAlertsBreakdown = function(a) {
+    return [
+        a.danger.length ? `${a.danger.length} en peligro` : '',
+        a.warn.length   ? `${a.warn.length} en precaución` : '',
+        a.trend.length  ? `${a.trend.length} de wellness` : '',
+        a.rpe.length    ? `${a.rpe.length} ${a.rpe.length === 1 ? 'RPE distinto' : 'RPE distintos'}` : ''
+    ].filter(Boolean).join(' · ');
 };
 
 // Atributos del KPI: accesible con teclado y lector de pantalla, y abre el panel
-RPETracker.prototype._dashAlertsKpiAttrs = function(sum, dangerCount) {
+RPETracker.prototype._dashAlertsKpiAttrs = function(sum) {
     const { a, info } = sum;
-    const label = `${dangerCount} ${dangerCount === 1 ? 'alerta' : 'alertas'} A:C`
-        + (a.total ? `, ${a.total} ${a.total === 1 ? 'aviso' : 'avisos'} hoy${info.seen ? ' (vistos)' : ''}` : ', sin avisos hoy')
-        + '. Abrir los avisos';
+    const detail = this._dashAlertsBreakdown(a);
+    const name = a.total
+        ? `${a.total} ${a.total === 1 ? 'alerta' : 'alertas'} hoy: ${detail}${info.seen ? ' (vistas)' : ''}`
+        : 'Sin alertas hoy';
     return `id="dashAlertsKpi" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="${!!this._dashAlertsOpen}"`
-        + ` aria-label="${esc(label)}" title="Ver los avisos de hoy"`
+        + ` aria-label="${esc(name + '. Abrir las alertas')}" title="${esc(a.total ? detail : 'Sin alertas hoy')}"`
         + ` onclick="window.rpeTracker?.toggleDashAlerts()" onkeydown="window.rpeTracker?.dashAlertsKpiKey(event)"`;
 };
 
@@ -160,37 +168,47 @@ RPETracker.prototype.dashAlertsKpiKey = function(e) {
 };
 
 RPETracker.prototype._dashAlertsTitle = function(a, info) {
-    if (!a.total) return 'Avisos de hoy';
-    if (info.seen) return `Avisos vistos hoy: ${a.total}`;
-    let t = a.total === 1 ? '1 aviso' : `${a.total} avisos`;
-    if (info.partial) t += ` · ${info.newCount} ${info.newCount === 1 ? 'nuevo' : 'nuevos'}`;
+    if (!a.total) return 'Alertas de hoy';
+    if (info.seen) return `Alertas vistas hoy: ${a.total}`;
+    let t = a.total === 1 ? '1 alerta' : `${a.total} alertas`;
+    if (info.partial) t += ` · ${info.newCount} ${info.newCount === 1 ? 'nueva' : 'nuevas'}`;
     return t;
 };
 
-// Contenido del panel: filas de avisos + pie con «Marcar como visto» y «Ver analítica»
+// «Marta, Lucía y Alba» (con «e» delante de nombres que empiezan por i- / hi-: «Marta e Irene»)
+function _dashAlertsJoinNames(names) {
+    const list = names.map(n => String(n));
+    if (list.length <= 1) return list.map(esc).join('');
+    const last = list[list.length - 1];
+    const plain = last.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const and = /^(i|hi(?!e))/i.test(plain) ? 'e' : 'y';
+    return list.slice(0, -1).map(esc).join(', ') + ' ' + and + ' ' + esc(last);
+}
+
+// Contenido del panel: filas de alertas + pie con «Marcar como visto» y «Ver analítica»
 RPETracker.prototype._dashAlertsPanelHtml = function() {
     const a = this._lastDashAlerts || this._collectDashAlerts({});
     const info = this._lastDashAlertsInfo || { seen: false, newCount: 0, partial: false };
     const close = 'window.rpeTracker?.closeDashAlerts();';
 
-    const names = list => list.map(x => esc(x.name)).join(', ');
+    const names = list => _dashAlertsJoinNames(list.map(x => x.name));
     const rows = [];
     if (a.team) {
         rows.push(`<div class="db-alerts-row"><span>⚠️ <strong>${a.danger.length} jugadoras en zona de riesgo A:C simultáneamente</strong> — revisar carga de equipo hoy</span>`
             + `<button type="button" class="db-alerts-btn" onclick="${close}window.rpeTracker?.openPreSessionModal()">Ver detalle →</button></div>`);
     }
-    if (a.danger.length) rows.push(`<div class="db-alerts-row"><span><span class="wh-bad" aria-hidden="true">●</span> <strong>${names(a.danger)}</strong> ratio en zona de peligro</span></div>`);
-    if (a.warn.length)   rows.push(`<div class="db-alerts-row"><span><span class="wh-warn" aria-hidden="true">●</span> <strong>${names(a.warn)}</strong> en precaución</span></div>`);
+    if (a.danger.length) rows.push(`<div class="db-alerts-row"><span><span class="wh-bad" aria-hidden="true">●</span> <strong>${names(a.danger)}</strong> — zona de peligro (ratio A:C)</span></div>`);
+    if (a.warn.length)   rows.push(`<div class="db-alerts-row"><span><span class="wh-warn" aria-hidden="true">●</span> <strong>${names(a.warn)}</strong> — en precaución (ratio A:C)</span></div>`);
     a.trend.forEach(t => rows.push(`<div class="db-alerts-row"><span>🔁 <strong>${esc(t.name)}</strong> — ${esc(t.message)}</span></div>`));
     a.rpe.forEach(d => rows.push(`<div class="db-alerts-row"><span>⚠️ <strong>${esc(d.name)}</strong> RPE distinto (tú: ${esc(d.staffRpe)}, ella: ${esc(d.playerRpe)}) — ${esc(d.date)}</span>`
         + `<button type="button" class="db-alerts-btn" data-session-id="${esc(d.sessionId)}" onclick="${close}window.rpeTracker?.showSessionDetail(this.dataset.sessionId)">Revisar →</button></div>`));
 
-    const body = rows.length ? rows.join('') : '<div class="db-alerts-empty">Sin avisos hoy ✓</div>';
+    const body = rows.length ? rows.join('') : '<div class="db-alerts-empty">Sin alertas hoy ✓</div>';
     const seenBtn = (a.total && !info.seen)
         ? '<button type="button" class="db-alerts-btn db-alerts-btn--seen" onclick="window.rpeTracker?.markDashAlertsSeen()">Marcar como visto por hoy</button>' : '';
     const analyticsBtn = `<button type="button" class="db-alerts-btn" onclick="${close}window.rpeTracker?.switchView('analytics')">Ver analítica →</button>`;
 
-    return `<div class="db-alerts-pop${info.seen ? ' db-alerts-pop--seen' : ''}" id="dashAlertsPop" role="dialog" aria-label="Avisos de hoy" tabindex="-1">
+    return `<div class="db-alerts-pop${info.seen ? ' db-alerts-pop--seen' : ''}" id="dashAlertsPop" role="dialog" aria-label="Alertas de hoy" tabindex="-1">
         <div class="db-alerts-head"><span class="db-alerts-title">${this._dashAlertsTitle(a, info)}</span>`
         + `<button type="button" class="db-alerts-x" aria-label="Cerrar" onclick="window.rpeTracker?.closeDashAlerts(true)">×</button></div>
         <div class="db-alerts-body">${body}</div>
