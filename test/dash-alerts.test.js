@@ -496,7 +496,7 @@ test('_acDangerCount cuenta solo peligro: no precaución, ni lesionadas, ni "Ins
         { out: ['p3'], players: ['p1', 'p2', 'p3', 'p4', 'p5'] });   // p6 no es activa
     assert.strictEqual(t._acDangerCount(), 2);   // p1 y p5
 });
-console.log('\nTotal de alertas: KPI de Inicio = insignia de Análisis = icono de la app');
+console.log('\nTotal de alertas (KPI de Inicio) y pendientes (insignia de Análisis e icono de la app)');
 // Escenario: p1 peligro, p2 precaución, p3 bien, p4 sin ratio fiable, p5 peligro pero NO entrena hoy, p6 no es activa
 const totalEnv = (extra = {}) => {
     const t = acEnv({ p1: R(1.8), p2: R(1.4), p3: R(1.0), p4: R(2.2, 'low'), p5: R(1.9), p6: R(2.0) },
@@ -510,7 +510,7 @@ test('el total suma peligro + precaución + tendencias de wellness + RPE distint
     assert.strictEqual(t._dashAlertsTotal(), 4);                     // p1 + p2 + 1 tendencia + 1 RPE
     assert.strictEqual(t._acDangerCount(), 1, 'la cuenta de solo peligro sigue disponible');
 });
-test('Inicio y la insignia dan SIEMPRE el mismo número: _dashAlertsInputs con las filas de Inicio = sin filas', () => {
+test('Inicio y la insignia clasifican SIEMPRE igual: _dashAlertsInputs con las filas de Inicio = sin filas', () => {
     const t = totalEnv();
     const rows = t.activePlayers.map(player => ({ player, ratio: t.calculateAcuteChronicRatio(player.id), out: t._acIsOutToday(player.id) }));
     assert.strictEqual(t._dashAlertsSummary(t._dashAlertsInputs(rows)).a.total, t._dashAlertsTotal());
@@ -523,7 +523,7 @@ test('cambia con las alertas: una tendencia o un RPE distinto nuevo suben el nú
     t._wTrendAlerts = () => []; t._rpeDiscrepancies = [];
     assert.strictEqual(t._dashAlertsTotal(), 2);
 });
-test('marcar las alertas como «vistas» NO cambia el número (tampoco el del KPI)', () => {
+test('marcar las alertas como «vistas» NO cambia el total del KPI', () => {
     const { t } = makeEnv(); t._dashAlertsSummary(DATA()); const before = t._collectDashAlerts(DATA()).total;
     t.markDashAlertsSeen();
     assert.strictEqual(t._dashAlertsSummary(DATA()).a.total, before);
@@ -541,7 +541,7 @@ test('un nombre con HTML en los datos de la insignia no afecta al número (solo 
 });
 
 // Código REAL de la insignia de Análisis y del icono de la app (app.js), con un DOM y un navegador de mentira
-function badgeEnv(total, trend = 0) {
+function badgeEnv(total, trend = 0, unseen = total) {
     const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
     const push = appSrc.slice(appSrc.indexOf('const PushNotifications = {'), appSrc.indexOf('\n};', appSrc.indexOf('const PushNotifications = {')) + 3);
     const m0 = appSrc.indexOf('    _updateNavAlertBadge() {');
@@ -551,18 +551,30 @@ function badgeEnv(total, trend = 0) {
     const ctx2 = vm.createContext({ console, document: { getElementById: id => ({ bnAlertBadge: badge, bnInjuryBadge: inj })[id] || null },
         navigator: { setAppBadge: n => calls.push(['set', n]), clearAppBadge: () => calls.push(['clear']) }, window: {} });
     vm.runInContext(push + '\nglobalThis.PN = PushNotifications;\nglobalThis.O = {' + method + '};', ctx2);
-    const tracker = ctx2.O; tracker._dashAlertsTotal = () => total; tracker._wTrendAlerts = () => new Array(trend).fill({});
+    const tracker = ctx2.O; tracker._dashAlertsTotal = () => total; tracker._dashAlertsUnseenTotal = () => unseen; tracker._wTrendAlerts = () => new Array(trend).fill({});
     tracker._acDangerCount = () => { throw new Error('la insignia ya no debe contar solo peligro'); };
     return { tracker, badge, inj, calls };
 }
-test('la insignia de Análisis y el icono de la app muestran el TOTAL de alertas (el del KPI)', () => {
-    const { tracker, badge, calls } = badgeEnv(4);
+test('la insignia de Análisis y el icono de la app muestran el MISMO número: las alertas pendientes', () => {
+    const { tracker, badge, calls } = badgeEnv(4);                     // sin marcar como vistas: 4 pendientes
     tracker._updateNavAlertBadge();
     assert.strictEqual(badge.textContent, 4); assert.strictEqual(badge.style.display, '');
     assert.deepStrictEqual(JSON.parse(JSON.stringify(calls)), [['set', 4]]);
 });
+test('ya marcadas como vistas: la insignia se oculta y el icono se limpia (el KPI conserva el total)', () => {
+    const { tracker, badge, calls } = badgeEnv(4, 0, 0);
+    tracker._updateNavAlertBadge();
+    assert.strictEqual(badge.style.display, 'none'); assert.strictEqual(badge.textContent, 0);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(calls)), [['clear']]);
+});
+test('con una alerta nueva tras marcar «visto», insignia e icono muestran solo esa (1)', () => {
+    const { tracker, badge, calls } = badgeEnv(5, 0, 1);
+    tracker._updateNavAlertBadge();
+    assert.strictEqual(badge.textContent, 1); assert.strictEqual(badge.style.display, '');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(calls)), [['set', 1]]);
+});
 test('sin alertas: la insignia se oculta y el icono se limpia', () => {
-    const { tracker, badge, calls } = badgeEnv(0);
+    const { tracker, badge, calls } = badgeEnv(0, 0, 0);
     tracker._updateNavAlertBadge();
     assert.strictEqual(badge.style.display, 'none'); assert.deepStrictEqual(JSON.parse(JSON.stringify(calls)), [['clear']]);
 });
@@ -576,8 +588,69 @@ test('un navegador sin setAppBadge no rompe nada', () => {
     const ctxBad = vm.createContext({ console, document: { getElementById: () => badge }, navigator: {}, window: {} });
     const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
     vm.runInContext(appSrc.slice(appSrc.indexOf('const PushNotifications = {'), appSrc.indexOf('\n};', appSrc.indexOf('const PushNotifications = {')) + 3) + '\nglobalThis.PN = PushNotifications;', ctxBad);
-    assert.strictEqual(ctxBad.PN.updateBadge(tracker), 3);
+    assert.strictEqual(ctxBad.PN.updateBadge(tracker), 3, 'devuelve las pendientes');
 });
+console.log('\nIcono de la app: solo alertas PENDIENTES');
+// Con las entradas fijadas a DATA() (6 alertas) para probar solo la lógica de «visto»
+const pendingEnv = (opts) => { const e = makeEnv(opts); e.t._inputs = DATA(); e.t._dashAlertsInputs = function() { return this._inputs; }; e.t.badgeRefreshes = 0;
+    e.t._updateNavAlertBadge = function() { this.badgeRefreshes++; }; return e; };
+test('sin marcar nada, el icono cuenta todas las alertas; sin alertas, cero', () => {
+    const { t } = pendingEnv();
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 6);
+    t._inputs = { dangerPlayers: [], warnPlayers: [], trendAlerts: [], rpeDiscrepancies: [] };
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 0);
+});
+test('«Marcar como visto por hoy» deja el icono a cero (y el total del KPI no cambia)', () => {
+    const { t } = pendingEnv();
+    t._dashAlertsSummary(t._dashAlertsInputs()); t.markDashAlertsSeen();
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 0);
+    assert.strictEqual(t._dashAlertsTotal(), 6, 'el KPI y la insignia siguen con el total');
+});
+test('marcar «visto» refresca el icono al momento, aunque no estemos en Inicio', () => {
+    const { t } = pendingEnv(); t.currentView = 'carga';
+    t._dashAlertsSummary(t._dashAlertsInputs()); t.markDashAlertsSeen();
+    assert.ok(t.badgeRefreshes >= 1, 'se llamó a _updateNavAlertBadge');
+});
+test('si luego aparece una alerta NUEVA, el icono muestra solo las nuevas; si se resuelve una vista, sigue a cero', () => {
+    const { t } = pendingEnv();
+    t._dashAlertsSummary(t._dashAlertsInputs()); t.markDashAlertsSeen();
+    t._inputs = DATA(); t._inputs.warnPlayers.push(P('p9', 'Noa'));
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 1);
+    t._inputs.warnPlayers.push(P('p8', 'Eva')); assert.strictEqual(t._dashAlertsUnseenTotal(), 2);
+    t._inputs = DATA(); t._inputs.warnPlayers = [];            // se resuelve una que ya estaba vista
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 0);
+});
+test('al día siguiente las alertas vuelven a contar en el icono aunque sean las mismas', () => {
+    const { t } = pendingEnv();
+    t._dashAlertsSummary(t._dashAlertsInputs()); t.markDashAlertsSeen();
+    t._dashAlertsSeen = Object.assign({}, t._dashAlertsSeen, { date: '2026-11-03' });   // «hoy» es 2026-11-04
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 6);
+});
+test('la marca guardada en el dispositivo se carga antes de contar (al abrir la app el icono sale ya limpio)', () => {
+    const rec = { date: '2026-11-04', keys: [...KEYS].sort().join(',') };
+    const { t } = pendingEnv({ ls: { basketballDashAlertsSeen_u1: JSON.stringify(rec) } });
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 0);     // sin haber pintado Inicio antes
+});
+test('marcado en OTRO dispositivo: este icono se limpia al recibirlo, aunque no estemos en Inicio, sin repintar Inicio', () => {
+    const { t, db } = pendingEnv(); t.currentView = 'carga';
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 6);     // registra el listener
+    const before = t.badgeRefreshes;
+    db.emit('staffAlertsSeen/u1', { date: '2026-11-04', keys: [...KEYS].sort().join(',') });
+    assert.ok(t.badgeRefreshes > before, 'refrescó el icono');
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 0); assert.strictEqual(t.renders, 0);
+});
+test('el eco de lo que acabo de marcar yo no refresca el icono otra vez', () => {
+    const { t, db } = pendingEnv();
+    t._dashAlertsSummary(t._dashAlertsInputs()); t.markDashAlertsSeen();
+    const n = t.badgeRefreshes;
+    db.emit('staffAlertsSeen/u1', JSON.parse(JSON.stringify(t._dashAlertsSeen)));
+    assert.strictEqual(t.badgeRefreshes, n);
+});
+test('sin sesión iniciada (sin uid) no rompe: cuenta todas', () => {
+    const { t } = pendingEnv({ uid: null });
+    assert.strictEqual(t._dashAlertsUnseenTotal(), 6);
+});
+
 test('el refresco de la insignia es SEGURO: si falla (datos a medio cargar) no lanza, y sin _updateNavAlertBadge no hace nada', () => {
     const { t } = makeEnv();
     assert.doesNotThrow(() => t._refreshAlertBadges());                      // sin _updateNavAlertBadge
@@ -586,12 +659,14 @@ test('el refresco de la insignia es SEGURO: si falla (datos a medio cargar) no l
     t._updateNavAlertBadge = () => { throw new Error('datos sin cargar'); };
     assert.doesNotThrow(() => t._refreshAlertBadges());
 });
-test('cableado: la insignia y el icono usan _dashAlertsTotal; Inicio usa las MISMAS entradas; y se refrescan al llegar alertas nuevas', () => {
+test('cableado: la insignia y el icono usan las pendientes (y el KPI el total); Inicio usa las MISMAS entradas; y se refrescan al llegar alertas nuevas', () => {
     const rend = fs.readFileSync(path.join(ROOT, 'dashboard-renderer.js'), 'utf8');
     const app = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
     assert.ok(/this\._dashAlertsSummary\(this\._dashAlertsInputs\(players\)\)/.test(rend), 'Inicio usa _dashAlertsInputs con sus filas');
     assert.ok(!/alertPlayers|warnPlayers/.test(rend) && !/acAlertCount/.test(rend), 'Inicio ya no construye sus propias listas');
-    assert.ok(app.includes('const alertCount = this._dashAlertsTotal()') && app.includes('const count = tracker._dashAlertsTotal()'));
+    assert.ok(app.includes('const alertCount = this._dashAlertsUnseenTotal()'), 'insignia = pendientes');
+    assert.ok(!app.includes('_dashAlertsTotal'), 'app.js ya no usa el total: solo el KPI de Inicio');
+    assert.ok(app.includes('const count = tracker._dashAlertsUnseenTotal()'), 'icono = pendientes');
     assert.ok(!app.includes('_acDangerCount'), 'ni la insignia ni el icono cuentan solo peligro');
     assert.ok(/tracker\._acLevel\(ratio, pid\) === 'danger'/.test(app), 'la notificación al guardar sesión sigue siendo solo de peligro');
     const sess = fs.readFileSync(path.join(ROOT, 'app-sessions.js'), 'utf8');

@@ -15,8 +15,9 @@
 //     dueña lo lee y lo escribe) y se guarda también en el dispositivo por si no hay conexión.
 //   · Las alertas NO se guardan: se calculan cada vez a partir de los datos. Solo se guarda qué
 //     alertas (sus identificadores, sin nombres ni datos de wellness) estaban cuando se marcó «visto».
-//   · OJO: el número del KPI es el TOTAL de alertas; la insignia de Análisis, el icono de la app y la
-//     notificación al guardar una sesión siguen contando solo jugadoras en PELIGRO (_acDangerCount).
+//   · Números: el KPI de Inicio muestra el TOTAL de alertas (_dashAlertsTotal); la insignia de Análisis (barra
+//     inferior) y el ICONO de la app muestran las PENDIENTES (_dashAlertsUnseenTotal), el mismo número en los dos,
+//     así que «Marcar como visto por hoy» los limpia. La notificación al guardar una sesión avisa solo de peligro.
 //
 // Expone: RPETracker.prototype._dashAlertsSummary / _dashAlertsKpiAttrs / _dashAlertsKpiSeverity / _dashAlertsKpiWord
 //          RPETracker.prototype._dashAlertsPanelHtml / toggleDashAlerts / openDashAlerts / closeDashAlerts / markDashAlertsSeen
@@ -141,7 +142,18 @@ RPETracker.prototype._dashAlertsTotal = function() {
     return this._collectDashAlerts(this._dashAlertsInputs()).total;
 };
 
-// Refresca la insignia de Análisis y el icono de la app. Lo llaman escuchas de Firebase (RPE y wellness de jugadoras)
+// Alertas PENDIENTES = las que aún no has marcado como vistas hoy. Es el número del ICONO de la app y de la insignia de
+// Análisis: al pulsar «Marcar como visto por hoy» se limpian; si luego aparece una alerta nueva, solo cuenta esa (o las
+// nuevas); al día siguiente vuelven a contar todas. El KPI de Inicio usa el total (_dashAlertsTotal).
+RPETracker.prototype._dashAlertsUnseenTotal = function() {
+    this._ensureDashAlertsSync();            // carga la marca guardada en el dispositivo antes de decidir
+    const a = this._collectDashAlerts(this._dashAlertsInputs());
+    if (!a.total) return 0;
+    const info = this._dashAlertsSeenInfo(a.keys);
+    return info.seen ? 0 : info.newCount;
+};
+
+// Refresca la insignia de Análisis y el icono de la app (alertas pendientes). Lo llaman escuchas de Firebase (RPE y wellness de jugadoras)
 // que pueden dispararse durante el arranque, con datos a medio cargar: un fallo aquí NUNCA debe cortar al escucha.
 RPETracker.prototype._refreshAlertBadges = function() {
     if (typeof this._updateNavAlertBadge !== 'function') return;
@@ -344,6 +356,7 @@ RPETracker.prototype.markDashAlertsSeen = function() {
     this._dashAlertsSeen = rec;
     this.closeDashAlerts();                      // el panel se cierra al marcar «visto»
     this._saveDashAlertsSeen(rec);
+    this._refreshAlertBadges();                  // el icono de la app deja de mostrar el número
     if (typeof this.renderDashboard === 'function') this.renderDashboard();
 };
 
@@ -395,6 +408,7 @@ RPETracker.prototype._ensureDashAlertsSync = function() {
             const same = _dashAlertsValid(cur) && cur.date === v.date && cur.keys === v.keys;
             this._dashAlertsSeen = { date: v.date, keys: v.keys };
             try { localStorage.setItem(DASH_ALERTS_LS_PREFIX + uid, JSON.stringify(this._dashAlertsSeen)); } catch (_) { /* sin almacenamiento local */ }
+            if (!same) this._refreshAlertBadges();   // el icono se actualiza aunque no estemos en Inicio
             if (!same && this.currentView === 'dashboard' && typeof this.renderDashboard === 'function') this.renderDashboard();
         }, err => console.warn('Avisos vistos: sin acceso a la nube, se usa solo este dispositivo:', err && err.message));
     } catch (e) { console.warn('Avisos vistos: no se pudo escuchar la nube:', e && e.message); }

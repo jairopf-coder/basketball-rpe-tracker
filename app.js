@@ -1298,9 +1298,9 @@ class RPETracker {
     // ========== BATCH 3: NAV ALERT BADGE ==========
 
     _updateNavAlertBadge() {
-        const alertCount = this._dashAlertsTotal();   // total de alertas: el mismo número que el KPI de Inicio (dashboard-alerts.js)
+        const alertCount = this._dashAlertsUnseenTotal();   // alertas pendientes (sin marcar como vistas hoy); el KPI de Inicio muestra el total
 
-        // Bottom-nav "Análisis" badge (total de alertas, como el KPI de Inicio)
+        // Bottom-nav "Análisis" badge: el mismo número que el icono de la app (PushNotifications.updateBadge lo vuelve a escribir)
         const alertBadge = document.getElementById('bnAlertBadge');
         if (alertBadge) {
             alertBadge.textContent = alertCount;
@@ -1316,7 +1316,7 @@ class RPETracker {
             injBadge.style.display = total > 0 ? '' : 'none';
         }
 
-        // Update PWA app icon badge with the same total of alerts
+        // Update PWA app icon badge with the pending (unseen) alerts
         PushNotifications.updateBadge(this);
     }
 }
@@ -1356,10 +1356,10 @@ const PushNotifications = {
         return alertCount;
     },
 
-    // Update PWA badge with the total of alerts (el mismo número que el KPI de Inicio)
+    // Update PWA badge with the PENDING alerts (las que no se han marcado como vistas hoy)
     updateBadge(tracker) {
         if (!tracker) return;
-        const count = tracker._dashAlertsTotal();   // dashboard-alerts.js
+        const count = tracker._dashAlertsUnseenTotal();   // dashboard-alerts.js
         try {
             if ('setAppBadge' in navigator) {
                 if (count > 0) navigator.setAppBadge(count);
